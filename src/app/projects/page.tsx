@@ -5,12 +5,12 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import styled, { css } from 'styled-components';
 
-import AlgorithmVisualizer from '@/components/cs/algorithmVisualizer';
-import BFSExplorer from '@/components/cs/BFS';
-import CPUPipelineSimulator from '@/components/cs/CPUPipeline';
-import GraphExplorer from '@/components/cs/graphExplorer';
-import MazeSolverDemo from '@/components/cs/mazesolver/mazeSolver';
-import TSPVisualizer from '@/components/cs/tspvisualizer';
+import AlgorithmVisualizer from '../../components/cs/algorithmVisualizer';
+import BFSExplorer from '../../components/cs/BFS';
+import CPUPipelineSimulator from '../../components/cs/CPUPipeline';
+import GraphExplorer from '../../components/cs/graphExplorer';
+import MazeSolverDemo from '../../components/cs/mazesolver/mazeSolver';
+import TSPVisualizer from '../../components/cs/tspvisualizer';
 
 // Glassmorphic styles
 const glass = css`
