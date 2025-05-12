@@ -4,18 +4,18 @@ import Image from 'next/image';
 import logo from '../../public/assets/logo2.png';
 
 // Portfolio Cards
-import CSPortfolioCard from '@/components/cs/CSPortfolioCard';
-import ArtPortfolioCard from '@/components/gallery/artPortfolioCard';
-import WritingPortfolioCard from '@/components/poetry/writingPortfolio';
+import CSPortfolioCard from '../components/cs/CSPortfolioCard';
+import ArtPortfolioCard from '../components/gallery/artPortfolioCard';
+import WritingPortfolioCard from '../components/poetry/writingPortfolio';
 
 // General & Misc Cards
-import Card from '@/components/thrive/Card';
-import ContactCard from '@/components/misc/contactUs';
-import AppointmentCard from '@/components/misc/appointmentsCard';
+import Card from '../components/thrive/Card';
+import ContactCard from '../components/misc/contactUs';
+import AppointmentCard from '../components/misc/appointmentsCard';
 
 // Reviews
-import ReviewCard from '@/components/reviews/reviewCard';
-import ReviewsCard from '@/components/reviews/reviewsCard';
+import ReviewCard from '../components/reviews/reviewCard';
+import ReviewsCard from '../components/reviews/reviewsCard';
 
 // Golden ratio constant
 const GOLDEN_RATIO = 1.618;
