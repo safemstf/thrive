@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "vercel-build": "npm install --include=optional sharp && next build"
+
   },
   "dependencies": {
     "lucide-react": "^0.508.0",
@@ -14,6 +16,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
+    "sharp": "^0.34.1",
     "styled-components": "^6.1.17"
   },
   "devDependencies": {
