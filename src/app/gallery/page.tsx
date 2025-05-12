@@ -5,16 +5,16 @@ import styled, { createGlobalStyle } from 'styled-components';
 import Image, { StaticImageData } from 'next/image';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
-import portrait1 from '@/assets/art/portrait1.jpg';
-import portrait2 from '@/assets/art/portrait2.jpg';
-import portrait3 from '@/assets/art/portrait3.jpg';
-import portrait4 from '@/assets/art/portrait4.jpg';
-import portrait5 from '@/assets/art/portrait5.jpg';
-import portrait6 from '@/assets/art/portrait6.jpg';
-import portrait7 from '@/assets/art/portrait7.jpg';
-import portrait8 from '@/assets/art/portrait8.jpg';
-import portrait9 from '@/assets/art/portrait9.jpg';
-import portrait10 from '@/assets/art/portrait10.jpg';
+// import portrait1 from '@/assets/art/portrait1.jpg';
+// import portrait2 from '@/assets/art/portrait2.jpg';
+import portrait3 from '../../../public/assets/art/portrait3.jpg';
+import portrait4 from '../../../public/assets/art/portrait4.jpg';
+import portrait5 from '../../../public/assets/art/portrait5.jpg';
+import portrait6 from '../../../public/assets/art/portrait6.jpg';
+import portrait7 from '../../../public/assets/art/portrait7.jpg';
+import portrait8 from '../../../public/assets/art/portrait8.jpg';
+import portrait9 from '../../../public/assets/art/portrait9.jpg';
+import portrait10 from '../../../public/assets/art/portrait10.jpg';
 
 // Golden ratio constant
 const GOLDEN_RATIO = 1.618;

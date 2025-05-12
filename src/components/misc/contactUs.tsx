@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import whatsappQR from '@/assets/WhatsappQR.jpg';
+import whatsappQR from '../../../public/assets/WhatsappQR.jpg';
 
 const ContactCard = () => {
   const [isFlipped, setIsFlipped] = useState(false);
