@@ -70,51 +70,68 @@ export default function HomePage() {
         </div>
       </section>
 
-      <style jsx>{`
-        .page {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 3rem 1rem;
-          /* Soft pastel gradient from top-left to bottom-right */
-          background: linear-gradient(
-            135deg,
+  <style jsx>{`
+    .page {
+      min-height: 100vh;
+      width: 100vw;
+      overflow-x: hidden; /* Prevent horizontal scroll */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 3rem 1rem;
+      background: linear-gradient(
+        135deg,
         rgba(55, 112, 178, 0.9) 0%,
         rgba(79, 161, 255, 0.8) 10%,
         rgba(255, 239, 118, 0.7) 100%
-  );
-        }
+      );
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      background-size: cover;
+    }
 
-        .logo-container {
-          margin-bottom: 2.5rem;
-        }
-        .logo {
-          border-radius: 0.75rem;
-          box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-        }
-        .cards-container {
-          width: 100%;
-          max-width: 1400px;
-        }
-        .cards-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(${MIN_SIZE}px, 1fr));
-          gap: 2.5rem;
-          justify-items: center;
-        }
-        @media (max-width: 1024px) {
-          .cards-grid {
-            grid-template-columns: repeat(auto-fit, minmax(${MIN_SIZE}px, 1fr));
-          }
-        }
-        @media (max-width: 640px) {
-          .cards-grid {
-            grid-template-columns: 1fr;
-            justify-items: center;
-          }
-        }
-      `}</style>
+    .logo-container {
+      margin-bottom: 2.5rem;
+    }
+
+    .logo {
+      border-radius: 0.75rem;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .cards-container {
+      width: 100%;
+      max-width: 1400px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(${MIN_SIZE}px, 1fr));
+      gap: 2.5rem;
+      justify-items: center;
+      width: 100%;
+    }
+
+    @media (max-width: 1024px) {
+      .cards-grid {
+        grid-template-columns: repeat(auto-fit, minmax(${MIN_SIZE}px, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .cards-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+      .logo-container {
+        margin-bottom: 1.5rem;
+      }
+    }
+  `}</style>
+
     </main>
   );
 }
