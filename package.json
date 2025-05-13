@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "npm install --include=optional sharp && next build"
+    "vercel-build": "next build"
   },
   "dependencies": {
     "lucide-react": "^0.508.0",
