@@ -268,6 +268,7 @@ const StyledWrapper = styled.div`
     padding: 5px;
     background-image: linear-gradient(#f0f7ee, #42a5f5, #42a5f5 70%);
     cursor: pointer;
+    margin-left: 90px;
   }
 
   .card__content {

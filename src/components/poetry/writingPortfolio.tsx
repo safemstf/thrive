@@ -59,7 +59,7 @@ const WritingPortfolioCard = () => {
           </svg>
 
           <div className="card__content">
-            <p className="card__title">Writing Portfolio</p>
+            <p className="card__title">Success Guides</p>
             <p className="card__description">
               Explore my creative writing and professional works
             </p>
