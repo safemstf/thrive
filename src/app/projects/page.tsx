@@ -3,31 +3,25 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import AlgorithmVisualizer from '../../components/cs/algorithmVisualizer';
-import BFSExplorer from '../../components/cs/BFS';
-import CPUPipelineSimulator from '../../components/cs/CPUPipeline';
-import GraphExplorer from '../../components/cs/graphExplorer';
 import MazeSolverDemo from '../../components/cs/mazesolver/mazeSolver';
-import TSPVisualizer from '../../components/cs/tspvisualizer';
-import { Footer } from '@/components/misc/footer';
-import { BookOpen, Grid } from 'lucide-react';
+import { Grid } from 'lucide-react';
 
 export default function ProjectsPage() {
   const [ready, setReady] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
   const router = useRouter();
 
   useEffect(() => {
-    const id = (window as any).requestIdleCallback(() => setReady(true), { timeout: 2000 });
-    return () => (window as any).cancelIdleCallback(id);
-  }, []);
+      setMounted(true);
+      const id = (window as any)
+        .requestIdleCallback(() => setReady(true), { timeout: 2000 });
+      return () => (window as any).cancelIdleCallback(id);
+    }, []);
 
   const demos = [
     { title: 'Maze Solver', component: <MazeSolverDemo /> },
-    { title: 'Algorithm Visualizer', component: <AlgorithmVisualizer /> },
-    { title: 'Graph Explorer', component: <GraphExplorer /> },
-    { title: 'CPU Pipeline', component: <CPUPipelineSimulator /> },
-    { title: 'TSP Visualizer', component: <TSPVisualizer /> },
-    { title: 'BFS Explorer', component: <BFSExplorer /> },
+
   ];
 
   return (

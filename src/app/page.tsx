@@ -4,7 +4,6 @@
 import React from 'react';
 import styled from 'styled-components';
 
-import DataEntryCardfrom from '@/components/reviews/reviewResponses';
 import ReviewResponses from '@/components/reviews/reviewResponses';
 
 const Main = styled.main`

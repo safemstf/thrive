@@ -123,7 +123,7 @@ export default function MazeSolverDemo() {
                 const isPath = path.slice(0, agentIdx+1).some(([pr, pc]) => pr===r && pc===c);
                 const isGoal = goal?.[0]===r && goal?.[1]===c;
                 return (
-                  <Cell key={key} wall={cell===1} path={isPath} goal={isGoal}>
+                  <Cell key={key} $wall={cell===1} $path={isPath} $goal={isGoal}>
                     {isAgent && <GiLion color="#f90" size={14} />}
                     {isGoal && '🎯'}
                   </Cell>
@@ -134,9 +134,9 @@ export default function MazeSolverDemo() {
         </ClickableArea>
 
         <Legend>
-          <Item><Box wall={false} /> Open</Item>
-          <Item><Box wall={true} /> Wall</Item>
-          <Item><Box path={true} /> Explored</Item>
+          <Item><Box $wall={false} /> Open</Item>
+          <Item><Box $wall={true} /> Wall</Item>
+          <Item><Box $path={true} /> Explored</Item>
           <Item><GiLion color="#f90" size={16} /> Agent</Item>
           <Item><span>🎯</span> Goal</Item>
         </Legend>
@@ -155,7 +155,7 @@ export default function MazeSolverDemo() {
                   const isPath = path.slice(0, agentIdx+1).some(([pr, pc]) => pr===r && pc===c);
                   const isGoal = goal?.[0]===r && goal?.[1]===c;
                   return (
-                    <LargeCell key={key} wall={cell===1} path={isPath} goal={isGoal}>
+                    <LargeCell key={key} $wall={cell===1} $path={isPath} $goal={isGoal}>
                       {isAgent && <GiLion color="#f90" size={22} />}
                       {isGoal && '🎯'}
                     </LargeCell>
@@ -191,13 +191,11 @@ const Grid = styled.div<{ rows: number; cols: number }>`
   gap: 2px;
 `;
 
-const Cell = styled.div<{ wall?: boolean; path?: boolean; goal?: boolean }>`
-  width: 15px;
-  height: 15px;
-  background: ${({ wall, path, goal }) => {
-    if (goal) return '#ff0';
-    if (wall) return '#333';
-    if (path) return '#0f0';
+const Cell = styled.div<{ $wall?: boolean; $path?: boolean; $goal?: boolean }>`
+  background: ${({ $goal, $wall, $path }) => {
+    if ($goal) return '#ff0';
+    if ($wall) return '#333';
+    if ($path) return '#0f0';
     return '#eee';
   }};
   border: 1px solid #999;
@@ -218,13 +216,13 @@ const Item = styled.div`
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  color: white;
+  color: #2196f3;
 `;
 
-const Box = styled.div<{ wall?: boolean; path?: boolean }>`
+const Box = styled.div<{ $wall?: boolean; $path?: boolean }>`
   width: 16px;
   height: 16px;
-  background: ${({ wall, path }) => wall ? '#333' : path ? '#0f0' : '#eee'};
+  background: ${({ $wall, $path }) => $wall ? '#333' : $path ? '#0f0' : '#eee'};
   border: 1px solid #999;
 `;
 

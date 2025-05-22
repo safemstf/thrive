@@ -98,9 +98,10 @@ export default function ReviewResponses() {
   // Render star rating
   const renderStars = (rating: number) => {
     return Array(5).fill(0).map((_, index) => (
-      <Star key={index} filled={index < rating}>
-        {index < rating ? '★' : '☆'}
-      </Star>
+    <Star key={index} $filled={index < rating}>
+      {index < rating ? '★' : '☆'}
+    </Star>
+
     ));
   };
 
@@ -250,11 +251,12 @@ const FeedbackText = styled.p`
   word-wrap: break-word;
 `;
 
-const Star = styled.span<{ filled: boolean }>`
-  color: ${props => props.filled ? 'var(--accent-primary)' : 'var(--text-muted)'};
+const Star = styled.span<{ $filled: boolean }>`
+  color: ${props => props.$filled ? 'var(--accent-primary)' : 'var(--text-muted)'};
   font-size: 1rem;
   margin-right: 1px;
 `;
+
 
 const LoadingSpinner = styled.div`
   position: absolute;

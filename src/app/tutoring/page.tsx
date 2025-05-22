@@ -44,7 +44,7 @@ export default function TutoringPage() {
   };
 
   return (
-    <PageWrapper loaded={loaded}>
+    <PageWrapper $loaded={loaded}>
       <Main>
         <Header>
           <BookOpen size={28} />
@@ -83,15 +83,16 @@ export default function TutoringPage() {
 
 // ---------- Styled Components ----------
 
-const PageWrapper = styled.div<{ loaded: boolean }>`
+const PageWrapper = styled.div<{ $loaded: boolean }>`
   background: linear-gradient(
     var(--gradient-angle),
     var(--background-start),
     var(--background-end)
   );
   min-height: 100vh;
-  opacity: ${({ loaded }) => (loaded ? 1 : 0)};
-  transform: ${({ loaded }) => (loaded ? 'translateY(0)' : 'translateY(20px)')};
+   opacity: ${({ $loaded }) => ($loaded ? 1 : 0)};
+  transform: ${({ $loaded }) =>
+    $loaded ? 'translateY(0)' : 'translateY(20px)'};
   transition: all 0.6s ease;
 `;
 
