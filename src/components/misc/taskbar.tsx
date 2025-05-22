@@ -19,12 +19,12 @@ export const navLinks: NavLink[] = [
   { href: '/gallery', label: 'Gallery' },
 ];
 
-// Styled NavButton matching BackButton style
-const NavButton = styled.a<{ active?: boolean }>`
+// Use styled(Link) to avoid nested <a> and use a transient prop ($active) to prevent React warnings
+const NavButton = styled(Link)<{ $active?: boolean }>`
   background: none;
   border: 1px solid #2c2c2c;
-  color: ${props => (props.active ? '#f8f8f8' : '#2c2c2c')};
-  background-color: ${props => (props.active ? '#2c2c2c' : 'transparent')};
+  color: ${props => (props.$active ? '#f8f8f8' : '#2c2c2c')};
+  background-color: ${props => (props.$active ? '#2c2c2c' : 'transparent')};
   padding: 0.75rem 1.5rem;
   font-size: 1rem;
   font-family: 'Work Sans', sans-serif;
@@ -48,11 +48,13 @@ export function Taskbar() {
   return (
     <nav className="taskbar">
       {navLinks.map(link => (
-        <Link key={link.href} href={link.href} passHref legacyBehavior>
-          <NavButton active={pathname === link.href}>
-            {link.label}
-          </NavButton>
-        </Link>
+        <NavButton 
+          key={link.href}
+          href={link.href}
+          $active={pathname === link.href}
+        >
+          {link.label}
+        </NavButton>
       ))}
     </nav>
   );
