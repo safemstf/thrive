@@ -11,7 +11,7 @@ export const questionBank: Question[] = [
   {
     "module": "arithmetic__mixed",
     "difficulty": "easy",
-    "question": "Calculate (-1)/(10 - 1106/112).",
+    "question": "(-1)/(10 - 1106/112).",
     "answer": -8,
     "range": [
       6,
