@@ -1,146 +1,132 @@
-// src/app/thrive/sat/page.tsx
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import styled from 'styled-components';
+import { PageWrapper } from './styles';
+import { questionBank, Question } from '@/data/questionBank';
+import { MathJax, MathJaxContext } from 'better-react-mathjax';
+import { ReadingGame } from '@/components/thrive/readingGame';
 
-// Wrapper for the entire page with background, typography, and nav
-const PageWrapper = styled.div`
-  background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
-  min-height: 100vh;
-  padding: 4rem 1rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+// Leaderboard placeholder
+const TopScores = () => {
+  const dummy = [
+    { name: 'Alice', level: 23 },
+    { name: 'Bob', level: 19 },
+    { name: 'Carol', level: 15 },
+  ];
+  return (
+    <div className="leaderboard">
+      <h3>Top Scores</h3>
+      <ul className="scores">
+        {dummy.map((s, i) => (
+          <li key={i}>{s.name}: Level {s.level}</li>
+        ))}
+      </ul>
+    </div>
+  );
+};
 
-  .taskbar {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
-
-  .task-button {
-    background: #fff;
-    border: 2px solid transparent;
-    border-radius: 0.75rem;
-    padding: 0.75rem 1.5rem;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #102a43;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: background 0.3s, transform 0.3s;
-    text-decoration: none;
-
-    &:hover {
-      background: #f0f4f8;
-      transform: translateY(-2px);
-    }
-
-    &.active {
-      border-color: #486581;
-      background: #d9e2ec;
-    }
-  }
-
-
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 2rem;
-    width: 100%;
-    max-width: 1000px;
-    margin-bottom: 4rem;
-  }
-
-  .card {
-    background: #fff;
-    border-radius: 1rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-    cursor: pointer;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-
-    &:hover { transform: translateY(-8px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); }
-
-    .card__content {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 2rem;
-      height: 100%;
-      background: #ffffff;
-    }
-
-    .text-title { font-size: 1.5rem; font-weight: 600; color: #102a43; margin-bottom: 0.5rem; text-align: center; }
-    .text-body  { font-size: 1rem; color: #627d98; text-align: center; }
-  }
-
-  .exercises {
-    width: 100%;
-    max-width: 800px;
-    background: #fff;
-    border-radius: 1rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    padding: 2rem;
-    margin-bottom: 2rem;
-
-    h2 { font-size: 2rem; color: #102a43; margin-bottom: 1rem; text-align: center; }
-
-    ul {
-      list-style: disc;
-      padding-left: 1.5rem;
-
-      li { margin-bottom: 0.75rem; font-size: 1rem; color: #334e68; }
-    }
-  }
-`;
-
-const navLinks = [
-  { href: '/thrive', label: 'Thrive' },
-  { href: '/writing', label: 'Writing' },
-  { href: '/tutoring', label: 'Tutoring' },
-  { href: '/projects', label: 'Projects' },
-  { href: '/gallery', label: 'Gallery' },
+const modules = [
+  { key: 'math',   label: 'Math' },
+  { key: 'reading', label: 'Reading' },
 ];
 
-const cards = [
-  { href: '/thrive/sat/reading', label: 'Reading', desc: 'Grammar & passage drills' },
-  { href: '/thrive/sat/writing', label: 'Writing', desc: 'Essay tips & practice' },
-  { href: '/thrive/sat/math', label: 'Math', desc: 'Problem-solving skills' },
-  { href: '/thrive/sat/tests', label: 'Practice Tests', desc: 'Full-length, timed exams' },
-];
+type ActiveModule = 'math' | 'reading';
 
-const exercises = [
-  'Read an SAT-level passage and summarize the main idea in 2-3 sentences.',
-  'Write a timed 50-minute SAT essay on an argument prompt.',
-  'Solve 10 medium-difficulty algebra questions in 15 minutes.',
-  'Complete 15 vocabulary-in-context questions under timed conditions.',
-];
+function MathGame() {
+  const [level, setLevel] = useState<number>(1);
+  const [puzzle, setPuzzle] = useState<Question | null>(null);
+  const [input, setInput] = useState<string>('');
+  const [feedback, setFeedback] = useState<string | null>(null);
 
-export default function SATHubPage() {
-  const currentPath = '/thrive'; // adjust dynamically via router if needed
+  React.useEffect(() => {
+    const idx = level - 1;
+    setPuzzle(idx < questionBank.length ? questionBank[idx] : null);
+    setInput('');
+    setFeedback(null);
+  }, [level]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!puzzle) return;
+    const userVal = parseFloat(input.trim());
+    if (!isNaN(userVal) && Math.abs(userVal - puzzle.answer) < 1e-3) {
+      setFeedback('Correct!');
+      setLevel(l => l + 1);
+    } else {
+      const correct = Number.isInteger(puzzle.answer)
+        ? puzzle.answer.toString()
+        : puzzle.answer.toFixed(3);
+      setFeedback(`Oops, the right answer was ${correct}`);
+    }
+  };
 
   return (
-    <PageWrapper>
+    <div>
+      <h2>Math Puzzle (Level {level})</h2>
+      {puzzle ? (
+        <>
+          <div style={{ margin: '1rem 0' }}>
+            <MathJax dynamic>
+              {'`' + puzzle.question + '`'}
+            </MathJax>
+          </div>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              style={{ flex: 1, padding: '0.5rem', fontSize: '1rem' }}
+              required
+            />
+            <button type="submit" style={{ padding: '0.5rem 1rem', fontSize: '1rem' }}>
+              Submit
+            </button>
+          </form>
+          {feedback && <p style={{ marginTop: '1rem' }}>{feedback}</p>}
+        </>
+      ) : (
+        <p>No more questions available. Come back later!</p>
+      )}
+    </div>
+  );
+}
 
-      <div className="cards">
-        {cards.map(({ href, label, desc }) => (
-          <Link key={href} href={href} className="card">
-            <div className="card__content">
-              <div className="text-title">{label}</div>
-              <div className="text-body">{desc}</div>
-            </div>
-          </Link>
-        ))}
-      </div>
+export default function SATHubPage() {
+  const [active, setActive] = useState<ActiveModule>('math');
+  const config = { loader: { load: ['input/asciimath', 'output/chtml'] } };
 
-      <section className="exercises">
-        <h2>Today's Exercises</h2>
-        <ul>
-          {exercises.map((item, idx) => <li key={idx}>{item}</li>)}
-        </ul>
-      </section>
-    </PageWrapper>
+  return (
+    <MathJaxContext config={config}>
+      <PageWrapper>
+        <nav style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+          {modules.map(m => (
+            <button
+              key={m.key}
+              onClick={() => setActive(m.key as ActiveModule)}
+              style={{
+                padding: '0.5rem 1rem',
+                background: active === m.key ? '#102a43' : '#fff',
+                color: active === m.key ? '#fff' : '#102a43',
+                borderRadius: '0.5rem',
+                border: '1px solid #102a43',
+                cursor: 'pointer',
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
+        </nav>
+
+        <section className="exercises">
+          {active === 'math' && <MathGame />}
+          {active === 'reading' && <ReadingGame />}
+          <TopScores />
+        </section>
+
+        <div className="cards">
+          {/* keep drill cards or other resources here if needed */}
+        </div>
+      </PageWrapper>
+    </MathJaxContext>
   );
 }
