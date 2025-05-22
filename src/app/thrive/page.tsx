@@ -21,9 +21,9 @@ const ComingSoon = styled.div`
 
 // --- styled nav & button ---
 const Nav = styled.nav`
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
-  flex-wrap: wrap;
   margin-bottom: 2rem;
 `;
 
@@ -39,6 +39,7 @@ const TabButton = styled.button<{ $active?: boolean }>`
   color: ${({ $active }) => ($active ? '#f8f8f8' : '#2c2c2c')};
   cursor: pointer;
   transition: all 0.3s ease;
+  text-align: center;
 
   &:hover {
     background: #2c2c2c;
@@ -51,9 +52,9 @@ const modules = [
   { key: 'math', label: 'Math' },
   { key: 'reading', label: 'Reading' },
   { key: 'wordle', label: 'Wordle' },
-  { key: 'scrabble', label: 'Scrabble (Coming Soon)' },
-  { key: 'arabicWordle', label: 'Wordle Arabic (Coming Soon)' },
-  { key: 'arabicTree', label: 'Arabic Word Tree (Coming Soon)' },
+  { key: 'scrabble', label: 'Scrabble' },
+  { key: 'arabicWordle', label: 'Wordle Arabic' },
+  { key: 'arabicTree', label: 'Arabic Word Tree' },
 ] as const;
 
 type ActiveModule = typeof modules[number]['key'];
