@@ -110,7 +110,7 @@ const Header = styled.div`
   align-items: center;
 
   h1 {
-    font-family: var(--font-display);
+  font-family: 'Work Sans', sans-serif;
     font-size: 2.5rem;
     margin: 0;
   }
@@ -189,7 +189,7 @@ const Close = styled.button`
 
 const ModalTitle = styled.h2`
   font-size: 1.75rem;
-  font-family: var(--font-display);
+  font-family: 'Work Sans', sans-serif;
   margin: 0;
   text-align: center;
 `;

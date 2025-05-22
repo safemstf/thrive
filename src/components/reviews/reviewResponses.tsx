@@ -98,9 +98,9 @@ export default function ReviewResponses() {
   // Render star rating
   const renderStars = (rating: number) => {
     return Array(5).fill(0).map((_, index) => (
-    <Star key={index} $filled={index < rating}>
-      {index < rating ? '★' : '☆'}
-    </Star>
+  <Star key={index} $filled={index < rating}>
+    {index < rating ? '★' : '☆'}
+  </Star>
 
     ));
   };
@@ -160,17 +160,18 @@ const Wrapper = styled.div`
 `;
 
 const Title = styled.h2`
-  font-family: var(--font-display);
+  font-family: 'Poppins', sans-serif;
   color: var(--accent-primary);
   margin-bottom: 1.25rem;
   text-align: center;
   font-size: 1.5rem;
-  
+
   @media (min-width: 768px) {
     font-size: 1.75rem;
     margin-bottom: 1.5rem;
   }
 `;
+
 
 const FormContainer = styled.div`
   position: relative;
