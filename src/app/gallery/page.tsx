@@ -218,7 +218,7 @@ export default function GalleryPage() {
         </GalleryGrid>
 
         <InfoSection>
-          <BackButton onClick={() => router.push('/')}>Return to Main Hall</BackButton>
+          {/* <BackButton onClick={() => router.push('/')}>Return to Main Hall</BackButton> */}
         </InfoSection>
 
         {modalOpen && selectedPiece && (

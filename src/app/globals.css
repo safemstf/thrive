@@ -1,4 +1,358 @@
+/* 1) Reset & Font Import */
+@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background: #f0f4f8;
+  color: #102a43;
+  line-height: 1.6;
+}
+
+/* 2) CSS variables for theme & glassmorphism */
+:root {
+  --background-start: #f0f4f8;
+  --background-end:   #d9e2ec;
+  --muted:            #486581;
+  --accent-primary:   #2196f3;
+  --accent-secondary: #64b5f6;
+
+  --glass-bg:     rgba(255,255,255,0.85);
+  --glass-border: rgba(255,255,255,0.3);
+  --glass-blur:   15px;
+
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.1);
+  --shadow-md: 0 8px 20px rgba(0,0,0,0.15);
+
+  --radius-sm:  12px;
+  --radius-md:  20px;
+
+  --transition: all 0.3s ease;
+  --gradient-angle: 135deg;
+
+}
+
+/* 3) Typography */
+h1,h2,h3,h4,h5,h6 {
+  font-family: 'Playfair Display', serif;
+  color: var(--foreground);
+  margin-bottom: 1rem;
+}
+p, li {
+  margin-bottom: 0.75rem;
+}
+
+/* 4) Utility classes */
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+.grid, .cards {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.grid-4, .cards {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+/* 5) Taskbar & Buttons */
+.taskbar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+
+.task-button,
+.button {
+  background: #fff;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  color: var(--foreground);
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.task-button:hover,
+.button:hover {
+  background: #f0f4f8;
+  transform: translateY(-2px);
+}
+
+.task-button.active,
+.button.active {
+  background: var(--muted);
+  color: #fff;
+  border-color: var(--muted);
+}
+
+/* 6) Cards & Covers */
+.card, .book-card {
+  background: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.card:hover,
+.book-card:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-md);
+}
+
+.cover {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  color: #fff;
+  gap: 0.5rem;
+
+  /* fallback colors if custom props aren't set */
+  background: linear-gradient(
+    var(--gradient-angle),
+    var(--primary, var(--accent-primary)),
+    var(--secondary, var(--accent-secondary))
+  );
+  transition: var(--transition);
+}
+
+.meta {
+  font-size: 0.875rem;
+  opacity: 0.85;
+}
+
+/* 7) Section Titles & Grids */
+.section-title, .text-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 1rem;
+  text-align: center;
+  font-family: 'Great Vibes', cursive;
+}
+
+header .logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--foreground);
+  margin-bottom: 1rem;
+}
+
+header .logo img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+/* 8) Specific SAT cards */
+.card__content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+.text-body {
+  font-size: 1rem;
+  color: #627d98;
+  text-align: center;
+}
+
+.exercises {
+  background: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.exercises h2 {
+  font-size: 2rem;
+  color: var(--foreground);
+  text-align: center;
+  margin-bottom: 1rem;
+  font-family: 'Playfair Display', serif;
+}
+
+.exercises ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+}
+
+.exercises li {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  color: #334e68;
+}
+
+/* 9) Glass panel utility */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-sm);
+}
+
+/* 10) Modal */
+.modal-overlay,
+.ModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content,
+.ModalContent {
+  background: #fff;
+  padding: 2rem;
+  border-radius: var(--radius-md);
+  max-width: 500px;
+  width: 90%;
+  position: relative;
+  box-shadow: var(--shadow-md);
+}
+
+.close-btn,
+.CloseBtn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+/* 11) Footer */
+.footer {
+  margin-top: auto;
+  padding: 2rem 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+
+/* 12) Responsive tweaks */
+@media (max-width: 768px) {
+  .cards, .grid-4 {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+  .task-button, .button {
+    padding: 0.5rem 1rem;
+  }
+  .cover {
+    padding: 1.5rem;
+  }
+  .section-title, .text-title {
+    font-size: 1.5rem;
+  }
+  .exercises {
+    padding: 1.5rem;
+  }
+  .exercises h2 {
+    font-size: 1.75rem;
+  }
+  header .logo {
+    flex-direction: column;
+    font-size: 1rem;
+  }
+  header .logo img {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
