@@ -5,7 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import styled from 'styled-components';
 
-// Styled BackButton matching gallery design
+// Styled button for the footer
 const BackButton = styled.button`
   background: none;
   border: 1px solid #2c2c2c;
@@ -18,7 +18,7 @@ const BackButton = styled.button`
   transition: all 0.3s ease;
   text-transform: uppercase;
   font-weight: 300;
-
+  
   &:hover {
     background: #2c2c2c;
     color: #f8f8f8;
@@ -32,7 +32,7 @@ export function Footer() {
         <Link href="/">
           <BackButton>Home</BackButton>
         </Link>
-        <p>© {new Date().getFullYear()} Excel Prep. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} Learn Morra. All rights reserved.</p>
       </div>
     </footer>
   );

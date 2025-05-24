@@ -14,7 +14,7 @@ export function Header({ title, subtitle }: HeaderProps) {
   return (
     <header className="header container">
       <div className="logo">
-        <Image src={logo} alt="Excel Prep Logo" width={40} height={40} />
+        <Image src={logo} alt="Learn Morra Logo" width={200} height={200} />
         <span>{title}</span>
       </div>
       {subtitle && <p className="subtitle">{subtitle}</p>}

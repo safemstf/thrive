@@ -36,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {/* site-wide header */}
-        <Header title="Excel Prep" subtitle="Your gateway to academic success" />
+        <Header title="Learn Morra" subtitle="Your guide to excellence" />
 
         {/* page content */}
         <main className="flex-grow">{children}</main>

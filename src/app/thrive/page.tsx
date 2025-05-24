@@ -7,7 +7,7 @@ import { questionBank, Question } from '@/data/questionBank';
 import { ReadingGame } from '@/components/thrive/readingGame';
 import Wordle from '@/components/thrive/wordle';
 import { PageWrapper } from './styles';
-
+import { MathGameComponent } from '@/components/thrive/mathGame';
 // Placeholder component for coming soon games
 const ComingSoon = styled.div`
   padding: 2rem;
@@ -35,6 +35,7 @@ const TabButton = styled.button<{ $active?: boolean }>`
   text-transform: uppercase;
   font-weight: 300;
   border: 1px solid #2c2c2c;
+  border-radius: 12px;
   background: ${({ $active }) => ($active ? '#2c2c2c' : 'transparent')};
   color: ${({ $active }) => ($active ? '#f8f8f8' : '#2c2c2c')};
   cursor: pointer;
@@ -78,63 +79,7 @@ const TopScores = () => {
   );
 };
 
-// --- MathGame ---
-function MathGame() {
-  const [level, setLevel] = useState(1);
-  const [puzzle, setPuzzle] = useState<Question | null>(null);
-  const [input, setInput] = useState('');
-  const [feedback, setFeedback] = useState<string | null>(null);
 
-  useEffect(() => {
-    const idx = level - 1;
-    setPuzzle(idx < questionBank.length ? questionBank[idx] : null);
-    setInput('');
-    setFeedback(null);
-  }, [level]);
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (!puzzle) return;
-    const userVal = parseFloat(input.trim());
-    if (!isNaN(userVal) && Math.abs(userVal - puzzle.answer) < 1e-3) {
-      setFeedback('Correct!');
-      setLevel(l => l + 1);
-    } else {
-      const correct = Number.isInteger(puzzle.answer)
-        ? puzzle.answer.toString()
-        : puzzle.answer.toFixed(3);
-      setFeedback(`Oops, the right answer was ${correct}`);
-    }
-  };
-
-  return (
-    <div>
-      <h2>Math Puzzle (Level {level})</h2>
-      {puzzle ? (
-        <>
-          <div style={{ margin: '1rem 0' }}>
-            <MathJax dynamic>{'`' + puzzle.question + '`'}</MathJax>
-          </div>
-          <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              style={{ flex: 1, padding: '0.5rem', fontSize: '1rem' }}
-              required
-            />
-            <button type="submit" style={{ padding: '0.5rem 1rem', fontSize: '1rem' }}>
-              Submit
-            </button>
-          </form>
-          {feedback && <p style={{ marginTop: '1rem' }}>{feedback}</p>}
-        </>
-      ) : (
-        <p>No more questions available. Come back later!</p>
-      )}
-    </div>
-  );
-}
 
 // --- Page component ---
 export default function SATHubPage() {
@@ -153,7 +98,7 @@ export default function SATHubPage() {
         </Nav>
 
         <section className="exercises">
-          {active === 'math' && <MathGame />}
+          {active === 'math' && <MathGameComponent/>}
           {active === 'reading' && <ReadingGame />}
           {active === 'wordle' && <Wordle />}
           {active === 'scrabble' && <ComingSoon>Scrabble coming soon!</ComingSoon>}
