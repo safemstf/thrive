@@ -13,30 +13,30 @@ interface SectionConfig {
 }
 
 const sections: SectionConfig[] = [
-  { 
-    key: 'sat', 
-    title: 'SAT Guides', 
-    categories: ['math', 'english'] 
+  {
+    key: 'sat',
+    title: 'SAT Guides',
+    categories: ['math', 'english'],
   },
-  { 
-    key: 'workbooks', 
-    title: 'Writing Workbooks', 
-    categories: ['english-workbook'] // Fixed: using proper category type
+  {
+    key: 'workbooks',
+    title: 'Workbooks',
+    categories: ['math-workbook', 'english-workbook', 'study-skills'],
   },
-  { 
-    key: 'ms-science', 
-    title: 'MS Science', 
-    categories: ['life-science', 'physical-science', 'earth-science'] 
+  {
+    key: 'ms-science',
+    title: 'MS Science',
+    categories: ['life-science', 'physical-science', 'earth-science'],
   },
-  { 
-    key: 'ap-science', 
-    title: 'AP Science', 
-    categories: ['ap-physics', 'ap-biology', 'ap-chemistry'] 
+  {
+    key: 'ap-science',
+    title: 'AP Science',
+    categories: ['ap-physics', 'ap-biology', 'ap-chemistry'],
   },
-  { 
-    key: 'ap-calc', 
-    title: 'AP Calculus', 
-    categories: ['calculus-ab', 'calculus-bc'] 
+  {
+    key: 'ap-calc',
+    title: 'AP Calculus',
+    categories: ['calculus-ab', 'calculus-bc'],
   },
 ];
 
@@ -46,22 +46,24 @@ const getBookIcon = (category: Category): JSX.Element => {
   const iconProps = { size: iconSize, color: 'var(--icon-color, #666)' };
   
   const iconMap: Record<Category, JSX.Element> = {
-    'math': <Calculator {...iconProps} />,
+    math:          <Calculator {...iconProps} />,
     'math-workbook': <Calculator {...iconProps} />,
     'calculus-ab': <Calculator {...iconProps} />,
     'calculus-bc': <Calculator {...iconProps} />,
-    'english': <PenTool {...iconProps} />,
+    english:       <PenTool {...iconProps} />,
     'english-workbook': <Bookmark {...iconProps} />,
     'life-science': <Brain {...iconProps} />,
     'physical-science': <Brain {...iconProps} />,
     'earth-science': <Globe {...iconProps} />,
-    'ap-physics': <Brain {...iconProps} />,
-    'ap-biology': <Brain {...iconProps} />,
-    'ap-chemistry': <Brain {...iconProps} />,
+    'ap-physics':  <Brain {...iconProps} />,
+    'ap-biology':  <Brain {...iconProps} />,
+    'ap-chemistry':<Brain {...iconProps} />,
+    'study-skills':<Brain {...iconProps} />,
   };
   
   return iconMap[category] || <BookOpen {...iconProps} />;
 };
+
 
 type SectionKey = string;
 
@@ -100,12 +102,6 @@ export default function WritingPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedBook(null);
-  };
-
-  const handleModalOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      handleCloseModal();
-    }
   };
 
   const currentSection = sections.find(sec => sec.key === activeSection);
@@ -168,53 +164,164 @@ export default function WritingPage() {
         )}
       </BooksGrid>
 
+      {/* Learning Modal */}
       {isModalOpen && selectedBook && (
-        <ModalOverlay onClick={handleModalOverlayClick}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>{selectedBook.title}</ModalTitle>
-              <CloseButton 
-                onClick={handleCloseModal}
-                aria-label="Close modal"
-              >
-                <X size={24} />
-              </CloseButton>
-            </ModalHeader>
-            
-            <ModalBody>
-              <BookDetails>
-                <DetailRow>
-                  <DetailLabel>Category:</DetailLabel>
-                  <DetailValue>{selectedBook.category.replace('-', ' ').toUpperCase()}</DetailValue>
-                </DetailRow>
-                <DetailRow>
-                  <DetailLabel>Year:</DetailLabel>
-                  <DetailValue>{selectedBook.year}</DetailValue>
-                </DetailRow>
-              </BookDetails>
-              
-              {selectedBook.description && (
-                <Description>{selectedBook.description}</Description>
-              )}
-              
-              <ActionSection>
-                {selectedBook.link ? (
-                  <PrimaryLink 
-                    href={selectedBook.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                  >
-                    View Online
-                  </PrimaryLink>
-                ) : (
-                  <ComingSoon>Preview coming soon</ComingSoon>
-                )}
-              </ActionSection>
-            </ModalBody>
-          </ModalContent>
-        </ModalOverlay>
+        <LearningModal book={selectedBook} onClose={handleCloseModal} />
       )}
     </PageContainer>
+  );
+}
+
+// Learning Modal Component
+function LearningModal({ book, onClose }: { book: Book; onClose: () => void }) {
+  const availableTabs = [];
+  
+  if (book.learningContent?.punctuation) availableTabs.push('Punctuation');
+  if (book.learningContent?.tenses) availableTabs.push('Tenses');
+  if (book.learningContent?.grammar) availableTabs.push('Grammar');
+  
+  const [activeTab, setActiveTab] = useState<string>(availableTabs[0] || 'Overview');
+
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  // If no learning content, show basic info modal
+  if (!book.learningContent || availableTabs.length === 0) {
+    return (
+      <ModalOverlay onClick={handleOverlayClick}>
+        <ModalContent onClick={(e) => e.stopPropagation()}>
+          <ModalHeader>
+            <ModalTitle>{book.title}</ModalTitle>
+            <CloseButton onClick={onClose} aria-label="Close modal">
+              <X size={24} />
+            </CloseButton>
+          </ModalHeader>
+          <ModalBody>
+            <BookDetails>
+              <DetailRow>
+                <DetailLabel>Category:</DetailLabel>
+                <DetailValue>{book.category.replace('-', ' ').toUpperCase()}</DetailValue>
+              </DetailRow>
+              <DetailRow>
+                <DetailLabel>Year:</DetailLabel>
+                <DetailValue>{book.year}</DetailValue>
+              </DetailRow>
+            </BookDetails>
+            {book.description && (
+              <Description>{book.description}</Description>
+            )}
+            <ActionSection>
+              {book.link ? (
+                <PrimaryLink href={book.link} target="_blank" rel="noopener noreferrer">
+                  View Online
+                </PrimaryLink>
+              ) : (
+                <ComingSoon>Interactive learning content coming soon</ComingSoon>
+              )}
+            </ActionSection>
+          </ModalBody>
+        </ModalContent>
+      </ModalOverlay>
+    );
+  }
+
+  // Learning content modal
+  return (
+    <ModalOverlay onClick={handleOverlayClick}>
+      <LearningModalContent onClick={(e) => e.stopPropagation()}>
+        <ModalHeader>
+          <ModalTitle>{book.title} - Learning Guide</ModalTitle>
+          <CloseButton onClick={onClose} aria-label="Close modal">
+            <X size={24} />
+          </CloseButton>
+        </ModalHeader>
+        
+        <TabList>
+          {availableTabs.map(tab => (
+            <Tab key={tab} $active={activeTab === tab} onClick={() => setActiveTab(tab)}>
+              {tab}
+            </Tab>
+          ))}
+        </TabList>
+        
+        <LearningContent>
+          {activeTab === 'Punctuation' && book.learningContent.punctuation && (
+            <>
+              <SectionTitle>Punctuation Rules</SectionTitle>
+              <Table>
+                <thead>
+                  <tr>
+                    <Th style={{width: '80px'}}>Mark</Th>
+                    <Th>Rule</Th>
+                    <Th>Example</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {book.learningContent.punctuation.map((rule, index) => (
+                    <tr key={index}>
+                      <Td><strong style={{fontSize: '1.2em', color: '#48304D'}}>{rule.mark}</strong></Td>
+                      <Td>{rule.rule}</Td>
+                      <Td><em>{rule.examples}</em></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </>
+          )}
+          
+          {activeTab === 'Tenses' && book.learningContent.tenses && (
+            <>
+              <SectionTitle>Verb Tenses</SectionTitle>
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Tense</Th>
+                    <Th>Structure</Th>
+                    <Th>Example</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {book.learningContent.tenses.map((tense, index) => (
+                    <tr key={index}>
+                      <Td><strong style={{color: '#48304D'}}>{tense.name}</strong></Td>
+                      <Td>{tense.structure || tense.rule}</Td>
+                      <Td><em>{tense.examples}</em></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </>
+          )}
+          
+          {activeTab === 'Grammar' && book.learningContent.grammar && (
+            <>
+              <SectionTitle>Grammar Rules</SectionTitle>
+              <Table>
+                <thead>
+                  <tr>
+                    <Th>Topic</Th>
+                    <Th>Rule</Th>
+                    <Th>Example</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {book.learningContent.grammar.map((rule, index) => (
+                    <tr key={index}>
+                      <Td><strong style={{color: '#48304D'}}>{rule.topic}</strong></Td>
+                      <Td>{rule.rule}</Td>
+                      <Td><em>{rule.examples}</em></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </>
+          )}
+        </LearningContent>
+      </LearningModalContent>
+    </ModalOverlay>
   );
 }
 
@@ -308,7 +415,8 @@ const SectionHeader = styled.div`
 const SectionTitle = styled.h2`
   font-size: 1.5rem;
   font-weight: 600;
-  margin: 0;
+  margin: 0 0 1rem 0;
+  color: #48304D;
 `;
 
 const BookCount = styled.span`
@@ -408,7 +516,7 @@ const EmptyMessage = styled.p`
 const ModalOverlay = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -420,6 +528,16 @@ const ModalContent = styled.div`
   background: white;
   border-radius: var(--border-radius);
   max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+`;
+
+const LearningModalContent = styled.div`
+  background: white;
+  border-radius: var(--border-radius);
+  max-width: 800px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
@@ -507,7 +625,7 @@ const PrimaryLink = styled.a`
   transition: all 0.2s ease;
   
   &:hover {
-    background: #0000;
+    background: #000;
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
   }
@@ -521,4 +639,51 @@ const PrimaryLink = styled.a`
 const ComingSoon = styled.em`
   color: var(--secondary-color);
   font-style: italic;
+`;
+
+// Learning Modal Specific Styles
+const TabList = styled.div`
+  display: flex;
+  border-bottom: 2px solid #eee;
+  margin: 0 2rem;
+`;
+
+const Tab = styled.button<{ $active: boolean }>`
+  padding: 12px 20px;
+  border: none;
+  background: none;
+  border-bottom: ${({ $active }) => ($active ? '3px solid #48304D' : '3px solid transparent')};
+  font-weight: ${({ $active }) => ($active ? '600' : '400')};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #f8f9fa;
+  }
+`;
+
+const LearningContent = styled.div`
+  padding: 2rem;
+  font-size: 1rem;
+  line-height: 1.5;
+`;
+
+const Table = styled.table`
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+`;
+
+const Th = styled.th`
+  border: 1px solid #ddd;
+  padding: 12px;
+  background: #f9f9f9;
+  text-align: left;
+  font-weight: 600;
+`;
+
+const Td = styled.td`
+  border: 1px solid #ddd;
+  padding: 12px;
+  vertical-align: top;
 `;
