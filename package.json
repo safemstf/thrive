@@ -4,18 +4,23 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "vercel-build": "next build"
-  },
+    },
   "dependencies": {
     "@radix-ui/react-scroll-area": "^1.2.9",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-slot": "^1.2.3",
+    "@tanstack/react-query": "^5.79.2",
+    "@tanstack/react-query-devtools": "^5.77.2",
+    "bcryptjs": "^3.0.2",
     "better-react-mathjax": "^2.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "jsonwebtoken": "^9.0.2",
     "katex": "^0.16.22",
     "lucide-react": "^0.508.0",
     "next": "15.3.1",
@@ -29,6 +34,7 @@
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

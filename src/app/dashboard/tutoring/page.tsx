@@ -1,4 +1,4 @@
-// src/app/tutoring/page.tsx
+// src/app/dashboard/tutoring/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -11,7 +11,7 @@ const WHATSAPP_URL = 'https://wa.me/4694748676';
 const FORM_URL =
   'https://docs.google.com/forms/d/e/1FAIpQLSe6J_HJcwKGy2I55b5tn58kxkUIXWI7z5kabyYjEi9DA9120g/viewform?embedded=true';
 
-export default function TutoringPage() {
+export default function DashboardTutoringPage() {
   const [loaded, setLoaded] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
 
@@ -45,18 +45,16 @@ export default function TutoringPage() {
 
   return (
     <PageWrapper $loaded={loaded}>
-      <Main>
-        <Header>
-          <BookOpen size={28} />
-          <h1>Excel Prep Tutoring</h1>
-          <p>Reach out via WhatsApp, schedule a session, or leave us a review.</p>
-        </Header>
+      <Header>
+        <BookOpen size={28} />
+        <h1>Excel Prep Tutoring</h1>
+        <p>Reach out via WhatsApp, schedule a session, or leave us a review.</p>
+      </Header>
 
-        <Actions>
-          <ContactButton onClick={openContact}>Contact Us</ContactButton>
-          <FormButton onClick={goToForm}>Leave a Review</FormButton>
-        </Actions>
-      </Main>
+      <Actions>
+        <ContactButton onClick={openContact}>Contact Us</ContactButton>
+        <FormButton onClick={goToForm}>Leave a Review</FormButton>
+      </Actions>
 
       {/* Contact Options Modal */}
       {contactOpen && (
@@ -84,23 +82,11 @@ export default function TutoringPage() {
 // ---------- Styled Components ----------
 
 const PageWrapper = styled.div<{ $loaded: boolean }>`
-  background: linear-gradient(
-    var(--gradient-angle),
-    var(--background-start),
-    var(--background-end)
-  );
-  min-height: 100vh;
-   opacity: ${({ $loaded }) => ($loaded ? 1 : 0)};
+  min-height: 100%;
+  opacity: ${({ $loaded }) => ($loaded ? 1 : 0)};
   transform: ${({ $loaded }) =>
     $loaded ? 'translateY(0)' : 'translateY(20px)'};
   transition: all 0.6s ease;
-`;
-
-const Main = styled.main`
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 4rem 1rem;
-  text-align: center;
 `;
 
 const Header = styled.div`
@@ -108,20 +94,24 @@ const Header = styled.div`
   flex-direction: column;
   gap: 1rem;
   align-items: center;
+  text-align: center;
+  margin-bottom: 3rem;
 
   h1 {
-  font-family: 'Work Sans', sans-serif;
+    font-family: 'Work Sans', sans-serif;
     font-size: 2.5rem;
     margin: 0;
+    color: #2c2c2c;
   }
+  
   p {
     max-width: 600px;
-    color: var(--text-secondary);
+    color: #666;
+    font-size: 1.1rem;
   }
 `;
 
 const Actions = styled.div`
-  margin-top: 2rem;
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
@@ -149,12 +139,12 @@ const ContactButton = styled.button`
 
 const FormButton = styled(ContactButton)`
   border-radius: 4px;
-  background: var(--glass-bg);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #2c2c2c;
+  color: #2c2c2c;
 
   &:hover {
-    background: var(--accent-primary);
+    background: #2c2c2c;
     color: #fff;
   }
 `;
@@ -172,12 +162,13 @@ const ModalOverlay = styled.div`
 const ModalContent = styled.div`
   background: #fff;
   padding: 2.5rem;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   max-width: 360px;
   width: 90%;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 `;
 
 const Close = styled.button`
@@ -185,6 +176,12 @@ const Close = styled.button`
   background: transparent;
   border: none;
   cursor: pointer;
+  padding: 0.5rem;
+  margin: -1rem -1rem 0 0;
+  
+  &:hover {
+    opacity: 0.7;
+  }
 `;
 
 const ModalTitle = styled.h2`
@@ -192,6 +189,7 @@ const ModalTitle = styled.h2`
   font-family: 'Work Sans', sans-serif;
   margin: 0;
   text-align: center;
+  color: #2c2c2c;
 `;
 
 const ModalActions = styled.div`
@@ -206,16 +204,16 @@ const ModalLink = styled.a`
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  border: 1px solid var(--accent-primary);
+  border: 1px solid #2c2c2c;
   border-radius: 4px;
   text-decoration: none;
-  color: var(--accent-primary);
+  color: #2c2c2c;
   font-family: 'Work Sans', sans-serif;
   font-weight: 500;
   transition: all 0.3s ease;
 
   &:hover {
-    background: var(--accent-primary);
+    background: #2c2c2c;
     color: #fff;
   }
 `;
