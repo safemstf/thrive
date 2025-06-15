@@ -1,7 +1,7 @@
 // src/hooks/useEducationalApi.ts
 
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { api } from '@/lib/api-client';
+import { api, useApiClient } from '@/lib/api-client';
 import { APIError } from '@/lib/api-client';
 
 import { 
@@ -135,7 +135,7 @@ export function useContentSearch(
 ) {
   return useQuery({
     queryKey: queryKeys.search.query(query, filters),
-    queryFn: () => api.search.content(query, filters),
+    queryFn: () => api.content.search(query, filters),
     enabled: !!query && query.length > 2, // Only search with 3+ characters
     ...options,
   });
@@ -146,9 +146,11 @@ export function usePopularBooks(
   limit?: number,
   options?: UseQueryOptions<Book[], APIError>
 ) {
+  const apiClient = useApiClient();
+  
   return useQuery({
     queryKey: queryKeys.analytics.popular(limit),
-    queryFn: () => api.analytics.getPopularBooks(limit),
+    queryFn: () => apiClient.educational.getPopularBooks(limit),
     ...options,
   });
 }
@@ -207,12 +209,14 @@ export function useDeleteBook(
 
 // Track content view mutation
 export function useTrackContentView() {
+  const apiClient = useApiClient();
+  
   return useMutation({
     mutationFn: ({ userId, contentId, contentType }: {
       userId: string;
       contentId: string;
       contentType: string;
-    }) => api.analytics.trackView(userId, contentId, contentType),
+    }) => apiClient.educational.trackContentView(userId, contentId, contentType),
   });
 }
 
