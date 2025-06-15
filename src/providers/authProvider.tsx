@@ -12,6 +12,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Compute isAuthenticated based on user state
+  const isAuthenticated = !!user;
+
   const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me', {
@@ -61,40 +64,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push(redirect);
   };
 
+  const signup = async (credentials: SignupCredentials) => {
+    const response = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(credentials),
+      credentials: 'include',
+    });
 
-    const signup = async (credentials: SignupCredentials) => {
-      const response = await fetch('/api/auth/signup', {
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Signup failed');
+    }
+
+    const data = await response.json();
+    setUser(data.user);
+    router.push('/dashboard');
+  };
+
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
         credentials: 'include',
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Signup failed');
-      }
-
-      const data = await response.json();
-      setUser(data.user);
-      router.push('/dashboard');
-    };
-
-    const logout = async () => {
-      try {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          credentials: 'include',
-        });
-      } catch (error) {
-        console.error('Logout error:', error);
-      } finally {
-        setUser(null);
-        router.push('/');
-      }
-    };
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      router.push('/');
+    }
+  };
 
   const updateUser = async (updates: Partial<User>) => {
     const response = await fetch('/api/auth/me', {
@@ -116,7 +118,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, signup, updateUser }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isAuthenticated,  // Add this property
+      login, 
+      logout, 
+      loading, 
+      signup, 
+      updateUser 
+    }}>
       {children}
     </AuthContext.Provider>
   );
