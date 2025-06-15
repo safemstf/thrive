@@ -63,8 +63,8 @@ export default function WritingPage() {
       setLoadingState('loading');
       setError(null);
 
-      // Get books from API
-      const fetchedBooks = await apiClient.getBooks();
+      // Get books from API - Fixed: use apiClient.educational.getBooks()
+      const fetchedBooks = await apiClient.educational.getBooks();
       
       setBooks(fetchedBooks);
       setLoadingState('success');
