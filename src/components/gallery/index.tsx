@@ -332,124 +332,128 @@ export const Gallery: React.FC<GalleryProps> = ({
   );
 
   const renderGalleryControls = () => (
-    <ControlsBar>
-      <ControlsLeft>
-        <SearchBox>
-          <Search size={18} />
-          <input
-            type="text"
-            placeholder="Search gallery..."
-            value={filters.searchQuery || ''}
-            onChange={(e) => updateState({ 
-              filters: { ...filters, searchQuery: e.target.value } 
-            })}
-          />
-          {filters.searchQuery && (
-            <button onClick={() => updateState({ 
-              filters: { ...filters, searchQuery: '' } 
-            })}>
-              <X size={16} />
-            </button>
-          )}
-        </SearchBox>
-
-        {(mode === 'manage' || mode === 'portfolio') && (
-          <FilterButton>
-            <Filter size={18} />
-            Filters
-          </FilterButton>
-        )}
-      </ControlsLeft>
-
-      <ControlsRight>
-        <ViewToggle>
-          <ViewButton
-            $active={viewConfig.layout === 'grid'}
-            onClick={() => updateState({ 
-              viewConfig: { ...viewConfig, layout: 'grid' } 
-            })}
-          >
-            <Grid size={18} />
-          </ViewButton>
-          <ViewButton
-            $active={viewConfig.layout === 'masonry'}
-            onClick={() => updateState({ 
-              viewConfig: { ...viewConfig, layout: 'masonry' } 
-            })}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="2" y="2" width="8" height="10" />
-              <rect x="12" y="2" width="10" height="6" />
-              <rect x="12" y="10" width="10" height="12" />
-              <rect x="2" y="14" width="8" height="8" />
-            </svg>
-          </ViewButton>
-          <ViewButton
-            $active={viewConfig.layout === 'list'}
-            onClick={() => updateState({ 
-              viewConfig: { ...viewConfig, layout: 'list' } 
-            })}
-          >
-            <List size={18} />
-          </ViewButton>
-        </ViewToggle>
-
-        {mode === 'manage' && renderManagementControls()}
-        {mode === 'portfolio' && user?.id === portfolioUserId && (
-          <ActionButton 
-            onClick={() => router.push('/dashboard/portfolio/edit')}
-            $variant="primary"
-          >
-            Edit Portfolio
-          </ActionButton>
-        )}
-      </ControlsRight>
-    </ControlsBar>
-  );
-
-  const renderManagementControls = () => {
-    if (isSelectionMode) {
-      return (
-        <SelectionActions>
-          <SelectionInfo>
-            {selectedItems.size} selected
-          </SelectionInfo>
-          <VisibilityToggle
-            value="public"
-            onChange={(v) => handleBulkAction('visibility', v)}
-            compact
-          />
-          <ActionButton 
-            onClick={() => handleBulkAction('delete')} 
-            $variant="danger"
-          >
-            Delete
-          </ActionButton>
-          <ActionButton onClick={() => updateState({ 
-            isSelectionMode: false, 
-            selectedItems: new Set() 
+  <ControlsBar>
+    <ControlsLeft>
+      <SearchBox>
+        <Search size={18} />
+        <input
+          type="text"
+          placeholder="Search gallery..."
+          value={filters.searchQuery || ''}
+          onChange={(e) => updateState({ 
+            filters: { ...filters, searchQuery: e.target.value } 
+          })}
+        />
+        {filters.searchQuery && (
+          <button onClick={() => updateState({ 
+            filters: { ...filters, searchQuery: '' } 
           })}>
-            Cancel
-          </ActionButton>
-        </SelectionActions>
-      );
-    }
-    
-    return (
-      <>
-        <ActionButton onClick={() => updateState({ isSelectionMode: true })}>
-          Select
-        </ActionButton>
+            <X size={16} />
+          </button>
+        )}
+      </SearchBox>
+
+      {(mode === 'manage' || mode === 'private' || mode === 'portfolio') && (
+        <FilterButton>
+          <Filter size={18} />
+          Filters
+        </FilterButton>
+      )}
+    </ControlsLeft>
+
+    <ControlsRight>
+      <ViewToggle>
+        <ViewButton
+          $active={viewConfig.layout === 'grid'}
+          onClick={() => updateState({ 
+            viewConfig: { ...viewConfig, layout: 'grid' } 
+          })}
+        >
+          <Grid size={18} />
+        </ViewButton>
+        <ViewButton
+          $active={viewConfig.layout === 'masonry'}
+          onClick={() => updateState({ 
+            viewConfig: { ...viewConfig, layout: 'masonry' } 
+          })}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="2" y="2" width="8" height="10" />
+            <rect x="12" y="2" width="10" height="6" />
+            <rect x="12" y="10" width="10" height="12" />
+            <rect x="2" y="14" width="8" height="8" />
+          </svg>
+        </ViewButton>
+        <ViewButton
+          $active={viewConfig.layout === 'list'}
+          onClick={() => updateState({ 
+            viewConfig: { ...viewConfig, layout: 'list' } 
+          })}
+        >
+          <List size={18} />
+        </ViewButton>
+      </ViewToggle>
+
+      {/* Show upload controls for both manage and private modes */}
+      {(mode === 'manage' || mode === 'private') && renderManagementControls()}
+      
+      {mode === 'portfolio' && user?.id === portfolioUserId && (
         <ActionButton 
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => router.push('/dashboard/portfolio/edit')}
           $variant="primary"
         >
-          <Plus size={18} />
-          Upload
+          Edit Portfolio
         </ActionButton>
-      </>
+      )}
+    </ControlsRight>
+  </ControlsBar>
+  );
+
+
+  const renderManagementControls = () => {
+  if (isSelectionMode) {
+    return (
+      <SelectionActions>
+        <SelectionInfo>
+          {selectedItems.size} selected
+        </SelectionInfo>
+        <VisibilityToggle
+          value="public"
+          onChange={(v) => handleBulkAction('visibility', v)}
+          compact
+        />
+        <ActionButton 
+          onClick={() => handleBulkAction('delete')} 
+          $variant="danger"
+        >
+          Delete
+        </ActionButton>
+        <ActionButton onClick={() => updateState({ 
+          isSelectionMode: false, 
+          selectedItems: new Set() 
+        })}>
+          Cancel
+        </ActionButton>
+      </SelectionActions>
     );
+  }
+  
+  return (
+    <>
+      <ActionButton onClick={() => updateState({ isSelectionMode: true })}>
+        Select
+      </ActionButton>
+      <ActionButton 
+        onClick={() => fileInputRef.current?.click()}
+        $variant="primary"
+      >
+        <Plus size={18} />
+        Upload
+      </ActionButton>
+    </>
+  );
   };
+
 
   const renderUploaderModal = () => (
     <UploaderModal>
@@ -536,8 +540,7 @@ export const Gallery: React.FC<GalleryProps> = ({
       )}
 
       {/* Gallery Controls */}
-      {(mode !== 'public' || filters.searchQuery) && renderGalleryControls()}
-
+      {((mode !== 'public' && isAuthenticated) || filters.searchQuery) && renderGalleryControls()}
       {/* Gallery Grid */}
       <GalleryGrid $layout={viewConfig.layout}>
         {sortedPieces.map((piece, index) => (
