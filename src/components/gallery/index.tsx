@@ -407,10 +407,10 @@ export const Gallery: React.FC<GalleryProps> = ({
       )}
     </ControlsRight>
   </ControlsBar>
-  );
+ );
 
 
-  const renderManagementControls = () => {
+   const renderManagementControls = () => {
   if (isSelectionMode) {
     return (
       <SelectionActions>
@@ -453,8 +453,6 @@ export const Gallery: React.FC<GalleryProps> = ({
     </>
   );
   };
-
-
   const renderUploaderModal = () => (
     <UploaderModal>
       <UploaderContent>
