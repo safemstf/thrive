@@ -235,25 +235,11 @@ export const batchUpdateVisibility = async (
   pieceIds: string[],
   visibility: GalleryVisibility
 ): Promise<void> => {
-  const response = await fetch('/api/gallery/batch-visibility', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids: pieceIds, visibility })
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to update visibility');
-  }
+  const { galleryApi } = await import('@/lib/api/gallery-api-client');
+  return galleryApi.batchUpdateVisibility(pieceIds, visibility);
 };
 
 export const batchDeletePieces = async (pieceIds: string[]): Promise<void> => {
-  const response = await fetch('/api/gallery/batch-delete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids: pieceIds })
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to delete pieces');
-  }
+  const { galleryApi } = await import('@/lib/api/gallery-api-client');
+  return galleryApi.batchDeletePieces(pieceIds);
 };
