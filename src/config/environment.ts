@@ -4,7 +4,7 @@
 export const config = {
   // API Configuration
    api: {
-    baseUrl: process.env.NEXT_PUBLIC_NGROK_URL || 'https://fd28-47-189-145-241.ngrok-free.app',
+    baseUrl: process.env.NEXT_PUBLIC_NGROK_URL || 'https://f61a-47-189-145-241.ngrok-free.app',
     version: 'v1',
     timeout: 30000,
   },
