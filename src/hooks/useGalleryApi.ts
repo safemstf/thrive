@@ -1,8 +1,15 @@
 // src/hooks/useGalleryApi.ts
 
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { api } from '@/lib/api-client';
-import { APIError } from '@/lib/api-client';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useInfiniteQuery,
+  UseQueryOptions,
+  UseMutationOptions,
+  UseInfiniteQueryOptions,
+} from '@tanstack/react-query';
+import { api, APIError } from '@/lib/api-client';
 
 import {
   GalleryPiece,
@@ -12,7 +19,7 @@ import {
   Artist,
   GalleryStats,
   ArtworkCategory,
-  ArtworkStatus
+  ArtworkStatus,
 } from '@/types/gallery.types';
 
 // Query keys factory for gallery
@@ -24,10 +31,8 @@ export const galleryQueryKeys = {
     list: (params?: GalleryQueryParams) => [...galleryQueryKeys.pieces.lists(), params] as const,
     details: () => [...galleryQueryKeys.pieces.all, 'detail'] as const,
     detail: (id: string) => [...galleryQueryKeys.pieces.details(), id] as const,
-    byCategory: (category: ArtworkCategory) => 
-      [...galleryQueryKeys.pieces.all, 'category', category] as const,
-    featured: (limit?: number) => 
-      [...galleryQueryKeys.pieces.all, 'featured', limit] as const,
+    byCategory: (category: ArtworkCategory) => [...galleryQueryKeys.pieces.all, 'category', category] as const,
+    featured: (limit?: number) => [...galleryQueryKeys.pieces.all, 'featured', limit] as const,
   },
   collections: {
     all: ['gallery', 'collections'] as const,
@@ -160,18 +165,19 @@ export function useGalleryStats(
 
 // Mutation hooks
 export function useCreateGalleryPiece(
-  options?: UseMutationOptions<GalleryPiece, APIError, Omit<GalleryPiece, 'id' | 'createdAt' | 'updatedAt'>>
+  options?: UseMutationOptions<
+    GalleryPiece,
+    APIError,
+    Omit<GalleryPiece, 'id' | 'createdAt' | 'updatedAt'>
+  >
 ) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: api.gallery.create,
     onSuccess: (data) => {
-      // Invalidate and refetch gallery lists
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.lists() });
-      // Add the new piece to the cache
       queryClient.setQueryData(galleryQueryKeys.pieces.detail(data.id), data);
-      // Invalidate stats as counts may have changed
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.stats });
     },
     ...options,
@@ -179,18 +185,19 @@ export function useCreateGalleryPiece(
 }
 
 export function useUpdateGalleryPiece(
-  options?: UseMutationOptions<GalleryPiece, APIError, { id: string; updates: Partial<GalleryPiece> }>
+  options?: UseMutationOptions<
+    GalleryPiece,
+    APIError,
+    { id: string; updates: Partial<GalleryPiece> }
+  >
 ) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: ({ id, updates }) => api.gallery.update(id, updates),
     onSuccess: (data, { id }) => {
-      // Update the piece in cache
       queryClient.setQueryData(galleryQueryKeys.pieces.detail(id), data);
-      // Invalidate lists to ensure consistency
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.lists() });
-      // If category changed, invalidate category queries
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.all });
     },
     ...options,
@@ -201,15 +208,12 @@ export function useDeleteGalleryPiece(
   options?: UseMutationOptions<void, APIError, string>
 ) {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: api.gallery.delete,
-    onSuccess: (_, id) => {
-      // Remove from cache
+    onSuccess: (_data, id) => {
       queryClient.removeQueries({ queryKey: galleryQueryKeys.pieces.detail(id) });
-      // Invalidate lists
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.lists() });
-      // Invalidate stats
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.stats });
     },
     ...options,
@@ -218,7 +222,11 @@ export function useDeleteGalleryPiece(
 
 // Image upload mutation
 export function useUploadGalleryImage(
-  options?: UseMutationOptions<{ url: string; thumbnailUrl?: string }, APIError, { file: File; metadata?: Record<string, any> }>
+  options?: UseMutationOptions<
+    { url: string; thumbnailUrl?: string },
+    APIError,
+    { file: File; metadata?: Record<string, any> }
+  >
 ) {
   return useMutation({
     mutationFn: ({ file, metadata }) => api.gallery.uploadImage(file, metadata),
@@ -249,19 +257,24 @@ export const prefetchFeaturedPieces = async (queryClient: any, limit?: number) =
 };
 
 // Infinite query hook for gallery pieces (for infinite scroll)
-import { useInfiniteQuery, UseInfiniteQueryOptions } from '@tanstack/react-query';
+import type { QueryFunctionContext } from '@tanstack/react-query';
 
 export function useInfiniteGalleryPieces(
   baseParams?: Omit<GalleryQueryParams, 'page'>,
-  options?: Omit<UseInfiniteQueryOptions<GalleryApiResponse, APIError>, 'queryKey' | 'queryFn' | 'getNextPageParam' | 'initialPageParam'>
+  options?: Omit<
+    UseInfiniteQueryOptions<GalleryApiResponse, APIError>,
+    'queryKey' | 'queryFn' | 'getNextPageParam' | 'initialPageParam'
+  >
 ) {
   return useInfiniteQuery({
-    queryKey: ['gallery', 'pieces', 'infinite', baseParams],
-    queryFn: ({ pageParam }) => api.gallery.getPieces({ ...baseParams, page: pageParam as number }),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage, allPages) => {
-      return lastPage.hasMore ? allPages.length + 1 : undefined;
+    // keep key consistent
+    queryKey: galleryQueryKeys.pieces.list(baseParams),
+    queryFn: (context: QueryFunctionContext) => {
+      const page = typeof context.pageParam === 'number' ? context.pageParam : 1;
+      return api.gallery.getPieces({ ...baseParams, page });
     },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
     ...options,
   });
 }
@@ -271,41 +284,19 @@ export function useOptimisticGalleryUpdate() {
   const queryClient = useQueryClient();
 
   return {
-    // Optimistically update a gallery piece
     updatePieceOptimistically: (id: string, updates: Partial<GalleryPiece>) => {
-      queryClient.setQueryData<GalleryPiece>(
-        galleryQueryKeys.pieces.detail(id),
-        (old) => old ? { ...old, ...updates } : old
+      queryClient.setQueryData<GalleryPiece>(galleryQueryKeys.pieces.detail(id), (old) =>
+        old ? { ...old, ...updates } : old
       );
     },
-
-    // Optimistically add a piece to lists
     addPieceToListsOptimistically: (piece: GalleryPiece) => {
-      queryClient.setQueriesData<GalleryApiResponse>(
-        { queryKey: galleryQueryKeys.pieces.lists() },
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            pieces: [piece, ...old.pieces],
-            total: old.total + 1,
-          };
-        }
+      queryClient.setQueriesData<GalleryApiResponse>({ queryKey: galleryQueryKeys.pieces.lists() }, (old) =>
+        old ? { ...old, pieces: [piece, ...old.pieces], total: old.total + 1 } : old
       );
     },
-
-    // Optimistically remove a piece from lists
     removePieceFromListsOptimistically: (id: string) => {
-      queryClient.setQueriesData<GalleryApiResponse>(
-        { queryKey: galleryQueryKeys.pieces.lists() },
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            pieces: old.pieces.filter(p => p.id !== id),
-            total: old.total - 1,
-          };
-        }
+      queryClient.setQueriesData<GalleryApiResponse>({ queryKey: galleryQueryKeys.pieces.lists() }, (old) =>
+        old ? { ...old, pieces: old.pieces.filter((p) => p.id !== id), total: old.total - 1 } : old
       );
     },
   };

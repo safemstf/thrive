@@ -1,6 +1,7 @@
 // src/app/dashboard/gallery/page.tsx
 'use client';
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { Gallery } from '@/components/gallery';
 import { useApiConnection } from '@/providers/apiProvider';
@@ -11,65 +12,99 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { UploadIcon as PlusIcon, GridIcon, ListIcon } from '@/components/ui/icons';
 import { ArtworkUploadModal } from '@/components/gallery/utils/uploadModal';
-import { useRouter, useSearchParams } from 'next/navigation'; // Added useSearchParams
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // ==================== CONSTANTS ====================
 const ITEMS_PER_PAGE = 12;
 
 type ViewLayout = 'grid' | 'masonry' | 'list';
+type GalleryMode = 'public' | 'private';
 
 export default function GalleryPage() {
   const router = useRouter();
-  const searchParams = useSearchParams(); // Get query parameters
+  const searchParams = useSearchParams();
   const { connectionStatus, isReady } = useApiConnection();
-  const auth = useAuth();
-  const user = auth?.user as any;
-  const isAuthenticated = auth?.isAuthenticated as boolean;
+  const { user, isAuthenticated } = useAuth();
   
-  const { data: portfolio, isLoading, isError, refetch } = useMyPortfolio();
+  const { data: portfolio, isLoading: portfolioLoading, error: portfolioError, refetch } = useMyPortfolio();
+  
+  // State management
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [galleryMode, setGalleryMode] = useState<'public' | 'private'>('public');
-  const [viewLayout, setViewLayout] = useState<ViewLayout>('masonry');
-  const [showSetup, setShowSetup] = useState(false);
-
-  // Show setup prompt for authenticated users without a portfolio
-  useEffect(() => {
-    if (isAuthenticated && !isLoading && !portfolio) {
-      setShowSetup(true);
-    } else {
-      setShowSetup(false);
+  const [galleryMode, setGalleryMode] = useState<GalleryMode>(() => {
+    // Persist gallery mode in localStorage
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('galleryMode') as GalleryMode) || 'public';
     }
-  }, [isAuthenticated, isLoading, portfolio]);
+    return 'public';
+  });
+  const [viewLayout, setViewLayout] = useState<ViewLayout>(() => {
+    // Persist view layout in localStorage
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('viewLayout') as ViewLayout) || 'masonry';
+    }
+    return 'masonry';
+  });
+
+  // Persist preferences
+  useEffect(() => {
+    localStorage.setItem('galleryMode', galleryMode);
+  }, [galleryMode]);
+
+  useEffect(() => {
+    localStorage.setItem('viewLayout', viewLayout);
+  }, [viewLayout]);
 
   // Check if we should open upload modal from query param
   useEffect(() => {
     const shouldOpenUpload = searchParams.get('upload') === 'true';
-    if (shouldOpenUpload && portfolio) {
+    if (shouldOpenUpload && isAuthenticated) {
       setShowUploadModal(true);
       
-      // Clean up the URL
-      const newParams = new URLSearchParams(searchParams.toString());
-      newParams.delete('upload');
-      router.replace(`/dashboard/gallery?${newParams.toString()}`);
+      // Clean up the URL without triggering re-render
+      const url = new URL(window.location.href);
+      url.searchParams.delete('upload');
+      window.history.replaceState({}, '', url);
     }
-  }, [searchParams, portfolio, router]);
+  }, [searchParams, isAuthenticated]);
 
-  // Refresh gallery after upload
-  const handleUploadSuccess = () => {
+  // Memoized values
+  const showSetup = useMemo(() => {
+    return isAuthenticated && !portfolioLoading && !portfolio && !portfolioError;
+  }, [isAuthenticated, portfolioLoading, portfolio, portfolioError]);
+
+  const galleryConfig = useMemo(() => ({
+    layout: viewLayout,
+    itemsPerPage: ITEMS_PER_PAGE,
+    showPrivateIndicator: galleryMode === 'private',
+    enableSelection: galleryMode === 'private',
+    enableQuickEdit: galleryMode === 'private'
+  }), [viewLayout, galleryMode]);
+
+  // Callbacks
+  const handleUploadSuccess = useCallback(() => {
     refetch();
     setShowUploadModal(false);
-  };
+    // Optionally refresh the gallery component
+    window.dispatchEvent(new CustomEvent('gallery-refresh'));
+  }, [refetch]);
 
-  // Handle upload button click
-  const handleUploadClick = () => {
-    if (portfolio) {
-      setShowUploadModal(true);
-    } else {
-      router.push('/portfolio/edit');
+  const handleUploadClick = useCallback(() => {
+    if (!isAuthenticated) {
+      router.push('/login?redirect=/dashboard/gallery?upload=true');
+      return;
     }
-  };
+    setShowUploadModal(true);
+  }, [isAuthenticated, router]);
 
-  // Calculate gallery stats
+  const handleGalleryModeChange = useCallback((mode: GalleryMode) => {
+    setGalleryMode(mode);
+  }, []);
+
+  const handleViewLayoutChange = useCallback((layout: ViewLayout) => {
+    setViewLayout(layout);
+  }, []);
+
+  // Gallery metadata
   const galleryTitle = galleryMode === 'public' 
     ? 'Discover Creative Works' 
     : 'My Portfolio Gallery';
@@ -95,54 +130,58 @@ export default function GalleryPage() {
         <HeaderActions>
           {isAuthenticated && (
             <>
-              {portfolio && (
-                <>
-                  <ViewToggle>
-                    <ToggleButton 
-                      $active={galleryMode === 'public'}
-                      onClick={() => setGalleryMode('public')}
-                    >
-                      Community Gallery
-                    </ToggleButton>
-                    <ToggleButton 
-                      $active={galleryMode === 'private'}
-                      onClick={() => setGalleryMode('private')}
-                    >
-                      My Artwork
-                    </ToggleButton>
-                  </ViewToggle>
+              <ViewToggle>
+                <ToggleButton 
+                  $active={galleryMode === 'public'}
+                  onClick={() => handleGalleryModeChange('public')}
+                >
+                  Community Gallery
+                </ToggleButton>
+                <ToggleButton 
+                  $active={galleryMode === 'private'}
+                  onClick={() => handleGalleryModeChange('private')}
+                >
+                  My Artwork
+                </ToggleButton>
+              </ViewToggle>
 
-                  <LayoutToggle>
-                    <LayoutButton
-                      $active={viewLayout === 'grid'}
-                      onClick={() => setViewLayout('grid')}
-                      title="Grid view"
-                    >
-                      <GridIcon size={18} />
-                    </LayoutButton>
-                    <LayoutButton
-                      $active={viewLayout === 'masonry'}
-                      onClick={() => setViewLayout('masonry')}
-                      title="Masonry view"
-                    >
-                      <GridIcon size={18} style={{ transform: 'rotate(45deg)' }} />
-                    </LayoutButton>
-                    <LayoutButton
-                      $active={viewLayout === 'list'}
-                      onClick={() => setViewLayout('list')}
-                      title="List view"
-                    >
-                      <ListIcon size={18} />
-                    </LayoutButton>
-                  </LayoutToggle>
-                </>
-              )}
+              <LayoutToggle>
+                <LayoutButton
+                  $active={viewLayout === 'grid'}
+                  onClick={() => handleViewLayoutChange('grid')}
+                  title="Grid view"
+                >
+                  <GridIcon size={18} />
+                </LayoutButton>
+                <LayoutButton
+                  $active={viewLayout === 'masonry'}
+                  onClick={() => handleViewLayoutChange('masonry')}
+                  title="Masonry view"
+                >
+                  <GridIcon size={18} style={{ transform: 'rotate(45deg)' }} />
+                </LayoutButton>
+                <LayoutButton
+                  $active={viewLayout === 'list'}
+                  onClick={() => handleViewLayoutChange('list')}
+                  title="List view"
+                >
+                  <ListIcon size={18} />
+                </LayoutButton>
+              </LayoutToggle>
 
               <UploadButton onClick={handleUploadClick} id="gallery-upload-button">
                 <PlusIcon size={18} />
                 <span>Upload Artwork</span>
               </UploadButton>
             </>
+          )}
+          
+          {!isAuthenticated && (
+            <Link href="/login?redirect=/dashboard/gallery">
+              <LoginButton>
+                Sign In to Upload
+              </LoginButton>
+            </Link>
           )}
         </HeaderActions>
       </Header>
@@ -151,42 +190,37 @@ export default function GalleryPage() {
         <SetupPrompt>
           <SetupContent>
             <SetupIcon>🎨</SetupIcon>
-            <SetupTitle>Create Your Portfolio</SetupTitle>
+            <SetupTitle>Welcome to Your Gallery</SetupTitle>
             <SetupDescription>
-              Set up your professional portfolio to showcase your creative work,
-              connect with other artists, and build your online presence.
+              Start building your creative portfolio. Upload your artwork,
+              organize your collection, and share your talent with the world.
             </SetupDescription>
             <SetupFeatures>
               <Feature>
                 <FeatureIcon>✨</FeatureIcon>
-                <FeatureText>Customizable portfolio layout</FeatureText>
+                <FeatureText>Upload unlimited artwork</FeatureText>
               </Feature>
               <Feature>
                 <FeatureIcon>🖼️</FeatureIcon>
-                <FeatureText>Unlimited artwork uploads</FeatureText>
+                <FeatureText>Organize with tags and categories</FeatureText>
+              </Feature>
+              <Feature>
+                <FeatureIcon>🔒</FeatureIcon>
+                <FeatureText>Control visibility settings</FeatureText>
               </Feature>
               <Feature>
                 <FeatureIcon>📊</FeatureIcon>
-                <FeatureText>Analytics and insights</FeatureText>
-              </Feature>
-              <Feature>
-                <FeatureIcon>🔗</FeatureIcon>
-                <FeatureText>Share your work easily</FeatureText>
+                <FeatureText>Track views and engagement</FeatureText>
               </Feature>
             </SetupFeatures>
             <SetupActions>
-              <Link href="/portfolio/edit">
-                <PrimaryButton>
-                  Get Started
-                </PrimaryButton>
-              </Link>
               <UploadButton onClick={handleUploadClick}>
                 <PlusIcon size={18} />
-                <span>Upload Artwork</span>
+                <span>Upload Your First Artwork</span>
               </UploadButton>
-              <Link href="/portfolio/discover">
+              <Link href="/portfolio/edit">
                 <SecondaryButton>
-                  Browse Portfolios
+                  Create Portfolio
                 </SecondaryButton>
               </Link>
             </SetupActions>
@@ -196,13 +230,9 @@ export default function GalleryPage() {
 
       <GalleryContainer>
         <Gallery 
+          key={galleryMode} // Force re-mount when mode changes
           mode={galleryMode} 
-          viewConfig={{
-            layout: viewLayout,
-            itemsPerPage: ITEMS_PER_PAGE,
-            showPrivateIndicator: galleryMode === 'private',
-            enableSelection: galleryMode === 'private'
-          }}
+          viewConfig={galleryConfig}
         />
       </GalleryContainer>
 
@@ -224,7 +254,6 @@ export default function GalleryPage() {
     </PageWrapper>
   );
 }
-
 
 // ==================== Styled Components ====================
 const PageWrapper = styled.main`
@@ -393,6 +422,17 @@ const UploadButton = styled.button`
   }
 `;
 
+const LoginButton = styled(Button)`
+  background: transparent;
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
+  
+  &:hover {
+    background: #3b82f6;
+    color: white;
+  }
+`;
+
 const GalleryContainer = styled.div`
   max-width: 1400px;
   margin: 0 auto;
@@ -484,6 +524,7 @@ const FeatureText = styled.span`
   font-size: 0.875rem;
   color: #4b5563;
   line-height: 1.4;
+  text-align: left;
 `;
 
 const SetupActions = styled.div`
@@ -491,24 +532,6 @@ const SetupActions = styled.div`
   gap: 1rem;
   justify-content: center;
   flex-wrap: wrap;
-`;
-
-const PrimaryButton = styled(Button)`
-  padding: 0.75rem 2rem;
-  font-size: 1rem;
-  font-weight: 600;
-  border-radius: 8px;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  
-  &:hover {
-    background: #2563eb;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-  }
 `;
 
 const SecondaryButton = styled(Button)`

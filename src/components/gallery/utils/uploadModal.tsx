@@ -3,7 +3,8 @@ import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
 import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
-import { UploadIcon } from '@/components/ui/icons';
+import { UploadIcon, X, Loader2 } from '@/components/ui/icons';
+import type { ArtworkCategory, GalleryStatus } from '@/types/gallery.types';
 
 interface ArtworkUploadModalProps {
   portfolioId?: string;
@@ -23,10 +24,12 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: 'painting',
+    category: 'painting' as ArtworkCategory,
     medium: '',
     tags: '',
-    price: ''
+    price: '',
+    artist: '',
+    year: new Date().getFullYear()
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -89,6 +92,10 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
         portfolioId
       });
       
+      if (!uploadResponse || !uploadResponse.url) {
+        throw new Error('Upload failed - no URL returned');
+      }
+      
       // Then create the gallery piece
       const tagsArray = formData.tags
         .split(',')
@@ -96,22 +103,23 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
         .filter(tag => tag.length > 0);
       
       await api.gallery.create({
-          title: formData.title,
-          description: formData.description,
-          imageUrl: uploadResponse.url,
-          thumbnailUrl: uploadResponse.thumbnailUrl || uploadResponse.url,
-          category: formData.category as any,
-          medium: formData.medium,
-          tags: tagsArray,
-          price: formData.price ? parseFloat(formData.price) : undefined,
-          status: 'exhibition', // Updated to match your backend
-          visibility: 'public',
-          artist: '',
-          displayOrder: 0,
-          alt: '',
-          size: 'small',
-          ownerId: '',
-          uploadedBy: ''
+        title: formData.title,
+        description: formData.description || '',
+        imageUrl: uploadResponse.url,
+        thumbnailUrl: uploadResponse.thumbnailUrl || uploadResponse.url,
+        category: formData.category,
+        medium: formData.medium || '',
+        tags: tagsArray,
+        price: formData.price ? parseFloat(formData.price) : undefined,
+        status: 'exhibition' as GalleryStatus,
+        visibility: 'public',
+        artist: formData.artist || '',
+        year: formData.year,
+        displayOrder: 0,
+        alt: formData.title,
+        size: 'medium',
+        ownerId: '', // Will be set by backend
+        uploadedBy: '' // Will be set by backend
       });
       
       onSuccess();
@@ -128,7 +136,9 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
       <ModalContent onClick={e => e.stopPropagation()}>
         <ModalHeader>
           <h2>Upload Artwork</h2>
-          <CloseButton onClick={onClose}>×</CloseButton>
+          <CloseButton onClick={onClose}>
+            <X size={24} />
+          </CloseButton>
         </ModalHeader>
         
         <form onSubmit={handleSubmit}>
@@ -174,6 +184,16 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
               </FormGroup>
               
               <FormGroup>
+                <Label>Artist Name</Label>
+                <Input
+                  name="artist"
+                  value={formData.artist}
+                  onChange={handleInputChange}
+                  placeholder="Artist name"
+                />
+              </FormGroup>
+              
+              <FormGroup>
                 <Label>Description</Label>
                 <TextArea
                   name="description"
@@ -214,12 +234,14 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
               
               <FormRow>
                 <FormGroup>
-                  <Label>Tags</Label>
+                  <Label>Year</Label>
                   <Input
-                    name="tags"
-                    value={formData.tags}
+                    name="year"
+                    type="number"
+                    value={formData.year}
                     onChange={handleInputChange}
-                    placeholder="Comma separated tags"
+                    min="1900"
+                    max={new Date().getFullYear()}
                   />
                 </FormGroup>
                 
@@ -235,6 +257,16 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                   />
                 </FormGroup>
               </FormRow>
+              
+              <FormGroup>
+                <Label>Tags</Label>
+                <Input
+                  name="tags"
+                  value={formData.tags}
+                  onChange={handleInputChange}
+                  placeholder="Comma separated tags"
+                />
+              </FormGroup>
             </FormSection>
             
             {error && <ErrorMessage>{error}</ErrorMessage>}
@@ -245,7 +277,14 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
               Cancel
             </Button>
             <Button type="submit" disabled={isUploading || !selectedFile}>
-              {isUploading ? 'Uploading...' : 'Upload Artwork'}
+              {isUploading ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} />
+                  Uploading...
+                </>
+              ) : (
+                'Upload Artwork'
+              )}
             </Button>
           </ModalFooter>
         </form>
@@ -264,6 +303,16 @@ const ModalOverlay = styled.div`
   justify-content: center;
   z-index: 1000;
   padding: 1rem;
+  animation: fadeIn 0.2s ease-out;
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
 `;
 
 const ModalContent = styled.div`
@@ -275,6 +324,18 @@ const ModalContent = styled.div`
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  animation: slideUp 0.3s ease-out;
+  
+  @keyframes slideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
 `;
 
 const ModalHeader = styled.div`
@@ -294,19 +355,18 @@ const ModalHeader = styled.div`
 const CloseButton = styled.button`
   background: none;
   border: none;
-  font-size: 2rem;
-  line-height: 1;
   cursor: pointer;
   color: #6b7280;
-  padding: 0;
-  width: 32px;
-  height: 32px;
+  padding: 0.5rem;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s;
   
   &:hover {
     color: #111827;
+    background: #f3f4f6;
   }
 `;
 
@@ -349,13 +409,15 @@ const UploadHint = styled.p`
 const PreviewContainer = styled.div`
   position: relative;
   display: inline-block;
+  width: 100%;
 `;
 
 const PreviewImage = styled.img`
-  max-width: 100%;
+  width: 100%;
   max-height: 300px;
+  object-fit: contain;
   border-radius: 8px;
-  display: block;
+  background: #f3f4f6;
 `;
 
 const ChangeButton = styled.button`
@@ -369,6 +431,7 @@ const ChangeButton = styled.button`
   border-radius: 6px;
   font-size: 0.875rem;
   cursor: pointer;
+  transition: all 0.2s;
   
   &:hover {
     background: rgba(0, 0, 0, 0.8);
@@ -409,6 +472,7 @@ const Input = styled.input`
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   font-size: 1rem;
+  transition: all 0.2s;
   
   &:focus {
     outline: none;
@@ -423,6 +487,7 @@ const TextArea = styled.textarea`
   border-radius: 6px;
   font-size: 1rem;
   resize: vertical;
+  transition: all 0.2s;
   
   &:focus {
     outline: none;
@@ -437,6 +502,8 @@ const Select = styled.select`
   border-radius: 6px;
   font-size: 1rem;
   background: white;
+  cursor: pointer;
+  transition: all 0.2s;
   
   &:focus {
     outline: none;
@@ -460,4 +527,17 @@ const ModalFooter = styled.div`
   gap: 0.75rem;
   padding: 1.5rem;
   border-top: 1px solid #e5e7eb;
+  
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
 `;

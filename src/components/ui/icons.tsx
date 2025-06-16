@@ -1,5 +1,26 @@
 import React from 'react';
 
+
+// Lucide icons
+import { X as XIcon, Loader2 as Loader2Icon } from 'lucide-react';
+
+interface IconProps {
+  size?: number;
+  color?: string;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+// Re-export Lucide X icon
+export const X: React.FC<IconProps> = ({ size = 20, color = 'currentColor', className, style }) => (
+  <XIcon size={size} color={color} className={className} style={style} />
+);
+
+// Re-export Lucide Loader2 with spin animation helper
+export const Loader2: React.FC<IconProps> = ({ size = 20, color = 'currentColor', className, style }) => (
+  <Loader2Icon size={size} color={color} className={className} style={style} />
+);
+
 interface IconProps {
   size?: number;
   color?: string;
@@ -103,3 +124,4 @@ export const ListIcon: React.FC<IconProps> = ({
     <line x1="3" y1="18" x2="3.01" y2="18" />
   </svg>
 );
+
