@@ -1,483 +1,339 @@
-// src/config/api-routes.ts
+// config/api-routes.ts
 export interface RouteDefinition {
   name: string;
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   endpoint: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   description: string;
   needsAuth?: boolean;
   params?: Record<string, string>;
   body?: any;
-  queryParams?: Record<string, any>;
 }
 
 export interface RouteCategory {
   name: string;
-  icon?: any; // Lucide icon component
   routes: RouteDefinition[];
+}
+
+export function replaceRouteParams(
+  endpoint: string,
+  params?: Record<string, string>
+): string {
+  let url = endpoint;
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      url = url.replace(`:${key}`, value);
+    });
+  }
+  return url;
 }
 
 export const API_ROUTES: Record<string, RouteCategory> = {
   system: {
-    name: 'System Routes',
+    name: 'System',
     routes: [
       {
-        name: 'API Info',
-        method: 'GET',
-        endpoint: '/',
-        description: 'Get API information and available endpoints',
-      },
-      {
         name: 'Health Check',
-        method: 'GET',
         endpoint: '/health',
-        description: 'Check server health status',
+        method: 'GET',
+        description: 'Check if the server is running'
       },
       {
         name: 'Server Stats',
-        method: 'GET',
         endpoint: '/stats',
-        description: 'Get server statistics and metrics',
+        method: 'GET',
+        description: 'Get server statistics'
       },
-    ],
+      {
+        name: 'API Info',
+        endpoint: '/api',
+        method: 'GET',
+        description: 'Get API documentation'
+      }
+    ]
   },
   auth: {
     name: 'Authentication',
     routes: [
       {
-        name: 'Login',
-        method: 'POST',
-        endpoint: '/api/auth/login',
-        description: 'Authenticate user and receive token',
-        body: {
-          usernameOrEmail: 'test@example.com',
-          password: 'test123',
-        },
-      },
-      {
         name: 'Register',
-        method: 'POST',
         endpoint: '/api/auth/register',
-        description: 'Create new user account',
+        method: 'POST',
+        description: 'Register a new user',
         body: {
           username: 'testuser',
           email: 'test@example.com',
-          password: 'test123',
-          firstName: 'Test',
-          lastName: 'User',
-        },
+          password: 'password123',
+          name: 'Test User'
+        }
       },
       {
-        name: 'Logout',
+        name: 'Login',
+        endpoint: '/api/auth/login',
         method: 'POST',
-        endpoint: '/api/auth/logout',
-        description: 'End user session',
-        needsAuth: true,
+        description: 'Login user',
+        body: {
+          usernameOrEmail: 'admin@admin.com',
+          password: 'admin123'
+        }
       },
       {
         name: 'Get Current User',
-        method: 'GET',
         endpoint: '/api/auth/me',
-        description: 'Get authenticated user profile',
-        needsAuth: true,
+        method: 'GET',
+        description: 'Get current user profile',
+        needsAuth: true
       },
       {
         name: 'Update Profile',
-        method: 'PUT',
         endpoint: '/api/auth/me',
-        description: 'Update current user profile',
+        method: 'PUT',
+        description: 'Update user profile',
         needsAuth: true,
         body: {
-          firstName: 'Updated',
-          lastName: 'Name',
-        },
-      },
-    ],
+          name: 'Updated Name',
+          preferences: {
+            theme: 'dark'
+          }
+        }
+      }
+    ]
   },
   users: {
-    name: 'User Management',
+    name: 'Users',
     routes: [
       {
-        name: 'List Users',
-        method: 'GET',
+        name: 'Get All Users',
         endpoint: '/api/users',
-        description: 'Get paginated list of users',
-        needsAuth: true,
-        queryParams: {
-          page: 1,
-          limit: 10,
-        },
+        method: 'GET',
+        description: 'Get all users (admin only)',
+        needsAuth: true
       },
       {
         name: 'Get User by ID',
+        endpoint: '/api/users/:id',
         method: 'GET',
-        endpoint: '/api/users/:id',
-        description: 'Get specific user details',
+        description: 'Get user by ID',
         needsAuth: true,
         params: {
-          id: '1',
-        },
-      },
-      {
-        name: 'Update User',
-        method: 'PUT',
-        endpoint: '/api/users/:id',
-        description: 'Update user information',
-        needsAuth: true,
-        params: {
-          id: '1',
-        },
-        body: {
-          firstName: 'Updated',
-          lastName: 'User',
-        },
-      },
-      {
-        name: 'Delete User',
-        method: 'DELETE',
-        endpoint: '/api/users/:id',
-        description: 'Delete user account',
-        needsAuth: true,
-        params: {
-          id: '1',
-        },
-      },
-    ],
+          id: '123'
+        }
+      }
+    ]
   },
   books: {
-    name: 'Books & Educational Content',
+    name: 'Books',
     routes: [
       {
-        name: 'List Books',
-        method: 'GET',
+        name: 'Get All Books',
         endpoint: '/api/books',
-        description: 'Get all books with optional filters',
-        queryParams: {
-          category: 'MATHEMATICS',
-          difficulty: 'INTERMEDIATE',
-          page: 1,
-          limit: 10,
-        },
+        method: 'GET',
+        description: 'Get all books with filtering'
       },
       {
         name: 'Get Book by ID',
-        method: 'GET',
         endpoint: '/api/books/:id',
-        description: 'Get detailed book information',
+        method: 'GET',
+        description: 'Get single book',
         params: {
-          id: '1',
-        },
+          id: '123'
+        }
       },
       {
         name: 'Create Book',
-        method: 'POST',
         endpoint: '/api/books',
-        description: 'Add new book to library',
+        method: 'POST',
+        description: 'Create new book',
         needsAuth: true,
         body: {
           title: 'Test Book',
           author: 'Test Author',
-          description: 'A test book description',
-          category: 'MATHEMATICS',
-          subCategory: 'ALGEBRA',
-          difficulty: 'INTERMEDIATE',
-          isbn: '978-1234567890',
-        },
-      },
-      {
-        name: 'Update Book',
-        method: 'PUT',
-        endpoint: '/api/books/:id',
-        description: 'Update book information',
-        needsAuth: true,
-        params: {
-          id: '1',
-        },
-        body: {
-          title: 'Updated Book Title',
-          description: 'Updated description',
-        },
-      },
-      {
-        name: 'Delete Book',
-        method: 'DELETE',
-        endpoint: '/api/books/:id',
-        description: 'Remove book from library',
-        needsAuth: true,
-        params: {
-          id: '1',
-        },
-      },
-      {
-        name: 'Get Math Concepts',
-        method: 'GET',
-        endpoint: '/api/books/:id/math-concepts',
-        description: 'Get mathematical concepts covered in book',
-        params: {
-          id: '1',
-        },
-      },
-      {
-        name: 'Get Science Concepts',
-        method: 'GET',
-        endpoint: '/api/books/:id/science-concepts',
-        description: 'Get scientific concepts covered in book',
-        params: {
-          id: '1',
-        },
-        queryParams: {
-          discipline: 'PHYSICS',
-        },
-      },
-      {
-        name: 'Get Grammar Rules',
-        method: 'GET',
-        endpoint: '/api/books/:id/grammar-rules',
-        description: 'Get grammar rules covered in book',
-        params: {
-          id: '1',
-        },
-      },
-      {
-        name: 'Get Books by Category',
-        method: 'GET',
-        endpoint: '/api/categories/:category/books',
-        description: 'Get all books in a specific category',
-        params: {
-          category: 'SCIENCE',
-        },
-        queryParams: {
-          subCategory: 'PHYSICS',
-        },
-      },
-    ],
+          description: 'A test book',
+          gradeLevel: 'high school',
+          subject: 'Mathematics',
+          difficulty: 'intermediate'
+        }
+      }
+    ]
   },
   gallery: {
-    name: 'Gallery Management',
+    name: 'Gallery',
     routes: [
       {
-        name: 'List Gallery Pieces',
-        method: 'GET',
+        name: 'Get Gallery Pieces',
         endpoint: '/api/gallery',
-        description: 'Get paginated gallery pieces',
-        queryParams: {
-          page: 1,
-          limit: 20,
-          category: 'painting',
-          status: 'available',
-        },
-      },
-      {
-        name: 'Get Gallery Piece',
         method: 'GET',
-        endpoint: '/api/gallery/:id',
-        description: 'Get specific gallery piece details',
+        description: 'Get gallery items with pagination and filtering',
         params: {
-          id: '1',
-        },
-      },
-      {
-        name: 'Create Gallery Piece',
-        method: 'POST',
-        endpoint: '/api/gallery',
-        description: 'Add new artwork to gallery',
-        needsAuth: true,
-        body: {
-          title: 'Test Artwork',
-          artist: 'Test Artist',
-          description: 'A beautiful test piece',
-          category: 'painting',
-          medium: 'Oil on canvas',
-          dimensions: '24x36 inches',
-          year: 2024,
-          price: 5000,
-          status: 'available',
-        },
-      },
-      {
-        name: 'Update Gallery Piece',
-        method: 'PUT',
-        endpoint: '/api/gallery/:id',
-        description: 'Update artwork information',
-        needsAuth: true,
-        params: {
-          id: '1',
-        },
-        body: {
-          title: 'Updated Artwork Title',
-          price: 6000,
-          status: 'sold',
-        },
-      },
-      {
-        name: 'Delete Gallery Piece',
-        method: 'DELETE',
-        endpoint: '/api/gallery/:id',
-        description: 'Remove artwork from gallery',
-        needsAuth: true,
-        params: {
-          id: '1',
-        },
+          limit: '10',
+          page: '1',
+          visibility: 'public',
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        }
       },
       {
         name: 'Get Featured Pieces',
-        method: 'GET',
         endpoint: '/api/gallery/featured',
-        description: 'Get featured artworks',
-        queryParams: {
-          limit: 10,
-        },
-      },
-      {
-        name: 'Get Collections',
         method: 'GET',
-        endpoint: '/api/gallery/collections',
-        description: 'Get all gallery collections',
-      },
-      {
-        name: 'Get Collection by ID',
-        method: 'GET',
-        endpoint: '/api/gallery/collections/:id',
-        description: 'Get specific collection details',
+        description: 'Get featured gallery items',
         params: {
-          id: '1',
-        },
-      },
-      {
-        name: 'Get Artists',
-        method: 'GET',
-        endpoint: '/api/gallery/artists',
-        description: 'Get all artists in gallery',
-      },
-      {
-        name: 'Get Artist by ID',
-        method: 'GET',
-        endpoint: '/api/gallery/artists/:id',
-        description: 'Get specific artist details',
-        params: {
-          id: '1',
-        },
-      },
-      {
-        name: 'Get Artist Pieces',
-        method: 'GET',
-        endpoint: '/api/gallery/artists/:id/pieces',
-        description: 'Get all artworks by specific artist',
-        params: {
-          id: '1',
-        },
+          limit: '6'
+        }
       },
       {
         name: 'Get Gallery Stats',
-        method: 'GET',
         endpoint: '/api/gallery/stats',
-        description: 'Get gallery statistics and metrics',
+        method: 'GET',
+        description: 'Get gallery statistics'
       },
       {
-        name: 'Upload Gallery Image',
+        name: 'Get Single Piece',
+        endpoint: '/api/gallery/:id',
+        method: 'GET',
+        description: 'Get a specific gallery piece by ID',
+        params: {
+          id: '123456789'
+        },
+        needsAuth: false
+      },
+      {
+        name: 'Create Gallery Piece',
+        endpoint: '/api/gallery',
         method: 'POST',
-        endpoint: '/api/gallery/upload',
-        description: 'Upload artwork image',
+        description: 'Create a new gallery piece (without file upload)',
         needsAuth: true,
-        body: 'FormData with image file',
-      },
-    ],
-  },
-  search: {
-    name: 'Search & Analytics',
-    routes: [
-      {
-        name: 'Search Content',
-        method: 'POST',
-        endpoint: '/api/search',
-        description: 'Search across all content types',
         body: {
-          query: 'mathematics',
-          filters: {
-            contentTypes: ['book', 'gallery'],
-            categories: ['MATHEMATICS', 'SCIENCE'],
-          },
-        },
+          title: 'Test Artwork',
+          description: 'A test gallery piece',
+          artist: 'Test Artist',
+          visibility: 'private',
+          tags: ['test', 'demo'],
+          category: 'digital',
+          price: 100,
+          currency: 'USD'
+        }
       },
       {
-        name: 'Get Popular Books',
-        method: 'GET',
-        endpoint: '/api/analytics/popular-books',
-        description: 'Get most viewed/popular books',
-        queryParams: {
-          limit: 10,
-        },
-      },
-      {
-        name: 'Track Content View',
-        method: 'POST',
-        endpoint: '/api/analytics/track',
-        description: 'Track user content interaction',
-        body: {
-          userId: '1',
-          contentId: '1',
-          contentType: 'book',
-          action: 'view',
-        },
-      },
-      {
-        name: 'Get User Progress',
-        method: 'GET',
-        endpoint: '/api/users/:userId/progress',
-        description: 'Get user learning progress',
+        name: 'Update Gallery Piece',
+        endpoint: '/api/gallery/:id',
+        method: 'PUT',
+        description: 'Update an existing gallery piece',
         needsAuth: true,
         params: {
-          userId: '1',
+          id: '123456789'
         },
-        queryParams: {
-          bookId: '1',
-        },
+        body: {
+          title: 'Updated Artwork',
+          description: 'Updated description',
+          visibility: 'public',
+          price: 150
+        }
       },
-    ],
+      {
+        name: 'Delete Gallery Piece',
+        endpoint: '/api/gallery/:id',
+        method: 'DELETE',
+        description: 'Delete a gallery piece',
+        needsAuth: true,
+        params: {
+          id: '123456789'
+        }
+      },
+      {
+        name: 'Batch Update Visibility',
+        endpoint: '/api/gallery/batch-visibility',
+        method: 'POST',
+        description: 'Update visibility for multiple pieces',
+        needsAuth: true,
+        body: {
+          ids: ['123456789', '987654321'],
+          visibility: 'public'
+        }
+      },
+      {
+        name: 'Batch Delete Pieces',
+        endpoint: '/api/gallery/batch-delete',
+        method: 'POST',
+        description: 'Delete multiple gallery pieces',
+        needsAuth: true,
+        body: {
+          ids: ['123456789', '987654321']
+        }
+      },
+      {
+        name: 'Get Collections',
+        endpoint: '/api/gallery/collections',
+        method: 'GET',
+        description: 'Get all gallery collections'
+      },
+      {
+        name: 'Get Artists',
+        endpoint: '/api/gallery/artists',
+        method: 'GET',
+        description: 'Get all artists'
+      },
+      {
+        name: 'Get Artist by ID',
+        endpoint: '/api/gallery/artists/:id',
+        method: 'GET',
+        description: 'Get specific artist details',
+        params: {
+          id: 'artist-1'
+        }
+      },
+      {
+        name: 'Get Artist Pieces',
+        endpoint: '/api/gallery/artists/:artistId/pieces',
+        method: 'GET',
+        description: 'Get all pieces by a specific artist',
+        params: {
+          artistId: 'artist-1',
+          limit: '20',
+          page: '1'
+        }
+      }
+    ]
   },
+  concepts: {
+    name: 'Concepts',
+    routes: [
+      {
+        name: 'Get All Concepts',
+        endpoint: '/api/concepts',
+        method: 'GET',
+        description: 'Get all concepts'
+      },
+      {
+        name: 'Search Concepts',
+        endpoint: '/api/concepts/search',
+        method: 'GET',
+        description: 'Search concepts',
+        params: {
+          q: 'algebra'
+        }
+      }
+    ]
+  },
+  progress: {
+    name: 'Progress',
+    routes: [
+      {
+        name: 'Get Progress',
+        endpoint: '/api/progress',
+        method: 'GET',
+        description: 'Get user progress summary',
+        needsAuth: true
+      },
+      {
+        name: 'Get Book Progress',
+        endpoint: '/api/progress/book/:bookId',
+        method: 'GET',
+        description: 'Get progress for specific book',
+        needsAuth: true,
+        params: {
+          bookId: '123'
+        }
+      }
+    ]
+  }
 };
-
-// Helper function to get all routes flat
-export function getAllRoutes(): RouteDefinition[] {
-  return Object.values(API_ROUTES).flatMap(category => category.routes);
-}
-
-// Helper function to get routes by category
-export function getRoutesByCategory(categoryKey: string): RouteDefinition[] {
-  return API_ROUTES[categoryKey]?.routes || [];
-}
-
-// Helper function to get authenticated routes only
-export function getAuthenticatedRoutes(): RouteDefinition[] {
-  return getAllRoutes().filter(route => route.needsAuth);
-}
-
-// Helper function to get public routes only
-export function getPublicRoutes(): RouteDefinition[] {
-  return getAllRoutes().filter(route => !route.needsAuth);
-}
-
-// Helper to replace URL parameters
-export function replaceRouteParams(endpoint: string, params?: Record<string, string>): string {
-  if (!params) return endpoint;
-  
-  let url = endpoint;
-  Object.entries(params).forEach(([key, value]) => {
-    url = url.replace(`:${key}`, value);
-  });
-  return url;
-}
-
-// Helper to build query string
-export function buildQueryString(params?: Record<string, any>): string {
-  if (!params) return '';
-  
-  const query = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      query.append(key, String(value));
-    }
-  });
-  
-  const queryString = query.toString();
-  return queryString ? `?${queryString}` : '';
-}
