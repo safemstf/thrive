@@ -1,6 +1,7 @@
 // src/components/gallery/utils/index.ts
 
-import { GalleryPiece, GalleryFilters, GalleryVisibility } from '@/types//gallery.types';
+import { GalleryPiece, GalleryFilters, GalleryVisibility } from '@/types/gallery.types';
+
 // ==================== Constants ====================
 export const GALLERY_CONSTANTS = {
   ITEMS_PER_PAGE: 20,
@@ -221,7 +222,7 @@ export const buildGalleryQueryParams = (
     params.append('q', filters.searchQuery);
   }
 
-  // ← NEW: only append owner if it’s defined
+  // ← NEW: only append owner if it's defined
   if (filters.owner) {
     params.append('owner', filters.owner);
   }
@@ -229,17 +230,29 @@ export const buildGalleryQueryParams = (
   return params;
 };
 
-
 // ==================== Batch Operations ====================
 export const batchUpdateVisibility = async (
   pieceIds: string[],
   visibility: GalleryVisibility
 ): Promise<void> => {
-  const { galleryApi } = await import('@/lib/api/gallery-api-client');
-  return galleryApi.batchUpdateVisibility(pieceIds, visibility);
+  // Import the api utilities from the main api-client file
+  const { api } = await import('@/lib/api-client');
+  
+  // Get the gallery client instance through the API utilities
+  const galleryClient = api.gallery;
+  
+  // Since the gallery client doesn't have batchUpdateVisibility in the api utilities,
+  // we need to get the actual client instance
+  const { getApiClient } = await import('@/lib/api-client');
+  const client = getApiClient();
+  
+  return client.gallery.batchUpdateVisibility(pieceIds, visibility);
 };
 
 export const batchDeletePieces = async (pieceIds: string[]): Promise<void> => {
-  const { galleryApi } = await import('@/lib/api/gallery-api-client');
-  return galleryApi.batchDeletePieces(pieceIds);
+  // Import and use the API client properly
+  const { getApiClient } = await import('@/lib/api-client');
+  const client = getApiClient();
+  
+  return client.gallery.batchDeletePieces(pieceIds);
 };
