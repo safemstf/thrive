@@ -457,7 +457,6 @@ export const Gallery: React.FC<GalleryProps> = ({
     <UploaderModal>
       <UploaderContent>
         <UploaderHeader>
-          <h2>Upload Artwork</h2>
           <button onClick={() => updateState({ showUploader: false })}>
             <X size={24} />
           </button>

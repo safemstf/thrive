@@ -1,206 +1,237 @@
-// src/hooks/useApiTester.ts
-import { useState, useCallback } from 'react';
-import { RouteDefinition, replaceRouteParams, buildQueryString } from '@/config/api-routes';
-import { config } from '@/config/environment';
+// hooks/useApiTester.ts
+import { useState, useCallback, useRef } from 'react';
+import { replaceRouteParams, buildQueryString } from '@/config/api-routes';
 
-export interface TestResult {
-  route: RouteDefinition;
-  status: 'pending' | 'running' | 'success' | 'error';
+// Define RouteDefinition interface locally to match the updated one
+interface RouteDefinition {
+  name: string;
+  endpoint: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  description: string;
+  needsAuth?: boolean;
+  params?: Record<string, string>;
+  queryParams?: Record<string, any>;
+  body?: any;
+  skipInBatchTest?: boolean;
+}
+
+interface TestResult {
+  status: 'success' | 'error' | 'running' | 'pending';
   response?: {
     status: number;
-    statusText: string;
     data: any;
-    headers: Record<string, string>;
     duration: number;
   };
   error?: string;
 }
 
-export interface ApiTesterOptions {
-  baseUrl?: string;
-  authToken?: string;
-  onTestComplete?: (result: TestResult) => void;
-  onAllTestsComplete?: (results: TestResult[]) => void;
+interface UseApiTesterOptions {
+  baseUrl: string;
 }
 
-export function useApiTester(options: ApiTesterOptions = {}) {
+export function useApiTester({ baseUrl }: UseApiTesterOptions) {
   const [results, setResults] = useState<Record<string, TestResult>>({});
   const [isRunning, setIsRunning] = useState(false);
-  const [authToken, setAuthToken] = useState(options.authToken || null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const baseUrl = options.baseUrl || config.api.baseUrl;
-
-  // Test a single route
-  const testRoute = useCallback(async (route: RouteDefinition, categoryKey?: string) => {
-    const testKey = categoryKey ? `${categoryKey}-${route.name}` : route.name;
+  // Generate unique test data for each test run
+  const generateTestData = (template: any): any => {
+    // If template is a function, call it to get dynamic data
+    if (typeof template === 'function') {
+      return template();
+    }
     
-    // Set status to running
-    setResults(prev => ({
-      ...prev,
-      [testKey]: { route, status: 'running' }
-    }));
+    if (!template) return template;
+    
+    const result = { ...template };
+    
+    // Generate unique username if present
+    if (result.username && typeof result.username === 'string') {
+      result.username = `testuser_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    
+    // Generate unique email if present
+    if (result.email && typeof result.email === 'string') {
+      result.email = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@example.com`;
+    }
+    
+    // Generate unique title if present (for books, gallery items, etc.)
+    if (result.title && typeof result.title === 'string' && result.title.includes('Test')) {
+      result.title = `${result.title} ${Date.now()}`;
+    }
+    
+    // Generate unique simulation_id if present
+    if (result.simulation_id && typeof result.simulation_id === 'string') {
+      result.simulation_id = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    
+    return result;
+  };
 
+  const makeRequest = async (
+    route: RouteDefinition,
+    overrideBody?: any
+  ): Promise<{ status: number; data: any; duration: number }> => {
     const startTime = Date.now();
-
+    
+    // Build the URL
+    let url = `${baseUrl}${replaceRouteParams(route.endpoint, route.params)}`;
+    
+    // Add query parameters
+    if (route.queryParams) {
+      url += buildQueryString(route.queryParams);
+    }
+    
+    // Prepare headers
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
+    
+    // Add auth token if needed
+    if (route.needsAuth && authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    
+    // Prepare body with unique data
+    const body = overrideBody || (route.body ? generateTestData(route.body) : undefined);
+    
+    // Create abort controller for this request
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
     try {
-      // Build URL
-      const endpoint = replaceRouteParams(route.endpoint, route.params);
-      const queryString = buildQueryString(route.queryParams);
-      const url = `${baseUrl}${endpoint}${queryString}`;
-
-      // Build headers
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      };
-
-      // Add auth token if needed
-      if (route.needsAuth && authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-
-      // Make request
       const response = await fetch(url, {
         method: route.method,
         headers,
-        ...(route.body && route.body !== 'FormData with image file' 
-          ? { body: JSON.stringify(route.body) } 
-          : {}),
-        credentials: 'include',
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
       });
-
+      
       const duration = Date.now() - startTime;
-
-      // Parse response
-      let data: any;
+      
+      let data;
       const contentType = response.headers.get('content-type');
       
-      if (contentType?.includes('application/json')) {
+      if (contentType && contentType.includes('application/json')) {
         data = await response.json();
-      } else if (contentType?.includes('text/')) {
-        data = await response.text();
       } else {
-        data = null;
+        data = await response.text();
       }
-
-      // Extract headers
-      const responseHeaders: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        responseHeaders[key] = value;
-      });
-
-      // Check if this was a login route and extract token
-      if (route.name === 'Login' && response.ok && data.token) {
+      
+      // Store auth token from login response
+      if (route.endpoint === '/api/auth/login' && response.ok && data.token) {
         setAuthToken(data.token);
       }
-
-      // Create result
-      const result: TestResult = {
-        route,
-        status: response.ok ? 'success' : 'error',
-        response: {
-          status: response.status,
-          statusText: response.statusText,
-          data,
-          headers: responseHeaders,
-          duration,
-        },
+      
+      return {
+        status: response.status,
+        data,
+        duration,
       };
-
-      // Update results
-      setResults(prev => ({
-        ...prev,
-        [testKey]: result
-      }));
-
-      // Call callback if provided
-      if (options.onTestComplete) {
-        options.onTestComplete(result);
-      }
-
-      return result;
-    } catch (error) {
+    } catch (error: any) {
       const duration = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      const result: TestResult = {
-        route,
-        status: 'error',
-        error: errorMessage,
-        response: {
-          status: 0,
-          statusText: 'Network Error',
-          data: { error: errorMessage },
-          headers: {},
-          duration,
-        },
-      };
+      if (error.name === 'AbortError') {
+        throw new Error('Request cancelled');
+      }
+      
+      throw error;
+    }
+  };
 
+  const testRoute = useCallback(
+    async (route: RouteDefinition, category: string, overrideBody?: any) => {
+      const testKey = `${category}-${route.name}`;
+      
+      // Skip if already running
+      if (results[testKey]?.status === 'running') {
+        return;
+      }
+      
+      // Update status to running
       setResults(prev => ({
         ...prev,
-        [testKey]: result
+        [testKey]: { status: 'running' },
       }));
-
-      if (options.onTestComplete) {
-        options.onTestComplete(result);
-      }
-
-      return result;
-    }
-  }, [baseUrl, authToken, options]);
-
-  // Test multiple routes
-  const testRoutes = useCallback(async (routes: RouteDefinition[], categoryKey?: string) => {
-    setIsRunning(true);
-    const testResults: TestResult[] = [];
-
-    for (const route of routes) {
-      const result = await testRoute(route, categoryKey);
-      testResults.push(result);
       
-      // Small delay between tests
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
+      try {
+        const response = await makeRequest(route, overrideBody);
+        
+        // Determine if response is successful
+        const isSuccess = response.status >= 200 && response.status < 300;
+        
+        setResults(prev => ({
+          ...prev,
+          [testKey]: {
+            status: isSuccess ? 'success' : 'error',
+            response,
+            error: isSuccess ? undefined : `HTTP ${response.status}`,
+          },
+        }));
+      } catch (error: any) {
+        setResults(prev => ({
+          ...prev,
+          [testKey]: {
+            status: 'error',
+            error: error.message || 'Unknown error',
+          },
+        }));
+      }
+    },
+    [baseUrl, authToken, results]
+  );
 
-    setIsRunning(false);
+  const testRoutes = useCallback(
+    async (routes: RouteDefinition[], category: string) => {
+      setIsRunning(true);
+      
+      for (const route of routes) {
+        // Skip routes marked to skip in batch tests
+        if (route.skipInBatchTest) {
+          console.log(`Skipping ${route.name} in batch test`);
+          continue;
+        }
+        
+        // Check if we need auth but don't have a token
+        if (route.needsAuth && !authToken) {
+          console.log(`Skipping ${route.name} - requires auth`);
+          continue;
+        }
+        
+        await testRoute(route, category);
+        
+        // Add a small delay between requests to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      setIsRunning(false);
+    },
+    [testRoute, authToken]
+  );
 
-    if (options.onAllTestsComplete) {
-      options.onAllTestsComplete(testResults);
-    }
-
-    return testResults;
-  }, [testRoute, options]);
-
-  // Clear results
   const clearResults = useCallback(() => {
+    // Cancel any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
     setResults({});
+    setIsRunning(false);
   }, []);
 
-  // Get result for specific test
-  const getResult = useCallback((testKey: string) => {
-    return results[testKey];
-  }, [results]);
-
-  // Get all results as array
-  const getAllResults = useCallback(() => {
-    return Object.values(results);
-  }, [results]);
-
-  // Update auth token
-  const updateAuthToken = useCallback((token: string | null) => {
-    setAuthToken(token);
+  const resetAuth = useCallback(() => {
+    setAuthToken(null);
   }, []);
 
   return {
-    testRoute,
-    testRoutes,
     results,
     isRunning,
-    clearResults,
-    getResult,
-    getAllResults,
     authToken,
-    updateAuthToken,
+    testRoute,
+    testRoutes,
+    clearResults,
+    resetAuth,
   };
 }

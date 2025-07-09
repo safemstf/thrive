@@ -6,7 +6,9 @@ export interface RouteDefinition {
   description: string;
   needsAuth?: boolean;
   params?: Record<string, string>;
+  queryParams?: Record<string, any>;
   body?: any;
+  skipInBatchTest?: boolean; // Add this to skip certain routes in batch testing
 }
 
 export interface RouteCategory {
@@ -26,6 +28,27 @@ export function replaceRouteParams(
   }
   return url;
 }
+
+export function buildQueryString(params?: Record<string, any>): string {
+  if (!params || Object.keys(params).length === 0) {
+    return '';
+  }
+  
+  const searchParams = new URLSearchParams();
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== null && value !== undefined) {
+      searchParams.append(key, String(value));
+    }
+  });
+  
+  const queryString = searchParams.toString();
+  return queryString ? `?${queryString}` : '';
+}
+
+// Generate unique test data helpers
+export const generateUniqueUsername = () => `testuser_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+export const generateUniqueEmail = () => `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@example.com`;
 
 export const API_ROUTES: Record<string, RouteCategory> = {
   system: {
@@ -59,12 +82,13 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         endpoint: '/api/auth/register',
         method: 'POST',
         description: 'Register a new user',
-        body: {
-          username: 'testuser',
-          email: 'test@example.com',
+        body: () => ({
+          username: generateUniqueUsername(),
+          email: generateUniqueEmail(),
           password: 'password123',
           name: 'Test User'
-        }
+        }),
+        skipInBatchTest: true // Skip in batch tests to avoid conflicts
       },
       {
         name: 'Login',
@@ -90,7 +114,7 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         description: 'Update user profile',
         needsAuth: true,
         body: {
-          name: 'Updated Name',
+          name: 'User',
           preferences: {
             theme: 'dark'
           }
@@ -115,7 +139,7 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         description: 'Get user by ID',
         needsAuth: true,
         params: {
-          id: '123'
+          id: '684b5492bf70237d7f29fc92'
         }
       }
     ]
@@ -127,7 +151,11 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         name: 'Get All Books',
         endpoint: '/api/books',
         method: 'GET',
-        description: 'Get all books with filtering'
+        description: 'Get all books with filtering',
+        queryParams: {
+          page: '1',
+          limit: '10'
+        }
       },
       {
         name: 'Get Book by ID',
@@ -135,23 +163,35 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         method: 'GET',
         description: 'Get single book',
         params: {
-          id: '123'
+          id: '507f1f77bcf86cd799439011' // Use a valid MongoDB ObjectId format
+        }
+      },
+      {
+        name: 'Get Books by Category',
+        endpoint: '/api/books/category/:mainCategory',
+        method: 'GET',
+        description: 'Get books by category',
+        params: {
+          mainCategory: 'Mathematics'
         }
       },
       {
         name: 'Create Book',
         endpoint: '/api/books',
         method: 'POST',
-        description: 'Create new book',
+        description: 'Create new book (admin only)',
         needsAuth: true,
-        body: {
-          title: 'Test Book',
+        body: () => ({
+          title: `Test Book ${Date.now()}`,
           author: 'Test Author',
           description: 'A test book',
-          gradeLevel: 'high school',
-          subject: 'Mathematics',
-          difficulty: 'intermediate'
-        }
+          mainCategory: 'Mathematics',
+          subCategory: 'Algebra',
+          gradeLevel: 'High School',
+          difficulty: 'Intermediate',
+          isbn: `TEST-${Date.now()}`,
+          concepts: []
+        })
       }
     ]
   },
@@ -162,13 +202,10 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         name: 'Get Gallery Pieces',
         endpoint: '/api/gallery',
         method: 'GET',
-        description: 'Get gallery items with pagination and filtering',
-        params: {
+        description: 'Get gallery items with pagination',
+        queryParams: {
           limit: '10',
-          page: '1',
-          visibility: 'public',
-          sortBy: 'createdAt',
-          sortOrder: 'desc'
+          page: '1'
         }
       },
       {
@@ -176,7 +213,7 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         endpoint: '/api/gallery/featured',
         method: 'GET',
         description: 'Get featured gallery items',
-        params: {
+        queryParams: {
           limit: '6'
         }
       },
@@ -192,18 +229,17 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         method: 'GET',
         description: 'Get a specific gallery piece by ID',
         params: {
-          id: '123456789'
-        },
-        needsAuth: false
+          id: '507f1f77bcf86cd799439011' // Use a valid MongoDB ObjectId format
+        }
       },
       {
         name: 'Create Gallery Piece',
         endpoint: '/api/gallery',
         method: 'POST',
-        description: 'Create a new gallery piece (without file upload)',
+        description: 'Create a new gallery piece',
         needsAuth: true,
         body: {
-          title: 'Test Artwork',
+          title: `Test Artwork ${Date.now()}`,
           description: 'A test gallery piece',
           artist: 'Test Artist',
           visibility: 'private',
@@ -211,86 +247,73 @@ export const API_ROUTES: Record<string, RouteCategory> = {
           category: 'digital',
           price: 100,
           currency: 'USD'
-        }
-      },
-      {
-        name: 'Update Gallery Piece',
-        endpoint: '/api/gallery/:id',
-        method: 'PUT',
-        description: 'Update an existing gallery piece',
-        needsAuth: true,
-        params: {
-          id: '123456789'
         },
-        body: {
-          title: 'Updated Artwork',
-          description: 'Updated description',
-          visibility: 'public',
-          price: 150
+        skipInBatchTest: true
+      }
+    ]
+  },
+  portfolios: {
+    name: 'Portfolios',
+    routes: [
+      {
+        name: 'Get All Portfolios',
+        endpoint: '/api/portfolios',
+        method: 'GET',
+        description: 'Get all portfolios with filtering'
+      },
+      {
+        name: 'Discover Portfolios',
+        endpoint: '/api/portfolios/discover',
+        method: 'GET',
+        description: 'Discover portfolios with pagination',
+        queryParams: {
+          page: '1',
+          limit: '10'
         }
       },
       {
-        name: 'Delete Gallery Piece',
-        endpoint: '/api/gallery/:id',
-        method: 'DELETE',
-        description: 'Delete a gallery piece',
-        needsAuth: true,
+        name: 'Get Featured Portfolios',
+        endpoint: '/api/portfolios/featured',
+        method: 'GET',
+        description: 'Get featured portfolios'
+      },
+      {
+        name: 'Search Portfolios',
+        endpoint: '/api/portfolios/search',
+        method: 'GET',
+        description: 'Search portfolios',
+        queryParams: {
+          q: 'design'
+        }
+      },
+      {
+        name: 'Get Portfolio Stats',
+        endpoint: '/api/portfolios/stats',
+        method: 'GET',
+        description: 'Get portfolio statistics'
+      },
+      {
+        name: 'Get Portfolio by Username',
+        endpoint: '/api/portfolios/:username',
+        method: 'GET',
+        description: 'Get specific portfolio by username',
         params: {
-          id: '123456789'
+          username: 'jane_designer'
         }
       },
       {
-        name: 'Batch Update Visibility',
-        endpoint: '/api/gallery/batch-visibility',
+        name: 'Create Portfolio',
+        endpoint: '/api/portfolios',
         method: 'POST',
-        description: 'Update visibility for multiple pieces',
+        description: 'Create new portfolio',
         needsAuth: true,
         body: {
-          ids: ['123456789', '987654321'],
-          visibility: 'public'
-        }
-      },
-      {
-        name: 'Batch Delete Pieces',
-        endpoint: '/api/gallery/batch-delete',
-        method: 'POST',
-        description: 'Delete multiple gallery pieces',
-        needsAuth: true,
-        body: {
-          ids: ['123456789', '987654321']
-        }
-      },
-      {
-        name: 'Get Collections',
-        endpoint: '/api/gallery/collections',
-        method: 'GET',
-        description: 'Get all gallery collections'
-      },
-      {
-        name: 'Get Artists',
-        endpoint: '/api/gallery/artists',
-        method: 'GET',
-        description: 'Get all artists'
-      },
-      {
-        name: 'Get Artist by ID',
-        endpoint: '/api/gallery/artists/:id',
-        method: 'GET',
-        description: 'Get specific artist details',
-        params: {
-          id: 'artist-1'
-        }
-      },
-      {
-        name: 'Get Artist Pieces',
-        endpoint: '/api/gallery/artists/:artistId/pieces',
-        method: 'GET',
-        description: 'Get all pieces by a specific artist',
-        params: {
-          artistId: 'artist-1',
-          limit: '20',
-          page: '1'
-        }
+          username: generateUniqueUsername(),
+          name: 'Test Portfolio',
+          bio: 'Test portfolio description',
+          tags: ['test', 'portfolio']
+        },
+        skipInBatchTest: true
       }
     ]
   },
@@ -308,8 +331,17 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         endpoint: '/api/concepts/search',
         method: 'GET',
         description: 'Search concepts',
-        params: {
+        queryParams: {
           q: 'algebra'
+        }
+      },
+      {
+        name: 'Get Concepts by Type',
+        endpoint: '/api/concepts/type/:type',
+        method: 'GET',
+        description: 'Get concepts by type',
+        params: {
+          type: 'math'
         }
       }
     ]
@@ -331,7 +363,58 @@ export const API_ROUTES: Record<string, RouteCategory> = {
         description: 'Get progress for specific book',
         needsAuth: true,
         params: {
-          bookId: '123'
+          bookId: '507f1f77bcf86cd799439011' // Use a valid MongoDB ObjectId format
+        }
+      },
+      {
+        name: 'Get Progress Stats',
+        endpoint: '/api/progress/stats',
+        method: 'GET',
+        description: 'Get detailed progress statistics',
+        needsAuth: true
+      }
+    ]
+  },
+  simulations: {
+    name: 'Simulations',
+    routes: [
+      {
+        name: 'Get All Simulations',
+        endpoint: '/api/simulations',
+        method: 'GET',
+        description: 'Get all simulations with filtering',
+        queryParams: {
+          limit: '10',
+          page: '1'
+        }
+      },
+      {
+        name: 'Register Simulation',
+        endpoint: '/api/simulations',
+        method: 'POST',
+        description: 'Register new simulation',
+        body: {
+          simulation_id: `sim_${Date.now()}`,
+          name: 'Test Simulation',
+          type: 'test',
+          config: {
+            test: true
+          }
+        }
+      },
+      {
+        name: 'Get Simulation Stats',
+        endpoint: '/api/simulations/stats',
+        method: 'GET',
+        description: 'Get comprehensive simulation statistics'
+      },
+      {
+        name: 'Get Simulation by ID',
+        endpoint: '/api/simulations/:id',
+        method: 'GET',
+        description: 'Get specific simulation details',
+        params: {
+          id: 'sim_test'
         }
       }
     ]

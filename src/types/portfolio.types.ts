@@ -256,6 +256,7 @@ export interface PortfolioWithPieces extends Portfolio {
 }
 
 export interface PortfolioListResponse {
+  data: Portfolio[];
   portfolios: Portfolio[];
   total: number;
   page: number;
