@@ -42,7 +42,6 @@ export interface GalleryAPI {
 }
 
 export class GalleryApiClient extends BaseApiClient implements GalleryAPI {
-  // Fix: Accept optional baseURL parameter like other API clients
   constructor(baseURL?: string) {
     super(baseURL);
   }
@@ -132,7 +131,12 @@ export class GalleryApiClient extends BaseApiClient implements GalleryAPI {
     formData.append('image', file);
     
     if (metadata) {
-      formData.append('metadata', JSON.stringify(metadata));
+      // Add metadata fields individually to FormData
+      Object.entries(metadata).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
+        }
+      });
     }
 
     // Get auth token manually to ensure it's present
@@ -141,77 +145,47 @@ export class GalleryApiClient extends BaseApiClient implements GalleryAPI {
       throw new APIError('Authentication required for file upload', 401, 'NO_AUTH_TOKEN');
     }
 
-    const url = `${this.baseURL}/api/gallery/upload`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for uploads
+    // Build the URL - the BaseApiClient will add /api prefix
+    const endpoint = '/gallery/upload';
     
     try {
-      console.log(`[Gallery] Uploading file to: ${url}`);
+      console.log(`[Gallery] Starting upload...`);
       console.log(`[Gallery] File details:`, {
         name: file.name,
         size: file.size,
         type: file.type,
       });
+      console.log(`[Gallery] Metadata:`, metadata);
       
-      const headers: HeadersInit = {
-        'ngrok-skip-browser-warning': 'true',
-        'Authorization': `Bearer ${token}`,
-      };
-      // Note: Don't set Content-Type for FormData, let browser set it with boundary
-
-      const response = await fetch(url, {
+      // Use the base request method which handles URL construction
+      const result = await this.request<{ url: string; thumbnailUrl?: string }>(endpoint, {
         method: 'POST',
-        headers,
         body: formData,
-        signal: controller.signal,
-        mode: 'cors',
-        credentials: 'omit',
+        headers: {
+          // Remove Content-Type to let browser set it with boundary
+          'Content-Type': undefined as any,
+        },
+        timeout: 60000, // 60 second timeout for uploads
       });
-
-      clearTimeout(timeoutId);
-
-      console.log(`[Gallery] Upload response status: ${response.status}`);
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch {
-          errorData = { message: response.statusText };
-        }
-        
-        console.error(`[Gallery] Upload failed:`, errorData);
-        
-        throw new APIError(
-          errorData.message || `Upload failed: ${response.statusText}`,
-          response.status,
-          errorData.code || 'UPLOAD_FAILED',
-          errorData.details
-        );
-      }
-
-      const result = await response.json();
+      
       console.log(`[Gallery] Upload successful:`, result);
       return result;
     } catch (error) {
-      clearTimeout(timeoutId);
+      console.error(`[Gallery] Upload failed:`, error);
       
       if (error instanceof APIError) {
-        throw error;
-      }
-      
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          throw new APIError('Upload timeout - file may be too large', 408, 'UPLOAD_TIMEOUT');
+        // Improve error messages
+        if (error.status === 404) {
+          throw new APIError(
+            'Upload endpoint not found. Please check if the backend has /api/gallery/upload endpoint.',
+            404,
+            'UPLOAD_ENDPOINT_NOT_FOUND'
+          );
         }
-        
-        console.error(`[Gallery] Upload error:`, error);
-        throw new APIError(error.message, undefined, 'UPLOAD_ERROR');
+        throw error;
       }
       
       throw new APIError('Upload failed with unknown error', undefined, 'UNKNOWN_UPLOAD_ERROR');
     }
   }
 }
-

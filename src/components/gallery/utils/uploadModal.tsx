@@ -1,5 +1,5 @@
 // components/gallery/utils/uploadModal.tsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
 import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,6 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<string>('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -36,40 +35,6 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Debug localStorage and auth state
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const tokenKeys = ['auth-token', 'token', 'accessToken', 'authToken', 'jwt', 'bearer'];
-      const foundTokens: string[] = [];
-      
-      tokenKeys.forEach(key => {
-        const value = localStorage.getItem(key);
-        if (value) {
-          foundTokens.push(`${key}: ${value.substring(0, 20)}...`);
-        }
-      });
-      
-      // Also check for any keys that might contain 'token' or 'auth'
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.toLowerCase().includes('token') || key.toLowerCase().includes('auth'))) {
-          if (!tokenKeys.includes(key)) {
-            const value = localStorage.getItem(key);
-            if (value) {
-              foundTokens.push(`${key}: ${value.substring(0, 20)}...`);
-            }
-          }
-        }
-      }
-      
-      setDebugInfo(`
-Auth State: ${isAuthenticated ? 'Authenticated' : 'Not Authenticated'}
-User: ${user ? JSON.stringify({id: user.id, name: user.name, email: user.email}) : 'null'}
-Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') : 'None found'}
-      `.trim());
-    }
-  }, [isAuthenticated, user]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -106,94 +71,6 @@ Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') 
     }));
   };
 
-  // Try to manually set the auth token before upload
-  const ensureAuthToken = () => {
-    if (typeof window === 'undefined') return false;
-    
-    // Common token storage keys to check
-    const tokenKeys = ['auth-token', 'token', 'accessToken', 'authToken', 'jwt', 'bearer'];
-    
-    for (const key of tokenKeys) {
-      const token = localStorage.getItem(key);
-      if (token) {
-        // Set it to the expected key if it's not already there
-        if (key !== 'auth-token') {
-          localStorage.setItem('auth-token', token);
-          console.log(`Found token under ${key}, copied to auth-token`);
-        }
-        return true;
-      }
-    }
-    
-    // Check if there's any localStorage key containing token data
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && (key.toLowerCase().includes('token') || key.toLowerCase().includes('auth'))) {
-        const value = localStorage.getItem(key);
-        if (value && !tokenKeys.includes(key)) {
-          try {
-            // Try to parse if it's JSON
-            const parsed = JSON.parse(value);
-            if (parsed.token || parsed.accessToken || parsed.authToken) {
-              const actualToken = parsed.token || parsed.accessToken || parsed.authToken;
-              localStorage.setItem('auth-token', actualToken);
-              console.log(`Found token in ${key} object, extracted to auth-token`);
-              return true;
-            }
-          } catch {
-            // If it's not JSON, treat it as a direct token
-            localStorage.setItem('auth-token', value);
-            console.log(`Found token under ${key}, copied to auth-token`);
-            return true;
-          }
-        }
-      }
-    }
-    
-    return false;
-  };
-
-  // Custom upload function that handles auth differently
-  const uploadWithDirectAuth = async (file: File, metadata?: any) => {
-    // Since localStorage doesn't have the token, we need to get it from the auth context
-    // This is a temporary workaround - ideally your auth provider should expose the token
-    
-    // Try to get token from any possible auth context property
-    const authContext = useAuth() as any;
-    let token = null;
-    
-    // Common token property names in auth contexts
-    const tokenProps = ['token', 'accessToken', 'authToken', 'jwt', 'bearerToken'];
-    for (const prop of tokenProps) {
-      if (authContext[prop]) {
-        token = authContext[prop];
-        break;
-      }
-    }
-    
-    // If we still don't have a token, try to make a request to get one
-    // or check if the auth provider has a method to get the current token
-    if (!token && typeof authContext.getToken === 'function') {
-      token = await authContext.getToken();
-    }
-    
-    if (!token) {
-      throw new Error('No authentication token available. Please log out and log back in.');
-    }
-    
-    // Temporarily store the token for the API client
-    localStorage.setItem('auth-token', token);
-    
-    try {
-      // Now make the upload request
-      const result = await api.gallery.uploadImage(file, metadata);
-      return result;
-    } finally {
-      // Clean up temporary token storage if you prefer
-      // localStorage.removeItem('auth-token');
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -219,8 +96,9 @@ Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') 
     try {
       console.log('Starting upload process...');
       
-      // Use our custom upload function
-      const uploadResponse = await uploadWithDirectAuth(selectedFile, {
+      // The api.gallery.uploadImage uses the BaseApiClient which automatically
+      // includes the Bearer token from localStorage
+      const uploadResponse = await api.gallery.uploadImage(selectedFile, {
         title: formData.title,
         portfolioId
       });
@@ -270,7 +148,7 @@ Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') 
       }
       
       // Handle specific authentication errors
-      if (errorMessage.includes('token') || errorMessage.includes('auth') || errorMessage.includes('401')) {
+      if (errorMessage.includes('NO_AUTH_TOKEN') || errorMessage.includes('401')) {
         errorMessage = 'Authentication failed. Please try logging out and back in.';
       }
       
@@ -336,12 +214,6 @@ Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') 
         <ModalBody>
           <form onSubmit={handleSubmit}>
             <FormContent>
-              {/* Debug Info Section - Remove this in production */}
-              <DebugSection>
-                <DebugTitle>Debug Info (remove in production):</DebugTitle>
-                <DebugText>{debugInfo}</DebugText>
-              </DebugSection>
-              
               <UploadSection>
                 <input
                   ref={fileInputRef}
@@ -515,7 +387,7 @@ Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') 
   );
 };
 
-// Styled Components with Debug Section
+// Styled Components (keeping all the same styles but removing debug section)
 const ModalOverlay = styled.div`
   position: fixed;
   inset: 0;
@@ -610,32 +482,6 @@ const ModalBody = styled.div`
 
 const FormContent = styled.div`
   padding: 1.5rem 2rem;
-`;
-
-// Debug styles (remove in production)
-const DebugSection = styled.div`
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1.5rem;
-`;
-
-const DebugTitle = styled.h4`
-  margin: 0 0 0.5rem 0;
-  color: #856404;
-  font-size: 0.875rem;
-  font-weight: 600;
-`;
-
-const DebugText = styled.pre`
-  margin: 0;
-  font-size: 0.75rem;
-  white-space: pre-wrap;
-  color: #6c5700;
-  background: rgba(255, 255, 255, 0.5);
-  padding: 0.5rem;
-  border-radius: 4px;
 `;
 
 const UploadSection = styled.div`

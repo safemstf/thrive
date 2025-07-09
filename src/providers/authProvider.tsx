@@ -4,6 +4,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, AuthContextType, SignupCredentials } from '@/types/auth.types';
 import { useRouter } from 'next/navigation';
+import { api } from '@/lib/api-client';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -17,18 +18,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me', {
-        credentials: 'include',
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-      } else {
+      // Check if we have a token
+      const token = localStorage.getItem('auth-token');
+      if (!token) {
         setUser(null);
+        setLoading(false);
+        return;
       }
+
+      // Use the API client to get current user
+      const currentUser = await api.auth.getCurrentUser();
+      setUser(currentUser);
     } catch (error) {
       console.error('Auth check failed:', error);
+      // If auth check fails, clear the token
+      localStorage.removeItem('auth-token');
       setUser(null);
     } finally {
       setLoading(false);
@@ -40,56 +44,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [checkAuth]);
 
   const login = async (usernameOrEmail: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        usernameOrEmail,   // ← send this key
+    try {
+      // Use the API client which will automatically store the token
+      const response = await api.auth.login({
+        email: usernameOrEmail, // The API client will convert this to usernameOrEmail
         password
-      }),
-    });
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Login failed');
+      if (response.user) {
+        setUser(response.user);
+        
+        // Redirect as before
+        const searchParams = new URLSearchParams(window.location.search);
+        const redirect = searchParams.get('redirect') || '/dashboard';
+        router.push(redirect);
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
-
-    const data = await response.json();
-    setUser(data.user);
-
-    // Redirect as before
-    const searchParams = new URLSearchParams(window.location.search);
-    const redirect = searchParams.get('redirect') || '/dashboard';
-    router.push(redirect);
   };
 
   const signup = async (credentials: SignupCredentials) => {
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Signup failed');
+    try {
+      // Use the API client which will automatically store the token
+      const response = await api.auth.signup(credentials);
+      
+      if (response.user) {
+        setUser(response.user);
+        router.push('/dashboard');
+      }
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
     }
-
-    const data = await response.json();
-    setUser(data.user);
-    router.push('/dashboard');
   };
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
+      // Use the API client which will clear the token
+      await api.auth.logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -99,28 +93,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateUser = async (updates: Partial<User>) => {
-    const response = await fetch('/api/auth/me', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(updates),
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Update failed');
+    try {
+      const updatedUser = await api.auth.updateProfile(updates);
+      setUser(updatedUser);
+    } catch (error) {
+      console.error('Update user error:', error);
+      throw error;
     }
-
-    const data = await response.json();
-    setUser(data.user);
   };
 
   return (
     <AuthContext.Provider value={{ 
       user, 
-      isAuthenticated,  // Add this property
+      isAuthenticated,
       login, 
       logout, 
       loading, 
