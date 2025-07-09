@@ -153,6 +153,47 @@ Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') 
     return false;
   };
 
+  // Custom upload function that handles auth differently
+  const uploadWithDirectAuth = async (file: File, metadata?: any) => {
+    // Since localStorage doesn't have the token, we need to get it from the auth context
+    // This is a temporary workaround - ideally your auth provider should expose the token
+    
+    // Try to get token from any possible auth context property
+    const authContext = useAuth() as any;
+    let token = null;
+    
+    // Common token property names in auth contexts
+    const tokenProps = ['token', 'accessToken', 'authToken', 'jwt', 'bearerToken'];
+    for (const prop of tokenProps) {
+      if (authContext[prop]) {
+        token = authContext[prop];
+        break;
+      }
+    }
+    
+    // If we still don't have a token, try to make a request to get one
+    // or check if the auth provider has a method to get the current token
+    if (!token && typeof authContext.getToken === 'function') {
+      token = await authContext.getToken();
+    }
+    
+    if (!token) {
+      throw new Error('No authentication token available. Please log out and log back in.');
+    }
+    
+    // Temporarily store the token for the API client
+    localStorage.setItem('auth-token', token);
+    
+    try {
+      // Now make the upload request
+      const result = await api.gallery.uploadImage(file, metadata);
+      return result;
+    } finally {
+      // Clean up temporary token storage if you prefer
+      // localStorage.removeItem('auth-token');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -176,12 +217,10 @@ Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') 
     setError(null);
     
     try {
-      // Try to ensure we have the auth token in the right place
-      const hasToken = ensureAuthToken();
-      console.log('Token check result:', hasToken);
+      console.log('Starting upload process...');
       
-      // First upload the image
-      const uploadResponse = await api.gallery.uploadImage(selectedFile, {
+      // Use our custom upload function
+      const uploadResponse = await uploadWithDirectAuth(selectedFile, {
         title: formData.title,
         portfolioId
       });
@@ -189,6 +228,8 @@ Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') 
       if (!uploadResponse || !uploadResponse.url) {
         throw new Error('Upload failed - no URL returned');
       }
+      
+      console.log('Upload successful, creating gallery piece...');
       
       // Then create the gallery piece
       const tagsArray = formData.tags
@@ -216,6 +257,7 @@ Found tokens in localStorage: ${foundTokens.length > 0 ? foundTokens.join(', ') 
         uploadedBy: user?.id || ''
       });
       
+      console.log('Gallery piece created successfully!');
       onSuccess();
     } catch (error) {
       console.error('Upload error:', error);

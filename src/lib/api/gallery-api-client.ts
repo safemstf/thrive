@@ -1,4 +1,4 @@
-// lib/api/gallery-client.ts
+// lib/api/gallery-api-client.ts
 import { BaseApiClient, APIError } from './base-api-client';
 import {
   GalleryPiece,
@@ -10,7 +10,6 @@ import {
   ArtworkCategory,
   GalleryVisibility,
 } from '@/types/gallery.types';
-import { config } from '@/config/environment';
 
 export interface GalleryAPI {
   // Gallery pieces
@@ -40,20 +39,14 @@ export interface GalleryAPI {
   // Batch operations
   batchUpdateVisibility(pieceIds: string[], visibility: GalleryVisibility): Promise<void>;
   batchDeletePieces(pieceIds: string[]): Promise<void>;
-  
-  // Upload with options
-  uploadArtwork(file: File, options: {
-    visibility: GalleryVisibility;
-    generateThumbnail?: boolean;
-    optimizeImages?: boolean;
-    preserveMetadata?: boolean;
-    quality?: number;
-    maxWidth?: number;
-    maxHeight?: number;
-  }): Promise<GalleryPiece>;
 }
 
 export class GalleryApiClient extends BaseApiClient implements GalleryAPI {
+  // Fix: Accept optional baseURL parameter like other API clients
+  constructor(baseURL?: string) {
+    super(baseURL);
+  }
+
   async getPieces(params?: GalleryQueryParams): Promise<GalleryApiResponse> {
     return this.requestWithRetry<GalleryApiResponse>('/gallery', { params });
   }
@@ -134,93 +127,6 @@ export class GalleryApiClient extends BaseApiClient implements GalleryAPI {
     });
   }
 
-  async uploadArtwork(file: File, options: {
-    visibility: GalleryVisibility;
-    generateThumbnail?: boolean;
-    optimizeImages?: boolean;
-    preserveMetadata?: boolean;
-    quality?: number;
-    maxWidth?: number;
-    maxHeight?: number;
-  }): Promise<GalleryPiece> {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('visibility', options.visibility);
-    
-    if (options.generateThumbnail !== undefined) {
-      formData.append('generateThumbnail', String(options.generateThumbnail));
-    }
-    if (options.optimizeImages !== undefined) {
-      formData.append('optimizeImages', String(options.optimizeImages));
-    }
-    if (options.preserveMetadata !== undefined) {
-      formData.append('preserveMetadata', String(options.preserveMetadata));
-    }
-    if (options.quality !== undefined) {
-      formData.append('quality', String(options.quality));
-    }
-    if (options.maxWidth !== undefined) {
-      formData.append('maxWidth', String(options.maxWidth));
-    }
-    if (options.maxHeight !== undefined) {
-      formData.append('maxHeight', String(options.maxHeight));
-    }
-
-    const url = `${this.baseURL}/gallery/upload`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.api.timeout);
-    
-    try {
-      const token = this.getAuthToken();
-      const headers: HeadersInit = {
-        'ngrok-skip-browser-warning': 'true',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: formData,
-        signal: controller.signal,
-        mode: 'cors',
-        credentials: 'omit',
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new APIError(
-          errorData.message || `Upload failed: ${response.statusText}`,
-          response.status,
-          errorData.code,
-          errorData.details
-        );
-      }
-
-      return await response.json();
-    } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (error instanceof APIError) {
-        throw error;
-      }
-      
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          throw new APIError('Upload timeout', 408, 'TIMEOUT');
-        }
-        throw new APIError(error.message, undefined, 'UPLOAD_ERROR');
-      }
-      
-      throw new APIError('Upload failed', undefined, 'UNKNOWN');
-    }
-  }
-
   async uploadImage(file: File, metadata?: Record<string, any>): Promise<{ url: string; thumbnailUrl?: string }> {
     const formData = new FormData();
     formData.append('image', file);
@@ -229,20 +135,30 @@ export class GalleryApiClient extends BaseApiClient implements GalleryAPI {
       formData.append('metadata', JSON.stringify(metadata));
     }
 
-    const url = `${this.baseURL}/gallery/upload`;
+    // Get auth token manually to ensure it's present
+    const token = this.getAuthToken();
+    if (!token) {
+      throw new APIError('Authentication required for file upload', 401, 'NO_AUTH_TOKEN');
+    }
+
+    const url = `${this.baseURL}/api/gallery/upload`;
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.api.timeout);
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for uploads
     
     try {
-      const token = this.getAuthToken();
+      console.log(`[Gallery] Uploading file to: ${url}`);
+      console.log(`[Gallery] File details:`, {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      });
+      
       const headers: HeadersInit = {
         'ngrok-skip-browser-warning': 'true',
+        'Authorization': `Bearer ${token}`,
       };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      // Note: Don't set Content-Type for FormData, let browser set it with boundary
 
       const response = await fetch(url, {
         method: 'POST',
@@ -255,17 +171,29 @@ export class GalleryApiClient extends BaseApiClient implements GalleryAPI {
 
       clearTimeout(timeoutId);
 
+      console.log(`[Gallery] Upload response status: ${response.status}`);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { message: response.statusText };
+        }
+        
+        console.error(`[Gallery] Upload failed:`, errorData);
+        
         throw new APIError(
           errorData.message || `Upload failed: ${response.statusText}`,
           response.status,
-          errorData.code,
+          errorData.code || 'UPLOAD_FAILED',
           errorData.details
         );
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log(`[Gallery] Upload successful:`, result);
+      return result;
     } catch (error) {
       clearTimeout(timeoutId);
       
@@ -275,15 +203,15 @@ export class GalleryApiClient extends BaseApiClient implements GalleryAPI {
       
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new APIError('Upload timeout', 408, 'TIMEOUT');
+          throw new APIError('Upload timeout - file may be too large', 408, 'UPLOAD_TIMEOUT');
         }
+        
+        console.error(`[Gallery] Upload error:`, error);
         throw new APIError(error.message, undefined, 'UPLOAD_ERROR');
       }
       
-      throw new APIError('Upload failed', undefined, 'UNKNOWN');
+      throw new APIError('Upload failed with unknown error', undefined, 'UNKNOWN_UPLOAD_ERROR');
     }
   }
 }
 
-// Export singleton instance
-export const galleryApi = new GalleryApiClient();

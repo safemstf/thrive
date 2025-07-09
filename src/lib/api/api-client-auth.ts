@@ -1,7 +1,6 @@
 // lib/api/api-client-auth.ts
-import { BaseApiClient, APIError } from '@/lib/api/base-api-client';
+import { BaseApiClient, APIError } from './base-api-client';
 import { 
-  AuthAPI, 
   LoginCredentials, 
   AuthResponse, 
   User 
@@ -16,10 +15,22 @@ export interface SignupCredentials {
   lastName?: string;
 }
 
+// Auth API interface
+export interface AuthAPI {
+  login(credentials: LoginCredentials): Promise<AuthResponse>;
+  signup(credentials: SignupCredentials): Promise<AuthResponse>;
+  logout(): Promise<void>;
+  getCurrentUser(): Promise<User>;
+  updateProfile(updates: Partial<User>): Promise<User>;
+  refreshToken(): Promise<AuthResponse>;
+  verifyToken(token: string): Promise<User | null>;
+}
+
 export class AuthApiClient extends BaseApiClient implements AuthAPI {
-  // No need to override getAuthToken - it's already in BaseApiClient
-  
-  // No need to override request method - BaseApiClient already adds auth headers
+  // Add constructor to accept baseURL
+  constructor(baseURL?: string) {
+    super(baseURL);
+  }
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await this.requestWithRetry<AuthResponse>('/auth/login', {
@@ -33,6 +44,7 @@ export class AuthApiClient extends BaseApiClient implements AuthAPI {
     // Store token in localStorage for API calls
     if (response.token && typeof window !== 'undefined') {
       localStorage.setItem('auth-token', response.token);
+      console.log('[Auth] Token stored after login');
     }
 
     return response;
@@ -47,6 +59,7 @@ export class AuthApiClient extends BaseApiClient implements AuthAPI {
     // Store token in localStorage for API calls
     if (response.token && typeof window !== 'undefined') {
       localStorage.setItem('auth-token', response.token);
+      console.log('[Auth] Token stored after signup');
     }
 
     return response;
@@ -61,6 +74,7 @@ export class AuthApiClient extends BaseApiClient implements AuthAPI {
       // Always clear local storage, even if server request fails
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth-token');
+        console.log('[Auth] Token cleared after logout');
       }
     }
   }
@@ -123,9 +137,9 @@ export class AuthApiClient extends BaseApiClient implements AuthAPI {
 // Singleton for auth API
 let authApiClient: AuthApiClient;
 
-export function getAuthApiClient(): AuthApiClient {
+export function getAuthApiClient(baseURL?: string): AuthApiClient {
   if (!authApiClient) {
-    authApiClient = new AuthApiClient();
+    authApiClient = new AuthApiClient(baseURL);
   }
   return authApiClient;
 }
