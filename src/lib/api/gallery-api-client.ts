@@ -162,8 +162,6 @@ export class GalleryApiClient extends BaseApiClient implements GalleryAPI {
         method: 'POST',
         body: formData,
         headers: {
-          // Remove Content-Type to let browser set it with boundary
-          'Content-Type': undefined as any,
         },
         timeout: 60000, // 60 second timeout for uploads
       });

@@ -71,92 +71,186 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // SIMPLIFIED FRONTEND - components/gallery/utils/uploadModal.tsx
+// Update the handleSubmit function to send everything in one request
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!isAuthenticated) {
+    setError('You must be logged in to upload artwork');
+    return;
+  }
+  
+  if (!selectedFile) {
+    setError('Please select an image to upload');
+    return;
+  }
+  
+  if (!formData.title.trim()) {
+    setError('Please enter a title for your artwork');
+    return;
+  }
+  
+  setIsUploading(true);
+  setError(null);
+  
+  try {
+    console.log('Starting upload process...');
     
-    // Check authentication first
-    if (!isAuthenticated) {
-      setError('You must be logged in to upload artwork');
-      return;
+    // Parse tags
+    const tagsArray = formData.tags
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+    
+    // Send everything in one request
+    const uploadResponse = await api.gallery.uploadImage(selectedFile, {
+      // Gallery piece data
+      title: formData.title,
+      description: formData.description,
+      category: formData.category,
+      medium: formData.medium,
+      tags: tagsArray.join(','), // Send as comma-separated string
+      price: formData.price || '',
+      artist: formData.artist || user?.name || '',
+      year: formData.year.toString(),
+      portfolioId: portfolioId || '',
+      
+      // Upload settings
+      visibility: 'public',
+      generateThumbnail: 'true',
+      optimizeImages: 'true',
+      preserveMetadata: 'false',
+      quality: '0.9',
+      maxWidth: '2000',
+      maxHeight: '2000'
+    });
+    
+    if (!uploadResponse || !uploadResponse.url) {
+      throw new Error('Upload failed - no URL returned');
     }
     
-    if (!selectedFile) {
-      setError('Please select an image to upload');
-      return;
+    console.log('Upload and gallery piece creation successful!');
+    onSuccess();
+  } catch (error) {
+    console.error('Upload error:', error);
+    let errorMessage = 'Failed to upload artwork';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
     }
     
-    if (!formData.title.trim()) {
-      setError('Please enter a title for your artwork');
-      return;
+    // Handle authentication errors
+    if (errorMessage.includes('401') || errorMessage.includes('NO_AUTH_TOKEN')) {
+      errorMessage = 'Authentication failed. Please try logging out and back in.';
     }
     
-    setIsUploading(true);
-    setError(null);
+    setError(errorMessage);
+  } finally {
+    setIsUploading(false);
+  }
+};
+
+// ALTERNATIVE: Two-step process with better error handling
+const handleSubmitTwoStep = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!isAuthenticated) {
+    setError('You must be logged in to upload artwork');
+    return;
+  }
+  
+  if (!selectedFile) {
+    setError('Please select an image to upload');
+    return;
+  }
+  
+  if (!formData.title.trim()) {
+    setError('Please enter a title for your artwork');
+    return;
+  }
+  
+  setIsUploading(true);
+  setError(null);
+  
+  let uploadedUrl: string | null = null;
+  let uploadedThumbnailUrl: string | null = null;
+  
+  try {
+    // Step 1: Upload the image file
+    console.log('Step 1: Uploading image file...');
+    const uploadResponse = await api.gallery.uploadImage(selectedFile, {
+      title: formData.title,
+      generateThumbnail: 'true',
+      optimizeImages: 'true',
+      quality: '0.9'
+    });
     
-    try {
-      console.log('Starting upload process...');
-      
-      // The api.gallery.uploadImage uses the BaseApiClient which automatically
-      // includes the Bearer token from localStorage
-      const uploadResponse = await api.gallery.uploadImage(selectedFile, {
-        title: formData.title,
-        portfolioId
-      });
-      
-      if (!uploadResponse || !uploadResponse.url) {
-        throw new Error('Upload failed - no URL returned');
-      }
-      
-      console.log('Upload successful, creating gallery piece...');
-      
-      // Then create the gallery piece
-      const tagsArray = formData.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0);
-      
-      await api.gallery.create({
-        title: formData.title,
-        description: formData.description || '',
-        imageUrl: uploadResponse.url,
-        thumbnailUrl: uploadResponse.thumbnailUrl || uploadResponse.url,
-        category: formData.category,
-        medium: formData.medium || '',
-        tags: tagsArray,
-        price: formData.price ? parseFloat(formData.price) : undefined,
-        status: 'exhibition' as GalleryStatus,
-        visibility: 'public',
-        artist: formData.artist || user?.name || '',
-        year: formData.year,
-        displayOrder: 0,
-        alt: formData.title,
-        size: 'medium',
-        ownerId: user?.id || '',
-        uploadedBy: user?.id || ''
-      });
-      
-      console.log('Gallery piece created successfully!');
-      onSuccess();
-    } catch (error) {
-      console.error('Upload error:', error);
-      let errorMessage = 'Failed to upload artwork';
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null && 'message' in error) {
-        errorMessage = String(error.message);
-      }
-      
-      // Handle specific authentication errors
-      if (errorMessage.includes('NO_AUTH_TOKEN') || errorMessage.includes('401')) {
-        errorMessage = 'Authentication failed. Please try logging out and back in.';
-      }
-      
-      setError(errorMessage);
-    } finally {
-      setIsUploading(false);
+    if (!uploadResponse || !uploadResponse.url) {
+      throw new Error('Upload failed - no URL returned');
     }
-  };
+    
+    uploadedUrl = uploadResponse.url;
+    uploadedThumbnailUrl = uploadResponse.thumbnailUrl || uploadResponse.url;
+    
+    console.log('Step 1 complete: Image uploaded successfully');
+    
+    // Step 2: Create the gallery piece record
+    console.log('Step 2: Creating gallery piece record...');
+    const tagsArray = formData.tags
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
+    
+    await api.gallery.create({
+      title: formData.title,
+      description: formData.description || '',
+      imageUrl: uploadedUrl,
+      thumbnailUrl: uploadedThumbnailUrl,
+      category: formData.category,
+      medium: formData.medium || '',
+      tags: tagsArray,
+      price: formData.price ? parseFloat(formData.price) : undefined,
+      status: 'exhibition' as GalleryStatus,
+      visibility: 'public',
+      artist: formData.artist || user?.name || '',
+      year: formData.year,
+      displayOrder: 0,
+      alt: formData.title,
+      size: 'medium',
+      ownerId: user?.id || '',
+      uploadedBy: user?.id || '',
+      portfolioId: portfolioId
+    });
+    
+    console.log('Step 2 complete: Gallery piece created successfully!');
+    onSuccess();
+  } catch (error) {
+    console.error('Upload error:', error);
+    
+    // If we uploaded the file but failed to create the record,
+    // we might want to clean up the uploaded file
+    if (uploadedUrl && error instanceof Error && error.message.includes('gallery.create')) {
+      console.error('File was uploaded but gallery record creation failed');
+      // Optionally: Call a cleanup endpoint to delete the orphaned file
+    }
+    
+    let errorMessage = 'Failed to upload artwork';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    
+    if (errorMessage.includes('401') || errorMessage.includes('NO_AUTH_TOKEN')) {
+      errorMessage = 'Authentication failed. Please try logging out and back in.';
+    }
+    
+    setError(errorMessage);
+  } finally {
+    setIsUploading(false);
+  }
+};
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
