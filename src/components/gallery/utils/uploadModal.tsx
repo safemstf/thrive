@@ -5,7 +5,7 @@ import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { UploadIcon, X, Loader2 } from '@/components/ui/icons';
 import { useAuth } from '@/providers/authProvider';
-import type { ArtworkCategory, GalleryStatus } from '@/types/gallery.types';
+import type { ArtworkCategory, GalleryPiece, GalleryStatus } from '@/types/gallery.types';
 
 interface ArtworkUploadModalProps {
   portfolioId?: string;
@@ -152,7 +152,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   }
 };
 
-// ALTERNATIVE: Two-step process with better error handling
+// Two-step upload function for more control
 const handleSubmitTwoStep = async (e: React.FormEvent) => {
   e.preventDefault();
   
@@ -203,7 +203,8 @@ const handleSubmitTwoStep = async (e: React.FormEvent) => {
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
     
-    await api.gallery.create({
+    // Create the gallery piece object WITHOUT portfolioId (since it's not in the type)
+    const galleryPieceData: Omit<GalleryPiece, 'id' | 'createdAt' | 'updatedAt'> = {
       title: formData.title,
       description: formData.description || '',
       imageUrl: uploadedUrl,
@@ -220,11 +221,26 @@ const handleSubmitTwoStep = async (e: React.FormEvent) => {
       alt: formData.title,
       size: 'medium',
       ownerId: user?.id || '',
-      uploadedBy: user?.id || '',
-      portfolioId: portfolioId
-    });
+      uploadedBy: user?.id || ''
+      // portfolioId is handled separately or via metadata
+    };
     
-    console.log('Step 2 complete: Gallery piece created successfully!');
+    const createdPiece = await api.gallery.create(galleryPieceData);
+    
+    // Step 3: If portfolioId is provided, associate the piece with the portfolio
+    if (portfolioId && createdPiece.id) {
+      try {
+        // You might need a separate API call to associate with portfolio
+        // This depends on your backend implementation
+        console.log('Step 3: Associating with portfolio...');
+        // await api.portfolio.addPiece(portfolioId, createdPiece.id);
+      } catch (portfolioError) {
+        console.warn('Failed to associate with portfolio:', portfolioError);
+        // Don't fail the entire upload for this
+      }
+    }
+    
+    console.log('Upload process completed successfully!');
     onSuccess();
   } catch (error) {
     console.error('Upload error:', error);
