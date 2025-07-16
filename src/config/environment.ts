@@ -6,7 +6,7 @@ export const config = {
   api: {
     baseUrl: process.env.NEXT_PUBLIC_NGROK_URL || 
              process.env.NEXT_PUBLIC_API_URL || 
-             'https://5f34c0472bd6.ngrok-free.app',
+             'https://60a90cb1d075.ngrok-free.app',
     version: process.env.NEXT_PUBLIC_API_VERSION || 'v1',
     timeout: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '30000', 10),
     // Legacy support

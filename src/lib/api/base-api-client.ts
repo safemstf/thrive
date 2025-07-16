@@ -182,7 +182,6 @@ export class BaseApiClient {
     }
   }
 
-  // Helper method for making requests
   protected async request<T>(
     endpoint: string,
     options?: RequestConfig
@@ -214,16 +213,38 @@ export class BaseApiClient {
 
     // Get auth token and add to headers if available
     const token = this.getAuthToken();
-    const headers: Record<string, string> = {
-      ...this.defaultHeaders as Record<string, string>,
-      ...fetchConfig.headers as Record<string, string>,
-    };
     
+    // IMPORTANT: Check if body is FormData
+    const isFormData = fetchConfig.body instanceof FormData;
+    
+    // Build headers - but exclude Content-Type for FormData
+    const headers: Record<string, string> = {};
+    
+    // Only add default headers if not FormData
+    if (!isFormData) {
+      Object.assign(headers, this.defaultHeaders);
+    } else {
+      // For FormData, only copy non-Content-Type headers
+      const { 'Content-Type': _, ...otherDefaultHeaders } = this.defaultHeaders as Record<string, string>;
+      Object.assign(headers, otherDefaultHeaders);
+    }
+    
+    // Add any custom headers from fetchConfig
+    if (fetchConfig.headers) {
+      Object.assign(headers, fetchConfig.headers);
+    }
+    
+    // Add auth token if available
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
       console.log(`[API] Request with auth token: ${url.pathname}`);
     } else {
       console.warn(`[API] Request without auth token: ${url.pathname}`);
+    }
+
+    // Log FormData requests
+    if (isFormData) {
+      console.log(`[API] FormData request detected, Content-Type header omitted`);
     }
 
     // Setup timeout
