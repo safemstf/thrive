@@ -52,11 +52,11 @@ export interface PortfolioAPI {
 
 export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
   async create(data: CreatePortfolioDto): Promise<Portfolio> {
-    return this.requestWithRetry<Portfolio>('/portfolios', {
+    return this.requestWithRetry<Portfolio>('/portfolios/me/create', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-  }
+    }
 
   async update(id: string, data: UpdatePortfolioDto): Promise<Portfolio> {
     return this.requestWithRetry<Portfolio>(`/portfolios/${id}`, {

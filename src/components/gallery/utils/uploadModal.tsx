@@ -71,202 +71,96 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     }));
   };
 
-  // SIMPLIFIED FRONTEND - components/gallery/utils/uploadModal.tsx
-// Update the handleSubmit function to send everything in one request
-
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
-  
+
   if (!isAuthenticated) {
     setError('You must be logged in to upload artwork');
     return;
   }
-  
+
   if (!selectedFile) {
     setError('Please select an image to upload');
     return;
   }
-  
+
   if (!formData.title.trim()) {
     setError('Please enter a title for your artwork');
     return;
   }
-  
+
   setIsUploading(true);
   setError(null);
-  
+
   try {
     console.log('Starting upload process...');
-    
+
+    // Ensure portfolio exists
+    let pid = portfolioId;
+    if (!pid) {
+      const newPortfolio = await api.portfolio.create({
+        title: `${user?.name || 'My'} Portfolio`,
+        bio: '',
+        visibility: 'public',
+        specializations: [],
+        tags: [],
+        tagline: '',
+        settings: {},
+      });
+      pid = newPortfolio.id;
+    }
+
     // Parse tags
     const tagsArray = formData.tags
       .split(',')
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
-    
-    // Send everything in one request
+
+    // Upload image and create gallery piece
     const uploadResponse = await api.gallery.uploadImage(selectedFile, {
-      // Gallery piece data
       title: formData.title,
       description: formData.description,
       category: formData.category,
       medium: formData.medium,
-      tags: tagsArray.join(','), // Send as comma-separated string
+      tags: tagsArray.join(','),
       price: formData.price || '',
       artist: formData.artist || user?.name || '',
       year: formData.year.toString(),
-      portfolioId: portfolioId || '',
-      
-      // Upload settings
+      portfolioId: pid,
       visibility: 'public',
       generateThumbnail: 'true',
       optimizeImages: 'true',
       preserveMetadata: 'false',
       quality: '0.9',
       maxWidth: '2000',
-      maxHeight: '2000'
+      maxHeight: '2000',
     });
-    
-    if (!uploadResponse || !uploadResponse.url) {
+
+    if (!uploadResponse?.url) {
       throw new Error('Upload failed - no URL returned');
     }
-    
+
     console.log('Upload and gallery piece creation successful!');
     onSuccess();
   } catch (error) {
     console.error('Upload error:', error);
     let errorMessage = 'Failed to upload artwork';
-    
+
     if (error instanceof Error) {
       errorMessage = error.message;
     }
-    
-    // Handle authentication errors
+
     if (errorMessage.includes('401') || errorMessage.includes('NO_AUTH_TOKEN')) {
       errorMessage = 'Authentication failed. Please try logging out and back in.';
     }
-    
+
     setError(errorMessage);
   } finally {
     setIsUploading(false);
   }
 };
 
-// Two-step upload function for more control
-const handleSubmitTwoStep = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  if (!isAuthenticated) {
-    setError('You must be logged in to upload artwork');
-    return;
-  }
-  
-  if (!selectedFile) {
-    setError('Please select an image to upload');
-    return;
-  }
-  
-  if (!formData.title.trim()) {
-    setError('Please enter a title for your artwork');
-    return;
-  }
-  
-  setIsUploading(true);
-  setError(null);
-  
-  let uploadedUrl: string | null = null;
-  let uploadedThumbnailUrl: string | null = null;
-  
-  try {
-    // Step 1: Upload the image file
-    console.log('Step 1: Uploading image file...');
-    const uploadResponse = await api.gallery.uploadImage(selectedFile, {
-      title: formData.title,
-      generateThumbnail: 'true',
-      optimizeImages: 'true',
-      quality: '0.9'
-    });
-    
-    if (!uploadResponse || !uploadResponse.url) {
-      throw new Error('Upload failed - no URL returned');
-    }
-    
-    uploadedUrl = uploadResponse.url;
-    uploadedThumbnailUrl = uploadResponse.thumbnailUrl || uploadResponse.url;
-    
-    console.log('Step 1 complete: Image uploaded successfully');
-    
-    // Step 2: Create the gallery piece record
-    console.log('Step 2: Creating gallery piece record...');
-    const tagsArray = formData.tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-    
-    // Create the gallery piece object WITHOUT portfolioId (since it's not in the type)
-    const galleryPieceData: Omit<GalleryPiece, 'id' | 'createdAt' | 'updatedAt'> = {
-      title: formData.title,
-      description: formData.description || '',
-      imageUrl: uploadedUrl,
-      thumbnailUrl: uploadedThumbnailUrl,
-      category: formData.category,
-      medium: formData.medium || '',
-      tags: tagsArray,
-      price: formData.price ? parseFloat(formData.price) : undefined,
-      status: 'exhibition' as GalleryStatus,
-      visibility: 'public',
-      artist: formData.artist || user?.name || '',
-      year: formData.year,
-      displayOrder: 0,
-      alt: formData.title,
-      size: 'medium',
-      ownerId: user?.id || '',
-      uploadedBy: user?.id || ''
-      // portfolioId is handled separately or via metadata
-    };
-    
-    const createdPiece = await api.gallery.create(galleryPieceData);
-    
-    // Step 3: If portfolioId is provided, associate the piece with the portfolio
-    if (portfolioId && createdPiece.id) {
-      try {
-        // You might need a separate API call to associate with portfolio
-        // This depends on your backend implementation
-        console.log('Step 3: Associating with portfolio...');
-        // await api.portfolio.addPiece(portfolioId, createdPiece.id);
-      } catch (portfolioError) {
-        console.warn('Failed to associate with portfolio:', portfolioError);
-        // Don't fail the entire upload for this
-      }
-    }
-    
-    console.log('Upload process completed successfully!');
-    onSuccess();
-  } catch (error) {
-    console.error('Upload error:', error);
-    
-    // If we uploaded the file but failed to create the record,
-    // we might want to clean up the uploaded file
-    if (uploadedUrl && error instanceof Error && error.message.includes('gallery.create')) {
-      console.error('File was uploaded but gallery record creation failed');
-      // Optionally: Call a cleanup endpoint to delete the orphaned file
-    }
-    
-    let errorMessage = 'Failed to upload artwork';
-    
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    
-    if (errorMessage.includes('401') || errorMessage.includes('NO_AUTH_TOKEN')) {
-      errorMessage = 'Authentication failed. Please try logging out and back in.';
-    }
-    
-    setError(errorMessage);
-  } finally {
-    setIsUploading(false);
-  }
-};
+
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
