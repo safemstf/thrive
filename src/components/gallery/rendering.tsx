@@ -5,20 +5,13 @@ import styled from 'styled-components';
 import Image from 'next/image';
 import { 
   Globe, Lock, Link, Eye, EyeOff, ImageOff, Loader2, 
-  MoreVertical, X, Check, ChevronDown 
+  MoreVertical, X, Check, ChevronDown, Edit3, Trash2 
 } from 'lucide-react';
-import { GalleryPiece, GalleryVisibility, GalleryLayout } from '@/types/gallery.types';
+
+import { GalleryPiece, GalleryVisibility, GalleryLayout, GalleryItemProps, GalleryModalProps } from '@/types/gallery.types';
 import { VISIBILITY_CONFIG } from './utils';
 
 // ==================== Gallery Item Component ====================
-interface GalleryItemProps {
-  piece: GalleryPiece;
-  layout: GalleryLayout;
-  isSelected?: boolean;
-  showPrivateIndicator?: boolean;
-  onQuickAction?: (action: string, pieceId: string) => void;
-  priority?: boolean;
-}
 
 export const GalleryItem: React.FC<GalleryItemProps> = ({
   piece,
@@ -69,12 +62,25 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
 
         {onQuickAction && (
           <QuickActions>
-            <ActionButton onClick={(e) => {
-              e.stopPropagation();
-              onQuickAction('edit', piece.id);
-            }}>
-              <MoreVertical size={16} />
-            </ActionButton>
+            <QuickActionButton
+              title="Edit"
+              onClick={e => {
+                e.stopPropagation();
+                onQuickAction('edit', piece.id);
+              }}
+            >
+              <Edit3 size={16} />
+            </QuickActionButton>
+            <QuickActionButton
+              title="Delete"
+              data-variant="danger"
+              onClick={e => {
+                e.stopPropagation();
+                onQuickAction('delete', piece.id);
+              }}
+            >
+              <Trash2 size={16} />
+            </QuickActionButton>
           </QuickActions>
         )}
       </ListItem>
@@ -120,6 +126,31 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               <Check size={16} />
             </SelectionCheck>
           </SelectionOverlay>
+        )}
+
+        {/* Quick actions overlay for grid view */}
+        {onQuickAction && (
+          <QuickActionsOverlay className="quick-actions">
+            <QuickActionButton
+              title="Edit"
+              onClick={e => {
+                e.stopPropagation();
+                onQuickAction('edit', piece.id);
+              }}
+            >
+              <Edit3 size={16} />
+            </QuickActionButton>
+            <QuickActionButton
+              title="Delete"
+              data-variant="danger"
+              onClick={e => {
+                e.stopPropagation();
+                onQuickAction('delete', piece.id);
+              }}
+            >
+              <Trash2 size={16} />
+            </QuickActionButton>
+          </QuickActionsOverlay>
         )}
       </ImageContainer>
 
@@ -225,18 +256,14 @@ export const VisibilityToggle: React.FC<VisibilityToggleProps> = ({
 };
 
 // ==================== Modal Component ====================
-interface GalleryModalProps {
-  piece: GalleryPiece;
-  onClose: () => void;
-  onEdit?: (piece: GalleryPiece) => void;
-  canEdit?: boolean;
-}
 
 export const GalleryModal: React.FC<GalleryModalProps> = ({
   piece,
   onClose,
   onEdit,
-  canEdit
+  onDelete,
+  canEdit,
+  canDelete
 }) => {
   const [imageError, setImageError] = React.useState(false);
 
@@ -297,11 +324,28 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
             )}
           </ModalMeta>
 
-          {canEdit && onEdit && (
-            <EditButton onClick={() => onEdit(piece)}>
-              Edit Details
-            </EditButton>
-          )}
+          {/* Enhanced action buttons */}
+          <ModalActions>
+            {canEdit && onEdit && (
+              <ModalActionButton 
+                onClick={() => onEdit(piece)} 
+                $variant="secondary"
+              >
+                <Edit3 size={16} />
+                Edit Details
+              </ModalActionButton>
+            )}
+            
+            {canDelete && onDelete && (
+              <ModalActionButton 
+                onClick={() => onDelete(piece)} 
+                $variant="danger"
+              >
+                <Trash2 size={16} />
+                Delete Artwork
+              </ModalActionButton>
+            )}
+          </ModalActions>
         </ModalInfo>
       </ModalContent>
     </ModalOverlay>
@@ -331,6 +375,10 @@ const GridItem = styled.div<{ $size: string; $layout: string; $isSelected?: bool
   &:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    
+    .quick-actions {
+      opacity: 1;
+    }
   }
 `;
 
@@ -395,6 +443,17 @@ const SelectionCheck = styled.div`
   align-items: center;
   justify-content: center;
   color: white;
+`;
+
+const QuickActionsOverlay = styled.div`
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 10;
 `;
 
 const ItemInfo = styled.div`
@@ -489,18 +548,30 @@ const QuickActions = styled.div`
   gap: 0.5rem;
 `;
 
-const ActionButton = styled.button`
-  background: none;
-  border: none;
+const QuickActionButton = styled.button<{ 'data-variant'?: 'danger' }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.5rem;
+  border-radius: 6px;
+  border: none;
   cursor: pointer;
-  color: #666;
-  border-radius: 4px;
   transition: all 0.2s;
-
-  &:hover {
-    background: #f3f4f6;
-  }
+  
+  ${props => {
+    if (props['data-variant'] === 'danger') {
+      return `
+        background: rgba(239, 68, 68, 0.9);
+        color: white;
+        &:hover { background: rgba(220, 38, 38, 0.9); }
+      `;
+    }
+    return `
+      background: rgba(255, 255, 255, 0.9);
+      color: #374151;
+      &:hover { background: white; }
+    `;
+  }}
 `;
 
 // Visibility Toggle
@@ -728,19 +799,65 @@ const MetaItem = styled.div`
   }
 `;
 
-const EditButton = styled.button`
+const ModalActions = styled.div`
   margin-top: 2rem;
-  width: 100%;
-  padding: 0.75rem;
-  background: #2c2c2c;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-
-  &:hover {
-    background: #1a1a1a;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  
+  @media (min-width: 480px) {
+    flex-direction: row;
   }
+`;
+
+const ModalActionButton = styled.button<{ $variant?: 'primary' | 'secondary' | 'danger' }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.875rem;
+  font-weight: 500;
+  flex: 1;
+  
+  ${props => {
+    switch (props.$variant) {
+      case 'primary':
+        return `
+          background: #2c2c2c;
+          color: white;
+          &:hover { background: #1a1a1a; }
+        `;
+      case 'danger':
+        return `
+          background: #ef4444;
+          color: white;
+          &:hover { background: #dc2626; }
+        `;
+      case 'secondary':
+        return `
+          background: white;
+          color: #374151;
+          border: 1px solid #e5e7eb;
+          &:hover { 
+            border-color: #d1d5db;
+            background: #f9fafb;
+          }
+        `;
+      default:
+        return `
+          background: white;
+          color: #374151;
+          border: 1px solid #e5e7eb;
+          &:hover { 
+            border-color: #d1d5db;
+            background: #f9fafb;
+          }
+        `;
+    }
+  }}
 `;

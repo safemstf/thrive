@@ -205,3 +205,22 @@ export interface GalleryUpload {
   dimensions?: { width: number; height: number; unit: 'px' | 'cm' | 'in' };
   metadata?: Record<string, any>;
 }
+
+// === Component Interface Types ===
+export interface GalleryItemProps {
+  piece: GalleryPiece;
+  layout: GalleryLayout;
+  isSelected?: boolean;
+  showPrivateIndicator?: boolean;
+  onQuickAction?: (action: 'edit' | 'delete', pieceId: string) => Promise<void>;
+  priority?: boolean;
+}
+
+export interface GalleryModalProps {
+  piece: GalleryPiece;
+  onClose: () => void;
+  onEdit?: (piece: GalleryPiece) => void;
+  onDelete?: (piece: GalleryPiece) => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
+}

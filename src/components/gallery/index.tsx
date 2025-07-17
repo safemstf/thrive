@@ -1,6 +1,5 @@
 // src/components/gallery/index.tsx
 'use client';
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
@@ -9,7 +8,8 @@ import {
   AlertCircle, RefreshCw, Plus, Download, Share2 
 } from 'lucide-react';
 import { useAuth } from '@/providers/authProvider';
-import { useInfiniteGalleryPieces } from '@/hooks/useGalleryApi';
+import { useInfiniteGalleryPieces,  useDeleteGalleryPiece } from '@/hooks/useGalleryApi';
+
 
 import {
    GalleryViewConfig,
@@ -68,6 +68,7 @@ export const Gallery: React.FC<GalleryProps> = ({
   portfolioUserId
 }) => {
   const router = useRouter();
+  const deleteMutation = useDeleteGalleryPiece();
   const { user, isAuthenticated } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -104,6 +105,7 @@ export const Gallery: React.FC<GalleryProps> = ({
     viewConfig 
   } = state;
 
+  
   // API data fetching
   const galleryData = useInfiniteGalleryPieces(
     {
@@ -128,6 +130,37 @@ export const Gallery: React.FC<GalleryProps> = ({
   const filteredPieces = filterGalleryPieces(pieces, filters);
   const sortedPieces = sortGalleryPieces(filteredPieces);
 
+  const handleQuickAction = useCallback(
+    async (action: 'edit' | 'delete', pieceId: string): Promise<void> => {
+      if (action === 'edit') {
+        router.push(`/dashboard/gallery/edit/${pieceId}`);
+      } else if (action === 'delete') {
+        // Find the piece to show its title in confirmation
+        const piece = pieces.find(p => p.id === pieceId);
+        const pieceTitle = piece?.title || 'this artwork';
+        
+        const confirmed = window.confirm(
+          `Are you sure you want to delete "${pieceTitle}"?\n\nThis action cannot be undone.`
+        );
+        
+        if (!confirmed) return;
+        
+        try {
+          await deleteMutation.mutateAsync(pieceId);
+          console.log(`Successfully deleted "${pieceTitle}"`);
+          refetch();
+        } catch (error) {
+          console.error('Delete failed:', error);
+          alert(
+            `Failed to delete "${pieceTitle}". Please try again.\n\n` +
+            `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+        }
+      }
+    },
+    [router, deleteMutation, refetch, pieces]
+  );
+
   // ==================== State Updaters ====================
   const updateState = (newState: Partial<GalleryState>) => {
     setState(prev => ({ ...prev, ...newState }));
@@ -146,10 +179,6 @@ export const Gallery: React.FC<GalleryProps> = ({
     }
   }, [isSelectionMode]);
 
-  const handleQuickAction = useCallback((pieceId: string) => {
-    router.push(`/dashboard/gallery/edit/${pieceId}`);
-  }, [router]);
-
   const handleBulkAction = useCallback(async (action: 'visibility' | 'delete', value?: GalleryVisibility) => {
     if (selectedItems.size === 0) return;
     
@@ -157,8 +186,19 @@ export const Gallery: React.FC<GalleryProps> = ({
       if (action === 'visibility' && value) {
         await batchUpdateVisibility(Array.from(selectedItems), value);
       } else if (action === 'delete') {
-        if (!window.confirm(`Delete ${selectedItems.size} items?`)) return;
+        const count = selectedItems.size;
+        const confirmed = window.confirm(
+          `Delete ${count} artwork${count > 1 ? 's' : ''}?\n\n` +
+          `This will permanently delete the selected artwork${count > 1 ? 's' : ''} and cannot be undone.`
+        );
+        
+        if (!confirmed) return;
+        
+        const itemsToDelete = pieces.filter(p => selectedItems.has(p.id));
+        console.log('Deleting items:', itemsToDelete.map(p => p.title));
+        
         await batchDeletePieces(Array.from(selectedItems));
+        console.log(`Successfully deleted ${count} artwork${count > 1 ? 's' : ''}`);
       }
       
       updateState({ 
@@ -168,8 +208,9 @@ export const Gallery: React.FC<GalleryProps> = ({
       refetch();
     } catch (error) {
       console.error(`Bulk ${action} failed:`, error);
+      alert(`Failed to ${action} selected items. Please try again.`);
     }
-  }, [selectedItems, refetch]);
+  }, [selectedItems, refetch, pieces]);
 
   const handleFileSelect = useCallback(async (files: FileList) => {
     const fileArray = Array.from(files).slice(0, GALLERY_CONSTANTS.MAX_UPLOAD_FILES);
@@ -412,7 +453,6 @@ export const Gallery: React.FC<GalleryProps> = ({
   </ControlsBar>
  );
 
-
    const renderManagementControls = () => {
   if (isSelectionMode) {
     return (
@@ -456,6 +496,7 @@ export const Gallery: React.FC<GalleryProps> = ({
     </>
   );
   };
+  
   const renderUploaderModal = () => (
     <UploaderModal>
       <UploaderContent>
@@ -541,6 +582,7 @@ export const Gallery: React.FC<GalleryProps> = ({
 
       {/* Gallery Controls */}
       {((mode !== 'public' && isAuthenticated) || filters.searchQuery) && renderGalleryControls()}
+      
       {/* Gallery Grid */}
       <GalleryGrid $layout={viewConfig.layout}>
         {sortedPieces.map((piece, index) => (
@@ -580,7 +622,16 @@ export const Gallery: React.FC<GalleryProps> = ({
               ? () => router.push(`/dashboard/gallery/edit/${selectedPiece.id}`)
               : undefined
           }
+          onDelete={
+            canUserEditPiece(selectedPiece, user?.id, user?.role)
+              ? (piece: GalleryPiece) => {
+                  updateState({ selectedPiece: null });
+                  handleQuickAction('delete', piece.id);
+                }
+              : undefined
+          }
           canEdit={canUserEditPiece(selectedPiece, user?.id, user?.role)}
+          canDelete={canUserEditPiece(selectedPiece, user?.id, user?.role)}
         />
       )}
 
