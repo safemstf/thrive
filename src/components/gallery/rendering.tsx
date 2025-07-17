@@ -66,6 +66,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               title="Edit"
               onClick={e => {
                 e.stopPropagation();
+                console.log('List Edit clicked for piece:', piece.id, piece);
                 onQuickAction('edit', piece.id);
               }}
             >
@@ -76,6 +77,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               data-variant="danger"
               onClick={e => {
                 e.stopPropagation();
+                console.log('List Delete clicked for piece:', piece.id, piece);
                 onQuickAction('delete', piece.id);
               }}
             >
@@ -135,6 +137,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               title="Edit"
               onClick={e => {
                 e.stopPropagation();
+                console.log('Edit clicked for piece:', piece.id, piece);
                 onQuickAction('edit', piece.id);
               }}
             >
@@ -145,6 +148,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               data-variant="danger"
               onClick={e => {
                 e.stopPropagation();
+                console.log('Delete clicked for piece:', piece.id, piece);
                 onQuickAction('delete', piece.id);
               }}
             >

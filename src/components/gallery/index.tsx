@@ -130,14 +130,37 @@ export const Gallery: React.FC<GalleryProps> = ({
   const filteredPieces = filterGalleryPieces(pieces, filters);
   const sortedPieces = sortGalleryPieces(filteredPieces);
 
+  // Helper function to safely get piece ID
+  const getPieceId = (piece: any): string => {
+    // Try different possible ID fields
+    return piece.id || piece._id || piece.pieceId || '';
+  };
+
   const handleQuickAction = useCallback(
     async (action: 'edit' | 'delete', pieceId: string): Promise<void> => {
+      // Add debugging to check if pieceId is valid
+      console.log('handleQuickAction called with:', { action, pieceId });
+      
+      if (!pieceId || pieceId === 'undefined') {
+        console.error('Invalid pieceId provided:', pieceId);
+        alert('Error: Invalid artwork ID. Please refresh the page and try again.');
+        return;
+      }
+
       if (action === 'edit') {
         router.push(`/dashboard/gallery/edit/${pieceId}`);
       } else if (action === 'delete') {
         // Find the piece to show its title in confirmation
-        const piece = pieces.find(p => p.id === pieceId);
-        const pieceTitle = piece?.title || 'this artwork';
+        const piece = pieces.find(p => getPieceId(p) === pieceId);
+        console.log('Found piece for deletion:', piece);
+        
+        if (!piece) {
+          console.error('Piece not found in local state:', pieceId);
+          alert('Error: Artwork not found. Please refresh the page and try again.');
+          return;
+        }
+        
+        const pieceTitle = piece.title || 'this artwork';
         
         const confirmed = window.confirm(
           `Are you sure you want to delete "${pieceTitle}"?\n\nThis action cannot be undone.`
@@ -146,6 +169,7 @@ export const Gallery: React.FC<GalleryProps> = ({
         if (!confirmed) return;
         
         try {
+          console.log('Attempting to delete piece with ID:', pieceId);
           await deleteMutation.mutateAsync(pieceId);
           console.log(`Successfully deleted "${pieceTitle}"`);
           refetch();
@@ -168,14 +192,16 @@ export const Gallery: React.FC<GalleryProps> = ({
 
   // ==================== Event Handlers ====================
   const handlePieceClick = useCallback((piece: GalleryPiece) => {
+    const pieceId = getPieceId(piece);
+    
     if (isSelectionMode) {
       setState(prev => {
         const newSet = new Set(prev.selectedItems);
-        newSet.has(piece.id) ? newSet.delete(piece.id) : newSet.add(piece.id);
+        newSet.has(pieceId) ? newSet.delete(pieceId) : newSet.add(pieceId);
         return { ...prev, selectedItems: newSet };
       });
     } else {
-      updateState({ selectedPiece: piece });
+      updateState({ selectedPiece: {...piece, id: pieceId} });
     }
   }, [isSelectionMode]);
 
@@ -585,18 +611,29 @@ export const Gallery: React.FC<GalleryProps> = ({
       
       {/* Gallery Grid */}
       <GalleryGrid $layout={viewConfig.layout}>
-        {sortedPieces.map((piece, index) => (
-          <div key={piece.id} onClick={() => handlePieceClick(piece)}>
-            <GalleryItem
-              piece={piece}
-              layout={viewConfig.layout}
-              isSelected={selectedItems.has(piece.id)}
-              showPrivateIndicator={viewConfig.showPrivateIndicator && mode !== 'portfolio'}
-              onQuickAction={viewConfig.enableQuickEdit ? handleQuickAction : undefined}
-              priority={index < 4}
-            />
-          </div>
-        ))}
+        {sortedPieces.map((piece, index) => {
+          const pieceId = getPieceId(piece);
+          
+          // Debug logging to check piece structure
+          if (index === 0) {
+            console.log('Sample piece structure:', piece);
+            console.log('Piece ID:', pieceId);
+            console.log('Piece keys:', Object.keys(piece));
+          }
+          
+          return (
+            <div key={pieceId || `piece-${index}`} onClick={() => handlePieceClick(piece)}>
+              <GalleryItem
+                piece={{...piece, id: pieceId}} // Ensure piece has id property
+                layout={viewConfig.layout}
+                isSelected={selectedItems.has(pieceId)}
+                showPrivateIndicator={viewConfig.showPrivateIndicator && mode !== 'portfolio'}
+                onQuickAction={viewConfig.enableQuickEdit ? handleQuickAction : undefined}
+                priority={index < 4}
+              />
+            </div>
+          );
+        })}
       </GalleryGrid>
 
       {/* Load More Button */}
