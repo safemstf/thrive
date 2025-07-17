@@ -29,8 +29,11 @@ import {
   generatePreview,
   compressImage,
   GALLERY_CONSTANTS,
-  batchUpdateVisibility,
-  batchDeletePieces
+    batchUpdateVisibility,    // Now uses portfolio API
+  batchDeletePieces,        // Now uses portfolio API
+  deleteGalleryPiece,       // New import
+  updatePieceVisibility,    // New import
+  deleteGalleryPieceWithConfirmation 
 } from './utils';
 import { GalleryItem, GalleryModal, VisibilityToggle } from './rendering';
 import { ImageOff } from 'lucide-react';

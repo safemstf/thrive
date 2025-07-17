@@ -33,6 +33,8 @@ export const VISIBILITY_CONFIG = {
   }
 };
 
+
+
 // ==================== Image Processing ====================
 export const validateImage = (
   file: File, 
@@ -230,29 +232,141 @@ export const buildGalleryQueryParams = (
   return params;
 };
 
-// ==================== Batch Operations ====================
-export const batchUpdateVisibility = async (
-  pieceIds: string[],
-  visibility: GalleryVisibility
-): Promise<void> => {
-  // Import the api utilities from the main api-client file
-  const { api } = await import('@/lib/api-client');
-  
-  // Get the gallery client instance through the API utilities
-  const galleryClient = api.gallery;
-  
-  // Since the gallery client doesn't have batchUpdateVisibility in the api utilities,
-  // we need to get the actual client instance
-  const { getApiClient } = await import('@/lib/api-client');
-  const client = getApiClient();
-  
-  return client.gallery.batchUpdateVisibility(pieceIds, visibility);
+
+// ==================== PORTFOLIO API INTEGRATION FUNCTIONS ====================
+import { api } from '@/lib/api-client';
+
+/**
+ * Delete a single gallery piece through the portfolio API
+ * This maintains portfolio consistency by updating stats and references
+ * @param pieceId - The ID of the gallery piece to delete
+ * @returns Promise with the deletion result
+ */
+export const deleteGalleryPiece = async (pieceId: string) => {
+  try {
+    const result = await api.portfolio.deleteGalleryPiece(pieceId);
+    console.log(`[Gallery] Deleted piece ${pieceId}, remaining: ${result.remainingCount}`);
+    return result;
+  } catch (error) {
+    console.error('[Gallery] Failed to delete piece:', error);
+    throw error;
+  }
 };
 
-export const batchDeletePieces = async (pieceIds: string[]): Promise<void> => {
-  // Import and use the API client properly
-  const { getApiClient } = await import('@/lib/api-client');
-  const client = getApiClient();
+/**
+ * Batch delete multiple gallery pieces through the portfolio API
+ * Efficiently removes multiple pieces while maintaining portfolio integrity
+ * @param pieceIds - Array of piece IDs to delete
+ * @returns Promise with batch deletion results
+ */
+export const batchDeletePieces = async (pieceIds: string[]) => {
+  try {
+    const result = await api.portfolio.batchDeleteGalleryPieces(pieceIds);
+    console.log(`[Gallery] Batch deleted ${result.deletedCount} pieces, remaining: ${result.remainingCount}`);
+    
+    if (result.unauthorizedCount > 0) {
+      console.warn(`[Gallery] ${result.unauthorizedCount} pieces were not authorized for deletion`);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('[Gallery] Failed to batch delete pieces:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update visibility for a single gallery piece through the portfolio API
+ * @param pieceId - The ID of the gallery piece
+ * @param visibility - The new visibility setting
+ * @returns Promise with the update result
+ */
+export const updatePieceVisibility = async (
+  pieceId: string, 
+  visibility: GalleryVisibility
+) => {
+  try {
+    const result = await api.portfolio.updateGalleryPieceVisibility(pieceId, visibility);
+    console.log(`[Gallery] Updated piece ${pieceId} visibility to: ${visibility}`);
+    return result;
+  } catch (error) {
+    console.error('[Gallery] Failed to update piece visibility:', error);
+    throw error;
+  }
+};
+
+/**
+ * Batch update visibility for multiple gallery pieces through the portfolio API
+ * @param pieceIds - Array of piece IDs to update
+ * @param visibility - The new visibility setting
+ * @returns Promise with batch update results
+ */
+export const batchUpdateVisibility = async (
+  pieceIds: string[], 
+  visibility: GalleryVisibility
+) => {
+  try {
+    const result = await api.portfolio.batchUpdateGalleryVisibility(pieceIds, visibility);
+    console.log(`[Gallery] Updated ${result.updatedCount} pieces visibility to: ${visibility}`);
+    return result;
+  } catch (error) {
+    console.error('[Gallery] Failed to batch update visibility:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a gallery piece with user confirmation
+ * @param pieceId - The ID of the piece to delete
+ * @param pieceName - Optional name for the confirmation message
+ * @returns Promise<boolean> - true if deleted, false if cancelled
+ */
+export const deleteGalleryPieceWithConfirmation = async (
+  pieceId: string,
+  pieceName?: string
+): Promise<boolean> => {
+  const message = pieceName 
+    ? `Are you sure you want to delete "${pieceName}"? This action cannot be undone.`
+    : 'Are you sure you want to delete this artwork? This action cannot be undone.';
+    
+  if (!window.confirm(message)) {
+    return false;
+  }
   
-  return client.gallery.batchDeletePieces(pieceIds);
+  try {
+    await deleteGalleryPiece(pieceId);
+    return true;
+  } catch (error) {
+    // You might want to show a toast or notification here
+    alert('Failed to delete artwork. Please try again.');
+    return false;
+  }
+};
+
+/**
+ * Helper to check if pieces can be deleted
+ * @param pieceIds - Array of piece IDs to check
+ * @param userId - Current user ID
+ * @returns Object with deletable and non-deletable piece arrays
+ */
+export const checkDeletablePieces = (
+  pieces: Array<{ id: string; ownerId: string }>,
+  userId?: string
+): { deletable: string[]; nonDeletable: string[] } => {
+  if (!userId) {
+    return { deletable: [], nonDeletable: pieces.map(p => p.id) };
+  }
+  
+  const deletable: string[] = [];
+  const nonDeletable: string[] = [];
+  
+  pieces.forEach(piece => {
+    if (piece.ownerId === userId) {
+      deletable.push(piece.id);
+    } else {
+      nonDeletable.push(piece.id);
+    }
+  });
+  
+  return { deletable, nonDeletable };
 };
