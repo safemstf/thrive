@@ -41,7 +41,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
             </ImageErrorBox>
           ) : (
             <Image
-              src={piece.thumbnailUrl}
+              src={(piece.highResUrl || piece.imageUrl).replace(/^http:\/\//, 'https://')}
               alt={piece.alt}
               width={80}
               height={80}
@@ -97,7 +97,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
           </ImageErrorBox>
         ) : (
           <Image
-            src={piece.thumbnailUrl}
+            src={piece.thumbnailUrl.replace(/^http:\/\//, 'https://')}
             alt={piece.alt}
             fill
             style={{ objectFit: 'cover' }}
