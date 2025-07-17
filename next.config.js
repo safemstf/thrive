@@ -5,9 +5,20 @@ const nextConfig = {
     styledComponents: true,
   },
   images: {
-    // Use default optimization in production
+    // Enable default optimization in production
     unoptimized: false,
     remotePatterns: [
+      // Frontend domain serving uploads directly
+      {
+        protocol: 'https',
+        hostname: 'www.learnmorra.com',
+        pathname: '/uploads/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'learnmorra.com',
+        pathname: '/uploads/**',
+      },
       // Local backend (if needed)
       {
         protocol: 'http',
@@ -32,7 +43,12 @@ const nextConfig = {
         hostname: '60a90cb1d075.ngrok-free.app',
         pathname: '/uploads/**',
       },
-      // Placeholder service
+      // Placeholder service (allow both HTTP/HTTPS)
+      {
+        protocol: 'http',
+        hostname: 'via.placeholder.com',
+        pathname: '/**',
+      },
       {
         protocol: 'https',
         hostname: 'via.placeholder.com',
@@ -51,4 +67,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-
