@@ -1,4 +1,4 @@
-// next.config.js (JavaScript)
+// next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   compiler: {
@@ -63,7 +63,6 @@ const nextConfig = {
     ],
   },
   reactStrictMode: true,
-  swcMinify: true,
 };
 
 module.exports = nextConfig;
