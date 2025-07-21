@@ -1,6 +1,6 @@
 // lib/api-client.ts
 import { BaseApiClient } from './api/base-api-client';
-import { DeletePortfolioOptions, PortfolioApiClient } from './api/portfolio-api-client';
+import { PortfolioApiClient } from './api/portfolio-api-client';
 import { GalleryApiClient } from './api/gallery-api-client';
 import { EducationalApiClient } from './api/educational-api-client';
 import { AuthApiClient } from './api/api-client-auth';
@@ -78,9 +78,6 @@ export function getApiClient(): ApiClient {
 export { useApiClient } from '@/providers/apiProvider';
 
 // ==================== UTILITY API NAMESPACE ====================
-// Update for lib/api-client.ts - portfolio namespace section
-
-// ==================== UTILITY API NAMESPACE ====================
 export const api = {
   // Portfolio API utilities
   portfolio: {
@@ -89,10 +86,25 @@ export const api = {
     getById: (id: string) => getApiClient().portfolio.getById(id),
     getByUserId: (userId: string) => getApiClient().portfolio.getByUserId(userId),
     getByUsername: (username: string) => getApiClient().portfolio.getByUsername(username),
-    delete: (id: string, options?: DeletePortfolioOptions) => getApiClient().portfolio.delete(id, options),
+    delete: (id: string) => getApiClient().portfolio.delete(id),
     getMyPortfolio: () => getApiClient().portfolio.getMyPortfolio(),
+    discover: (filters?: PortfolioFilters, page?: number, limit?: number) => 
+      getApiClient().portfolio.discover(filters, page, limit),
+    search: (query: string, limit?: number) => getApiClient().portfolio.search(query, limit),
+    getFeatured: (limit?: number) => getApiClient().portfolio.getFeatured(limit),
+    getTrending: (period?: 'day' | 'week' | 'month') => getApiClient().portfolio.getTrending(period),
+    addReview: (portfolioId: string, review: CreateReviewDto) => 
+      getApiClient().portfolio.addReview(portfolioId, review),
+    getReviews: (portfolioId: string, page?: number, limit?: number) => 
+      getApiClient().portfolio.getReviews(portfolioId, page, limit),
+    trackView: (portfolioId: string, data?: any) => 
+      getApiClient().portfolio.trackView(portfolioId, data),
+    getAnalytics: (portfolioId: string, period?: string) => 
+      getApiClient().portfolio.getAnalytics(portfolioId, period),
+    uploadImage: (file: File, type: 'profile' | 'cover') => 
+      getApiClient().portfolio.uploadImage(file, type),
     
-    // Gallery management (NEW)
+    // Gallery management methods (NEW)
     deleteGalleryPiece: (pieceId: string) => 
       getApiClient().portfolio.deleteGalleryPiece(pieceId),
     batchDeleteGalleryPieces: (pieceIds: string[]) => 
@@ -101,29 +113,6 @@ export const api = {
       getApiClient().portfolio.updateGalleryPieceVisibility(pieceId, visibility),
     batchUpdateGalleryVisibility: (pieceIds: string[], visibility: GalleryVisibility) => 
       getApiClient().portfolio.batchUpdateGalleryVisibility(pieceIds, visibility),
-    
-    // Discovery
-    discover: (filters?: PortfolioFilters, page?: number, limit?: number) => 
-      getApiClient().portfolio.discover(filters, page, limit),
-    search: (query: string, limit?: number) => getApiClient().portfolio.search(query, limit),
-    getFeatured: (limit?: number) => getApiClient().portfolio.getFeatured(limit),
-    getTrending: (period?: 'day' | 'week' | 'month') => getApiClient().portfolio.getTrending(period),
-    
-    // Reviews
-    addReview: (portfolioId: string, review: CreateReviewDto) => 
-      getApiClient().portfolio.addReview(portfolioId, review),
-    getReviews: (portfolioId: string, page?: number, limit?: number) => 
-      getApiClient().portfolio.getReviews(portfolioId, page, limit),
-    
-    // Analytics & tracking
-    trackView: (portfolioId: string, data?: any) => 
-      getApiClient().portfolio.trackView(portfolioId, data),
-    getAnalytics: (portfolioId: string, period?: string) => 
-      getApiClient().portfolio.getAnalytics(portfolioId, period),
-    
-    // Image upload
-    uploadImage: (file: File, type: 'profile' | 'cover') => 
-      getApiClient().portfolio.uploadImage(file, type),
   },
   
   gallery: {

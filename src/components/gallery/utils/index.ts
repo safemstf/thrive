@@ -1,6 +1,11 @@
 // src/components/gallery/utils/index.ts
 
-import { GalleryPiece, GalleryFilters, GalleryVisibility } from '@/types/gallery.types';
+import { 
+  GalleryPiece, 
+  GalleryFilters, 
+  GalleryVisibility,
+  GalleryQueryParams 
+} from '@/types/gallery.types';
 
 // ==================== Constants ====================
 export const GALLERY_CONSTANTS = {
@@ -32,8 +37,6 @@ export const VISIBILITY_CONFIG = {
     color: '#6b7280'
   }
 };
-
-
 
 // ==================== Image Processing ====================
 export const validateImage = (
@@ -224,7 +227,6 @@ export const buildGalleryQueryParams = (
     params.append('q', filters.searchQuery);
   }
 
-  // ← NEW: only append owner if it's defined
   if (filters.owner) {
     params.append('owner', filters.owner);
   }
@@ -232,54 +234,90 @@ export const buildGalleryQueryParams = (
   return params;
 };
 
-
-// ==================== PORTFOLIO API INTEGRATION FUNCTIONS ====================
+// ==================== PORTFOLIO-CENTRIC GALLERY API ====================
 import { api } from '@/lib/api-client';
 
 /**
- * Delete a single gallery piece through the portfolio API
- * This maintains portfolio consistency by updating stats and references
- * @param pieceId - The ID of the gallery piece to delete
- * @returns Promise with the deletion result
+ * PORTFOLIO API - GALLERY MANAGEMENT
+ * All user-specific gallery operations go through the portfolio API
+ */
+
+/**
+ * Create a new gallery piece through portfolio
+ * This ensures the piece is properly linked to the user's portfolio
+ */
+export const createGalleryPiece = async (
+  file: File,
+  metadata: Record<string, any>
+) => {
+  try {
+    // For now, still using gallery.uploadImage but this should move to portfolio
+    // TODO: Implement /portfolios/me/gallery/upload endpoint
+    const result = await api.gallery.uploadImage(file, metadata);
+    console.log('[Portfolio/Gallery] Created new piece:', result);
+    return result;
+  } catch (error) {
+    console.error('[Portfolio/Gallery] Failed to create piece:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update a gallery piece through portfolio
+ * TODO: Implement /portfolios/me/gallery/:pieceId endpoint with PUT method
+ */
+export const updateGalleryPiece = async (
+  pieceId: string,
+  updates: Partial<GalleryPiece>
+) => {
+  try {
+    // For now, still using gallery API
+    const result = await api.gallery.update(pieceId, updates);
+    console.log('[Portfolio/Gallery] Updated piece:', pieceId);
+    return result;
+  } catch (error) {
+    console.error('[Portfolio/Gallery] Failed to update piece:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a single gallery piece through portfolio
+ * Uses portfolio API to maintain consistency
  */
 export const deleteGalleryPiece = async (pieceId: string) => {
   try {
     const result = await api.portfolio.deleteGalleryPiece(pieceId);
-    console.log(`[Gallery] Deleted piece ${pieceId}, remaining: ${result.remainingCount}`);
+    console.log(`[Portfolio/Gallery] Deleted piece ${pieceId}, remaining: ${result.remainingCount}`);
     return result;
   } catch (error) {
-    console.error('[Gallery] Failed to delete piece:', error);
+    console.error('[Portfolio/Gallery] Failed to delete piece:', error);
     throw error;
   }
 };
 
 /**
- * Batch delete multiple gallery pieces through the portfolio API
+ * Batch delete multiple gallery pieces through portfolio
  * Efficiently removes multiple pieces while maintaining portfolio integrity
- * @param pieceIds - Array of piece IDs to delete
- * @returns Promise with batch deletion results
  */
 export const batchDeletePieces = async (pieceIds: string[]) => {
   try {
     const result = await api.portfolio.batchDeleteGalleryPieces(pieceIds);
-    console.log(`[Gallery] Batch deleted ${result.deletedCount} pieces, remaining: ${result.remainingCount}`);
+    console.log(`[Portfolio/Gallery] Batch deleted ${result.deletedCount} pieces, remaining: ${result.remainingCount}`);
     
     if (result.unauthorizedCount > 0) {
-      console.warn(`[Gallery] ${result.unauthorizedCount} pieces were not authorized for deletion`);
+      console.warn(`[Portfolio/Gallery] ${result.unauthorizedCount} pieces were not authorized for deletion`);
     }
     
     return result;
   } catch (error) {
-    console.error('[Gallery] Failed to batch delete pieces:', error);
+    console.error('[Portfolio/Gallery] Failed to batch delete pieces:', error);
     throw error;
   }
 };
 
 /**
- * Update visibility for a single gallery piece through the portfolio API
- * @param pieceId - The ID of the gallery piece
- * @param visibility - The new visibility setting
- * @returns Promise with the update result
+ * Update visibility for a single gallery piece through portfolio
  */
 export const updatePieceVisibility = async (
   pieceId: string, 
@@ -287,19 +325,16 @@ export const updatePieceVisibility = async (
 ) => {
   try {
     const result = await api.portfolio.updateGalleryPieceVisibility(pieceId, visibility);
-    console.log(`[Gallery] Updated piece ${pieceId} visibility to: ${visibility}`);
+    console.log(`[Portfolio/Gallery] Updated piece ${pieceId} visibility to: ${visibility}`);
     return result;
   } catch (error) {
-    console.error('[Gallery] Failed to update piece visibility:', error);
+    console.error('[Portfolio/Gallery] Failed to update piece visibility:', error);
     throw error;
   }
 };
 
 /**
- * Batch update visibility for multiple gallery pieces through the portfolio API
- * @param pieceIds - Array of piece IDs to update
- * @param visibility - The new visibility setting
- * @returns Promise with batch update results
+ * Batch update visibility for multiple gallery pieces through portfolio
  */
 export const batchUpdateVisibility = async (
   pieceIds: string[], 
@@ -307,19 +342,16 @@ export const batchUpdateVisibility = async (
 ) => {
   try {
     const result = await api.portfolio.batchUpdateGalleryVisibility(pieceIds, visibility);
-    console.log(`[Gallery] Updated ${result.updatedCount} pieces visibility to: ${visibility}`);
+    console.log(`[Portfolio/Gallery] Updated ${result.updatedCount} pieces visibility to: ${visibility}`);
     return result;
   } catch (error) {
-    console.error('[Gallery] Failed to batch update visibility:', error);
+    console.error('[Portfolio/Gallery] Failed to batch update visibility:', error);
     throw error;
   }
 };
 
 /**
  * Delete a gallery piece with user confirmation
- * @param pieceId - The ID of the piece to delete
- * @param pieceName - Optional name for the confirmation message
- * @returns Promise<boolean> - true if deleted, false if cancelled
  */
 export const deleteGalleryPieceWithConfirmation = async (
   pieceId: string,
@@ -345,9 +377,6 @@ export const deleteGalleryPieceWithConfirmation = async (
 
 /**
  * Helper to check if pieces can be deleted
- * @param pieceIds - Array of piece IDs to check
- * @param userId - Current user ID
- * @returns Object with deletable and non-deletable piece arrays
  */
 export const checkDeletablePieces = (
   pieces: Array<{ id: string; ownerId: string }>,
@@ -369,4 +398,70 @@ export const checkDeletablePieces = (
   });
   
   return { deletable, nonDeletable };
+};
+
+/**
+ * PUBLIC GALLERY API
+ * These operations are for public viewing and don't require portfolio context
+ */
+
+/**
+ * Get gallery pieces with filters (public viewing)
+ * This remains in gallery API as it's for discovery/browsing
+ */
+export const getGalleryPieces = async (params?: GalleryQueryParams) => {
+  try {
+    const result = await api.gallery.getPieces(params);
+    console.log('[Gallery] Fetched pieces:', result.pieces.length);
+    return result;
+  } catch (error) {
+    console.error('[Gallery] Failed to fetch pieces:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a single gallery piece by ID (public viewing)
+ * This remains in gallery API as it's for public access
+ */
+export const getGalleryPieceById = async (pieceId: string) => {
+  try {
+    const result = await api.gallery.getPieceById(pieceId);
+    console.log('[Gallery] Fetched piece:', pieceId);
+    return result;
+  } catch (error) {
+    console.error('[Gallery] Failed to fetch piece:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get user's own gallery pieces through portfolio
+ * TODO: Implement /portfolios/me/gallery endpoint with GET method
+ */
+export const getMyGalleryPieces = async (params?: GalleryQueryParams) => {
+  try {
+    // For now, use gallery API without owner filter since GalleryQueryParams doesn't support it
+    // This is a temporary solution until we have the proper portfolio endpoint
+    const result = await api.gallery.getPieces(params);
+    
+    // Get current user to filter client-side
+    const user = await api.auth.getCurrentUser();
+    if (!user) {
+      return { pieces: [], total: 0, page: 1, limit: 20 };
+    }
+    
+    // Filter pieces client-side for now
+    const userPieces = result.pieces.filter(piece => piece.ownerId === user.id);
+    
+    console.log('[Portfolio/Gallery] Fetched user pieces:', userPieces.length);
+    return {
+      ...result,
+      pieces: userPieces,
+      total: userPieces.length
+    };
+  } catch (error) {
+    console.error('[Portfolio/Gallery] Failed to fetch user pieces:', error);
+    throw error;
+  }
 };

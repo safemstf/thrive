@@ -16,32 +16,6 @@ import {
 import { GalleryVisibility } from '@/types/gallery.types';
 import { config } from '@/config/environment';
 
-// Gallery management response types
-export interface DeleteGalleryPieceResponse {
-  message: string;
-  pieceId: string;
-  remainingCount: number;
-}
-
-export interface BatchDeleteGalleryResponse {
-  message: string;
-  deletedCount: number;
-  unauthorizedCount: number;
-  deletedPieceIds: string[];
-  remainingCount: number;
-}
-
-export interface UpdateVisibilityResponse {
-  message: string;
-  pieceId?: string;
-  updatedCount?: number;
-  visibility: GalleryVisibility;
-}
-
-export interface DeletePortfolioOptions {
-  deleteGalleryPieces?: boolean;
-}
-
 export interface PortfolioAPI {
   // Portfolio CRUD
   create(data: CreatePortfolioDto): Promise<Portfolio>;
@@ -49,14 +23,8 @@ export interface PortfolioAPI {
   getById(id: string): Promise<PortfolioWithPieces>;
   getByUserId(userId: string): Promise<PortfolioWithPieces>;
   getByUsername(username: string): Promise<PortfolioWithPieces>;
-  delete(id: string, options?: DeletePortfolioOptions): Promise<void>;
-  getMyPortfolio(): Promise<Portfolio>;
-  
-  // Gallery Management (NEW)
-  deleteGalleryPiece(pieceId: string): Promise<DeleteGalleryPieceResponse>;
-  batchDeleteGalleryPieces(pieceIds: string[]): Promise<BatchDeleteGalleryResponse>;
-  updateGalleryPieceVisibility(pieceId: string, visibility: GalleryVisibility): Promise<UpdateVisibilityResponse>;
-  batchUpdateGalleryVisibility(pieceIds: string[], visibility: GalleryVisibility): Promise<UpdateVisibilityResponse>;
+  delete(id: string): Promise<void>;
+  getMyPortfolio(): Promise<Portfolio | null>;  // Changed to allow null
   
   // Discovery
   discover(filters?: PortfolioFilters, page?: number, limit?: number): Promise<PortfolioListResponse>;
@@ -81,6 +49,34 @@ export interface PortfolioAPI {
   
   // Images
   uploadImage(file: File, type: 'profile' | 'cover'): Promise<{ url: string }>;
+  
+  // Gallery management methods (CORE PORTFOLIO FUNCTIONALITY)
+  // These manage gallery pieces within the portfolio context
+  deleteGalleryPiece(pieceId: string): Promise<{ remainingCount: number }>;
+  batchDeleteGalleryPieces(pieceIds: string[]): Promise<{ 
+    deletedCount: number; 
+    remainingCount: number; 
+    unauthorizedCount: number 
+  }>;
+  updateGalleryPieceVisibility(pieceId: string, visibility: GalleryVisibility): Promise<void>;
+  batchUpdateGalleryVisibility(pieceIds: string[], visibility: GalleryVisibility): Promise<{ 
+    updatedCount: number 
+  }>;
+  
+  // TODO: Add these methods when backend implements them
+  // getMyGalleryPieces(params?: GalleryQueryParams): Promise<GalleryApiResponse>;
+  // createGalleryPiece(file: File, metadata: Record<string, any>): Promise<GalleryPiece>;
+  // updateGalleryPiece(pieceId: string, updates: Partial<GalleryPiece>): Promise<GalleryPiece>;
+  // uploadGalleryImage(file: File, metadata: Record<string, any>): Promise<{ url: string; thumbnailUrl?: string }>;
+}
+
+interface PortfolioMeResponse {
+  hasPortfolio?: boolean;
+  portfolio?: Portfolio | null;
+  // When portfolio exists, the response is the portfolio object directly
+  _id?: string;
+  id?: string;
+  [key: string]: any; // Allow other portfolio fields
 }
 
 export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
@@ -110,65 +106,31 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
     return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/u/${username}`);
   }
 
-  async delete(id: string, options?: DeletePortfolioOptions): Promise<void> {
+  async delete(id: string): Promise<void> {
     return this.requestWithRetry<void>(`/portfolios/${id}`, {
       method: 'DELETE',
-      body: options ? JSON.stringify(options) : undefined,
     });
   }
 
-  async getMyPortfolio(): Promise<Portfolio> {
-    return this.requestWithRetry<Portfolio>('/portfolios/me');
-  }
-
-  // ==================== GALLERY MANAGEMENT METHODS ====================
-  
-  async deleteGalleryPiece(pieceId: string): Promise<DeleteGalleryPieceResponse> {
-    return this.requestWithRetry<DeleteGalleryPieceResponse>(
-      `/portfolios/me/gallery/${pieceId}`,
-      {
-        method: 'DELETE',
+  async getMyPortfolio(): Promise<Portfolio | null> {
+    try {
+      const response = await this.requestWithRetry<PortfolioMeResponse>('/portfolios/me');
+      
+      // If the response indicates no portfolio
+      if (response.hasPortfolio === false) {
+        return null;
       }
-    );
-  }
-
-  async batchDeleteGalleryPieces(pieceIds: string[]): Promise<BatchDeleteGalleryResponse> {
-    return this.requestWithRetry<BatchDeleteGalleryResponse>(
-      '/portfolios/me/gallery/batch',
-      {
-        method: 'DELETE',
-        body: JSON.stringify({ pieceIds }),
+      
+      // If the response is the portfolio object itself
+      return response as Portfolio;
+    } catch (error) {
+      // If it's a 404, the user doesn't have a portfolio
+      if (error instanceof APIError && error.status === 404) {
+        return null;
       }
-    );
+      throw error;
+    }
   }
-
-  async updateGalleryPieceVisibility(
-    pieceId: string,
-    visibility: GalleryVisibility
-  ): Promise<UpdateVisibilityResponse> {
-    return this.requestWithRetry<UpdateVisibilityResponse>(
-      `/portfolios/me/gallery/${pieceId}/visibility`,
-      {
-        method: 'PUT',
-        body: JSON.stringify({ visibility }),
-      }
-    );
-  }
-
-  async batchUpdateGalleryVisibility(
-    pieceIds: string[],
-    visibility: GalleryVisibility
-  ): Promise<UpdateVisibilityResponse> {
-    return this.requestWithRetry<UpdateVisibilityResponse>(
-      '/portfolios/me/gallery/batch/visibility',
-      {
-        method: 'PUT',
-        body: JSON.stringify({ pieceIds, visibility }),
-      }
-    );
-  }
-
-  // ==================== DISCOVERY METHODS ====================
 
   async discover(
     filters?: PortfolioFilters,
@@ -197,8 +159,6 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
       params: { period },
     });
   }
-
-  // ==================== REVIEW METHODS ====================
 
   async addReview(portfolioId: string, review: CreateReviewDto): Promise<PortfolioReview> {
     return this.requestWithRetry<PortfolioReview>(`/portfolios/${portfolioId}/reviews`, {
@@ -240,8 +200,6 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
     });
   }
 
-  // ==================== ANALYTICS METHODS ====================
-
   async trackView(
     portfolioId: string,
     data?: { referrer?: string; duration?: number }
@@ -260,8 +218,6 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
       params: { period },
     });
   }
-
-  // ==================== SHARING METHODS ====================
 
   async generateShareLink(
     portfolioId: string,
@@ -287,8 +243,6 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
     const data = await response.json();
     return data;
   }
-
-  // ==================== IMAGE UPLOAD ====================
 
   async uploadImage(
     file: File,
@@ -342,5 +296,56 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
       
       throw new APIError('Portfolio image upload failed', undefined, 'UPLOAD_ERROR');
     }
+  }
+
+  // Gallery management methods
+  async deleteGalleryPiece(pieceId: string): Promise<{ remainingCount: number }> {
+    return this.requestWithRetry<{ remainingCount: number }>(
+      `/portfolios/me/gallery/${pieceId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+  }
+
+  async batchDeleteGalleryPieces(pieceIds: string[]): Promise<{ 
+    deletedCount: number; 
+    remainingCount: number; 
+    unauthorizedCount: number 
+  }> {
+    return this.requestWithRetry<{ 
+      deletedCount: number; 
+      remainingCount: number; 
+      unauthorizedCount: number 
+    }>('/portfolios/me/gallery/batch', {
+      method: 'DELETE',
+      body: JSON.stringify({ pieceIds }),
+    });
+  }
+
+  async updateGalleryPieceVisibility(
+    pieceId: string, 
+    visibility: GalleryVisibility
+  ): Promise<void> {
+    return this.requestWithRetry<void>(
+      `/portfolios/me/gallery/${pieceId}/visibility`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ visibility }),
+      }
+    );
+  }
+
+  async batchUpdateGalleryVisibility(
+    pieceIds: string[], 
+    visibility: GalleryVisibility
+  ): Promise<{ updatedCount: number }> {
+    return this.requestWithRetry<{ updatedCount: number }>(
+      '/portfolios/me/gallery/batch/visibility',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ pieceIds, visibility }),
+      }
+    );
   }
 }

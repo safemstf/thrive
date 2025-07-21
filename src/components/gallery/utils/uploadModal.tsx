@@ -71,96 +71,148 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     }));
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  if (!isAuthenticated) {
-    setError('You must be logged in to upload artwork');
-    return;
-  }
+    if (!isAuthenticated) {
+      setError('You must be logged in to upload artwork');
+      return;
+    }
 
-  if (!selectedFile) {
-    setError('Please select an image to upload');
-    return;
-  }
+    if (!selectedFile) {
+      setError('Please select an image to upload');
+      return;
+    }
 
-  if (!formData.title.trim()) {
-    setError('Please enter a title for your artwork');
-    return;
-  }
+    if (!formData.title.trim()) {
+      setError('Please enter a title for your artwork');
+      return;
+    }
 
-  setIsUploading(true);
-  setError(null);
+    setIsUploading(true);
+    setError(null);
 
-  try {
-    console.log('Starting upload process...');
+    try {
+      console.log('Starting upload process...');
 
-    // Ensure portfolio exists
-    let pid = portfolioId;
-    if (!pid) {
-      const newPortfolio = await api.portfolio.create({
-        title: `${user?.name || 'My'} Portfolio`,
-        bio: '',
+      // Check if portfolio exists
+      let pid = portfolioId;
+      if (!pid) {
+        try {
+          // First, check if user already has a portfolio
+          const portfolioResponse = await api.portfolio.getMyPortfolio();
+          console.log('Portfolio check response:', portfolioResponse);
+          
+          if (!portfolioResponse) {
+            // User doesn't have a portfolio, create one
+            console.log('No portfolio exists, creating new one...');
+            
+            const newPortfolio = await api.portfolio.create({
+              title: `${user?.name || 'My'} Portfolio`,
+              bio: '',
+              visibility: 'public',
+              specializations: [],
+              tags: [],
+              tagline: '',
+              settings: {},
+            } as any);
+            
+            // Handle MongoDB _id or regular id
+            pid = (newPortfolio as any)._id || newPortfolio.id;
+            console.log('Created new portfolio:', pid);
+          } else {
+            // Portfolio exists, use it
+            pid = (portfolioResponse as any)._id || portfolioResponse.id;
+            console.log('Using existing portfolio:', pid);
+          }
+        } catch (portfolioError: any) {
+          console.error('Portfolio error:', portfolioError);
+          
+          // Special handling for 409 conflict (portfolio already exists)
+          if (portfolioError.status === 409 || portfolioError.message?.includes('already exists')) {
+            console.log('Portfolio already exists, fetching it...');
+            
+            // Wait a moment for the backend to be consistent
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            try {
+              const existingPortfolio = await api.portfolio.getMyPortfolio();
+              if (existingPortfolio) {
+                pid = (existingPortfolio as any)._id || existingPortfolio.id;
+                console.log('Retrieved existing portfolio:', pid);
+              } else {
+                // If still can't get it, try getting by user ID
+                if (user?.id) {
+                  const userPortfolio = await api.portfolio.getByUserId(user.id);
+                  pid = (userPortfolio as any)._id || userPortfolio.id;
+                  console.log('Retrieved portfolio by user ID:', pid);
+                } else {
+                  throw new Error('Unable to retrieve existing portfolio');
+                }
+              }
+            } catch (retryError) {
+              console.error('Failed to retrieve existing portfolio:', retryError);
+              throw new Error('Portfolio exists but cannot be retrieved. Please refresh the page and try again.');
+            }
+          } else {
+            throw portfolioError;
+          }
+        }
+      }
+
+      if (!pid) {
+        throw new Error('Failed to determine portfolio ID');
+      }
+
+      // Parse tags
+      const tagsArray = formData.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+
+      // Upload image and create gallery piece
+      const uploadResponse = await api.gallery.uploadImage(selectedFile, {
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        medium: formData.medium,
+        tags: tagsArray.join(','),
+        price: formData.price || '',
+        artist: formData.artist || user?.name || '',
+        year: formData.year.toString(),
+        portfolioId: pid,
         visibility: 'public',
-        specializations: [],
-        tags: [],
-        tagline: '',
-        settings: {},
+        generateThumbnail: 'true',
+        optimizeImages: 'true',
+        preserveMetadata: 'false',
+        quality: '0.9',
+        maxWidth: '2000',
+        maxHeight: '2000',
       });
-      pid = newPortfolio.id;
+
+      if (!uploadResponse?.url) {
+        throw new Error('Upload failed - no URL returned');
+      }
+
+      console.log('Upload and gallery piece creation successful!');
+      onSuccess();
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      let errorMessage = 'Failed to upload artwork';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      if (error.status === 401 || errorMessage.includes('401') || errorMessage.includes('NO_AUTH_TOKEN')) {
+        errorMessage = 'Authentication failed. Please try logging out and back in.';
+      }
+
+      setError(errorMessage);
+    } finally {
+      setIsUploading(false);
     }
-
-    // Parse tags
-    const tagsArray = formData.tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-
-    // Upload image and create gallery piece
-    const uploadResponse = await api.gallery.uploadImage(selectedFile, {
-      title: formData.title,
-      description: formData.description,
-      category: formData.category,
-      medium: formData.medium,
-      tags: tagsArray.join(','),
-      price: formData.price || '',
-      artist: formData.artist || user?.name || '',
-      year: formData.year.toString(),
-      portfolioId: pid,
-      visibility: 'public',
-      generateThumbnail: 'true',
-      optimizeImages: 'true',
-      preserveMetadata: 'false',
-      quality: '0.9',
-      maxWidth: '2000',
-      maxHeight: '2000',
-    });
-
-    if (!uploadResponse?.url) {
-      throw new Error('Upload failed - no URL returned');
-    }
-
-    console.log('Upload and gallery piece creation successful!');
-    onSuccess();
-  } catch (error) {
-    console.error('Upload error:', error);
-    let errorMessage = 'Failed to upload artwork';
-
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-
-    if (errorMessage.includes('401') || errorMessage.includes('NO_AUTH_TOKEN')) {
-      errorMessage = 'Authentication failed. Please try logging out and back in.';
-    }
-
-    setError(errorMessage);
-  } finally {
-    setIsUploading(false);
-  }
-};
-
-
+  };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -391,7 +443,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   );
 };
 
-// Styled Components (keeping all the same styles but removing debug section)
+// Styled Components
 const ModalOverlay = styled.div`
   position: fixed;
   inset: 0;
