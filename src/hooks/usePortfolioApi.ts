@@ -80,8 +80,9 @@ export function usePortfolioByUsername(
   });
 }
 
+// Fixed to handle nullable return type
 export function useMyPortfolio(
-  options?: UseQueryOptions<Portfolio, APIError>
+  options?: UseQueryOptions<Portfolio | null, APIError>
 ) {
   return useQuery({
     queryKey: portfolioQueryKeys.myPortfolio(),
@@ -269,5 +270,71 @@ export function useTrackPortfolioView() {
   return useMutation({
     mutationFn: ({ portfolioId, data }: { portfolioId: string; data?: any }) =>
       api.portfolio.trackView(portfolioId, data),
+  });
+}
+
+// ==================== Gallery Management Mutations ====================
+export function useDeleteGalleryPiece(
+  options?: UseMutationOptions<{ remainingCount: number }, APIError, string>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (pieceId: string) => api.portfolio.deleteGalleryPiece(pieceId),
+    onSuccess: () => {
+      // Invalidate gallery and portfolio queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.myPortfolio() });
+    },
+    ...options,
+  });
+}
+
+export function useBatchDeleteGalleryPieces(
+  options?: UseMutationOptions<
+    { deletedCount: number; remainingCount: number; unauthorizedCount: number },
+    APIError,
+    string[]
+  >
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (pieceIds: string[]) => api.portfolio.batchDeleteGalleryPieces(pieceIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.myPortfolio() });
+    },
+    ...options,
+  });
+}
+
+export function useUpdateGalleryPieceVisibility(
+  options?: UseMutationOptions<void, APIError, { pieceId: string; visibility: 'public' | 'private' | 'unlisted' }>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pieceId, visibility }) => 
+      api.portfolio.updateGalleryPieceVisibility(pieceId, visibility),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+    },
+    ...options,
+  });
+}
+
+export function useBatchUpdateGalleryVisibility(
+  options?: UseMutationOptions<
+    { updatedCount: number },
+    APIError,
+    { pieceIds: string[]; visibility: 'public' | 'private' | 'unlisted' }
+  >
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pieceIds, visibility }) => 
+      api.portfolio.batchUpdateGalleryVisibility(pieceIds, visibility),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+    },
+    ...options,
   });
 }
