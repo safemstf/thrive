@@ -1,5 +1,6 @@
-// src\app\api-test\page.tsx
 'use client'
+// src\app\api-test\page.tsx
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { 
@@ -26,18 +27,17 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   simulations: Zap,
 };
 
-
 // Category colors for visual distinction
 const CATEGORY_COLORS: Record<string, string> = {
-  health: '#4caf50',
-  auth: '#ff9800',
-  portfolios: '#2196f3',
-  gallery: '#9c27b0',
-  users: '#f44336',
-  books: '#00bcd4',
-  concepts: '#673ab7',
-  progress: '#009688',
-  simulations: '#ffc107',
+  health: '#10b981',
+  auth: '#f59e0b',
+  portfolios: '#3b82f6',
+  gallery: '#8b5cf6',
+  users: '#ef4444',
+  books: '#06b6d4',
+  concepts: '#6366f1',
+  progress: '#14b8a6',
+  simulations: '#f59e0b',
 };
 
 export default function EnhancedApiTestPage() {
@@ -218,13 +218,13 @@ export default function EnhancedApiTestPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'success':
-        return <CheckCircle style={{ color: '#4caf50' }} size={20} />;
+        return <CheckCircle style={{ color: '#10b981' }} size={20} />;
       case 'error':
-        return <XCircle style={{ color: '#f44336' }} size={20} />;
+        return <XCircle style={{ color: '#ef4444' }} size={20} />;
       case 'running':
-        return <Loader2 style={{ color: '#2196f3' }} className="animate-spin" size={20} />;
+        return <Loader2 style={{ color: '#3b82f6' }} className="animate-spin" size={20} />;
       default:
-        return <AlertCircle style={{ color: '#666666' }} size={20} />;
+        return <AlertCircle style={{ color: '#9ca3af' }} size={20} />;
     }
   };
 
@@ -284,7 +284,7 @@ export default function EnhancedApiTestPage() {
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#4caf50">
+            <StatCard $color="#10b981">
               <StatIcon><CheckCircle size={24} /></StatIcon>
               <StatContent>
                 <StatValue>{stats.passed}</StatValue>
@@ -292,7 +292,7 @@ export default function EnhancedApiTestPage() {
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#f44336">
+            <StatCard $color="#ef4444">
               <StatIcon><XCircle size={24} /></StatIcon>
               <StatContent>
                 <StatValue>{stats.failed}</StatValue>
@@ -300,7 +300,7 @@ export default function EnhancedApiTestPage() {
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#2196f3">
+            <StatCard $color="#3b82f6">
               <StatIcon><Loader2 size={24} /></StatIcon>
               <StatContent>
                 <StatValue>{stats.running}</StatValue>
@@ -312,7 +312,7 @@ export default function EnhancedApiTestPage() {
               <ProgressBar>
                 <ProgressFill 
                   $width={(stats.passed / stats.total) * 100}
-                  $color="#4caf50"
+                  $color="#10b981"
                 />
               </ProgressBar>
               <ProgressLabel>
@@ -364,12 +364,12 @@ export default function EnhancedApiTestPage() {
                           <CategoryStats>
                             {hasResults ? (
                               <>
-                                <span style={{ color: '#4caf50' }}>{passed}</span>
-                                <span style={{ color: '#666' }}>/</span>
+                                <span style={{ color: '#10b981' }}>{passed}</span>
+                                <span style={{ color: '#6b7280' }}>/</span>
                                 <span>{total}</span>
                               </>
                             ) : (
-                              <span style={{ color: '#666' }}>{total} routes</span>
+                              <span style={{ color: '#6b7280' }}>{total} routes</span>
                             )}
                           </CategoryStats>
                           {hasResults && (
@@ -514,7 +514,7 @@ export default function EnhancedApiTestPage() {
                               </RouteCheckbox>
                               
                               <StatusIcon>
-                                {result ? getStatusIcon(result.status) : <AlertCircle style={{ color: '#666' }} size={20} />}
+                                {result ? getStatusIcon(result.status) : <AlertCircle style={{ color: '#9ca3af' }} size={20} />}
                               </StatusIcon>
                               
                               <RouteInfo>
@@ -626,157 +626,155 @@ export default function EnhancedApiTestPage() {
             )}
 
             {activeTab === 1 && (
-              <ConfigActions>
+              <ConfigSection>
                 <ConfigCard>
-                  <ConfigCard>
-                    <ConfigHeader>
-                      <ConfigTitle>Connection Settings</ConfigTitle>
-                      <ConfigStatus $connected={connectionStatus === 'connected'}>
-                        {connectionStatus === 'connected' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-                        {connectionStatus}
-                      </ConfigStatus>
-                    </ConfigHeader>
+                  <ConfigHeader>
+                    <ConfigTitle>Connection Settings</ConfigTitle>
+                    <ConfigStatus $connected={connectionStatus === 'connected'}>
+                      {connectionStatus === 'connected' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+                      {connectionStatus}
+                    </ConfigStatus>
+                  </ConfigHeader>
+                  
+                  <ConfigContent>
+                    <ConfigRow>
+                      <ConfigLabel>Base URL</ConfigLabel>
+                      <ConfigValue>{baseUrl}</ConfigValue>
+                    </ConfigRow>
                     
-                    <ConfigContent>
-                      <ConfigRow>
-                        <ConfigLabel>Base URL</ConfigLabel>
-                        <ConfigValue>{baseUrl}</ConfigValue>
-                      </ConfigRow>
-                      
-                      <ConfigRow>
-                        <ConfigLabel>NGROK URL</ConfigLabel>
-                        <ConfigValue>{process.env.NEXT_PUBLIC_NGROK_URL || 'Not configured'}</ConfigValue>
-                      </ConfigRow>
-                      
-                      <ConfigRow>
-                        <ConfigLabel>Environment</ConfigLabel>
-                        <ConfigValue>{process.env.NODE_ENV}</ConfigValue>
-                      </ConfigRow>
-                      
-                      {backendInfo && (
-                        <>
-                          <ConfigRow>
-                            <ConfigLabel>Backend Status</ConfigLabel>
-                            <ConfigValue>{backendInfo.status}</ConfigValue>
-                          </ConfigRow>
-                          
-                          <ConfigRow>
-                            <ConfigLabel>Backend Version</ConfigLabel>
-                            <ConfigValue>{backendInfo.version || 'Unknown'}</ConfigValue>
-                          </ConfigRow>
-                        </>
-                      )}
-                      
-                      <ConfigRow>
-                        <ConfigLabel>Auth Token</ConfigLabel>
-                        <ConfigValue>
-                          {authToken ? (
-                            <TokenDisplay onClick={copyToken}>
-                              {authToken.substring(0, 20)}...
-                              <Copy size={14} />
-                            </TokenDisplay>
-                          ) : (
-                            'Not authenticated'
-                          )}
-                        </ConfigValue>
-                      </ConfigRow>
-                    </ConfigContent>
+                    <ConfigRow>
+                      <ConfigLabel>NGROK URL</ConfigLabel>
+                      <ConfigValue>{process.env.NEXT_PUBLIC_NGROK_URL || 'Not configured'}</ConfigValue>
+                    </ConfigRow>
                     
-                    <ConfigActions>
-                      <ActionButton onClick={checkConnection}>
-                        <RefreshCw size={16} />
-                        Test Connection
+                    <ConfigRow>
+                      <ConfigLabel>Environment</ConfigLabel>
+                      <ConfigValue>{process.env.NODE_ENV}</ConfigValue>
+                    </ConfigRow>
+                    
+                    {backendInfo && (
+                      <>
+                        <ConfigRow>
+                          <ConfigLabel>Backend Status</ConfigLabel>
+                          <ConfigValue>{backendInfo.status}</ConfigValue>
+                        </ConfigRow>
+                        
+                        <ConfigRow>
+                          <ConfigLabel>Backend Version</ConfigLabel>
+                          <ConfigValue>{backendInfo.version || 'Unknown'}</ConfigValue>
+                        </ConfigRow>
+                      </>
+                    )}
+                    
+                    <ConfigRow>
+                      <ConfigLabel>Auth Token</ConfigLabel>
+                      <ConfigValue>
+                        {authToken ? (
+                          <TokenDisplay onClick={copyToken}>
+                            {authToken.substring(0, 20)}...
+                            <Copy size={14} />
+                          </TokenDisplay>
+                        ) : (
+                          'Not authenticated'
+                        )}
+                      </ConfigValue>
+                    </ConfigRow>
+                  </ConfigContent>
+                  
+                  <ConfigActions>
+                    <ActionButton onClick={checkConnection}>
+                      <RefreshCw size={16} />
+                      Test Connection
+                    </ActionButton>
+                    
+                    {authToken && (
+                      <ActionButton onClick={() => {
+                        localStorage.removeItem('api_test_token');
+                        window.location.reload();
+                      }}>
+                        <Lock size={16} />
+                        Clear Auth
                       </ActionButton>
-                      
-                      {authToken && (
-                        <ActionButton onClick={() => {
-                          localStorage.removeItem('api_test_token');
-                          window.location.reload();
-                        }}>
-                          <Lock size={16} />
-                          Clear Auth
-                        </ActionButton>
-                      )}
-                    </ConfigActions>
-                  </ConfigCard>
-
-                  <ConfigCard>
-                    <ConfigHeader>
-                      <ConfigTitle>Quick Links</ConfigTitle>
-                    </ConfigHeader>
-                    
-                    <QuickLinks>
-                      <QuickLink onClick={() => window.open(baseUrl, '_blank')}>
-                        <ExternalLink size={16} />
-                        Open Backend URL
-                      </QuickLink>
-                      
-                      <QuickLink onClick={() => window.open('http://localhost:5000', '_blank')}>
-                        <ExternalLink size={16} />
-                        Open Localhost:5000
-                      </QuickLink>
-                      
-                      <QuickLink onClick={() => window.open('http://localhost:4040', '_blank')}>
-                        <ExternalLink size={16} />
-                        Ngrok Dashboard
-                      </QuickLink>
-                      
-                      <QuickLink onClick={() => window.open(`${baseUrl}/api`, '_blank')}>
-                        <ExternalLink size={16} />
-                        API Documentation
-                      </QuickLink>
-                    </QuickLinks>
-                  </ConfigCard>
-
-                  <ConfigCard>
-                    <ConfigHeader>
-                      <ConfigTitle>Setup Instructions</ConfigTitle>
-                    </ConfigHeader>
-                    
-                    <SetupSteps>
-                      <SetupStep>
-                        <StepNumber>1</StepNumber>
-                        <StepContent>
-                          <StepTitle>Start Backend Server</StepTitle>
-                          <CodeSnippet>cd backend && npm start</CodeSnippet>
-                        </StepContent>
-                      </SetupStep>
-                      
-                      <SetupStep>
-                        <StepNumber>2</StepNumber>
-                        <StepContent>
-                          <StepTitle>Start Ngrok Tunnel</StepTitle>
-                          <CodeSnippet>ngrok http 5000</CodeSnippet>
-                        </StepContent>
-                      </SetupStep>
-                      
-                      <SetupStep>
-                        <StepNumber>3</StepNumber>
-                        <StepContent>
-                          <StepTitle>Update Environment</StepTitle>
-                          <CodeSnippet>NEXT_PUBLIC_NGROK_URL=https://xxx.ngrok.io</CodeSnippet>
-                          <StepNote>No trailing slash!</StepNote>
-                        </StepContent>
-                      </SetupStep>
-                      
-                      <SetupStep>
-                        <StepNumber>4</StepNumber>
-                        <StepContent>
-                          <StepTitle>Restart Next.js</StepTitle>
-                          <CodeSnippet>npm run dev</CodeSnippet>
-                        </StepContent>
-                      </SetupStep>
-                    </SetupSteps>
-                  </ConfigCard>
+                    )}
+                  </ConfigActions>
                 </ConfigCard>
-              </ConfigActions>
+
+                <ConfigCard>
+                  <ConfigHeader>
+                    <ConfigTitle>Quick Links</ConfigTitle>
+                  </ConfigHeader>
+                  
+                  <QuickLinks>
+                    <QuickLink onClick={() => window.open(baseUrl, '_blank')}>
+                      <ExternalLink size={16} />
+                      Open Backend URL
+                    </QuickLink>
+                    
+                    <QuickLink onClick={() => window.open('http://localhost:5000', '_blank')}>
+                      <ExternalLink size={16} />
+                      Open Localhost:5000
+                    </QuickLink>
+                    
+                    <QuickLink onClick={() => window.open('http://localhost:4040', '_blank')}>
+                      <ExternalLink size={16} />
+                      Ngrok Dashboard
+                    </QuickLink>
+                    
+                    <QuickLink onClick={() => window.open(`${baseUrl}/api`, '_blank')}>
+                      <ExternalLink size={16} />
+                      API Documentation
+                    </QuickLink>
+                  </QuickLinks>
+                </ConfigCard>
+
+                <ConfigCard>
+                  <ConfigHeader>
+                    <ConfigTitle>Setup Instructions</ConfigTitle>
+                  </ConfigHeader>
+                  
+                  <SetupSteps>
+                    <SetupStep>
+                      <StepNumber>1</StepNumber>
+                      <StepContent>
+                        <StepTitle>Start Backend Server</StepTitle>
+                        <CodeSnippet>cd backend && npm start</CodeSnippet>
+                      </StepContent>
+                    </SetupStep>
+                    
+                    <SetupStep>
+                      <StepNumber>2</StepNumber>
+                      <StepContent>
+                        <StepTitle>Start Ngrok Tunnel</StepTitle>
+                        <CodeSnippet>ngrok http 5000</CodeSnippet>
+                      </StepContent>
+                    </SetupStep>
+                    
+                    <SetupStep>
+                      <StepNumber>3</StepNumber>
+                      <StepContent>
+                        <StepTitle>Update Environment</StepTitle>
+                        <CodeSnippet>NEXT_PUBLIC_NGROK_URL=https://xxx.ngrok.io</CodeSnippet>
+                        <StepNote>No trailing slash!</StepNote>
+                      </StepContent>
+                    </SetupStep>
+                    
+                    <SetupStep>
+                      <StepNumber>4</StepNumber>
+                      <StepContent>
+                        <StepTitle>Restart Next.js</StepTitle>
+                        <CodeSnippet>npm run dev</CodeSnippet>
+                      </StepContent>
+                    </SetupStep>
+                  </SetupSteps>
+                </ConfigCard>
+              </ConfigSection>
             )}
 
             {activeTab === 2 && (
               <IntegrationSection>
                 <IntegrationCard>
                   <CardHeader>
-                    <CardIcon $color="#ff9800"><Code size={24} /></CardIcon>
+                    <CardIcon $color="#f59e0b"><Code size={24} /></CardIcon>
                     <CardTitle>Example Integration Flow</CardTitle>
                   </CardHeader>
                   
@@ -920,13 +918,13 @@ PUT /api/portfolios/me/gallery/batch/visibility
   );
 }
 
-// Styled Components
+// Styled Components - Light Theme to match Taskbar design
 const PageWrapper = styled.div`
   min-height: 100vh;
-  background: #0a0a0a;
+  background: #fafafa;
   padding: 2rem 1rem;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #ffffff;
+  font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #2c2c2c;
 `;
 
 const Container = styled.div`
@@ -954,17 +952,16 @@ const HeaderRight = styled.div`
 const PageTitle = styled.h1`
   font-size: 2.5rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #2c2c2c;
   margin: 0 0 0.5rem 0;
+  letter-spacing: -0.5px;
 `;
 
 const PageSubtitle = styled.p`
   font-size: 1.125rem;
-  color: #888888;
+  color: #666;
   margin: 0;
+  font-weight: 300;
 `;
 
 const ConnectionBadge = styled.div<{ $status: string }>`
@@ -974,15 +971,15 @@ const ConnectionBadge = styled.div<{ $status: string }>`
   padding: 0.5rem 1rem;
   border-radius: 20px;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 400;
   background: ${({ $status }) => 
-    $status === 'connected' ? 'rgba(76, 175, 80, 0.1)' : 
-    $status === 'disconnected' ? 'rgba(244, 67, 54, 0.1)' : 
-    'rgba(33, 150, 243, 0.1)'};
+    $status === 'connected' ? 'rgba(16, 185, 129, 0.1)' : 
+    $status === 'disconnected' ? 'rgba(239, 68, 68, 0.1)' : 
+    'rgba(59, 130, 246, 0.1)'};
   color: ${({ $status }) => 
-    $status === 'connected' ? '#4caf50' : 
-    $status === 'disconnected' ? '#f44336' : 
-    '#2196f3'};
+    $status === 'connected' ? '#10b981' : 
+    $status === 'disconnected' ? '#ef4444' : 
+    '#3b82f6'};
   border: 1px solid currentColor;
 `;
 
@@ -993,15 +990,15 @@ const AuthTokenBadge = styled.button`
   padding: 0.5rem 1rem;
   border-radius: 20px;
   font-size: 0.875rem;
-  font-weight: 500;
-  background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
-  border: 1px solid #667eea;
+  font-weight: 400;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid #3b82f6;
   cursor: pointer;
   transition: all 0.2s;
   
   &:hover {
-    background: rgba(102, 126, 234, 0.2);
+    background: rgba(59, 130, 246, 0.2);
     transform: translateY(-1px);
   }
 `;
@@ -1014,17 +1011,18 @@ const StatsOverview = styled.div`
 `;
 
 const StatCard = styled.div<{ $color?: string }>`
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: white;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 1.5rem;
   display: flex;
   align-items: center;
   gap: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   
   ${({ $color }) => $color && `
     border-color: ${$color}33;
-    background: ${$color}0a;
+    background: ${$color}08;
     
     svg {
       color: ${$color};
@@ -1044,25 +1042,28 @@ const StatValue = styled.div`
   font-size: 2rem;
   font-weight: 700;
   line-height: 1;
+  color: #2c2c2c;
 `;
 
 const StatLabel = styled.div`
   font-size: 0.875rem;
-  color: #666666;
+  color: #666;
   margin-top: 0.25rem;
+  font-weight: 300;
 `;
 
 const ProgressCard = styled.div`
   grid-column: span 2;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: white;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 `;
 
 const ProgressBar = styled.div`
   height: 8px;
-  background: #2a2a2a;
+  background: #f3f4f6;
   border-radius: 4px;
   overflow: hidden;
   margin-bottom: 0.75rem;
@@ -1077,22 +1078,23 @@ const ProgressFill = styled.div<{ $width: number; $color: string }>`
 
 const ProgressLabel = styled.div`
   font-size: 0.875rem;
-  color: #888888;
+  color: #666;
   text-align: center;
+  font-weight: 300;
 `;
 
 const MainCard = styled.div`
-  background: #1a1a1a;
+  background: white;
   border-radius: 16px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid #e5e7eb;
   overflow: hidden;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.05);
 `;
 
 const TabRow = styled.div`
   display: flex;
-  background: #0f0f0f;
-  border-bottom: 1px solid #2a2a2a;
+  background: #fafafa;
+  border-bottom: 1px solid #e5e7eb;
   overflow-x: auto;
 `;
 
@@ -1101,10 +1103,10 @@ const TabButton = styled.button<{ $active: boolean }>`
   min-width: fit-content;
   padding: 1rem 1.5rem;
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: ${({ $active }) => ($active ? "400" : "300")};
   border: none;
-  background: ${({ $active }) => ($active ? "#1a1a1a" : "transparent")};
-  color: ${({ $active }) => ($active ? "#ffffff" : "#888888")};
+  background: ${({ $active }) => ($active ? "white" : "transparent")};
+  color: ${({ $active }) => ($active ? "#2c2c2c" : "#666")};
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -1113,6 +1115,9 @@ const TabButton = styled.button<{ $active: boolean }>`
   gap: 0.5rem;
   position: relative;
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: 'Work Sans', sans-serif;
 
   &::after {
     content: '';
@@ -1121,12 +1126,12 @@ const TabButton = styled.button<{ $active: boolean }>`
     left: 0;
     right: 0;
     height: 2px;
-    background: ${({ $active }) => ($active ? "#667eea" : "transparent")};
+    background: ${({ $active }) => ($active ? "#2c2c2c" : "transparent")};
   }
 
   &:hover {
-    background: ${({ $active }) => ($active ? "#1a1a1a" : "#151515")};
-    color: #ffffff;
+    background: ${({ $active }) => ($active ? "white" : "#f3f4f6")};
+    color: #2c2c2c;
   }
 `;
 
@@ -1146,8 +1151,8 @@ const CategoryGrid = styled.div`
 `;
 
 const CategoryCard = styled.button<{ $active: boolean; $color: string }>`
-  background: ${({ $active }) => $active ? '#0f0f0f' : '#0a0a0a'};
-  border: 2px solid ${({ $active, $color }) => $active ? $color : '#2a2a2a'};
+  background: ${({ $active }) => $active ? 'white' : '#fafafa'};
+  border: 2px solid ${({ $active, $color }) => $active ? $color : '#e5e7eb'};
   border-radius: 12px;
   padding: 1.5rem;
   cursor: pointer;
@@ -1155,11 +1160,13 @@ const CategoryCard = styled.button<{ $active: boolean; $color: string }>`
   text-align: center;
   position: relative;
   overflow: hidden;
+  box-shadow: ${({ $active }) => $active ? '0 4px 12px rgba(0, 0, 0, 0.08)' : 'none'};
   
   &:hover {
-    background: #0f0f0f;
+    background: white;
     border-color: ${({ $color }) => $color};
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 `;
 
@@ -1170,20 +1177,24 @@ const CategoryIcon = styled.div<{ $color: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  background: ${({ $color }) => `${$color}1a`};
+  background: ${({ $color }) => `${$color}15`};
   border-radius: 12px;
   color: ${({ $color }) => $color};
 `;
 
 const CategoryName = styled.div`
-  font-weight: 600;
-  color: #ffffff;
+  font-weight: 500;
+  color: #2c2c2c;
   margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.875rem;
 `;
 
 const CategoryStats = styled.div`
   font-size: 0.875rem;
-  color: #888888;
+  color: #666;
+  font-weight: 300;
 `;
 
 const CategoryProgress = styled.div`
@@ -1192,7 +1203,7 @@ const CategoryProgress = styled.div`
   left: 0;
   right: 0;
   height: 3px;
-  background: #2a2a2a;
+  background: #f3f4f6;
 `;
 
 const CategoryProgressFill = styled.div<{ $width: number; $color: string }>`
@@ -1216,19 +1227,21 @@ const SearchBar = styled.div`
 const SearchInput = styled.input`
   flex: 1;
   padding: 0.75rem 1rem;
-  background: #0f0f0f;
-  border: 1px solid #2a2a2a;
+  background: white;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  color: #ffffff;
+  color: #2c2c2c;
   font-size: 0.875rem;
+  font-family: 'Work Sans', sans-serif;
   
   &:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
   
   &::placeholder {
-    color: #666666;
+    color: #9ca3af;
   }
 `;
 
@@ -1249,17 +1262,20 @@ const FilterButton = styled.button<{ $active: boolean }>`
   gap: 0.375rem;
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid ${({ $active }) => $active ? '#667eea' : '#2a2a2a'};
-  background: ${({ $active }) => $active ? 'rgba(102, 126, 234, 0.1)' : '#0f0f0f'};
-  color: ${({ $active }) => $active ? '#667eea' : '#666666'};
+  border: 1px solid ${({ $active }) => $active ? '#3b82f6' : '#e5e7eb'};
+  background: ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.1)' : 'white'};
+  color: ${({ $active }) => $active ? '#3b82f6' : '#666'};
   font-size: 0.813rem;
-  font-weight: 500;
+  font-weight: ${({ $active }) => $active ? '400' : '300'};
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: 'Work Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 
   &:hover {
-    background: ${({ $active }) => $active ? 'rgba(102, 126, 234, 0.2)' : '#1a1a1a'};
-    color: ${({ $active }) => $active ? '#667eea' : '#ffffff'};
+    background: ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.2)' : '#f9fafb'};
+    color: ${({ $active }) => $active ? '#3b82f6' : '#2c2c2c'};
   }
   
   svg {
@@ -1286,19 +1302,21 @@ const PrimaryButton = styled.button`
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
-  border-radius: 8px;
-  border: none;
-  background: #667eea;
-  color: #ffffff;
+  border-radius: 2px;
+  border: 1px solid #2c2c2c;
+  background: #2c2c2c;
+  color: #f8f8f8;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 300;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: 'Work Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 
   &:hover:not(:disabled) {
-    background: #5a67d8;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
   }
 
   &:disabled {
@@ -1308,15 +1326,12 @@ const PrimaryButton = styled.button`
 `;
 
 const SecondaryButton = styled(PrimaryButton)`
-  background: #0f0f0f;
-  border: 1px solid #2a2a2a;
-  color: #888888;
+  background: white;
+  border: 1px solid #2c2c2c;
+  color: #2c2c2c;
   
   &:hover:not(:disabled) {
-    background: #1a1a1a;
-    color: #ffffff;
-    border-color: #3a3a3a;
-    box-shadow: none;
+    background: #f8f8f8;
   }
 `;
 
@@ -1334,7 +1349,7 @@ const SectionHeader = styled.div`
 const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 600;
-  color: #ffffff;
+  color: #2c2c2c;
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -1342,9 +1357,9 @@ const SectionTitle = styled.h3`
 
 const RouteBadge = styled.span`
   font-size: 0.875rem;
-  font-weight: 500;
-  color: #666666;
-  background: #0f0f0f;
+  font-weight: 400;
+  color: #666;
+  background: #f3f4f6;
   padding: 0.25rem 0.75rem;
   border-radius: 12px;
 `;
@@ -1357,17 +1372,19 @@ const SelectionControls = styled.div`
 const SelectButton = styled.button`
   padding: 0.5rem 1rem;
   font-size: 0.813rem;
-  color: #888888;
+  color: #666;
   background: transparent;
-  border: 1px solid #2a2a2a;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: 'Work Sans', sans-serif;
+  font-weight: 300;
   
   &:hover {
-    background: #0f0f0f;
-    color: #ffffff;
-    border-color: #3a3a3a;
+    background: #f9fafb;
+    color: #2c2c2c;
+    border-color: #d1d5db;
   }
 `;
 
@@ -1378,19 +1395,20 @@ const RouteList = styled.div`
 `;
 
 const RouteCard = styled.div<{ $status?: string; $selected?: boolean }>`
-  background: #0f0f0f;
+  background: white;
   border: 2px solid ${({ $status, $selected }) => 
-    $selected ? '#667eea' :
-    $status === 'success' ? '#4caf5033' : 
-    $status === 'error' ? '#f4433633' : 
-    $status === 'running' ? '#2196f333' : 
-    '#2a2a2a'};
+    $selected ? '#3b82f6' :
+    $status === 'success' ? '#10b98133' : 
+    $status === 'error' ? '#ef444433' : 
+    $status === 'running' ? '#3b82f633' : 
+    '#e5e7eb'};
   border-radius: 12px;
   padding: 1.5rem;
   transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   
   &:hover {
-    background: #151515;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 `;
 
@@ -1425,7 +1443,7 @@ const RouteInfo = styled.div`
 
 const RouteName = styled.div`
   font-weight: 600;
-  color: #ffffff;
+  color: #2c2c2c;
   margin-bottom: 0.375rem;
   font-size: 1rem;
 `;
@@ -1440,32 +1458,35 @@ const RouteEndpoint = styled.div`
 const EndpointPath = styled.span`
   font-family: 'Fira Code', monospace;
   font-size: 0.875rem;
-  color: #888888;
+  color: #666;
 `;
 
 const RouteDescription = styled.div`
   font-size: 0.875rem;
-  color: #666666;
+  color: #666;
   margin-bottom: 0.5rem;
+  font-weight: 300;
 `;
 
 const MethodBadge = styled.span<{ $method: string }>`
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   background: ${({ $method }) => 
-    $method === 'GET' ? 'rgba(33, 150, 243, 0.2)' :
-    $method === 'POST' ? 'rgba(76, 175, 80, 0.2)' :
-    $method === 'PUT' || $method === 'PATCH' ? 'rgba(255, 152, 0, 0.2)' :
-    $method === 'DELETE' ? 'rgba(244, 67, 54, 0.2)' :
-    'rgba(158, 158, 158, 0.2)'};
+    $method === 'GET' ? 'rgba(59, 130, 246, 0.2)' :
+    $method === 'POST' ? 'rgba(16, 185, 129, 0.2)' :
+    $method === 'PUT' || $method === 'PATCH' ? 'rgba(245, 158, 11, 0.2)' :
+    $method === 'DELETE' ? 'rgba(239, 68, 68, 0.2)' :
+    'rgba(156, 163, 175, 0.2)'};
   color: ${({ $method }) => 
-    $method === 'GET' ? '#2196f3' :
-    $method === 'POST' ? '#4caf50' :
-    $method === 'PUT' || $method === 'PATCH' ? '#ff9800' :
-    $method === 'DELETE' ? '#f44336' :
-    '#9e9e9e'};
+    $method === 'GET' ? '#3b82f6' :
+    $method === 'POST' ? '#10b981' :
+    $method === 'PUT' || $method === 'PATCH' ? '#f59e0b' :
+    $method === 'DELETE' ? '#ef4444' :
+    '#6b7280'};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 `;
 
 const RouteTags = styled.div`
@@ -1482,13 +1503,13 @@ const RouteTag = styled.div<{ $type: string }>`
   border-radius: 4px;
   font-size: 0.75rem;
   background: ${({ $type }) => 
-    $type === 'auth' ? 'rgba(255, 152, 0, 0.1)' :
-    $type === 'skip' ? 'rgba(244, 67, 54, 0.1)' :
-    'rgba(158, 158, 158, 0.1)'};
+    $type === 'auth' ? 'rgba(245, 158, 11, 0.1)' :
+    $type === 'skip' ? 'rgba(239, 68, 68, 0.1)' :
+    'rgba(156, 163, 175, 0.1)'};
   color: ${({ $type }) => 
-    $type === 'auth' ? '#ff9800' :
-    $type === 'skip' ? '#f44336' :
-    '#9e9e9e'};
+    $type === 'auth' ? '#f59e0b' :
+    $type === 'skip' ? '#ef4444' :
+    '#6b7280'};
   
   svg {
     width: 12px;
@@ -1507,7 +1528,7 @@ const ResponseTime = styled.div<{ $status: string }>`
   align-items: center;
   gap: 0.375rem;
   font-size: 0.813rem;
-  color: ${({ $status }) => $status === 'success' ? '#4caf50' : '#f44336'};
+  color: ${({ $status }) => $status === 'success' ? '#10b981' : '#ef4444'};
   
   svg {
     width: 14px;
@@ -1521,18 +1542,21 @@ const TestButton = styled.button`
   gap: 0.375rem;
   padding: 0.5rem 1rem;
   border-radius: 6px;
-  border: 1px solid #2a2a2a;
-  background: #0a0a0a;
-  color: #888888;
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #666;
   font-size: 0.813rem;
-  font-weight: 500;
+  font-weight: 300;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: 'Work Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 
   &:hover:not(:disabled) {
-    background: #667eea;
-    color: #ffffff;
-    border-color: #667eea;
+    background: #2c2c2c;
+    color: #f8f8f8;
+    border-color: #2c2c2c;
   }
 
   &:disabled {
@@ -1553,7 +1577,7 @@ const TestButton = styled.button`
 const RouteDetails = styled.div`
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid #e5e7eb;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1rem;
@@ -1563,27 +1587,29 @@ const DetailSection = styled.div``;
 
 const DetailTitle = styled.div`
   font-size: 0.813rem;
-  font-weight: 600;
-  color: #888888;
+  font-weight: 500;
+  color: #666;
   margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 `;
 
 const CodeBlock = styled.pre`
-  background: #0a0a0a;
-  border: 1px solid #2a2a2a;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 1rem;
   font-family: 'Fira Code', monospace;
   font-size: 0.75rem;
   overflow: auto;
   max-height: 200px;
-  color: #cccccc;
+  color: #374151;
 `;
 
 const ResponseSection = styled.div`
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid #e5e7eb;
 `;
 
 const ResponseHeader = styled.div`
@@ -1595,14 +1621,14 @@ const ResponseHeader = styled.div`
 
 const ResponseStatus = styled.div<{ $success: boolean }>`
   font-weight: 600;
-  color: ${({ $success }) => $success ? '#4caf50' : '#f44336'};
+  color: ${({ $success }) => $success ? '#10b981' : '#ef4444'};
 `;
 
 const ResponseMeta = styled.div`
   display: flex;
   gap: 0.5rem;
   font-size: 0.813rem;
-  color: #666666;
+  color: #666;
 `;
 
 const ResponseBody = styled.div``;
@@ -1610,28 +1636,113 @@ const ResponseBody = styled.div``;
 const ErrorSection = styled.div`
   margin-top: 1rem;
   padding: 1rem;
-  background: rgba(244, 67, 54, 0.1);
-  border: 1px solid #f44336;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
   border-radius: 8px;
 `;
 
 const ErrorTitle = styled.div`
   font-weight: 600;
-  color: #f44336;
+  color: #ef4444;
   margin-bottom: 0.5rem;
 `;
 
 const ErrorMessage = styled.div`
-  color: #ff8a80;
+  color: #dc2626;
   font-size: 0.875rem;
 `;
 
 // Configuration Tab Styles
+const ConfigSection = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 2rem;
+`;
+
+const ConfigCard = styled.div`
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+`;
+
+const ConfigHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
+`;
+
+const ConfigTitle = styled.h3`
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #2c2c2c;
+  margin: 0;
+`;
+
+const ConfigStatus = styled.div<{ $connected: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: ${({ $connected }) => $connected ? '#10b981' : '#ef4444'};
+  font-size: 0.875rem;
+`;
+
+const ConfigContent = styled.div`
+  padding: 1.5rem;
+`;
+
+const ConfigRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const ConfigLabel = styled.div`
+  font-size: 0.875rem;
+  color: #666;
+  font-weight: 300;
+`;
+
+const ConfigValue = styled.div`
+  font-family: 'Fira Code', monospace;
+  font-size: 0.875rem;
+  color: #374151;
+  text-align: right;
+  max-width: 60%;
+  word-break: break-all;
+`;
+
+const TokenDisplay = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: #f3f4f6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: #e5e7eb;
+    color: #2c2c2c;
+  }
+`;
+
 const ConfigActions = styled.div`
   padding: 1.5rem;
-  border-top: 1px solid #2a2a2a;
+  border-top: 1px solid #e5e7eb;
   display: flex;
   gap: 1rem;
+  background: white;
 `;
 
 const QuickLinks = styled.div`
@@ -1646,19 +1757,20 @@ const QuickLink = styled.button`
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: white;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  color: #888888;
+  color: #666;
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;
+  font-family: 'Work Sans', sans-serif;
   
   &:hover {
-    background: #2a2a2a;
-    color: #ffffff;
-    border-color: #3a3a3a;
+    background: #f9fafb;
+    color: #2c2c2c;
+    border-color: #d1d5db;
   }
 `;
 
@@ -1680,8 +1792,8 @@ const StepNumber = styled.div`
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #667eea;
-  color: #ffffff;
+  background: #2c2c2c;
+  color: #f8f8f8;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1695,25 +1807,25 @@ const StepContent = styled.div`
 
 const StepTitle = styled.div`
   font-weight: 600;
-  color: #ffffff;
+  color: #2c2c2c;
   margin-bottom: 0.5rem;
 `;
 
 const CodeSnippet = styled.code`
   display: block;
   padding: 0.5rem 0.75rem;
-  background: #0a0a0a;
-  border: 1px solid #2a2a2a;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
   font-family: 'Fira Code', monospace;
   font-size: 0.813rem;
-  color: #667eea;
+  color: #3b82f6;
   margin-bottom: 0.25rem;
 `;
 
 const StepNote = styled.div`
   font-size: 0.813rem;
-  color: #ff9800;
+  color: #f59e0b;
   font-style: italic;
 `;
 
@@ -1725,10 +1837,11 @@ const IntegrationSection = styled.div`
 `;
 
 const IntegrationCard = styled.div`
-  background: #0f0f0f;
-  border: 1px solid #2a2a2a;
+  background: #fafafa;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 `;
 
 const CardHeader = styled.div`
@@ -1736,14 +1849,15 @@ const CardHeader = styled.div`
   align-items: center;
   gap: 1rem;
   padding: 1.5rem;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid #e5e7eb;
+  background: white;
 `;
 
 const CardIcon = styled.div<{ $color: string }>`
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: ${({ $color }) => `${$color}1a`};
+  background: ${({ $color }) => `${$color}15`};
   color: ${({ $color }) => $color};
   display: flex;
   align-items: center;
@@ -1753,7 +1867,7 @@ const CardIcon = styled.div<{ $color: string }>`
 const CardTitle = styled.h3`
   font-size: 1.125rem;
   font-weight: 600;
-  color: #ffffff;
+  color: #2c2c2c;
   margin: 0;
 `;
 
@@ -1762,89 +1876,20 @@ const CardContent = styled.div`
   
   p {
     margin: 0 0 1rem 0;
-    color: #888888;
+    color: #666;
     line-height: 1.6;
   }
 `;
 
-const FeatureList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-`;
-
-const Feature = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-`;
-
-const FeatureIcon = styled.div`
-  color: #4caf50;
-  flex-shrink: 0;
-  margin-top: 0.125rem;
-`;
-
-const FeatureText = styled.div`
-  font-size: 0.875rem;
-  color: #cccccc;
-  line-height: 1.5;
-`;
-
-const FlowSteps = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`;
-
-const FlowStep = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-`;
-
-const StepIcon = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #667eea;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  flex-shrink: 0;
-`;
-
-const StepInfo = styled.div``;
-
-const StepName = styled.div`
-  font-weight: 600;
-  color: #ffffff;
-  margin-bottom: 0.25rem;
-`;
-
-const StepDesc = styled.div`
-  font-size: 0.813rem;
-  color: #666666;
-`;
-
-const FlowConnector = styled.div`
-  width: 2px;
-  height: 24px;
-  background: #2a2a2a;
-  margin-left: 19px;
-`;
-
 const CodeExample = styled.pre`
-  background: #0a0a0a;
-  border: 1px solid #2a2a2a;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 1.5rem;
   font-family: 'Fira Code', monospace;
   font-size: 0.75rem;
   overflow: auto;
-  color: #cccccc;
+  color: #374151;
   line-height: 1.6;
 `;
 
@@ -1856,14 +1901,15 @@ const DiagnosticsSection = styled.div`
 `;
 
 const DiagnosticCard = styled.div<{ $type: 'warning' | 'error' | 'info' | 'success' }>`
-  background: #0f0f0f;
+  background: white;
   border: 1px solid ${({ $type }) => 
-    $type === 'warning' ? '#ff9800' :
-    $type === 'error' ? '#f44336' :
-    $type === 'info' ? '#2196f3' :
-    '#4caf50'};
+    $type === 'warning' ? '#f59e0b' :
+    $type === 'error' ? '#ef4444' :
+    $type === 'info' ? '#3b82f6' :
+    '#10b981'};
   border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 `;
 
 const DiagnosticHeader = styled.div`
@@ -1871,7 +1917,8 @@ const DiagnosticHeader = styled.div`
   align-items: center;
   gap: 1rem;
   padding: 1.5rem;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafafa;
   
   svg {
     color: inherit;
@@ -1881,7 +1928,7 @@ const DiagnosticHeader = styled.div`
     margin: 0;
     font-size: 1.125rem;
     font-weight: 600;
-    color: #ffffff;
+    color: #2c2c2c;
   }
 `;
 
@@ -1898,13 +1945,14 @@ const DiagnosticItem = styled.div`
   gap: 0.25rem;
   
   strong {
-    color: #ffffff;
+    color: #2c2c2c;
     font-size: 0.875rem;
   }
   
   span {
-    color: #888888;
+    color: #666;
     font-size: 0.813rem;
+    font-weight: 300;
   }
 `;
 
@@ -1919,7 +1967,7 @@ const DebugCommand = styled.div``;
 
 const CommandTitle = styled.div`
   font-weight: 600;
-  color: #ffffff;
+  color: #2c2c2c;
   margin-bottom: 0.5rem;
   font-size: 0.875rem;
 `;
@@ -1938,97 +1986,18 @@ const HealthCheck = styled.div`
 `;
 
 const HealthIcon = styled.div<{ $status: boolean }>`
-  color: ${({ $status }) => $status ? '#4caf50' : '#f44336'};
+  color: ${({ $status }) => $status ? '#10b981' : '#ef4444'};
 `;
 
 const HealthLabel = styled.div`
   flex: 1;
   font-size: 0.875rem;
-  color: #888888;
+  color: #666;
+  font-weight: 300;
 `;
 
 const HealthStatus = styled.div`
   font-size: 0.875rem;
-  font-weight: 600;
-  color: #ffffff;
-`;Selection = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: 2rem;
-`;
-
-const ConfigCard = styled.div`
-  background: #0f0f0f;
-  border: 1px solid #2a2a2a;
-  border-radius: 12px;
-  overflow: hidden;
-`;
-
-const ConfigHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid #2a2a2a;
-`;
-
-const ConfigTitle = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #ffffff;
-  margin: 0;
-`;
-
-const ConfigStatus = styled.div<{ $connected: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: ${({ $connected }) => $connected ? '#4caf50' : '#f44336'};
-  font-size: 0.875rem;
-`;
-
-const ConfigContent = styled.div`
-  padding: 1.5rem;
-`;
-
-const ConfigRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #1a1a1a;
-  
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const ConfigLabel = styled.div`
-  font-size: 0.875rem;
-  color: #666666;
-`;
-
-const ConfigValue = styled.div`
-  font-family: 'Fira Code', monospace;
-  font-size: 0.875rem;
-  color: #888888;
-  text-align: right;
-  max-width: 60%;
-  word-break: break-all;
-`;
-
-const TokenDisplay = styled.div`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
-  background: #1a1a1a;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background: #2a2a2a;
-    color: #ffffff;
-  }
+  font-weight: 500;
+  color: #2c2c2c;
 `;
