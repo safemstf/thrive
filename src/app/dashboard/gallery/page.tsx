@@ -1,261 +1,438 @@
-// src/app/dashboard/gallery/page.tsx
+// src\app\dashboard\gallery\page.tsx
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
-import { Gallery } from '@/components/gallery';
-import { useApiConnection } from '@/providers/apiProvider';
-import { ConnectionStatusIndicator } from '@/components/apiConnectionManager';
-import { useAuth } from '@/providers/authProvider';
-import { useMyPortfolio } from '@/hooks/usePortfolioApi';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { UploadIcon as PlusIcon, GridIcon, ListIcon } from '@/components/ui/icons';
-import { ArtworkUploadModal } from '@/components/gallery/utils/uploadModal';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { 
+  Grid3x3, LayoutGrid, List, Filter, Search, Upload, 
+  Eye, EyeOff, Download, Trash2, Edit, Share2, Heart,
+  Calendar, Tag, DollarSign, ChevronDown, X, Check,
+  Image as ImageIcon, Loader2, AlertCircle, Plus
+} from 'lucide-react';
 
-// ==================== CONSTANTS ====================
-const ITEMS_PER_PAGE = 12;
+// Mock data and types
+interface GalleryPiece {
+  id: string;
+  title: string;
+  imageUrl: string;
+  thumbnailUrl?: string;
+  artist: string;
+  portfolioId: string;
+  description?: string;
+  category: 'digital' | 'traditional' | 'photography' | 'mixed';
+  tags: string[];
+  visibility: 'public' | 'private' | 'unlisted';
+  price?: number;
+  currency?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  views: number;
+  likes: number;
+  dimensions?: {
+    width: number;
+    height: number;
+  };
+}
 
 type ViewLayout = 'grid' | 'masonry' | 'list';
 type GalleryMode = 'public' | 'private';
+type SortOption = 'newest' | 'oldest' | 'popular' | 'name';
 
-export default function GalleryPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const { connectionStatus, isReady } = useApiConnection();
-  const { user, isAuthenticated } = useAuth();
-  
-  const { data: portfolio, isLoading: portfolioLoading, error: portfolioError, refetch } = useMyPortfolio();
-  
-  // State management
+// Mock gallery component for demo
+const MockGallery = ({ mode, viewConfig }: { mode: GalleryMode; viewConfig: any }) => {
+  const mockPieces: GalleryPiece[] = [
+    {
+      id: '1',
+      title: 'Abstract Composition #1',
+      imageUrl: 'https://picsum.photos/400/600?random=1',
+      artist: 'Jane Doe',
+      portfolioId: 'portfolio-1',
+      category: 'digital',
+      tags: ['abstract', 'colorful', 'modern'],
+      visibility: 'public',
+      price: 299,
+      currency: 'USD',
+      createdAt: new Date('2024-01-15'),
+      updatedAt: new Date('2024-01-15'),
+      views: 342,
+      likes: 48,
+      dimensions: { width: 400, height: 600 }
+    },
+    {
+      id: '2',
+      title: 'Nature\'s Whisper',
+      imageUrl: 'https://picsum.photos/600/400?random=2',
+      artist: 'John Smith',
+      portfolioId: 'portfolio-2',
+      category: 'photography',
+      tags: ['nature', 'landscape', 'serene'],
+      visibility: mode === 'private' ? 'private' : 'public',
+      createdAt: new Date('2024-01-10'),
+      updatedAt: new Date('2024-01-10'),
+      views: 567,
+      likes: 89,
+      dimensions: { width: 600, height: 400 }
+    },
+    // Add more mock pieces...
+  ];
+
+  const filteredPieces = mode === 'private' 
+    ? mockPieces.filter(p => p.portfolioId === 'portfolio-1')
+    : mockPieces;
+
+  return (
+    <GalleryGrid $layout={viewConfig.layout}>
+      {filteredPieces.map(piece => (
+        <GalleryItem key={piece.id} $layout={viewConfig.layout}>
+          <ImageContainer>
+            <img src={piece.imageUrl} alt={piece.title} />
+            {mode === 'private' && (
+              <VisibilityBadge $visibility={piece.visibility}>
+                {piece.visibility === 'private' ? <EyeOff size={14} /> : <Eye size={14} />}
+                {piece.visibility}
+              </VisibilityBadge>
+            )}
+            <QuickActions>
+              <ActionButton><Eye size={16} /></ActionButton>
+              <ActionButton><Heart size={16} /></ActionButton>
+              {mode === 'private' && (
+                <>
+                  <ActionButton><Edit size={16} /></ActionButton>
+                  <ActionButton><Trash2 size={16} /></ActionButton>
+                </>
+              )}
+            </QuickActions>
+          </ImageContainer>
+          <ItemInfo>
+            <ItemTitle>{piece.title}</ItemTitle>
+            <ItemMeta>
+              <span>{piece.artist}</span>
+              {piece.price && <span>${piece.price}</span>}
+            </ItemMeta>
+          </ItemInfo>
+        </GalleryItem>
+      ))}
+    </GalleryGrid>
+  );
+};
+
+export default function EnhancedGalleryPage() {
+  const [galleryMode, setGalleryMode] = useState<GalleryMode>('public');
+  const [viewLayout, setViewLayout] = useState<ViewLayout>('masonry');
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [priceRange, setPriceRange] = useState({ min: 0, max: 10000 });
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [galleryMode, setGalleryMode] = useState<GalleryMode>(() => {
-    // Persist gallery mode in localStorage
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('galleryMode') as GalleryMode) || 'public';
-    }
-    return 'public';
-  });
-  const [viewLayout, setViewLayout] = useState<ViewLayout>(() => {
-    // Persist view layout in localStorage
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('viewLayout') as ViewLayout) || 'masonry';
-    }
-    return 'masonry';
-  });
+  const [selectedPieces, setSelectedPieces] = useState<Set<string>>(new Set());
+  const [bulkActionMode, setBulkActionMode] = useState(false);
 
-  // Persist preferences
-  useEffect(() => {
-    localStorage.setItem('galleryMode', galleryMode);
-  }, [galleryMode]);
-
-  useEffect(() => {
-    localStorage.setItem('viewLayout', viewLayout);
-  }, [viewLayout]);
-
-  // Check if we should open upload modal from query param
-  useEffect(() => {
-    const shouldOpenUpload = searchParams.get('upload') === 'true';
-    if (shouldOpenUpload && isAuthenticated) {
-      setShowUploadModal(true);
-      
-      // Clean up the URL without triggering re-render
-      const url = new URL(window.location.href);
-      url.searchParams.delete('upload');
-      window.history.replaceState({}, '', url);
-    }
-  }, [searchParams, isAuthenticated]);
-
-  // Memoized values
-  const showSetup = useMemo(() => {
-    return isAuthenticated && !portfolioLoading && !portfolio && !portfolioError;
-  }, [isAuthenticated, portfolioLoading, portfolio, portfolioError]);
+  const isAuthenticated = true; // Mock auth state
+  const hasPortfolio = true; // Mock portfolio state
 
   const galleryConfig = useMemo(() => ({
     layout: viewLayout,
-    itemsPerPage: ITEMS_PER_PAGE,
+    itemsPerPage: 24,
     showPrivateIndicator: galleryMode === 'private',
-    enableSelection: galleryMode === 'private',
+    enableSelection: bulkActionMode,
     enableQuickEdit: galleryMode === 'private'
-  }), [viewLayout, galleryMode]);
+  }), [viewLayout, galleryMode, bulkActionMode]);
 
-  // Callbacks
-  const handleUploadSuccess = useCallback(() => {
-    refetch();
-    setShowUploadModal(false);
-    // Optionally refresh the gallery component
-    window.dispatchEvent(new CustomEvent('gallery-refresh'));
-  }, [refetch]);
+  const handleSearch = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    // Implement search logic
+    console.log('Searching for:', searchQuery);
+  }, [searchQuery]);
 
-  const handleUploadClick = useCallback(() => {
-    if (!isAuthenticated) {
-      router.push('/login?redirect=/dashboard/gallery?upload=true');
-      return;
-    }
-    setShowUploadModal(true);
-  }, [isAuthenticated, router]);
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => {
+      const newTags = new Set(prev);
+      if (newTags.has(tag)) {
+        newTags.delete(tag);
+      } else {
+        newTags.add(tag);
+      }
+      return newTags;
+    });
+  };
 
-  const handleGalleryModeChange = useCallback((mode: GalleryMode) => {
-    setGalleryMode(mode);
-  }, []);
-
-  const handleViewLayoutChange = useCallback((layout: ViewLayout) => {
-    setViewLayout(layout);
-  }, []);
-
-  // Gallery metadata
-  const galleryTitle = galleryMode === 'public' 
-    ? 'Discover Creative Works' 
-    : 'My Portfolio Gallery';
-    
-  const gallerySubtitle = galleryMode === 'public'
-    ? 'Explore artwork from our creative community'
-    : 'Manage and organize your portfolio pieces';
+  const handleBulkAction = (action: 'delete' | 'visibility' | 'download') => {
+    console.log(`Bulk ${action} for pieces:`, Array.from(selectedPieces));
+    // Implement bulk action logic
+    setBulkActionMode(false);
+    setSelectedPieces(new Set());
+  };
 
   return (
     <PageWrapper>
       <Header>
         <HeaderTop>
-          <HeaderContent>
-            <Title>{galleryTitle}</Title>
-            <Subtitle>{gallerySubtitle}</Subtitle>
-          </HeaderContent>
-          
-          <ConnectionStatus>
-            <ConnectionStatusIndicator />
-          </ConnectionStatus>
+          <TitleSection>
+            <PageTitle>
+              {galleryMode === 'public' ? 'Creative Gallery' : 'My Artwork'}
+            </PageTitle>
+            <PageSubtitle>
+              {galleryMode === 'public' 
+                ? 'Discover inspiring works from our creative community'
+                : `Managing ${12} pieces in your portfolio`}
+            </PageSubtitle>
+          </TitleSection>
+
+          <HeaderStats>
+            {galleryMode === 'private' && (
+              <>
+                <StatItem>
+                  <StatValue>12</StatValue>
+                  <StatLabel>Total Pieces</StatLabel>
+                </StatItem>
+                <StatItem>
+                  <StatValue>8.4k</StatValue>
+                  <StatLabel>Total Views</StatLabel>
+                </StatItem>
+                <StatItem>
+                  <StatValue>342</StatValue>
+                  <StatLabel>Total Likes</StatLabel>
+                </StatItem>
+              </>
+            )}
+          </HeaderStats>
         </HeaderTop>
-        
-        <HeaderActions>
-          {isAuthenticated && (
-            <>
-              <ViewToggle>
-                <ToggleButton 
+
+        <HeaderBottom>
+          <ControlsLeft>
+            {isAuthenticated && (
+              <ModeToggle>
+                <ModeButton 
                   $active={galleryMode === 'public'}
-                  onClick={() => handleGalleryModeChange('public')}
+                  onClick={() => setGalleryMode('public')}
                 >
-                  Community Gallery
-                </ToggleButton>
-                <ToggleButton 
+                  <ImageIcon size={16} />
+                  Discover
+                </ModeButton>
+                <ModeButton 
                   $active={galleryMode === 'private'}
-                  onClick={() => handleGalleryModeChange('private')}
+                  onClick={() => setGalleryMode('private')}
                 >
-                  My Artwork
-                </ToggleButton>
-              </ViewToggle>
+                  <Eye size={16} />
+                  My Gallery
+                </ModeButton>
+              </ModeToggle>
+            )}
 
-              <LayoutToggle>
-                <LayoutButton
-                  $active={viewLayout === 'grid'}
-                  onClick={() => handleViewLayoutChange('grid')}
-                  title="Grid view"
-                >
-                  <GridIcon size={18} />
-                </LayoutButton>
-                <LayoutButton
-                  $active={viewLayout === 'masonry'}
-                  onClick={() => handleViewLayoutChange('masonry')}
-                  title="Masonry view"
-                >
-                  <GridIcon size={18} style={{ transform: 'rotate(45deg)' }} />
-                </LayoutButton>
-                <LayoutButton
-                  $active={viewLayout === 'list'}
-                  onClick={() => handleViewLayoutChange('list')}
-                  title="List view"
-                >
-                  <ListIcon size={18} />
-                </LayoutButton>
-              </LayoutToggle>
+            <SearchForm onSubmit={handleSearch}>
+              <SearchInput
+                type="text"
+                placeholder="Search artwork, artists, or tags..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <SearchButton type="submit">
+                <Search size={18} />
+              </SearchButton>
+            </SearchForm>
+          </ControlsLeft>
 
-              <UploadButton onClick={handleUploadClick} id="gallery-upload-button">
-                <PlusIcon size={18} />
-                <span>Upload Artwork</span>
-              </UploadButton>
-            </>
-          )}
-          
-          {!isAuthenticated && (
-            <Link href="/login?redirect=/dashboard/gallery">
-              <LoginButton>
+          <ControlsRight>
+            <ViewToggle>
+              <ViewButton
+                $active={viewLayout === 'grid'}
+                onClick={() => setViewLayout('grid')}
+                title="Grid view"
+              >
+                <Grid3x3 size={18} />
+              </ViewButton>
+              <ViewButton
+                $active={viewLayout === 'masonry'}
+                onClick={() => setViewLayout('masonry')}
+                title="Masonry view"
+              >
+                <LayoutGrid size={18} />
+              </ViewButton>
+              <ViewButton
+                $active={viewLayout === 'list'}
+                onClick={() => setViewLayout('list')}
+                title="List view"
+              >
+                <List size={18} />
+              </ViewButton>
+            </ViewToggle>
+
+            <FilterButton 
+              onClick={() => setShowFilters(!showFilters)}
+              $active={showFilters}
+            >
+              <Filter size={18} />
+              <span>Filters</span>
+              {(selectedCategory || selectedTags.size > 0) && (
+                <FilterBadge>{selectedTags.size + (selectedCategory ? 1 : 0)}</FilterBadge>
+              )}
+            </FilterButton>
+
+            {galleryMode === 'private' && (
+              <>
+                <ActionButton
+                  onClick={() => setBulkActionMode(!bulkActionMode)}
+                  $active={bulkActionMode}
+                >
+                  <Check size={18} />
+                  <span>Select</span>
+                </ActionButton>
+                
+                <UploadButton onClick={() => setShowUploadModal(true)}>
+                  <Upload size={18} />
+                  <span>Upload</span>
+                </UploadButton>
+              </>
+            )}
+
+            {!isAuthenticated && (
+              <SignInButton>
                 Sign In to Upload
-              </LoginButton>
-            </Link>
-          )}
-        </HeaderActions>
+              </SignInButton>
+            )}
+          </ControlsRight>
+        </HeaderBottom>
+
+        {showFilters && (
+          <FilterPanel>
+            <FilterSection>
+              <FilterTitle>Categories</FilterTitle>
+              <CategoryGrid>
+                {['digital', 'traditional', 'photography', 'mixed'].map(category => (
+                  <CategoryChip
+                    key={category}
+                    $active={selectedCategory === category}
+                    onClick={() => setSelectedCategory(
+                      selectedCategory === category ? null : category
+                    )}
+                  >
+                    {category}
+                  </CategoryChip>
+                ))}
+              </CategoryGrid>
+            </FilterSection>
+
+            <FilterSection>
+              <FilterTitle>Popular Tags</FilterTitle>
+              <TagCloud>
+                {['abstract', 'landscape', 'portrait', 'modern', 'vintage', 'nature', 'urban', 'minimal'].map(tag => (
+                  <TagChip
+                    key={tag}
+                    $active={selectedTags.has(tag)}
+                    onClick={() => toggleTag(tag)}
+                  >
+                    <Tag size={12} />
+                    {tag}
+                  </TagChip>
+                ))}
+              </TagCloud>
+            </FilterSection>
+
+            <FilterSection>
+              <FilterTitle>Sort By</FilterTitle>
+              <SortDropdown>
+                <SortButton>
+                  {sortBy === 'newest' ? 'Newest First' :
+                   sortBy === 'oldest' ? 'Oldest First' :
+                   sortBy === 'popular' ? 'Most Popular' : 'Name A-Z'}
+                  <ChevronDown size={16} />
+                </SortButton>
+              </SortDropdown>
+            </FilterSection>
+
+            <FilterSection>
+              <FilterTitle>Price Range</FilterTitle>
+              <PriceInputs>
+                <PriceInput
+                  type="number"
+                  placeholder="Min"
+                  value={priceRange.min}
+                  onChange={(e) => setPriceRange(prev => ({ ...prev, min: Number(e.target.value) }))}
+                />
+                <span>to</span>
+                <PriceInput
+                  type="number"
+                  placeholder="Max"
+                  value={priceRange.max}
+                  onChange={(e) => setPriceRange(prev => ({ ...prev, max: Number(e.target.value) }))}
+                />
+              </PriceInputs>
+            </FilterSection>
+
+            <FilterActions>
+              <ClearButton onClick={() => {
+                setSelectedCategory(null);
+                setSelectedTags(new Set());
+                setPriceRange({ min: 0, max: 10000 });
+                setSortBy('newest');
+              }}>
+                Clear All
+              </ClearButton>
+              <ApplyButton>Apply Filters</ApplyButton>
+            </FilterActions>
+          </FilterPanel>
+        )}
       </Header>
 
-      {showSetup && (
-        <SetupPrompt>
-          <SetupContent>
-            <SetupIcon>🎨</SetupIcon>
-            <SetupTitle>Welcome to Your Gallery</SetupTitle>
-            <SetupDescription>
-              Start building your creative portfolio. Upload your artwork,
-              organize your collection, and share your talent with the world.
-            </SetupDescription>
-            <SetupFeatures>
-              <Feature>
-                <FeatureIcon>✨</FeatureIcon>
-                <FeatureText>Upload unlimited artwork</FeatureText>
-              </Feature>
-              <Feature>
-                <FeatureIcon>🖼️</FeatureIcon>
-                <FeatureText>Organize with tags and categories</FeatureText>
-              </Feature>
-              <Feature>
-                <FeatureIcon>🔒</FeatureIcon>
-                <FeatureText>Control visibility settings</FeatureText>
-              </Feature>
-              <Feature>
-                <FeatureIcon>📊</FeatureIcon>
-                <FeatureText>Track views and engagement</FeatureText>
-              </Feature>
-            </SetupFeatures>
-            <SetupActions>
-              <UploadButton onClick={handleUploadClick}>
-                <PlusIcon size={18} />
-                <span>Upload Your First Artwork</span>
-              </UploadButton>
-              <Link href="/portfolio/edit">
-                <SecondaryButton>
-                  Create Portfolio
-                </SecondaryButton>
-              </Link>
-            </SetupActions>
-          </SetupContent>
-        </SetupPrompt>
+      {bulkActionMode && selectedPieces.size > 0 && (
+        <BulkActionBar>
+          <BulkInfo>
+            {selectedPieces.size} item{selectedPieces.size !== 1 ? 's' : ''} selected
+          </BulkInfo>
+          <BulkActions>
+            <BulkButton onClick={() => handleBulkAction('visibility')}>
+              <Eye size={16} />
+              Change Visibility
+            </BulkButton>
+            <BulkButton onClick={() => handleBulkAction('download')}>
+              <Download size={16} />
+              Download
+            </BulkButton>
+            <BulkButton onClick={() => handleBulkAction('delete')} $danger>
+              <Trash2 size={16} />
+              Delete
+            </BulkButton>
+          </BulkActions>
+        </BulkActionBar>
       )}
 
       <GalleryContainer>
-        <Gallery 
-          key={galleryMode} // Force re-mount when mode changes
-          mode={galleryMode} 
-          viewConfig={galleryConfig}
-        />
+        {!hasPortfolio && galleryMode === 'private' ? (
+          <EmptyState>
+            <EmptyIcon>
+              <ImageIcon size={64} />
+            </EmptyIcon>
+            <EmptyTitle>Start Your Creative Journey</EmptyTitle>
+            <EmptyDescription>
+              Upload your first artwork to build your portfolio and share your talent with the world.
+            </EmptyDescription>
+            <EmptyActions>
+              <PrimaryButton onClick={() => setShowUploadModal(true)}>
+                <Upload size={18} />
+                Upload Your First Artwork
+              </PrimaryButton>
+              <SecondaryButton>
+                Create Portfolio
+              </SecondaryButton>
+            </EmptyActions>
+          </EmptyState>
+        ) : (
+          <MockGallery mode={galleryMode} viewConfig={galleryConfig} />
+        )}
       </GalleryContainer>
 
-      {/* Floating Action Button for Mobile */}
-      {isAuthenticated && (
-        <MobileUploadButton onClick={handleUploadClick}>
-          <PlusIcon size={24} />
-        </MobileUploadButton>
-      )}
-
-      {/* Artwork Upload Modal */}
-      {showUploadModal && (
-        <ArtworkUploadModal 
-          portfolioId={portfolio?.id}
-          onClose={() => setShowUploadModal(false)}
-          onSuccess={handleUploadSuccess}
-        />
+      {isAuthenticated && galleryMode === 'private' && (
+        <FloatingActionButton onClick={() => setShowUploadModal(true)}>
+          <Plus size={24} />
+        </FloatingActionButton>
       )}
     </PageWrapper>
   );
 }
 
-// ==================== Styled Components ====================
+// Styled Components
 const PageWrapper = styled.main`
   min-height: 100vh;
   background-color: #fafafa;
@@ -265,78 +442,110 @@ const PageWrapper = styled.main`
 const Header = styled.header`
   background: white;
   border-bottom: 1px solid #e5e7eb;
-  padding: 1.5rem 2rem;
   position: sticky;
   top: 0;
   z-index: 50;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-
-  @media (max-width: 768px) {
-    padding: 1rem;
-  }
 `;
 
 const HeaderTop = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
-`;
-
-const HeaderContent = styled.div`
-  flex: 1;
-`;
-
-const HeaderActions = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
+  padding: 2rem 2rem 1rem;
   
   @media (max-width: 768px) {
-    width: 100%;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem 1rem 0.75rem;
   }
 `;
 
-const Title = styled.h1`
-  font-size: 1.875rem;
+const TitleSection = styled.div``;
+
+const PageTitle = styled.h1`
+  font-size: 2rem;
   font-weight: 700;
   color: #111827;
-  margin: 0;
+  margin: 0 0 0.5rem 0;
   
   @media (max-width: 768px) {
     font-size: 1.5rem;
   }
 `;
 
-const Subtitle = styled.p`
+const PageSubtitle = styled.p`
   font-size: 1rem;
   color: #6b7280;
-  margin: 0.25rem 0 0 0;
+  margin: 0;
+`;
+
+const HeaderStats = styled.div`
+  display: flex;
+  gap: 2rem;
   
   @media (max-width: 768px) {
-    font-size: 0.875rem;
+    gap: 1.5rem;
   }
 `;
 
-const ConnectionStatus = styled.div`
+const StatItem = styled.div`
+  text-align: center;
+`;
+
+const StatValue = styled.div`
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+`;
+
+const StatLabel = styled.div`
+  font-size: 0.813rem;
+  color: #6b7280;
+  margin-top: 0.125rem;
+`;
+
+const HeaderBottom = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem 1.5rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+  
   @media (max-width: 768px) {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
+    padding: 0 1rem 1rem;
   }
 `;
 
-const ViewToggle = styled.div`
+const ControlsLeft = styled.div`
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex: 1;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
+const ControlsRight = styled.div`
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+`;
+
+const ModeToggle = styled.div`
   display: flex;
   background: #f3f4f6;
   border-radius: 8px;
   padding: 4px;
-  gap: 2px;
 `;
 
-const ToggleButton = styled.button<{ $active: boolean }>`
+const ModeButton = styled.button<{ $active: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.5rem 1rem;
   border: none;
   border-radius: 6px;
@@ -351,26 +560,54 @@ const ToggleButton = styled.button<{ $active: boolean }>`
   &:hover {
     background: ${({ $active }) => $active ? 'white' : '#e5e7eb'};
   }
+`;
 
-  @media (max-width: 768px) {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.813rem;
+const SearchForm = styled.form`
+  display: flex;
+  flex: 1;
+  max-width: 400px;
+`;
+
+const SearchInput = styled.input`
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border: 1px solid #e5e7eb;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  font-size: 0.875rem;
+  
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
   }
 `;
 
-const LayoutToggle = styled.div`
+const SearchButton = styled.button`
+  padding: 0 1rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  transition: background 0.2s;
+  
+  &:hover {
+    background: #2563eb;
+  }
+`;
+
+const ViewToggle = styled.div`
   display: flex;
   background: #f3f4f6;
   border-radius: 8px;
   padding: 4px;
-  gap: 2px;
-
+  
   @media (max-width: 768px) {
     display: none;
   }
 `;
 
-const LayoutButton = styled.button<{ $active: boolean }>`
+const ViewButton = styled.button<{ $active: boolean }>`
   padding: 0.5rem;
   border: none;
   border-radius: 6px;
@@ -385,6 +622,41 @@ const LayoutButton = styled.button<{ $active: boolean }>`
   &:hover {
     background: ${({ $active }) => $active ? 'white' : '#e5e7eb'};
   }
+`;
+
+const FilterButton = styled.button<{ $active: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background: ${({ $active }) => $active ? '#3b82f6' : 'white'};
+  color: ${({ $active }) => $active ? 'white' : '#374151'};
+  border: 1px solid ${({ $active }) => $active ? '#3b82f6' : '#e5e7eb'};
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  
+  &:hover {
+    background: ${({ $active }) => $active ? '#2563eb' : '#f9fafb'};
+    border-color: ${({ $active }) => $active ? '#2563eb' : '#d1d5db'};
+  }
+`;
+
+const FilterBadge = styled.span`
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  min-width: 18px;
+  text-align: center;
 `;
 
 const UploadButton = styled.button`
@@ -407,14 +679,8 @@ const UploadButton = styled.button`
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
   }
   
-  svg {
-    width: 18px;
-    height: 18px;
-  }
-
   @media (max-width: 768px) {
-    padding: 0.5rem 1rem;
-    font-size: 0.813rem;
+    padding: 0.625rem;
     
     span {
       display: none;
@@ -422,7 +688,7 @@ const UploadButton = styled.button`
   }
 `;
 
-const LoginButton = styled(Button)`
+const SignInButton = styled(UploadButton)`
   background: transparent;
   color: #3b82f6;
   border: 1px solid #3b82f6;
@@ -433,8 +699,192 @@ const LoginButton = styled(Button)`
   }
 `;
 
+const FilterPanel = styled.div`
+  padding: 1.5rem 2rem;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+    grid-template-columns: 1fr;
+  }
+`;
+
+const FilterSection = styled.div``;
+
+const FilterTitle = styled.h3`
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.75rem;
+`;
+
+const CategoryGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const CategoryChip = styled.button<{ $active: boolean }>`
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid ${({ $active }) => $active ? '#3b82f6' : '#e5e7eb'};
+  background: ${({ $active }) => $active ? '#3b82f6' : 'white'};
+  color: ${({ $active }) => $active ? 'white' : '#6b7280'};
+  font-size: 0.813rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: capitalize;
+  
+  &:hover {
+    background: ${({ $active }) => $active ? '#2563eb' : '#f3f4f6'};
+  }
+`;
+
+const TagCloud = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const TagChip = styled(CategoryChip)`
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+`;
+
+const SortDropdown = styled.div`
+  position: relative;
+`;
+
+const SortButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  min-width: 150px;
+  
+  &:hover {
+    background: #f9fafb;
+  }
+`;
+
+const PriceInputs = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const PriceInput = styled.input`
+  width: 100px;
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+  }
+`;
+
+const FilterActions = styled.div`
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+`;
+
+const ClearButton = styled.button`
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #6b7280;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+`;
+
+const ApplyButton = styled.button`
+  padding: 0.5rem 1.5rem;
+  background: #3b82f6;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #2563eb;
+  }
+`;
+
+const BulkActionBar = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: #fef3c7;
+  border-bottom: 1px solid #fde68a;
+  
+  @media (max-width: 768px) {
+    padding: 0.75rem 1rem;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+`;
+
+const BulkInfo = styled.div`
+  font-weight: 500;
+  color: #92400e;
+`;
+
+const BulkActions = styled.div`
+  display: flex;
+  gap: 0.75rem;
+`;
+
+const BulkButton = styled.button<{ $danger?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 1px solid ${({ $danger }) => $danger ? '#ef4444' : '#e5e7eb'};
+  border-radius: 6px;
+  color: ${({ $danger }) => $danger ? '#ef4444' : '#374151'};
+  font-size: 0.813rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: ${({ $danger }) => $danger ? '#fef2f2' : '#f9fafb'};
+    border-color: ${({ $danger }) => $danger ? '#dc2626' : '#d1d5db'};
+  }
+`;
+
 const GalleryContainer = styled.div`
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 2rem;
   
@@ -443,116 +893,245 @@ const GalleryContainer = styled.div`
   }
 `;
 
-const SetupPrompt = styled.div`
-  max-width: 800px;
-  margin: 3rem auto;
-  padding: 0 2rem;
-
-  @media (max-width: 768px) {
-    margin: 2rem auto;
-    padding: 0 1rem;
-  }
+// Gallery Grid Components
+const GalleryGrid = styled.div<{ $layout: ViewLayout }>`
+  ${({ $layout }) => {
+    switch ($layout) {
+      case 'grid':
+        return `
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 1.5rem;
+        `;
+      case 'masonry':
+        return `
+          column-count: 4;
+          column-gap: 1.5rem;
+          
+          @media (max-width: 1200px) {
+            column-count: 3;
+          }
+          
+          @media (max-width: 768px) {
+            column-count: 2;
+          }
+          
+          @media (max-width: 480px) {
+            column-count: 1;
+          }
+        `;
+      case 'list':
+        return `
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        `;
+    }
+  }}
 `;
 
-const SetupContent = styled.div`
-  background: white;
-  border-radius: 16px;
-  padding: 3rem;
-  text-align: center;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e5e7eb;
+const GalleryItem = styled.div<{ $layout: ViewLayout }>`
+  ${({ $layout }) => {
+    if ($layout === 'masonry') {
+      return `
+        break-inside: avoid;
+        margin-bottom: 1.5rem;
+      `;
+    }
+    return '';
+  }}
   
-  @media (max-width: 768px) {
-    padding: 2rem 1.5rem;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: ${({ $layout }) => $layout !== 'list' ? 'translateY(-4px)' : 'none'};
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+  }
+  
+  ${({ $layout }) => $layout === 'list' && `
+    display: flex;
+    height: 120px;
+  `}
+`;
+
+const ImageContainer = styled.div`
+  position: relative;
+  overflow: hidden;
+  
+  img {
+    width: 100%;
+    height: auto;
+    display: block;
+    transition: transform 0.3s ease;
+  }
+  
+  &:hover {
+    img {
+      transform: scale(1.05);
+    }
+    
+    > div:last-child {
+      opacity: 1;
+    }
   }
 `;
 
-const SetupIcon = styled.div`
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
+const VisibilityBadge = styled.div<{ $visibility: string }>`
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  background: ${({ $visibility }) => 
+    $visibility === 'private' ? 'rgba(239, 68, 68, 0.9)' : 
+    $visibility === 'unlisted' ? 'rgba(251, 146, 60, 0.9)' : 
+    'rgba(34, 197, 94, 0.9)'};
+  color: white;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
 `;
 
-const SetupTitle = styled.h2`
-  font-size: 2rem;
+const QuickActions = styled.div`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+`;
+
+const ActionButton = styled.button<{ $active?: boolean }>`
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: ${({ $active }) => $active ? '#e0f2fe' : 'rgba(255, 255, 255, 0.9)'};
+  border: ${({ $active }) => $active ? '1px solid #3b82f6' : 'none'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: white;
+    transform: scale(1.1);
+  }
+
+  svg {
+    color: #374151;
+  }
+`;
+
+
+const ItemInfo = styled.div`
+  padding: 1rem;
+`;
+
+const ItemTitle = styled.h3`
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.25rem 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const ItemMeta = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #6b7280;
+`;
+
+// Empty State
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 4rem 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+`;
+
+const EmptyIcon = styled.div`
+  margin: 0 auto 2rem;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+`;
+
+const EmptyTitle = styled.h2`
+  font-size: 1.875rem;
+  font-weight: 700;
   color: #111827;
   margin-bottom: 1rem;
-  font-weight: 700;
-  
-  @media (max-width: 768px) {
-    font-size: 1.5rem;
-  }
 `;
 
-const SetupDescription = styled.p`
+const EmptyDescription = styled.p`
   font-size: 1.125rem;
   color: #6b7280;
   margin-bottom: 2rem;
   line-height: 1.6;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-  
-  @media (max-width: 768px) {
-    font-size: 1rem;
-  }
 `;
 
-const SetupFeatures = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2.5rem;
-  
-  @media (max-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-  }
-`;
-
-const Feature = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-`;
-
-const FeatureIcon = styled.span`
-  font-size: 1.5rem;
-  flex-shrink: 0;
-`;
-
-const FeatureText = styled.span`
-  font-size: 0.875rem;
-  color: #4b5563;
-  line-height: 1.4;
-  text-align: left;
-`;
-
-const SetupActions = styled.div`
+const EmptyActions = styled.div`
   display: flex;
   gap: 1rem;
   justify-content: center;
   flex-wrap: wrap;
 `;
 
-const SecondaryButton = styled(Button)`
-  padding: 0.75rem 2rem;
-  font-size: 1rem;
-  font-weight: 600;
+const PrimaryButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
   border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #2563eb;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+`;
+
+const SecondaryButton = styled(PrimaryButton)`
   background: transparent;
   color: #3b82f6;
   border: 2px solid #3b82f6;
-  transition: all 0.2s ease;
-  cursor: pointer;
   
   &:hover {
     background: #3b82f6;
     color: white;
-    transform: translateY(-2px);
   }
 `;
 
-const MobileUploadButton = styled.button`
+const FloatingActionButton = styled.button`
   position: fixed;
   bottom: 2rem;
   right: 2rem;
