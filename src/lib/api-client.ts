@@ -5,6 +5,17 @@ import { GalleryApiClient } from './api/gallery-api-client';
 import { EducationalApiClient } from './api/educational-api-client';
 import { AuthApiClient } from './api/api-client-auth';
 
+// Import educational types from the educational API client
+import type {
+  Concept,
+  ConceptFilters,
+  Exercise,
+  Lesson,
+  LessonFilters,
+  AssignmentData,
+  LessonSubmission
+} from './api/educational-api-client';
+
 import type {
   CreatePortfolioDto,
   UpdatePortfolioDto,
@@ -37,6 +48,17 @@ import type {
 // Re-export types
 export { APIError } from './api/base-api-client';
 export type { RequestConfig } from './api/base-api-client';
+// Re-export educational types for convenience
+export type { 
+  Concept, 
+  ConceptFilters,
+  Exercise,
+  Lesson,
+  LessonFilters,
+  AssignmentData,
+  LessonSubmission 
+} from './api/educational-api-client';
+
 
 // Combined API Interface
 export interface CombinedAPI {
@@ -141,7 +163,7 @@ export const api = {
     getPieces: (artistId: string) => getApiClient().gallery.getArtistPieces(artistId),
   },
   
-  // Educational API utilities
+  // Educational API utilities (ENHANCED)
   books: {
     getAll: (params?: BookQueryParams) => getApiClient().educational.getBooks(params),
     getById: (id: string) => getApiClient().educational.getBookById(id),
@@ -156,6 +178,67 @@ export const api = {
       getApiClient().educational.getBooksByDifficulty(level),
   },
   
+  // Concepts API (NEW)
+  concepts: {
+    // Public methods
+    getAll: (filters?: ConceptFilters) => 
+      getApiClient().educational.getConcepts(filters),
+    search: (query: string, filters?: Omit<ConceptFilters, 'search'>) => 
+      getApiClient().educational.searchConcepts(query, filters),
+    getById: (id: string) => 
+      getApiClient().educational.getConceptById(id),
+    getByBook: (bookId: string) => 
+      getApiClient().educational.getConceptsByBook(bookId),
+    getByType: (type: string, discipline?: string) => 
+      getApiClient().educational.getConceptsByType(type, discipline),
+    
+    // Student methods
+    markComplete: (id: string, score?: number) => 
+      getApiClient().educational.markConceptComplete(id, score),
+    
+    // Teacher methods
+    create: (concept: Omit<Concept, 'id' | 'createdAt' | 'updatedAt'>) => 
+      getApiClient().educational.createConcept(concept),
+    update: (id: string, updates: Partial<Concept>) => 
+      getApiClient().educational.updateConcept(id, updates),
+    delete: (id: string) => 
+      getApiClient().educational.deleteConcept(id),
+    bulkCreate: (concepts: Array<Omit<Concept, 'id' | 'createdAt' | 'updatedAt'>>) => 
+      getApiClient().educational.bulkCreateConcepts(concepts),
+  },
+  
+  // Lessons API (NEW)
+  lessons: {
+    // Common methods
+    getAll: (filters?: LessonFilters) => 
+      getApiClient().educational.getLessons(filters),
+    getById: (id: string) => 
+      getApiClient().educational.getLessonById(id),
+    
+    // Teacher methods
+    create: (lesson: Omit<Lesson, 'id' | 'createdAt' | 'updatedAt' | 'stats'>) => 
+      getApiClient().educational.createLesson(lesson),
+    update: (id: string, updates: Partial<Lesson>) => 
+      getApiClient().educational.updateLesson(id, updates),
+    delete: (id: string) => 
+      getApiClient().educational.deleteLesson(id),
+    publish: (id: string, isPublished: boolean = true) => 
+      getApiClient().educational.publishLesson(id, isPublished),
+    assign: (id: string, assignment: AssignmentData) => 
+      getApiClient().educational.assignLesson(id, assignment),
+    duplicate: (id: string) => 
+      getApiClient().educational.duplicateLesson(id),
+    getSubmissions: (id: string) => 
+      getApiClient().educational.getLessonSubmissions(id),
+    
+    // Student methods
+    submit: (id: string, answers: Record<string, any>) => 
+      getApiClient().educational.submitLesson(id, { answers }),
+    getProgress: (id: string) => 
+      getApiClient().educational.getLessonProgress(id),
+  },
+  
+  // Combined content methods (existing, but using new implementations)
   content: {
     getMathConcepts: (bookId: string) => getApiClient().educational.getMathConcepts(bookId),
     getScienceConcepts: (bookId: string, discipline?: ScientificDiscipline) => 
