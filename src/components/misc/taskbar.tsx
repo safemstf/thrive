@@ -48,9 +48,13 @@ const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
 const NavContainer = styled.nav<{ $isScrolled?: boolean }>`
   display: flex;
   align-items: center;
-  gap: ${props => props.$isScrolled ? '0.4rem' : '0.5rem'};
+  justify-content: ${props => props.$isScrolled ? 'flex-start' : 'space-between'};
   flex-wrap: wrap;
-  transition: gap 0.3s ease;
+  gap: ${props => props.$isScrolled ? '0.4rem' : '0.5rem'};
+  max-width: 100%;
+  padding-right: 1rem;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
 `;
 
 const NavButton = styled(Link)<{ $active?: boolean; $isScrolled?: boolean }>`
@@ -96,15 +100,11 @@ const NavButton = styled(Link)<{ $active?: boolean; $isScrolled?: boolean }>`
 
 const UserSection = styled.div<{ $isScrolled?: boolean }>`
   display: flex;
-  align-items: center;
-  gap: ${props => props.$isScrolled ? '0.75rem' : '1rem'};
+  flex-direction: column;
+  align-items: ${props => props.$isScrolled ? 'flex-start' : 'flex-end'};
+  gap: ${props => props.$isScrolled ? '0.5rem' : '0.75rem'};
   margin-left: ${props => props.$isScrolled ? '0.5rem' : '1rem'};
   transition: all 0.3s ease;
-
-  @media (max-width: 1024px) {
-    gap: 0.5rem;
-    margin-left: 0.5rem;
-  }
 `;
 
 const UserInfo = styled.div<{ $isScrolled?: boolean }>`

@@ -1,5 +1,9 @@
 // src/config/api-routes/auth.routes.ts
-import { RouteCategory, generateUniqueUsername, generateUniqueEmail } from '../api-routes';
+import {
+  RouteCategory,
+  generateUniqueUsername,
+  generateUniqueEmail
+} from '@/types/api.types';
 
 export const authRoutes: RouteCategory = {
   name: 'Authentication',

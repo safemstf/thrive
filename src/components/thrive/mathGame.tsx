@@ -192,9 +192,15 @@ export function MathGameComponent() {
   const [lastCorrect, setLastCorrect] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // New: Adaptive Learning State
+  const [streak, setStreak] = useState(0);
+  const [mistakes, setMistakes] = useState<Question[]>([]);
+  const [history, setHistory] = useState<{ question: Question, correct: boolean }[]>([]);
+
   const totalQuestions = questionBank.length;
   const progress = Math.min((level / totalQuestions) * 100, 100);
 
+  // Load question when level changes
   useEffect(() => {
     const idx = level - 1;
     const newPuzzle = idx < questionBank.length ? questionBank[idx] : null;
@@ -203,26 +209,42 @@ export function MathGameComponent() {
     setFeedback(null);
   }, [level]);
 
-  const handleSubmit = async (e: FormEvent) => {
+  // Move to next level with adaptive logic
+  function nextQuestion() {
+    let nextLevel = level + 1;
+
+    if (streak >= 3 && nextLevel < totalQuestions) {
+      nextLevel += 1;
+      setStreak(0); // reward: skip ahead
+    }
+
+    setLevel(nextLevel);
+  }
+
+  // Handle form submission
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!puzzle || isSubmitting) return;
-    
+
     setIsSubmitting(true);
-    
-    // Add a small delay for better UX
+
     setTimeout(() => {
       const { correct, formatted } = evaluateAnswer(input, puzzle.answer);
       setLastCorrect(correct);
-      
+      setHistory(h => [...h, { question: puzzle, correct }]);
+
       if (correct) {
-        setFeedback('Excellent! Moving to the next level...');
+        setStreak(s => s + 1);
+        setFeedback('✅ Excellent! Moving to the next level...');
         setTimeout(() => {
-          setLevel(l => l + 1);
+          nextQuestion();
         }, 1500);
       } else {
-        setFeedback(`Not quite right. The correct answer is ${formatted}`);
+        setStreak(0);
+        setMistakes(m => [...m, puzzle]);
+        setFeedback(`❌ Not quite right. The correct answer is ${formatted}`);
       }
-      
+
       setIsSubmitting(false);
     }, 300);
   };
@@ -230,19 +252,21 @@ export function MathGameComponent() {
   return (
     <Container>
       <Title>Sharpen your maths</Title>
-      
+
       {puzzle ? (
         <>
-          <LevelIndicator>Level {level} of {totalQuestions}</LevelIndicator>
-          
+          <LevelIndicator>
+            Level {level} of {totalQuestions}
+          </LevelIndicator>
+
           <ProgressBar>
             <ProgressFill $progress={progress} />
           </ProgressBar>
-          
+
           <QuestionContainer>
             <MathJax dynamic>{'`' + puzzle.question + '`'}</MathJax>
           </QuestionContainer>
-          
+
           <Form onSubmit={handleSubmit}>
             <InputContainer>
               <Input
@@ -259,10 +283,13 @@ export function MathGameComponent() {
               {isSubmitting ? 'Checking...' : 'Submit Answer'}
             </Button>
             <Hint>
-              Enter your answer as a number, fraction, or mathematical expression
+              Enter your answer as a number, fraction, or expression
+            </Hint>
+            <Hint>
+              Streak: {streak} | Mistakes: {mistakes.length}
             </Hint>
           </Form>
-          
+
           {feedback && (
             <Feedback $correct={lastCorrect}>
               {feedback}

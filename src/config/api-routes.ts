@@ -8,6 +8,11 @@ import { booksRoutes } from './api-routes/books.routes';
 import { conceptsRoutes } from './api-routes/concepts.routes';
 import { progressRoutes } from './api-routes/progress.routes';
 import { simulationsRoutes } from './api-routes/simulations.routes';
+import {
+  generateUniqueUsername,
+  generateUniqueEmail,
+  generateUniqueId
+} from '@/types/api.types';
 
 export interface RouteDefinition {
   name: string;
@@ -56,11 +61,6 @@ export function buildQueryString(params?: Record<string, any>): string {
   const queryString = searchParams.toString();
   return queryString ? `?${queryString}` : '';
 }
-
-// Generate unique test data helpers
-export const generateUniqueUsername = () => `testuser_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-export const generateUniqueEmail = () => `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@example.com`;
-export const generateUniqueId = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 // Main route registry
 export const API_ROUTES: Record<string, RouteCategory> = {

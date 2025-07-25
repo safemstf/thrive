@@ -1,6 +1,5 @@
 // src/types/portfolio.types.ts
 
-import { BaseEntity } from './educational.types';
 import { GalleryPiece } from './gallery.types';
 
 // ==================== Core Types ====================
@@ -16,6 +15,8 @@ export interface Portfolio extends BaseEntity {
   title: string;
   tagline?: string;
   bio: string;
+  kind: 'educational' | 'hybrid' | 'creative'; // adjust as needed
+
   
   // Images
   profileImage?: string;
@@ -309,3 +310,70 @@ export interface PortfolioReport {
   status: 'pending' | 'reviewed' | 'resolved';
   createdAt: Date;
 }
+
+// Add these types to the top of your portfolio.types.ts file:
+
+// ==================== Base Types (moved from educational.types) ====================
+export interface BaseEntity {
+  id: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// Main category types
+export type MainCategory = 'math' | 'english' | 'science';
+export type SubCategory = 'sat' | 'foundations' | 'ap';
+export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
+export type CategoryIcon = MainCategory | SubCategory;
+
+// ==================== Educational/Concept Types ====================
+export interface Concept {
+  id: string;
+  tags?: string[];
+  difficulty?: DifficultyLevel;
+  title: string;
+  summary?: string;
+  estimatedMinutes?: number;
+}
+
+export interface ConceptProgress {
+  conceptId: string;
+  status: 'not-started' | 'in-progress' | 'completed';
+  startedAt?: string;  // ISO timestamp
+  completedAt?: string; // ISO timestamp
+  score?: number;
+  attempts?: number;
+  notes?: string;
+}
+
+// Book types
+export interface Book extends BaseEntity {
+  title: string;
+  subtitle?: string;
+  year: string;
+  mainCategory: MainCategory;
+  subCategory: SubCategory;
+  colors: {
+    primary: string;
+    secondary: string;
+    accent?: string;
+  };
+  excerpt: string;
+  description: string;
+}
+
+// Section configuration for UI
+export interface SectionConfig {
+  key: string;
+  title: string;
+  mainCategory: MainCategory;
+  subCategory: SubCategory;
+}
+
+export const defaultSections: SectionConfig[] = [
+  { key: 'sat', title: 'SAT Guides', mainCategory: 'math', subCategory: 'sat' },
+  { key: 'workbooks', title: 'Workbooks', mainCategory: 'english', subCategory: 'foundations' },
+  { key: 'ms-science', title: 'MS Science', mainCategory: 'science', subCategory: 'foundations' },
+  { key: 'ap-science', title: 'AP Science', mainCategory: 'science', subCategory: 'ap' },
+  { key: 'ap-calc', title: 'AP Calculus', mainCategory: 'math', subCategory: 'ap' }
+];

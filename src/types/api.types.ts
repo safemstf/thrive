@@ -72,6 +72,37 @@ export interface ApiError {
   code?: string;
   details?: any;
 }
+// Route definitions
+
+export interface RouteDefinition {
+  name: string;
+  endpoint: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  description: string;
+  needsAuth?: boolean;
+  params?: Record<string, string>;
+  queryParams?: Record<string, any>;
+  body?: any;
+  skipInBatchTest?: boolean;
+  dependsOn?: string; // For routes that need data from other routes
+}
+
+export interface RouteCategory {
+  name: string;
+  routes: RouteDefinition[];
+}
+
+// Helpers for unique test data (used in route definitions)
+
+export const generateUniqueUsername = () =>
+  `testuser_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+export const generateUniqueEmail = () =>
+  `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@example.com`;
+
+export const generateUniqueId = () =>
+  `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
 
 // API endpoints interface
 export interface EducationalAPI {

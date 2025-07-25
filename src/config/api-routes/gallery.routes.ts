@@ -1,6 +1,6 @@
 // src/config/api-routes/gallery.routes.ts
-import { RouteCategory, generateUniqueId } from '../api-routes';
-
+import { RouteCategory } from '../api-routes';
+import { generateUniqueId } from '@/types/api.types';
 export const galleryRoutes: RouteCategory = {
   name: 'Gallery',
   routes: [

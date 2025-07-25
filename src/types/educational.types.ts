@@ -15,6 +15,26 @@ export type ScientificDiscipline = 'physics' | 'chemistry' | 'biology';
 // Difficulty levels
 export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
 
+// Concept types
+export interface Concept {
+  id: string;
+  tags?: string[];
+  difficulty?: DifficultyLevel;
+  title: string;
+  summary?: string;
+  estimatedMinutes?: number;
+}
+
+export interface ConceptProgress {
+  conceptId: string;
+  status: 'not-started' | 'in-progress' | 'completed';
+  startedAt?: string;  // ISO timestamp
+  completedAt?: string; // ISO timestamp
+  score?: number;
+  attempts?: number;
+  notes?: string;
+}
+
 // Content types for different subjects
 export interface Example {
   id?: string;

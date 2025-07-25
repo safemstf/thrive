@@ -135,6 +135,16 @@ export const api = {
       getApiClient().portfolio.updateGalleryPieceVisibility(pieceId, visibility),
     batchUpdateGalleryVisibility: (pieceIds: string[], visibility: GalleryVisibility) => 
       getApiClient().portfolio.batchUpdateGalleryVisibility(pieceIds, visibility),
+
+      // Concept progress tracking
+    getMyConcepts: () => 
+      getApiClient().portfolio.getMyConcepts(),
+    
+    addConceptToPortfolio: (conceptId: string, data: { status: string; startedAt: string }) =>
+      getApiClient().portfolio.addConceptToPortfolio(conceptId, data),
+    
+    updateConceptProgress: (conceptId: string, data: { status: string }) =>
+      getApiClient().portfolio.updateConceptProgress(conceptId, data),
   },
   
   gallery: {

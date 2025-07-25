@@ -222,16 +222,18 @@ export function Header({ title, subtitle }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Improved scroll handling with hysteresis to prevent flicker
-  const handleScroll = useCallback(() => {
-    const scrollY = window.scrollY;
-    const threshold = isScrolled ? 40 : 60; // Different thresholds for up/down
-    
-    if (scrollY > threshold && !isScrolled) {
-      setIsScrolled(true);
-    } else if (scrollY < threshold && isScrolled) {
-      setIsScrolled(false);
-    }
-  }, [isScrolled]);
+const handleScroll = useCallback(() => {
+  const scrollY = window.scrollY;
+  const thresholdDown = 120; // Scroll past this to collapse
+  const thresholdUp = 20;    // Scroll above this to expand
+
+  if (scrollY > thresholdDown && !isScrolled) {
+    setIsScrolled(true);
+  } else if (scrollY < thresholdUp && isScrolled) {
+    setIsScrolled(false);
+  }
+}, [isScrolled]);
+
 
   useEffect(() => {
     let ticking = false;
@@ -290,8 +292,8 @@ export function Header({ title, subtitle }: HeaderProps) {
               <Image 
                 src={logo} 
                 alt="Learn Morra Logo" 
-                width={isScrolled ? 150 : 200}
-                height={isScrolled ? 150 : 200}
+                width={isScrolled ? 60 : 180}
+                height={isScrolled ? 60 : 180}
                 priority
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />

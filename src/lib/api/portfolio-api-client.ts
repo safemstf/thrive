@@ -14,6 +14,7 @@ import {
   PortfolioShareLink,
 } from '@/types/portfolio.types';
 import { GalleryVisibility } from '@/types/gallery.types';
+import { ConceptProgress } from '@/types/educational.types'
 import { config } from '@/config/environment';
 
 export interface PortfolioAPI {
@@ -62,7 +63,13 @@ export interface PortfolioAPI {
   batchUpdateGalleryVisibility(pieceIds: string[], visibility: GalleryVisibility): Promise<{ 
     updatedCount: number 
   }>;
-  
+
+    // Concept progress (Educational/Hybrid Portfolios)
+  getMyConcepts(): Promise<ConceptProgress[]>;
+  addConceptToPortfolio(conceptId: string, data: { status: string; startedAt: string }): Promise<void>;
+  updateConceptProgress(conceptId: string, data: { status: string }): Promise<void>;
+
+    
   // TODO: Add these methods when backend implements them
   // getMyGalleryPieces(params?: GalleryQueryParams): Promise<GalleryApiResponse>;
   // createGalleryPiece(file: File, metadata: Record<string, any>): Promise<GalleryPiece>;
@@ -348,4 +355,23 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
       }
     );
   }
+
+  async getMyConcepts(): Promise<ConceptProgress[]> {
+    return await this.requestWithRetry<ConceptProgress[]>('/portfolios/me/concepts');
+  }
+
+  async addConceptToPortfolio(conceptId: string, data: { status: string; startedAt: string }): Promise<void> {
+    await this.requestWithRetry<void>(`/portfolios/me/concepts/${conceptId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateConceptProgress(conceptId: string, data: { status: string }): Promise<void> {
+    await this.requestWithRetry<void>(`/portfolios/me/concepts/${conceptId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
 }
