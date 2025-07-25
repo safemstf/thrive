@@ -1,5 +1,6 @@
 // src/config/api-routes/simulations.routes.ts
-import { RouteCategory, generateUniqueId } from '../api-routes';
+import { RouteCategory } from '../api-routes';
+import { generateUniqueId } from '@/types/api.types'
 
 export const simulationsRoutes: RouteCategory = {
   name: 'Simulations',
