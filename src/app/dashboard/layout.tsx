@@ -86,7 +86,7 @@ const navItems: NavItem[] = [
     requiresPortfolio: true
   },
   {
-    href: '/api-test',
+    href: '/dashboard/api-test',
     label: 'Admin Panel',
     icon: <Shield size={20} />,
     description: 'System administration',

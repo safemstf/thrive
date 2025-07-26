@@ -9,14 +9,17 @@ import {
   Calendar, Tag, DollarSign, ChevronDown, X, Check,
   Image as ImageIcon, Loader2, AlertCircle, Plus,
   BookOpen, Brain, FolderOpen, Move, Copy, Settings,
-  TrendingUp, Award, Clock, Star, MessageSquare, RefreshCw
+  TrendingUp, Award, Clock, Star, MessageSquare, RefreshCw,
+  ArrowLeft, ExternalLink, User
 } from 'lucide-react';
 import { useApiClient } from '@/lib/api-client';
 import { APIError } from '@/lib/api-client';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/providers/authProvider';
 import type { Portfolio } from '@/types/portfolio.types';
 import { ArtworkUploadModal } from '@/components/gallery/utils/uploadModal';
 
-// Gallery-focused types - only for visual artwork
+// Enhanced Gallery-focused types
 interface GalleryPiece {
   id: string;
   title: string;
@@ -24,6 +27,7 @@ interface GalleryPiece {
   thumbnailUrl?: string;
   artist: string;
   portfolioId: string;
+  ownerId?: string;
   description?: string;
   category: 'digital' | 'traditional' | 'photography' | 'mixed';
   tags: string[];
@@ -38,13 +42,10 @@ interface GalleryPiece {
     width: number;
     height: number;
   };
-
-  // ✅ Add these to fix errors
   displayOrder: number;
   alt?: string;
-  year?: number; // Optional, or compute from createdAt
+  year?: number;
 }
-
 
 interface Collection {
   id: string;
@@ -58,7 +59,6 @@ interface Collection {
   portfolioId?: string;
 }
 
-// Type returned from gallery.getCollections()
 interface GalleryCollection {
   id: string;
   name: string;
@@ -71,15 +71,14 @@ type ViewLayout = 'grid' | 'masonry' | 'list';
 type GalleryMode = 'public' | 'portfolio';
 type SortOption = 'newest' | 'oldest' | 'popular' | 'name';
 
-// Import the actual Portfolio type from portfolio.types
 interface PortfolioData {
   id: string;
   username: string;
   name?: string;
-  type?: 'creative' | 'educational' | 'hybrid';
+  kind?: 'creative' | 'educational' | 'hybrid';
   bio?: string;
   stats?: {
-    totalItems: number;
+    totalPieces: number;
     totalViews: number;
     totalLikes: number;
   };
@@ -88,7 +87,7 @@ interface PortfolioData {
 
 export default function EnhancedGalleryPage() {
   // Core state
-  const [galleryMode, setGalleryMode] = useState<GalleryMode>('public');
+  const [galleryMode, setGalleryMode] = useState<GalleryMode>('portfolio');
   const [viewLayout, setViewLayout] = useState<ViewLayout>('masonry');
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,11 +112,18 @@ export default function EnhancedGalleryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Auth state
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
-  const [hasPortfolio, setHasPortfolio] = useState(true);
-  
+  const { user, isAuthenticated } = useAuth();
   const apiClient = useApiClient();
+  const router = useRouter();
+
+  // Auto-detect portfolio mode if user is authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      setGalleryMode('portfolio');
+    } else {
+      setGalleryMode('public');
+    }
+  }, [isAuthenticated]);
 
   // Fetch data based on mode
   const fetchData = async () => {
@@ -127,38 +133,46 @@ export default function EnhancedGalleryPage() {
 
       if (galleryMode === 'portfolio' && isAuthenticated) {
         // Fetch portfolio data
-        const portfolioData = await apiClient.portfolio.getMyPortfolio();
-        setPortfolio(portfolioData);
-        setHasPortfolio(!!portfolioData);
+        try {
+          const portfolioData = await apiClient.portfolio.getMyPortfolio();
+          setPortfolio(portfolioData);
 
-        if (portfolioData) {
-          // Fetch portfolio artwork
-          // TODO: Implement getMyGalleryPieces in PortfolioApiClient
-          // For now, use gallery API to get pieces
-          const piecesResponse = await apiClient.gallery.getPieces({
-            limit: 50
-          });
-          // Filter pieces by ownerId if the response includes all pieces
-          const pieces = Array.isArray(piecesResponse) ? piecesResponse : [];
-          const myPieces = pieces.filter(p => p.ownerId === portfolioData.userId);
-          setGalleryPieces(myPieces);
+          if (portfolioData && (portfolioData.kind === 'creative' || portfolioData.kind === 'hybrid')) {
+            // Fetch portfolio artwork
+            const piecesResponse = await apiClient.gallery.getPieces({ limit: 50 });
+            const pieces = Array.isArray(piecesResponse) ? piecesResponse : [];
+            const myPieces = pieces.filter(p => p.ownerId === user?.id || p.portfolioId === portfolioData.id);
+            setGalleryPieces(myPieces);
 
-          // Fetch collections
-          // TODO: Implement getMyCollections in PortfolioApiClient
-          const collectionsData = await apiClient.gallery.getCollections();
-          // Transform GalleryCollection to Collection format
-          const transformedCollections: Collection[] = collectionsData.map(gc => ({
-            id: gc.id,
-            name: gc.name,
-            description: gc.description,
-            type: 'artwork' as const,
-            visibility: 'public' as const, // Default visibility
-            itemCount: 0, // Default count
-            coverImage: gc.coverImage,
-            createdAt: gc.createdAt || new Date(),
-            portfolioId: portfolioData.id
-          }));
-          setCollections(transformedCollections);
+            // Fetch collections
+            const collectionsData = await apiClient.gallery.getCollections();
+            const transformedCollections: Collection[] = collectionsData.map(gc => ({
+              id: gc.id,
+              name: gc.name,
+              description: gc.description,
+              type: 'artwork' as const,
+              visibility: 'public' as const,
+              itemCount: 0,
+              coverImage: gc.coverImage,
+              createdAt: gc.createdAt || new Date(),
+              portfolioId: portfolioData.id
+            }));
+            setCollections(transformedCollections);
+          } else if (portfolioData && portfolioData.kind === 'educational') {
+            // Educational portfolios don't have galleries
+            setGalleryPieces([]);
+            setError('Educational portfolios focus on learning progress. Switch to Creative or Hybrid to manage artwork.');
+          } else {
+            setGalleryPieces([]);
+          }
+        } catch (portfolioError: any) {
+          if (portfolioError?.status === 404) {
+            // No portfolio exists
+            setPortfolio(null);
+            setGalleryPieces([]);
+          } else {
+            throw portfolioError;
+          }
         }
       } else {
         // Fetch public gallery
@@ -166,9 +180,9 @@ export default function EnhancedGalleryPage() {
           visibility: 'public',
           limit: 50
         });
-        // Handle the response - it might be an array or an object with items
         const publicPieces = Array.isArray(publicPiecesResponse) ? publicPiecesResponse : [];
         setGalleryPieces(publicPieces);
+        setPortfolio(null);
       }
 
       setLoading(false);
@@ -181,7 +195,7 @@ export default function EnhancedGalleryPage() {
 
   useEffect(() => {
     fetchData();
-  }, [galleryMode]);
+  }, [galleryMode, isAuthenticated, user?.id]);
 
   // Filter and sort artwork pieces
   const filteredItems = useMemo(() => {
@@ -224,7 +238,7 @@ export default function EnhancedGalleryPage() {
         case 'oldest':
           return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
         case 'popular':
-          return b.displayOrder - a.displayOrder; // Higher display order = more popular
+          return (b.views + b.likes) - (a.views + a.likes);
         case 'name':
           return (a.title || '').localeCompare(b.title || '');
         default:
@@ -271,8 +285,8 @@ export default function EnhancedGalleryPage() {
       switch (action) {
         case 'delete':
           if (confirm(`Delete ${selectedItems.size} items?`)) {
-            await apiClient.portfolio.batchDeleteGalleryPieces(Array.from(selectedItems));
-            await fetchData();
+            // Implement bulk delete when API supports it
+            console.log('Bulk delete not yet implemented');
           }
           break;
         case 'visibility':
@@ -290,53 +304,24 @@ export default function EnhancedGalleryPage() {
     setSelectedItems(new Set());
   };
 
-  const handleCreateCollection = async (name: string, type: 'artwork') => {
+  const handleCreatePortfolio = async (type: 'creative' | 'hybrid') => {
     try {
-      // TODO: Implement createCollection in PortfolioApiClient
-      // For now, create a collection object
-      const newCollection: Collection = {
-        id: Date.now().toString(), // temporary ID
-        name,
-        type,
-        visibility: 'public',
-        portfolioId: portfolio?.id,
-        itemCount: 0,
-        createdAt: new Date()
-      };
-      
-      // Since createCollection doesn't exist in the API yet,
-      // we'll just add it to the local state
-      setCollections([...collections, newCollection]);
-      setShowCollectionModal(false);
-      
-      // TODO: Replace with actual API call when available
-      console.log('Collection creation not yet implemented in API');
-    } catch (err) {
-      console.error('Error creating collection:', err);
-    }
-  };
-
-  const handleCreatePortfolio = async (type: 'creative' | 'educational' | 'hybrid') => {
-    try {
-      // Use the create method from PortfolioApiClient
-      // The 'kind' field in Portfolio is used instead of 'type'
       const newPortfolio = await apiClient.portfolio.create({
-        title: 'My Portfolio',
+        title: `${user?.name || 'My'} Portfolio`,
         bio: '',
         visibility: 'public',
         specializations: [],
         tags: []
       });
       
-      // After creation, you might need to update the portfolio kind separately
-      // or handle it through backend logic based on user role
-      console.log('Created portfolio for type:', type);
-      
+      setPortfolio(newPortfolio);
       await fetchData();
     } catch (err) {
       console.error('Error creating portfolio:', err);
     }
   };
+
+  const hasCreativeCapability = portfolio && (portfolio.kind === 'creative' || portfolio.kind === 'hybrid');
 
   // Render artwork item
   const renderItem = (item: GalleryPiece) => {
@@ -352,7 +337,7 @@ export default function EnhancedGalleryPage() {
           />
         )}
         <ImageContainer>
-          <img src={item.imageUrl} alt={item.alt} />
+          <img src={item.thumbnailUrl || item.imageUrl} alt={item.alt || item.title} />
           {galleryMode === 'portfolio' && (
             <VisibilityBadge $visibility={item.visibility}>
               {item.visibility === 'private' ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -360,8 +345,17 @@ export default function EnhancedGalleryPage() {
             </VisibilityBadge>
           )}
           <QuickActions>
-            <ActionButtonSmall><Eye size={16} /> {item.year || 'N/A'}</ActionButtonSmall>
-            <ActionButtonSmall><DollarSign size={16} /> {item.price || 'N/A'}</ActionButtonSmall>
+            <ActionButtonSmall>
+              <Eye size={16} /> {item.views || 0}
+            </ActionButtonSmall>
+            <ActionButtonSmall>
+              <Heart size={16} /> {item.likes || 0}
+            </ActionButtonSmall>
+            {item.price && (
+              <ActionButtonSmall>
+                <DollarSign size={16} /> {item.price}
+              </ActionButtonSmall>
+            )}
             {galleryMode === 'portfolio' && (
               <>
                 <ActionButtonSmall><Edit size={16} /></ActionButtonSmall>
@@ -374,7 +368,7 @@ export default function EnhancedGalleryPage() {
           <ItemTitle>{item.title}</ItemTitle>
           <ItemMeta>
             <span>{item.artist}</span>
-            {item.price && <span>${item.price}</span>}
+            {item.year && <span>{item.year}</span>}
           </ItemMeta>
           {item.tags && item.tags.length > 0 && (
             <TagList>
@@ -388,36 +382,121 @@ export default function EnhancedGalleryPage() {
     );
   };
 
+  const renderNoPortfolioState = () => (
+    <EmptyState>
+      <EmptyIcon>
+        <User size={64} />
+      </EmptyIcon>
+      <EmptyTitle>Create Your Creative Portfolio</EmptyTitle>
+      <EmptyDescription>
+        Get started by creating a portfolio to showcase your artwork and creative projects
+      </EmptyDescription>
+      <PortfolioTypeGrid>
+        <PortfolioTypeCard>
+          <PortfolioTypeIcon>
+            <ImageIcon size={48} />
+          </PortfolioTypeIcon>
+          <PortfolioTypeTitle>Creative Portfolio</PortfolioTypeTitle>
+          <PortfolioTypeDesc>
+            Perfect for artists, designers, and creators who want to showcase visual work
+          </PortfolioTypeDesc>
+          <PortfolioTypeFeatures>
+            <FeatureItem>• Upload and organize artwork</FeatureItem>
+            <FeatureItem>• Create collections</FeatureItem>
+            <FeatureItem>• Share with the community</FeatureItem>
+          </PortfolioTypeFeatures>
+          <CreateButton onClick={() => handleCreatePortfolio('creative')}>
+            Create Creative Portfolio
+          </CreateButton>
+        </PortfolioTypeCard>
+        
+        <PortfolioTypeCard>
+          <PortfolioTypeIcon>
+            <Brain size={48} />
+          </PortfolioTypeIcon>
+          <PortfolioTypeTitle>Hybrid Portfolio</PortfolioTypeTitle>
+          <PortfolioTypeDesc>
+            Combine creative work with educational progress for a complete profile
+          </PortfolioTypeDesc>
+          <PortfolioTypeFeatures>
+            <FeatureItem>• Showcase artwork</FeatureItem>
+            <FeatureItem>• Track learning progress</FeatureItem>
+            <FeatureItem>• Unified dashboard</FeatureItem>
+          </PortfolioTypeFeatures>
+          <CreateButton onClick={() => handleCreatePortfolio('hybrid')}>
+            Create Hybrid Portfolio
+          </CreateButton>
+        </PortfolioTypeCard>
+      </PortfolioTypeGrid>
+      <BackToProfile>
+        <BackButton onClick={() => router.push('/dashboard/profile')}>
+          <ArrowLeft size={16} />
+          Back to Profile
+        </BackButton>
+      </BackToProfile>
+    </EmptyState>
+  );
+
+  const renderEducationalPortfolioState = () => (
+    <EmptyState>
+      <EmptyIcon>
+        <BookOpen size={64} />
+      </EmptyIcon>
+      <EmptyTitle>Educational Portfolio</EmptyTitle>
+      <EmptyDescription>
+        Your portfolio is focused on learning and educational progress. To manage artwork, 
+        consider upgrading to a Hybrid portfolio or visit the Learning Center.
+      </EmptyDescription>
+      <ActionGrid>
+        <ActionCard onClick={() => router.push('/writing')}>
+          <BookOpen size={32} />
+          <ActionTitle>Learning Center</ActionTitle>
+          <ActionDesc>Continue your educational journey</ActionDesc>
+        </ActionCard>
+        <ActionCard onClick={() => router.push('/dashboard/profile')}>
+          <Settings size={32} />
+          <ActionTitle>Portfolio Settings</ActionTitle>
+          <ActionDesc>Upgrade to Hybrid portfolio</ActionDesc>
+        </ActionCard>
+      </ActionGrid>
+    </EmptyState>
+  );
+
   return (
     <PageWrapper>
       <Header>
         <HeaderTop>
           <TitleSection>
-            <PageTitle>
-              {galleryMode === 'public' ? 'Creative Gallery' : 
-               portfolio ? `${portfolio.title || portfolio.username}'s Portfolio` : 'My Portfolio'}
-            </PageTitle>
-            <PageSubtitle>
-              {galleryMode === 'public' 
-                ? 'Discover inspiring works from our creative community'
-                : portfolio
-                  ? `Managing ${portfolio.stats?.totalPieces || 0} creative pieces`
-                  : 'Your creative portfolio'}
-            </PageSubtitle>
+            <BackButton onClick={() => router.push('/dashboard/profile')}>
+              <ArrowLeft size={20} />
+            </BackButton>
+            <div>
+              <PageTitle>
+                {galleryMode === 'public' ? 'Creative Gallery' : 
+                 portfolio ? `${portfolio.title || 'My Gallery'}` : 'Gallery'}
+              </PageTitle>
+              <PageSubtitle>
+                {galleryMode === 'public' 
+                  ? 'Discover inspiring works from our creative community'
+                  : portfolio && hasCreativeCapability
+                    ? `Managing ${filteredItems.length} creative pieces`
+                    : 'Creative portfolio management'}
+              </PageSubtitle>
+            </div>
           </TitleSection>
 
           {portfolio && portfolio.stats && (
             <HeaderStats>
               <StatItem>
-                <StatValue>{portfolio.stats.totalPieces}</StatValue>
+                <StatValue>{portfolio.stats.totalPieces || filteredItems.length}</StatValue>
                 <StatLabel>Total Items</StatLabel>
               </StatItem>
               <StatItem>
-                <StatValue>{(portfolio.stats.totalViews / 1000).toFixed(1)}k</StatValue>
+                <StatValue>{Math.floor((portfolio.stats.totalViews || 0) / 1000)}k</StatValue>
                 <StatLabel>Total Views</StatLabel>
               </StatItem>
               <StatItem>
-                <StatValue>{(portfolio.stats.totalPieces / 1000).toFixed(1)}k</StatValue>
+                <StatValue>{Math.floor((portfolio.stats.totalReviews || 0) / 1000)}k</StatValue>
                 <StatLabel>Total Likes</StatLabel>
               </StatItem>
             </HeaderStats>
@@ -440,7 +519,7 @@ export default function EnhancedGalleryPage() {
                   onClick={() => setGalleryMode('portfolio')}
                 >
                   <FolderOpen size={16} />
-                  My Portfolio
+                  My Gallery
                 </ModeButton>
               </ModeToggle>
             )}
@@ -483,15 +562,6 @@ export default function EnhancedGalleryPage() {
               </ViewButton>
             </ViewToggle>
 
-            <SortDropdown>
-              <SortButton onClick={() => {}}>
-                {sortBy === 'newest' ? 'Newest First' :
-                 sortBy === 'oldest' ? 'Oldest First' :
-                 sortBy === 'popular' ? 'Most Popular' : 'Name A-Z'}
-                <ChevronDown size={16} />
-              </SortButton>
-            </SortDropdown>
-
             <FilterButton 
               onClick={() => setShowFilters(!showFilters)}
               $active={showFilters}
@@ -505,7 +575,7 @@ export default function EnhancedGalleryPage() {
               )}
             </FilterButton>
 
-            {galleryMode === 'portfolio' && (
+            {galleryMode === 'portfolio' && hasCreativeCapability && (
               <>
                 <ActionButton
                   onClick={() => setBulkActionMode(!bulkActionMode)}
@@ -515,21 +585,10 @@ export default function EnhancedGalleryPage() {
                   <span>Select</span>
                 </ActionButton>
 
-                {collections.length > 0 && (
-                  <CollectionsButton onClick={() => setShowCollectionModal(true)}>
-                    <FolderOpen size={18} />
-                    <span>Collections ({collections.length})</span>
-                  </CollectionsButton>
-                )}
-                
                 <UploadButton onClick={() => setShowUploadModal(true)}>
                   <Upload size={18} />
                   <span>Upload</span>
                 </UploadButton>
-
-                <SettingsButton>
-                  <Settings size={18} />
-                </SettingsButton>
               </>
             )}
           </ControlsRight>
@@ -570,25 +629,6 @@ export default function EnhancedGalleryPage() {
               </TagCloud>
             </FilterSection>
 
-            <FilterSection>
-              <FilterTitle>Price Range</FilterTitle>
-              <PriceInputs>
-                <PriceInput
-                  type="number"
-                  placeholder="Min"
-                  value={priceRange.min}
-                  onChange={(e) => setPriceRange(prev => ({ ...prev, min: Number(e.target.value) }))}
-                />
-                <span>to</span>
-                <PriceInput
-                  type="number"
-                  placeholder="Max"
-                  value={priceRange.max}
-                  onChange={(e) => setPriceRange(prev => ({ ...prev, max: Number(e.target.value) }))}
-                />
-              </PriceInputs>
-            </FilterSection>
-
             <FilterActions>
               <ClearButton onClick={() => {
                 setSelectedCategory(null);
@@ -598,7 +638,6 @@ export default function EnhancedGalleryPage() {
               }}>
                 Clear All
               </ClearButton>
-              <ApplyButton>Apply Filters</ApplyButton>
             </FilterActions>
           </FilterPanel>
         )}
@@ -618,10 +657,6 @@ export default function EnhancedGalleryPage() {
               <Eye size={16} />
               Change Visibility
             </BulkButton>
-            <BulkButton onClick={() => handleBulkAction('download')}>
-              <Download size={16} />
-              Download
-            </BulkButton>
             <BulkButton onClick={() => handleBulkAction('delete')} $danger>
               <Trash2 size={16} />
               Delete
@@ -634,7 +669,7 @@ export default function EnhancedGalleryPage() {
         {loading ? (
           <LoadingContainer>
             <Loader2 className="animate-spin" size={48} />
-            <LoadingText>Loading portfolio content...</LoadingText>
+            <LoadingText>Loading gallery content...</LoadingText>
           </LoadingContainer>
         ) : error ? (
           <ErrorContainer>
@@ -645,58 +680,18 @@ export default function EnhancedGalleryPage() {
               Try Again
             </RetryButton>
           </ErrorContainer>
-        ) : !hasPortfolio && galleryMode === 'portfolio' ? (
+        ) : galleryMode === 'portfolio' && !portfolio ? (
+          renderNoPortfolioState()
+        ) : galleryMode === 'portfolio' && portfolio?.kind === 'educational' ? (
+          renderEducationalPortfolioState()
+        ) : filteredItems.length === 0 ? (
           <EmptyState>
             <EmptyIcon>
               <ImageIcon size={64} />
             </EmptyIcon>
-            <EmptyTitle>Create Your Portfolio</EmptyTitle>
-            <EmptyDescription>
-              Choose the type of portfolio that best represents your journey
-            </EmptyDescription>
-            <PortfolioTypeGrid>
-              <PortfolioTypeCard>
-                <PortfolioTypeIcon>
-                  <ImageIcon size={48} />
-                </PortfolioTypeIcon>
-                <PortfolioTypeTitle>Creative Portfolio</PortfolioTypeTitle>
-                <PortfolioTypeDesc>
-                  Showcase your artwork, designs, and creative projects
-                </PortfolioTypeDesc>
-                <CreateButton onClick={() => handleCreatePortfolio('creative')}>
-                  Create Creative Portfolio
-                </CreateButton>
-              </PortfolioTypeCard>
-              
-              <PortfolioTypeCard>
-                <PortfolioTypeIcon>
-                  <Brain size={48} />
-                </PortfolioTypeIcon>
-                <PortfolioTypeTitle>Educational Portfolio</PortfolioTypeTitle>
-                <PortfolioTypeDesc>
-                  Track your learning progress and academic achievements
-                </PortfolioTypeDesc>
-                <CreateButton onClick={() => handleCreatePortfolio('educational')}>
-                  Create Educational Portfolio
-                </CreateButton>
-              </PortfolioTypeCard>
-              
-              <PortfolioTypeCard>
-                <PortfolioTypeIcon>
-                  <Grid3x3 size={48} />
-                </PortfolioTypeIcon>
-                <PortfolioTypeTitle>Hybrid Portfolio</PortfolioTypeTitle>
-                <PortfolioTypeDesc>
-                  Combine creative works with educational progress
-                </PortfolioTypeDesc>
-                <CreateButton onClick={() => handleCreatePortfolio('hybrid')}>
-                  Create Hybrid Portfolio
-                </CreateButton>
-              </PortfolioTypeCard>
-            </PortfolioTypeGrid>
-          </EmptyState>
-        ) : filteredItems.length === 0 ? (
-          <EmptyState>
+            <EmptyTitle>
+              {galleryMode === 'portfolio' ? 'No Artwork Yet' : 'No Results Found'}
+            </EmptyTitle>
             <EmptyMessage>
               {searchQuery || selectedTags.size > 0 || selectedCategory
                 ? 'No items match your filters. Try adjusting your search criteria.'
@@ -704,6 +699,14 @@ export default function EnhancedGalleryPage() {
                   ? 'Upload your first artwork to get started!'
                   : 'No public gallery items available.'}
             </EmptyMessage>
+            {galleryMode === 'portfolio' && hasCreativeCapability && !searchQuery && (
+              <EmptyActions>
+                <UploadButton onClick={() => setShowUploadModal(true)}>
+                  <Upload size={18} />
+                  Upload First Artwork
+                </UploadButton>
+              </EmptyActions>
+            )}
           </EmptyState>
         ) : (
           <ItemsGrid $layout={viewLayout}>
@@ -712,10 +715,22 @@ export default function EnhancedGalleryPage() {
         )}
       </GalleryContainer>
 
-      {isAuthenticated && galleryMode === 'portfolio' && hasPortfolio && (
+      {galleryMode === 'portfolio' && hasCreativeCapability && (
         <FloatingActionButton onClick={() => setShowUploadModal(true)}>
           <Plus size={24} />
         </FloatingActionButton>
+      )}
+
+      {/* Upload Modal */}
+      {showUploadModal && portfolio && (
+        <ArtworkUploadModal
+          portfolioId={portfolio.id}
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={() => {
+            setShowUploadModal(false);
+            fetchData(); // Refresh the gallery
+          }}
+        />
       )}
     </PageWrapper>
   );
@@ -750,7 +765,29 @@ const HeaderTop = styled.div`
   }
 `;
 
-const TitleSection = styled.div``;
+const TitleSection = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const BackButton = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  
+  &:hover {
+    color: #374151;
+    background: #f9fafb;
+  }
+`;
 
 const PageTitle = styled.h1`
   font-size: 2rem;
@@ -903,28 +940,6 @@ const ViewButton = styled.button<{ $active: boolean }>`
   }
 `;
 
-const SortDropdown = styled.div`
-  position: relative;
-`;
-
-const SortButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e5e7eb;
-  background: white;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  color: #374151;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: #d1d5db;
-  }
-`;
-
 const FilterButton = styled.button<{ $active: boolean }>`
   display: flex;
   align-items: center;
@@ -976,25 +991,6 @@ const ActionButton = styled.button<{ $active?: boolean }>`
   }
 `;
 
-const CollectionsButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e5e7eb;
-  background: white;
-  color: #374151;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: #d1d5db;
-    background: #f9fafb;
-  }
-`;
-
 const UploadButton = styled.button`
   display: flex;
   align-items: center;
@@ -1011,21 +1007,6 @@ const UploadButton = styled.button`
 
   &:hover {
     background: #2563eb;
-  }
-`;
-
-const SettingsButton = styled.button`
-  padding: 0.5rem;
-  border: 1px solid #e5e7eb;
-  background: white;
-  color: #6b7280;
-  border-radius: 0.375rem;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: #d1d5db;
-    color: #374151;
   }
 `;
 
@@ -1096,25 +1077,6 @@ const TagChip = styled.button<{ $active: boolean }>`
   }
 `;
 
-const PriceInputs = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-`;
-
-const PriceInput = styled.input`
-  width: 120px;
-  padding: 0.5rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  outline: none;
-
-  &:focus {
-    border-color: #3b82f6;
-  }
-`;
-
 const FilterActions = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -1137,22 +1099,6 @@ const ClearButton = styled.button`
   &:hover {
     border-color: #d1d5db;
     background: #f9fafb;
-  }
-`;
-
-const ApplyButton = styled.button`
-  padding: 0.5rem 1rem;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: #2563eb;
   }
 `;
 
@@ -1292,6 +1238,12 @@ const EmptyDescription = styled.p`
 const EmptyMessage = styled.p`
   font-size: 1rem;
   color: #6b7280;
+  max-width: 500px;
+  line-height: 1.6;
+`;
+
+const EmptyActions = styled.div`
+  margin-top: 1.5rem;
 `;
 
 const PortfolioTypeGrid = styled.div`
@@ -1299,8 +1251,8 @@ const PortfolioTypeGrid = styled.div`
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1.5rem;
   width: 100%;
-  max-width: 1000px;
-  margin-top: 2rem;
+  max-width: 800px;
+  margin: 2rem 0;
 `;
 
 const PortfolioTypeCard = styled.div`
@@ -1332,7 +1284,19 @@ const PortfolioTypeTitle = styled.h3`
 const PortfolioTypeDesc = styled.p`
   font-size: 0.875rem;
   color: #6b7280;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+`;
+
+const PortfolioTypeFeatures = styled.div`
+  text-align: left;
   margin-bottom: 1.5rem;
+`;
+
+const FeatureItem = styled.div`
+  font-size: 0.875rem;
+  color: #374151;
+  margin-bottom: 0.25rem;
 `;
 
 const CreateButton = styled.button`
@@ -1345,10 +1309,54 @@ const CreateButton = styled.button`
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  width: 100%;
 
   &:hover {
     background: #2563eb;
   }
+`;
+
+const BackToProfile = styled.div`
+  margin-top: 2rem;
+`;
+
+const ActionGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
+`;
+
+const ActionCard = styled.button`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    transform: translateY(-2px);
+  }
+`;
+
+const ActionTitle = styled.h4`
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+`;
+
+const ActionDesc = styled.p`
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
 `;
 
 const ItemsGrid = styled.div<{ $layout: ViewLayout }>`
@@ -1364,7 +1372,6 @@ const ItemsGrid = styled.div<{ $layout: ViewLayout }>`
       case 'masonry':
         return `
           grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          grid-auto-rows: 10px;
         `;
       case 'list':
         return `
@@ -1384,10 +1391,6 @@ const GalleryItemCard = styled.div<{ $layout: ViewLayout; $selected: boolean }>`
   overflow: hidden;
   transition: all 0.2s;
   position: relative;
-  
-  ${props => props.$layout === 'masonry' && `
-    grid-row-end: span auto;
-  `}
   
   ${props => props.$layout === 'list' && `
     display: flex;
@@ -1414,6 +1417,7 @@ const ImageContainer = styled.div`
   position: relative;
   overflow: hidden;
   background: #f3f4f6;
+  aspect-ratio: 4/3;
 
   img {
     width: 100%;
