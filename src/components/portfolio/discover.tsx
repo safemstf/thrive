@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { Search, Filter, TrendingUp, Star } from 'lucide-react';
-import { usePaginatedDiscoverPortfolios, useFeaturedPortfolios } from '@/hooks/usePortfolioApi';
+import { usePaginatedDiscoverPortfolios, useFeaturedPortfolios } from '@/hooks/usePortfolioQueries';
 import { PortfolioFilters, PortfolioListResponse } from '@/types/portfolio.types';
 
 export function PortfolioDiscoverPage() {
