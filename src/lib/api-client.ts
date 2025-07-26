@@ -108,10 +108,10 @@ export const api = {
     getByUserId: (userId: string) => getApiClient().portfolio.getByUserId(userId),
     getByUsername: (username: string) => getApiClient().portfolio.getByUsername(username),
     delete: (id: string) => getApiClient().portfolio.delete(id),
-    deleteMyPortfolio: () => getApiClient().portfolio.deleteMyPortfolio(),
+    deleteMyPortfolio: (deleteGalleryPieces?: boolean) => getApiClient().portfolio.deleteMyPortfolio(deleteGalleryPieces),
     getMyPortfolio: () => getApiClient().portfolio.getMyPortfolio(),
 
-    // Discovery
+    // Discovery and search
     discover: (filters?: PortfolioFilters, page?: number, limit?: number) => 
       getApiClient().portfolio.discover(filters, page, limit),
     search: (query: string, limit?: number) => getApiClient().portfolio.search(query, limit),
@@ -140,7 +140,7 @@ export const api = {
       getApiClient().portfolio.batchUpdateGalleryVisibility(pieceIds, visibility),
     getGalleryStats: () => getApiClient().portfolio.getGalleryStats(),
 
-    // Batch operations - New enhanced methods
+    // Advanced batch operations
     batchUploadGallery: (uploads: Array<{
       file: File;
       title: string;
@@ -158,24 +158,34 @@ export const api = {
     updateConceptProgress: (conceptId: string, data: { status: string }) =>
       getApiClient().portfolio.updateConceptProgress(conceptId, data),
 
-    // Reviews
+    // Reviews system (NEWLY ADDED)
     addReview: (portfolioId: string, review: CreateReviewDto) => 
       getApiClient().portfolio.addReview(portfolioId, review),
     getReviews: (portfolioId: string, page?: number, limit?: number) => 
       getApiClient().portfolio.getReviews(portfolioId, page, limit),
+    updateReviewStatus: (reviewId: string, status: 'approved' | 'rejected') =>
+      getApiClient().portfolio.updateReviewStatus(reviewId, status),
+    respondToReview: (reviewId: string, comment: string) =>
+      getApiClient().portfolio.respondToReview(reviewId, comment),
+    deleteReview: (reviewId: string) => getApiClient().portfolio.deleteReview(reviewId),
 
-    // Analytics
-    trackView: (portfolioId: string, data?: any) => 
+    // Analytics and tracking (NEWLY ADDED)
+    trackView: (portfolioId: string, data?: { referrer?: string; duration?: number }) => 
       getApiClient().portfolio.trackView(portfolioId, data),
     getAnalytics: (portfolioId: string, period?: string) => 
       getApiClient().portfolio.getAnalytics(portfolioId, period),
     getPortfolioStats: () => getApiClient().portfolio.getPortfolioStats(),
 
-    // File uploads
+    // File upload system (NEWLY ADDED)
     uploadImage: (file: File, type: 'profile' | 'cover') => 
       getApiClient().portfolio.uploadImage(file, type),
 
-    // Utilities - New helper methods
+    // Sharing and collaboration (NEWLY ADDED)
+    generateShareLink: (portfolioId: string, options?: { expiresIn?: number; maxViews?: number }) =>
+      getApiClient().portfolio.generateShareLink(portfolioId, options),
+    getByShareToken: (token: string) => getApiClient().portfolio.getByShareToken(token),
+
+    // Utility methods
     hasPortfolio: () => getApiClient().portfolio.hasPortfolio(),
     getPortfolioTypeConfig: (type: string) => getApiClient().portfolio.getPortfolioTypeConfig(type),
   },
@@ -278,7 +288,6 @@ export const api = {
     search: (query: string, filters?: SearchFilters) => 
       getApiClient().educational.searchContent(query, filters),
   },
-  
   // Auth API utilities
   auth: {
     login: (credentials: LoginCredentials) => getApiClient().auth.login(credentials),
@@ -289,7 +298,6 @@ export const api = {
     refreshToken: () => getApiClient().auth.refreshToken(),
     verifyToken: (token: string) => getApiClient().auth.verifyToken(token),
   },
-  
   // Common utilities
   health: {
     check: () => getApiClient().healthCheck(),
