@@ -1,3 +1,8 @@
+
+import type { PortfolioStats } from '@/lib/api/portfolio-api-client';
+import { ConceptProgress } from '@/types/educational.types';
+import type { GalleryPiece, GalleryVisibility } from '@/types/gallery.types';
+// ==================== ENHANCED GALLERY HOOKS ====================
 import {
   useQuery,
   useMutation,
@@ -338,3 +343,170 @@ export function useBatchUpdateGalleryVisibility(
     ...options,
   });
 }
+
+export function useMyGalleryPieces(
+  options?: UseQueryOptions<GalleryPiece[], APIError>
+) {
+  return useQuery({
+    queryKey: [...portfolioQueryKeys.all, 'myGallery'],
+    queryFn: () => api.portfolio.getMyGalleryPieces(),
+    ...options,
+  });
+}
+
+export function usePortfolioGallery(
+  portfolioId: string,
+  options?: UseQueryOptions<GalleryPiece[], APIError>
+) {
+  return useQuery({
+    queryKey: [...portfolioQueryKeys.all, 'gallery', portfolioId],
+    queryFn: () => api.portfolio.getPortfolioGallery(portfolioId),
+    enabled: !!portfolioId,
+    ...options,
+  });
+}
+
+export function useGalleryStats(
+  options?: UseQueryOptions<{ totalPieces: number; totalViews: number }, APIError>
+) {
+  return useQuery({
+    queryKey: [...portfolioQueryKeys.all, 'galleryStats'],
+    queryFn: () => api.portfolio.getGalleryStats(),
+    ...options,
+  });
+}
+
+export function usePortfolioStats(
+  options?: UseQueryOptions<PortfolioStats, APIError>
+) {
+  return useQuery({
+    queryKey: [...portfolioQueryKeys.all, 'stats'],
+    queryFn: () => api.portfolio.getPortfolioStats(),
+    ...options,
+  });
+}
+
+// ==================== ENHANCED CONCEPT HOOKS ====================
+
+export function useMyConcepts(
+  options?: UseQueryOptions<ConceptProgress[], APIError>
+) {
+  return useQuery({
+    queryKey: [...portfolioQueryKeys.all, 'concepts'],
+    queryFn: () => api.portfolio.getMyConcepts(),
+    ...options,
+  });
+}
+
+export function useAddConceptToPortfolio(
+  options?: UseMutationOptions<void, APIError, { conceptId: string; data: { status: string; startedAt: string } }>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conceptId, data }) => api.portfolio.addConceptToPortfolio(conceptId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] });
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'stats'] });
+    },
+    ...options,
+  });
+}
+
+export function useUpdateConceptProgress(
+  options?: UseMutationOptions<void, APIError, { conceptId: string; data: { status: string } }>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conceptId, data }) => api.portfolio.updateConceptProgress(conceptId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] });
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'stats'] });
+    },
+    ...options,
+  });
+}
+
+// ==================== BATCH UPLOAD HOOKS ====================
+
+export function useBatchUploadGallery(
+  options?: UseMutationOptions<
+    { successful: GalleryPiece[]; failed: Array<{ error: string; fileName: string }> },
+    APIError,
+    {
+      uploads: Array<{
+        file: File;
+        title: string;
+        description?: string;
+        category?: string;
+        tags?: string[];
+        visibility?: GalleryVisibility;
+      }>;
+      onProgress?: (completed: number, total: number) => void;
+    }
+  >
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uploads, onProgress }) => api.portfolio.batchUploadGallery(uploads, onProgress),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['gallery'] }); // Also invalidate general gallery queries
+    },
+    ...options,
+  });
+}
+
+export function useAddGalleryPiece(
+  options?: UseMutationOptions<
+    GalleryPiece,
+    APIError,
+    {
+      title: string;
+      description?: string;
+      imageUrl: string;
+      category?: string;
+      tags?: string[];
+      visibility?: GalleryVisibility;
+    }
+  >
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (pieceData) => api.portfolio.addGalleryPiece(pieceData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'stats'] });
+    },
+    ...options,
+  });
+}
+
+export function useUpdateGalleryPiece(
+  options?: UseMutationOptions<GalleryPiece, APIError, { pieceId: string; updates: Partial<GalleryPiece> }>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pieceId, updates }) => api.portfolio.updateGalleryPiece(pieceId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
+      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+    },
+    ...options,
+  });
+}
+
+// ==================== UTILITY HOOKS ====================
+
+export function useHasPortfolio() {
+  const { data: portfolio, isLoading } = useMyPortfolio();
+  
+  return {
+    hasPortfolio: portfolio !== null && portfolio !== undefined,
+    isLoading,
+    portfolio
+  };
+}
+

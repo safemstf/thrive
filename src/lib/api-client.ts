@@ -1,4 +1,4 @@
-// lib/api-client.ts
+// lib/api-client.ts - Fixed version
 import { BaseApiClient } from './api/base-api-client';
 import { PortfolioApiClient } from './api/portfolio-api-client';
 import { GalleryApiClient } from './api/gallery-api-client';
@@ -48,7 +48,6 @@ import type {
 // Re-export types
 export { APIError } from './api/base-api-client';
 export type { RequestConfig } from './api/base-api-client';
-// Re-export educational types for convenience
 export type { 
   Concept, 
   ConceptFilters,
@@ -58,7 +57,6 @@ export type {
   AssignmentData,
   LessonSubmission 
 } from './api/educational-api-client';
-
 
 // Combined API Interface
 export interface CombinedAPI {
@@ -99,54 +97,90 @@ export function getApiClient(): ApiClient {
 // React Hook for API client (re-export from provider)
 export { useApiClient } from '@/providers/apiProvider';
 
-// ==================== UTILITY API NAMESPACE ====================
+// ==================== ENHANCED API NAMESPACE ====================
 export const api = {
-  // Portfolio API utilities
+  // Portfolio API utilities - Enhanced with new methods
   portfolio: {
+    // Core CRUD operations
     create: (data: CreatePortfolioDto) => getApiClient().portfolio.create(data),
     update: (id: string, data: UpdatePortfolioDto) => getApiClient().portfolio.update(id, data),
     getById: (id: string) => getApiClient().portfolio.getById(id),
     getByUserId: (userId: string) => getApiClient().portfolio.getByUserId(userId),
     getByUsername: (username: string) => getApiClient().portfolio.getByUsername(username),
     delete: (id: string) => getApiClient().portfolio.delete(id),
+    deleteMyPortfolio: () => getApiClient().portfolio.deleteMyPortfolio(),
     getMyPortfolio: () => getApiClient().portfolio.getMyPortfolio(),
+
+    // Discovery
     discover: (filters?: PortfolioFilters, page?: number, limit?: number) => 
       getApiClient().portfolio.discover(filters, page, limit),
     search: (query: string, limit?: number) => getApiClient().portfolio.search(query, limit),
     getFeatured: (limit?: number) => getApiClient().portfolio.getFeatured(limit),
     getTrending: (period?: 'day' | 'week' | 'month') => getApiClient().portfolio.getTrending(period),
-    addReview: (portfolioId: string, review: CreateReviewDto) => 
-      getApiClient().portfolio.addReview(portfolioId, review),
-    getReviews: (portfolioId: string, page?: number, limit?: number) => 
-      getApiClient().portfolio.getReviews(portfolioId, page, limit),
-    trackView: (portfolioId: string, data?: any) => 
-      getApiClient().portfolio.trackView(portfolioId, data),
-    getAnalytics: (portfolioId: string, period?: string) => 
-      getApiClient().portfolio.getAnalytics(portfolioId, period),
-    uploadImage: (file: File, type: 'profile' | 'cover') => 
-      getApiClient().portfolio.uploadImage(file, type),
-    
-    // Gallery management methods (NEW)
-    deleteGalleryPiece: (pieceId: string) => 
-      getApiClient().portfolio.deleteGalleryPiece(pieceId),
+
+    // Gallery management - Enhanced methods
+    getMyGalleryPieces: () => getApiClient().portfolio.getMyGalleryPieces(),
+    getPortfolioGallery: (portfolioId: string) => getApiClient().portfolio.getPortfolioGallery(portfolioId),
+    addGalleryPiece: (pieceData: {
+      title: string;
+      description?: string;
+      imageUrl: string;
+      category?: string;
+      tags?: string[];
+      visibility?: GalleryVisibility;
+    }) => getApiClient().portfolio.addGalleryPiece(pieceData),
+    updateGalleryPiece: (pieceId: string, updates: Partial<GalleryPiece>) => 
+      getApiClient().portfolio.updateGalleryPiece(pieceId, updates),
+    deleteGalleryPiece: (pieceId: string) => getApiClient().portfolio.deleteGalleryPiece(pieceId),
     batchDeleteGalleryPieces: (pieceIds: string[]) => 
       getApiClient().portfolio.batchDeleteGalleryPieces(pieceIds),
     updateGalleryPieceVisibility: (pieceId: string, visibility: GalleryVisibility) => 
       getApiClient().portfolio.updateGalleryPieceVisibility(pieceId, visibility),
     batchUpdateGalleryVisibility: (pieceIds: string[], visibility: GalleryVisibility) => 
       getApiClient().portfolio.batchUpdateGalleryVisibility(pieceIds, visibility),
+    getGalleryStats: () => getApiClient().portfolio.getGalleryStats(),
 
-      // Concept progress tracking
-    getMyConcepts: () => 
-      getApiClient().portfolio.getMyConcepts(),
-    
+    // Batch operations - New enhanced methods
+    batchUploadGallery: (uploads: Array<{
+      file: File;
+      title: string;
+      description?: string;
+      category?: string;
+      tags?: string[];
+      visibility?: GalleryVisibility;
+    }>, onProgress?: (completed: number, total: number) => void) => 
+      getApiClient().portfolio.batchUploadGallery(uploads, onProgress),
+
+    // Concept progress tracking
+    getMyConcepts: () => getApiClient().portfolio.getMyConcepts(),
     addConceptToPortfolio: (conceptId: string, data: { status: string; startedAt: string }) =>
       getApiClient().portfolio.addConceptToPortfolio(conceptId, data),
-    
     updateConceptProgress: (conceptId: string, data: { status: string }) =>
       getApiClient().portfolio.updateConceptProgress(conceptId, data),
+
+    // Reviews
+    addReview: (portfolioId: string, review: CreateReviewDto) => 
+      getApiClient().portfolio.addReview(portfolioId, review),
+    getReviews: (portfolioId: string, page?: number, limit?: number) => 
+      getApiClient().portfolio.getReviews(portfolioId, page, limit),
+
+    // Analytics
+    trackView: (portfolioId: string, data?: any) => 
+      getApiClient().portfolio.trackView(portfolioId, data),
+    getAnalytics: (portfolioId: string, period?: string) => 
+      getApiClient().portfolio.getAnalytics(portfolioId, period),
+    getPortfolioStats: () => getApiClient().portfolio.getPortfolioStats(),
+
+    // File uploads
+    uploadImage: (file: File, type: 'profile' | 'cover') => 
+      getApiClient().portfolio.uploadImage(file, type),
+
+    // Utilities - New helper methods
+    hasPortfolio: () => getApiClient().portfolio.hasPortfolio(),
+    getPortfolioTypeConfig: (type: string) => getApiClient().portfolio.getPortfolioTypeConfig(type),
   },
   
+  // Gallery API utilities
   gallery: {
     getPieces: (params?: GalleryQueryParams) => getApiClient().gallery.getPieces(params),
     getPieceById: (id: string) => getApiClient().gallery.getPieceById(id),
@@ -173,7 +207,7 @@ export const api = {
     getPieces: (artistId: string) => getApiClient().gallery.getArtistPieces(artistId),
   },
   
-  // Educational API utilities (ENHANCED)
+  // Educational API utilities
   books: {
     getAll: (params?: BookQueryParams) => getApiClient().educational.getBooks(params),
     getById: (id: string) => getApiClient().educational.getBookById(id),
@@ -188,9 +222,7 @@ export const api = {
       getApiClient().educational.getBooksByDifficulty(level),
   },
   
-  // Concepts API (NEW)
   concepts: {
-    // Public methods
     getAll: (filters?: ConceptFilters) => 
       getApiClient().educational.getConcepts(filters),
     search: (query: string, filters?: Omit<ConceptFilters, 'search'>) => 
@@ -201,12 +233,8 @@ export const api = {
       getApiClient().educational.getConceptsByBook(bookId),
     getByType: (type: string, discipline?: string) => 
       getApiClient().educational.getConceptsByType(type, discipline),
-    
-    // Student methods
     markComplete: (id: string, score?: number) => 
       getApiClient().educational.markConceptComplete(id, score),
-    
-    // Teacher methods
     create: (concept: Omit<Concept, 'id' | 'createdAt' | 'updatedAt'>) => 
       getApiClient().educational.createConcept(concept),
     update: (id: string, updates: Partial<Concept>) => 
@@ -217,15 +245,11 @@ export const api = {
       getApiClient().educational.bulkCreateConcepts(concepts),
   },
   
-  // Lessons API (NEW)
   lessons: {
-    // Common methods
     getAll: (filters?: LessonFilters) => 
       getApiClient().educational.getLessons(filters),
     getById: (id: string) => 
       getApiClient().educational.getLessonById(id),
-    
-    // Teacher methods
     create: (lesson: Omit<Lesson, 'id' | 'createdAt' | 'updatedAt' | 'stats'>) => 
       getApiClient().educational.createLesson(lesson),
     update: (id: string, updates: Partial<Lesson>) => 
@@ -240,15 +264,12 @@ export const api = {
       getApiClient().educational.duplicateLesson(id),
     getSubmissions: (id: string) => 
       getApiClient().educational.getLessonSubmissions(id),
-    
-    // Student methods
     submit: (id: string, answers: Record<string, any>) => 
       getApiClient().educational.submitLesson(id, { answers }),
     getProgress: (id: string) => 
       getApiClient().educational.getLessonProgress(id),
   },
   
-  // Combined content methods (existing, but using new implementations)
   content: {
     getMathConcepts: (bookId: string) => getApiClient().educational.getMathConcepts(bookId),
     getScienceConcepts: (bookId: string, discipline?: ScientificDiscipline) => 

@@ -4,12 +4,11 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import ogImage from '../../public/assets/og-preview.png';
 import './globals.css';
 
-import { Header } from '@/components/misc/header';
-import { Footer } from '@/components/misc/footer';
 import { ApiConnectionManager } from '@/components/apiConnectionManager';
 import { ApiProvider } from '@/providers/apiProvider';
 import { Providers } from '@/providers/providers';
 import { AuthProvider } from '@/providers/authProvider';
+import { ConditionalLayout } from '@/components/layout/conditionalLayout';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -40,15 +39,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <Providers>
-          {/* ApiProvider should come first as other providers might depend on it */}
           <ApiProvider>
-            {/* AuthProvider can now use the API client from ApiProvider */}
             <AuthProvider>
-              {/* ConnectionManager provides UI feedback for connection status */}
               <ApiConnectionManager>
-                <Header title="Learn Morra" subtitle="Your guide to excellence" />
-                <main className="flex-grow">{children}</main>
-                <Footer />
+                <ConditionalLayout>
+                  {children}
+                </ConditionalLayout>
               </ApiConnectionManager>
             </AuthProvider>
           </ApiProvider>

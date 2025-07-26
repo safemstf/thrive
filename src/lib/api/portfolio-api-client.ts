@@ -1,4 +1,4 @@
-// lib/api/portfolio-client.ts
+// lib/api/portfolio-api-client.ts
 import { BaseApiClient, APIError } from './base-api-client';
 import {
   Portfolio,
@@ -13,80 +13,43 @@ import {
   PortfolioAnalytics,
   PortfolioShareLink,
 } from '@/types/portfolio.types';
-import { GalleryVisibility } from '@/types/gallery.types';
-import { ConceptProgress } from '@/types/educational.types'
+import { GalleryPiece, GalleryVisibility } from '@/types/gallery.types';
+import { ConceptProgress } from '@/types/educational.types';
 import { config } from '@/config/environment';
 
-export interface PortfolioAPI {
-  // Portfolio CRUD
-  create(data: CreatePortfolioDto): Promise<Portfolio>;
-  update(id: string, data: UpdatePortfolioDto): Promise<Portfolio>;
-  getById(id: string): Promise<PortfolioWithPieces>;
-  getByUserId(userId: string): Promise<PortfolioWithPieces>;
-  getByUsername(username: string): Promise<PortfolioWithPieces>;
-  delete(id: string): Promise<void>;
-  getMyPortfolio(): Promise<Portfolio | null>;  // Changed to allow null
-  
-  // Discovery
-  discover(filters?: PortfolioFilters, page?: number, limit?: number): Promise<PortfolioListResponse>;
-  search(query: string, limit?: number): Promise<Portfolio[]>;
-  getFeatured(limit?: number): Promise<Portfolio[]>;
-  getTrending(period?: 'day' | 'week' | 'month'): Promise<Portfolio[]>;
-  
-  // Reviews
-  addReview(portfolioId: string, review: CreateReviewDto): Promise<PortfolioReview>;
-  getReviews(portfolioId: string, page?: number, limit?: number): Promise<ReviewListResponse>;
-  updateReviewStatus(reviewId: string, status: 'approved' | 'rejected'): Promise<PortfolioReview>;
-  respondToReview(reviewId: string, comment: string): Promise<PortfolioReview>;
-  deleteReview(reviewId: string): Promise<void>;
-  
-  // Analytics
-  trackView(portfolioId: string, data?: any): Promise<void>;
-  getAnalytics(portfolioId: string, period?: string): Promise<PortfolioAnalytics>;
-  
-  // Sharing
-  generateShareLink(portfolioId: string, options?: any): Promise<PortfolioShareLink>;
-  getByShareToken(token: string): Promise<PortfolioWithPieces>;
-  
-  // Images
-  uploadImage(file: File, type: 'profile' | 'cover'): Promise<{ url: string }>;
-  
-  // Gallery management methods (CORE PORTFOLIO FUNCTIONALITY)
-  // These manage gallery pieces within the portfolio context
-  deleteGalleryPiece(pieceId: string): Promise<{ remainingCount: number }>;
-  batchDeleteGalleryPieces(pieceIds: string[]): Promise<{ 
-    deletedCount: number; 
-    remainingCount: number; 
-    unauthorizedCount: number 
-  }>;
-  updateGalleryPieceVisibility(pieceId: string, visibility: GalleryVisibility): Promise<void>;
-  batchUpdateGalleryVisibility(pieceIds: string[], visibility: GalleryVisibility): Promise<{ 
-    updatedCount: number 
-  }>;
+// Enhanced interfaces for better type safety
+export interface PortfolioStats {
+  views: number;
+  rating: number;
+  totalRatings: number;
+  galleryCount: number;
+  projectCount: number;
+  conceptCount: number;
+  completedConcepts: number;
+}
 
-    // Concept progress (Educational/Hybrid Portfolios)
-  getMyConcepts(): Promise<ConceptProgress[]>;
-  addConceptToPortfolio(conceptId: string, data: { status: string; startedAt: string }): Promise<void>;
-  updateConceptProgress(conceptId: string, data: { status: string }): Promise<void>;
+export interface BatchUploadResult {
+  successful: GalleryPiece[];
+  failed: Array<{ error: string; fileName: string }>;
+}
 
-    
-  // TODO: Add these methods when backend implements them
-  // getMyGalleryPieces(params?: GalleryQueryParams): Promise<GalleryApiResponse>;
-  // createGalleryPiece(file: File, metadata: Record<string, any>): Promise<GalleryPiece>;
-  // updateGalleryPiece(pieceId: string, updates: Partial<GalleryPiece>): Promise<GalleryPiece>;
-  // uploadGalleryImage(file: File, metadata: Record<string, any>): Promise<{ url: string; thumbnailUrl?: string }>;
+export interface BatchOperationResult {
+  successCount: number;
+  failedCount: number;
+  errors?: string[];
 }
 
 interface PortfolioMeResponse {
   hasPortfolio?: boolean;
   portfolio?: Portfolio | null;
-  // When portfolio exists, the response is the portfolio object directly
   _id?: string;
   id?: string;
-  [key: string]: any; // Allow other portfolio fields
+  [key: string]: any;
 }
 
-export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
+export class PortfolioApiClient extends BaseApiClient {
+  // ==================== CORE PORTFOLIO OPERATIONS ====================
+  
   async create(data: CreatePortfolioDto): Promise<Portfolio> {
     return this.requestWithRetry<Portfolio>('/portfolios/me/create', {
       method: 'POST',
@@ -95,14 +58,14 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
   }
 
   async update(id: string, data: UpdatePortfolioDto): Promise<Portfolio> {
-    return this.requestWithRetry<Portfolio>(`/portfolios/${id}`, {
-      method: 'PATCH',
+    return this.requestWithRetry<Portfolio>(`/portfolios/by-id/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
   async getById(id: string): Promise<PortfolioWithPieces> {
-    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/${id}`);
+    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/by-id/${id}`);
   }
 
   async getByUserId(userId: string): Promise<PortfolioWithPieces> {
@@ -110,11 +73,17 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
   }
 
   async getByUsername(username: string): Promise<PortfolioWithPieces> {
-    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/u/${username}`);
+    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/by-username/${username}`);
   }
 
   async delete(id: string): Promise<void> {
-    return this.requestWithRetry<void>(`/portfolios/${id}`, {
+    return this.requestWithRetry<void>(`/portfolios/by-id/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async deleteMyPortfolio(): Promise<void> {
+    return this.requestWithRetry<void>('/portfolios/me', {
       method: 'DELETE',
     });
   }
@@ -123,21 +92,20 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
     try {
       const response = await this.requestWithRetry<PortfolioMeResponse>('/portfolios/me');
       
-      // If the response indicates no portfolio
       if (response.hasPortfolio === false) {
         return null;
       }
       
-      // If the response is the portfolio object itself
       return response as Portfolio;
     } catch (error) {
-      // If it's a 404, the user doesn't have a portfolio
       if (error instanceof APIError && error.status === 404) {
         return null;
       }
       throw error;
     }
   }
+
+  // ==================== DISCOVERY & SEARCH ====================
 
   async discover(
     filters?: PortfolioFilters,
@@ -167,145 +135,49 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
     });
   }
 
-  async addReview(portfolioId: string, review: CreateReviewDto): Promise<PortfolioReview> {
-    return this.requestWithRetry<PortfolioReview>(`/portfolios/${portfolioId}/reviews`, {
-      method: 'POST',
-      body: JSON.stringify(review),
-    });
-  }
+  // ==================== GALLERY MANAGEMENT ====================
 
-  async getReviews(
-    portfolioId: string,
-    page: number = 1,
-    limit: number = 10
-  ): Promise<ReviewListResponse> {
-    return this.requestWithRetry<ReviewListResponse>(`/portfolios/${portfolioId}/reviews`, {
-      params: { page, limit },
-    });
-  }
-
-  async updateReviewStatus(
-    reviewId: string,
-    status: 'approved' | 'rejected'
-  ): Promise<PortfolioReview> {
-    return this.requestWithRetry<PortfolioReview>(`/reviews/${reviewId}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-  }
-
-  async respondToReview(reviewId: string, comment: string): Promise<PortfolioReview> {
-    return this.requestWithRetry<PortfolioReview>(`/reviews/${reviewId}/respond`, {
-      method: 'POST',
-      body: JSON.stringify({ comment }),
-    });
-  }
-
-  async deleteReview(reviewId: string): Promise<void> {
-    return this.requestWithRetry<void>(`/reviews/${reviewId}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async trackView(
-    portfolioId: string,
-    data?: { referrer?: string; duration?: number }
-  ): Promise<void> {
-    return this.requestWithRetry<void>(`/portfolios/${portfolioId}/views`, {
-      method: 'POST',
-      body: JSON.stringify(data || {}),
-    });
-  }
-
-  async getAnalytics(
-    portfolioId: string,
-    period: string = 'month'
-  ): Promise<PortfolioAnalytics> {
-    return this.requestWithRetry<PortfolioAnalytics>(`/portfolios/${portfolioId}/analytics`, {
-      params: { period },
-    });
-  }
-
-  async generateShareLink(
-    portfolioId: string,
-    options?: { expiresIn?: number; maxViews?: number }
-  ): Promise<PortfolioShareLink> {
-    return this.requestWithRetry<PortfolioShareLink>(`/portfolios/${portfolioId}/share`, {
-      method: 'POST',
-      body: JSON.stringify(options || {}),
-    });
-  }
-
-  async getByShareToken(token: string): Promise<PortfolioWithPieces> {
-    // This endpoint might not require auth, so we'll use a simple fetch
-    const url = `${this.baseURL}/portfolios/shared/${token}`;
-    const response = await fetch(url, {
-      headers: this.defaultHeaders,
-    });
-    
-    if (!response.ok) {
-      throw new APIError('Invalid share link', response.status);
-    }
-    
-    const data = await response.json();
-    return data;
-  }
-
-  async uploadImage(
-    file: File,
-    type: 'profile' | 'cover'
-  ): Promise<{ url: string }> {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('type', type);
-
-    const url = `${this.baseURL}/portfolios/upload-image`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.api.timeout);
-    
+  async getMyGalleryPieces(): Promise<GalleryPiece[]> {
     try {
-      const token = this.getAuthToken();
-      const headers: HeadersInit = {
-        'ngrok-skip-browser-warning': 'true',
-        // Don't set Content-Type, let browser set it with boundary
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: formData,
-        signal: controller.signal,
-        mode: 'cors',
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText }));
-        throw new APIError(
-          errorData.message || `Upload failed: ${response.statusText}`,
-          response.status
-        );
-      }
-
-      return await response.json();
+      const response = await this.requestWithRetry<GalleryPiece[] | { pieces: GalleryPiece[] }>('/portfolios/me/gallery');
+      return Array.isArray(response) ? response : response.pieces || [];
     } catch (error) {
-      clearTimeout(timeoutId);
-      
-      if (error instanceof APIError) {
-        throw error;
-      }
-      
-      throw new APIError('Portfolio image upload failed', undefined, 'UPLOAD_ERROR');
+      console.error('Failed to get gallery pieces:', error);
+      return [];
     }
   }
 
-  // Gallery management methods
+  async getPortfolioGallery(portfolioId: string): Promise<GalleryPiece[]> {
+    try {
+      const response = await this.requestWithRetry<GalleryPiece[] | { pieces: GalleryPiece[] }>(`/portfolios/by-id/${portfolioId}/gallery`);
+      return Array.isArray(response) ? response : response.pieces || [];
+    } catch (error) {
+      console.error('Failed to get portfolio gallery:', error);
+      return [];
+    }
+  }
+
+  async addGalleryPiece(pieceData: {
+    title: string;
+    description?: string;
+    imageUrl: string;
+    category?: string;
+    tags?: string[];
+    visibility?: GalleryVisibility;
+  }): Promise<GalleryPiece> {
+    return this.requestWithRetry<GalleryPiece>('/portfolios/me/gallery', {
+      method: 'POST',
+      body: JSON.stringify(pieceData),
+    });
+  }
+
+  async updateGalleryPiece(pieceId: string, updates: Partial<GalleryPiece>): Promise<GalleryPiece> {
+    return this.requestWithRetry<GalleryPiece>(`/portfolios/me/gallery/${pieceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
   async deleteGalleryPiece(pieceId: string): Promise<{ remainingCount: number }> {
     return this.requestWithRetry<{ remainingCount: number }>(
       `/portfolios/me/gallery/${pieceId}`,
@@ -356,8 +228,20 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
     );
   }
 
+  async getGalleryStats(): Promise<{ totalPieces: number; totalViews: number }> {
+    try {
+      const response = await this.requestWithRetry<{ totalPieces: number; totalViews: number }>('/portfolios/me/gallery/stats');
+      return response;
+    } catch (error) {
+      console.error('Failed to get gallery stats:', error);
+      return { totalPieces: 0, totalViews: 0 };
+    }
+  }
+
+  // ==================== CONCEPT MANAGEMENT ====================
+
   async getMyConcepts(): Promise<ConceptProgress[]> {
-    return await this.requestWithRetry<ConceptProgress[]>('/portfolios/me/concepts');
+    return this.requestWithRetry<ConceptProgress[]>('/portfolios/me/concepts');
   }
 
   async addConceptToPortfolio(conceptId: string, data: { status: string; startedAt: string }): Promise<void> {
@@ -374,4 +258,291 @@ export class PortfolioApiClient extends BaseApiClient implements PortfolioAPI {
     });
   }
 
+  // ==================== REVIEWS ====================
+
+  async addReview(portfolioId: string, review: CreateReviewDto): Promise<PortfolioReview> {
+    return this.requestWithRetry<PortfolioReview>(`/portfolios/by-id/${portfolioId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(review),
+    });
+  }
+
+  async getReviews(
+    portfolioId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<ReviewListResponse> {
+    return this.requestWithRetry<ReviewListResponse>(`/portfolios/by-id/${portfolioId}/reviews`, {
+      params: { page, limit },
+    });
+  }
+
+  async updateReviewStatus(
+    reviewId: string,
+    status: 'approved' | 'rejected'
+  ): Promise<PortfolioReview> {
+    return this.requestWithRetry<PortfolioReview>(`/reviews/${reviewId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async respondToReview(reviewId: string, comment: string): Promise<PortfolioReview> {
+    return this.requestWithRetry<PortfolioReview>(`/reviews/${reviewId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ comment }),
+    });
+  }
+
+  async deleteReview(reviewId: string): Promise<void> {
+    return this.requestWithRetry<void>(`/reviews/${reviewId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ==================== ANALYTICS ====================
+
+  async trackView(
+    portfolioId: string,
+    data?: { referrer?: string; duration?: number }
+  ): Promise<void> {
+    return this.requestWithRetry<void>(`/portfolios/by-id/${portfolioId}/views`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+  }
+
+  async getAnalytics(
+    portfolioId: string,
+    period: string = 'month'
+  ): Promise<PortfolioAnalytics> {
+    return this.requestWithRetry<PortfolioAnalytics>(`/portfolios/by-id/${portfolioId}/analytics`, {
+      params: { period },
+    });
+  }
+
+  // ==================== SHARING ====================
+
+  async generateShareLink(
+    portfolioId: string,
+    options?: { expiresIn?: number; maxViews?: number }
+  ): Promise<PortfolioShareLink> {
+    return this.requestWithRetry<PortfolioShareLink>(`/portfolios/by-id/${portfolioId}/share`, {
+      method: 'POST',
+      body: JSON.stringify(options || {}),
+    });
+  }
+
+  async getByShareToken(token: string): Promise<PortfolioWithPieces> {
+    const url = `${this.baseURL}/portfolios/shared/${token}`;
+    const response = await fetch(url, {
+      headers: this.defaultHeaders,
+    });
+    
+    if (!response.ok) {
+      throw new APIError('Invalid share link', response.status);
+    }
+    
+    return response.json();
+  }
+
+  // ==================== FILE UPLOADS ====================
+
+  async uploadImage(
+    file: File,
+    type: 'profile' | 'cover'
+  ): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+
+    const url = `${this.baseURL}/portfolios/upload-image`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.api.timeout);
+    
+    try {
+      const token = this.getAuthToken();
+      const headers: HeadersInit = {
+        'ngrok-skip-browser-warning': 'true',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+        mode: 'cors',
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        throw new APIError(
+          errorData.message || `Upload failed: ${response.statusText}`,
+          response.status
+        );
+      }
+
+      return response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error instanceof APIError) {
+        throw error;
+      }
+      
+      throw new APIError('Portfolio image upload failed', undefined, 'UPLOAD_ERROR');
+    }
+  }
+
+  // ==================== ENHANCED BATCH OPERATIONS ====================
+
+  /**
+   * Upload multiple gallery images with progress tracking
+   * O(n) where n is number of files
+   */
+  async batchUploadGallery(
+    uploads: Array<{
+      file: File;
+      title: string;
+      description?: string;
+      category?: string;
+      tags?: string[];
+      visibility?: GalleryVisibility;
+    }>,
+    onProgress?: (completed: number, total: number) => void
+  ): Promise<BatchUploadResult> {
+    const successful: GalleryPiece[] = [];
+    const failed: Array<{ error: string; fileName: string }> = [];
+
+    for (let i = 0; i < uploads.length; i++) {
+      const upload = uploads[i];
+      try {
+        // Upload to gallery service first (external to portfolio)
+        const uploadResponse = await fetch(`${this.baseURL}/gallery/upload`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.getAuthToken()}`,
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: (() => {
+            const formData = new FormData();
+            formData.append('file', upload.file);
+            return formData;
+          })(),
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+        }
+
+        const uploadData = await uploadResponse.json();
+        
+        // Add to portfolio gallery
+        const galleryPiece = await this.addGalleryPiece({
+          title: upload.title,
+          description: upload.description || '',
+          imageUrl: uploadData.url || uploadData.imageUrl,
+          category: upload.category,
+          tags: upload.tags || [],
+          visibility: upload.visibility || 'public'
+        });
+
+        successful.push(galleryPiece);
+      } catch (error: any) {
+        failed.push({
+          error: error.message || 'Upload failed',
+          fileName: upload.file.name
+        });
+      }
+
+      onProgress?.(i + 1, uploads.length);
+    }
+
+    return { successful, failed };
+  }
+
+  /**
+   * Get comprehensive portfolio statistics
+   * Coordinates multiple API calls efficiently - O(1) with parallel requests
+   */
+  async getPortfolioStats(): Promise<PortfolioStats> {
+    try {
+      const [portfolio, galleryStats, concepts] = await Promise.allSettled([
+        this.getMyPortfolio(),
+        this.getGalleryStats(),
+        this.getMyConcepts()
+      ]);
+
+      const portfolioData = portfolio.status === 'fulfilled' ? portfolio.value : null;
+      const gallery = galleryStats.status === 'fulfilled' ? galleryStats.value : { totalPieces: 0, totalViews: 0 };
+      const conceptList = concepts.status === 'fulfilled' ? concepts.value : [];
+
+      return {
+        views: (portfolioData as any)?.views || 0, // Portfolio type might not have views yet
+        rating: (portfolioData as any)?.averageRating || 0, // Portfolio type might not have rating yet
+        totalRatings: (portfolioData as any)?.totalRatings || 0, // Portfolio type might not have totalRatings yet
+        galleryCount: gallery.totalPieces,
+        projectCount: (portfolioData as any)?.projectCount || 0, // Portfolio type might not have projectCount yet
+        conceptCount: conceptList.length,
+        completedConcepts: conceptList.filter(c => c.status === 'completed').length
+      };
+    } catch (error) {
+      console.error('Failed to get portfolio stats:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if user has a portfolio
+   * O(1) operation
+   */
+  async hasPortfolio(): Promise<boolean> {
+    try {
+      const portfolio = await this.getMyPortfolio();
+      return portfolio !== null;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get portfolio type configuration
+   * O(1) lookup
+   */
+  getPortfolioTypeConfig(type: string) {
+    const configs = {
+      creative: {
+        icon: '🎨',
+        title: 'Creative Portfolio',
+        color: '#8b5cf6',
+        features: ['Gallery', 'Artwork Showcase', 'Project Display']
+      },
+      educational: {
+        icon: '🧠',
+        title: 'Educational Portfolio',
+        color: '#3b82f6',
+        features: ['Progress Tracking', 'Concept Mastery', 'Learning Analytics']
+      },
+      hybrid: {
+        icon: '🔄',
+        title: 'Hybrid Portfolio',
+        color: '#10b981',
+        features: ['Creative Showcase', 'Learning Progress', 'Project Portfolio']
+      }
+    };
+
+    return configs[type as keyof typeof configs] || {
+      icon: '📁',
+      title: 'Portfolio',
+      color: '#6b7280',
+      features: ['Basic Portfolio']
+    };
+  }
 }

@@ -31,10 +31,6 @@ const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
 
   if (isAuthenticated) {
     links.push({ href: '/dashboard', label: 'Dashboard', requiresAuth: true });
-    
-    if (isAdmin) {
-      links.push({ href: '/api-test', label: 'API Test', requiresAuth: true, requiresAdmin: true });
-    }
   }
 
   if (!isAuthenticated) {

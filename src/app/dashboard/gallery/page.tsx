@@ -14,7 +14,7 @@ import {
 import { useApiClient } from '@/lib/api-client';
 import { APIError } from '@/lib/api-client';
 import type { Portfolio } from '@/types/portfolio.types';
-
+import { ArtworkUploadModal } from '@/components/gallery/utils/uploadModal';
 
 // Gallery-focused types - only for visual artwork
 interface GalleryPiece {
