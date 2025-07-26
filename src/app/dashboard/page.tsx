@@ -622,7 +622,7 @@ export default function DashboardOverview() {
                         </QuickAction>
 
                         {user?.role === 'admin' && (
-                          <QuickAction as="a" href="/admin">
+                          <QuickAction as="a" href="/dashboard/api-test">
                             <ActionIcon><Shield size={24} /></ActionIcon>
                             <ActionContent>
                               <ActionTitle>Admin Panel</ActionTitle>
