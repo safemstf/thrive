@@ -10,7 +10,7 @@ import {
   Loader2, AlertCircle 
 } from 'lucide-react';
 import { Gallery } from '@/components/gallery';
-import { usePortfolio, usePortfolioReviews } from '@/hooks/usePortfolioApi';
+import { usePortfolio, usePortfolioReviews } from '@/hooks/usePortfolioQueries';
 import { useAuth } from '@/providers/authProvider';
 import { Portfolio, PortfolioReview } from '@/types/portfolio.types';
 import { VISIBILITY_CONFIG } from '@/components/gallery/utils';

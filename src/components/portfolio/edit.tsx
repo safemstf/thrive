@@ -8,7 +8,7 @@ import {
   Plus, Trash2, Eye, EyeOff, Loader2 
 } from 'lucide-react';
 import { useAuth } from '@/providers/authProvider';
-import { useMyPortfolio, useUpdatePortfolio, useUploadPortfolioImage } from '@/hooks/usePortfolioApi';
+import { useMyPortfolio, useUpdatePortfolio, useUploadPortfolioImage } from '@/hooks/usePortfolioQueries';
 import { VisibilityToggle } from '@/components/gallery/rendering';
 import { UpdatePortfolioDto, PortfolioVisibility } from '@/types/portfolio.types';
 import { Gallery } from '@/components/gallery'; // Import the Gallery component
