@@ -1,3 +1,4 @@
+// src/types/gallery.types.ts
 import { BaseEntity } from './educational.types';
 
 // === Core Unions & Types ===
@@ -80,6 +81,11 @@ export interface GalleryPiece extends BaseEntity {
   originalFileName?: string;
   fileSize?: number;
   mimeType?: string;
+
+  // Portfolio/Social Features (ADDED)
+  portfolioId?: string;
+  views: number;
+  likes: number;
 }
 
 // === Collections & Artist Profiles ===
@@ -223,4 +229,18 @@ export interface GalleryModalProps {
   onDelete?: (piece: GalleryPiece) => void;
   canEdit?: boolean;
   canDelete?: boolean;
+}
+
+// === Upload Modal Types (ADDED) ===
+export interface ArtworkUploadModalProps {
+  portfolioId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+  initialFiles?: GalleryUploadFile[];
+}
+
+// === Batch Upload Result (ADDED) ===
+export interface BatchUploadResult {
+  successful: GalleryPiece[];
+  failed: Array<{ error: string; fileName: string }>;
 }

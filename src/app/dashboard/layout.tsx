@@ -79,13 +79,6 @@ const navItems: NavItem[] = [
     description: 'Tutoring services'
   },
   {
-    href: '/dashboard/analytics',
-    label: 'Analytics',
-    icon: <BarChart3 size={20} />,
-    description: 'View insights & stats',
-    requiresPortfolio: true
-  },
-  {
     href: '/dashboard/api-test',
     label: 'Admin Panel',
     icon: <Shield size={20} />,

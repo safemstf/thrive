@@ -1,22 +1,24 @@
 // components/gallery/utils/uploadModal.tsx
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { UploadIcon, X, Loader2 } from '@/components/ui/icons';
 import { useAuth } from '@/providers/authProvider';
-import type { ArtworkCategory, GalleryPiece, GalleryStatus } from '@/types/gallery.types';
+import type { ArtworkCategory, GalleryPiece, GalleryStatus, GalleryUploadFile } from '@/types/gallery.types';
 
 interface ArtworkUploadModalProps {
   portfolioId?: string;
   onClose: () => void;
   onSuccess: () => void;
+  initialFiles?: GalleryUploadFile[];
 }
 
 export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   portfolioId,
   onClose,
-  onSuccess
+  onSuccess,
+  initialFiles
 }) => {
   const { user, isAuthenticated } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
@@ -26,7 +28,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: 'painting' as ArtworkCategory,
+    category: 'portrait' as ArtworkCategory,
     medium: '',
     tags: '',
     price: '',
@@ -35,6 +37,34 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle initial files from drag & drop
+  useEffect(() => {
+    if (initialFiles && initialFiles.length > 0) {
+      const firstFile = initialFiles[0];
+      setSelectedFile(firstFile.file);
+      
+      if (firstFile.preview) {
+        setPreview(firstFile.preview);
+      } else {
+        // Create preview if not provided
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreview(reader.result as string);
+        };
+        reader.readAsDataURL(firstFile.file);
+      }
+
+      // Auto-populate title from filename if not set
+      if (!formData.title && firstFile.file.name) {
+        const nameWithoutExtension = firstFile.file.name.replace(/\.[^/.]+$/, '');
+        setFormData(prev => ({
+          ...prev,
+          title: nameWithoutExtension.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        }));
+      }
+    }
+  }, [initialFiles]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,6 +90,15 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
         setPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+
+      // Auto-populate title from filename if not set
+      if (!formData.title && file.name) {
+        const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
+        setFormData(prev => ({
+          ...prev,
+          title: nameWithoutExtension.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+        }));
+      }
     }
   };
 
@@ -260,7 +299,12 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
         <ModalHeader>
           <HeaderContent>
             <ModalTitle>Upload Artwork</ModalTitle>
-            <ModalSubtitle>Share your creative work with the community</ModalSubtitle>
+            <ModalSubtitle>
+              {initialFiles && initialFiles.length > 0 
+                ? `Ready to upload ${selectedFile?.name || 'your image'}`
+                : 'Share your creative work with the community'
+              }
+            </ModalSubtitle>
           </HeaderContent>
           <CloseButton onClick={onClose} type="button">
             <X size={20} />
@@ -290,6 +334,12 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                         Change Image
                       </ChangeButton>
                     </PreviewOverlay>
+                    {selectedFile && (
+                      <ImageInfo>
+                        <ImageName>{selectedFile.name}</ImageName>
+                        <ImageSize>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</ImageSize>
+                      </ImageInfo>
+                    )}
                   </PreviewContainer>
                 ) : (
                   <UploadArea onClick={() => fileInputRef.current?.click()}>
@@ -345,12 +395,11 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                       value={formData.category}
                       onChange={handleInputChange}
                     >
-                      <option value="painting">Painting</option>
-                      <option value="drawing">Drawing</option>
-                      <option value="digital">Digital Art</option>
-                      <option value="photography">Photography</option>
-                      <option value="sculpture">Sculpture</option>
-                      <option value="mixed_media">Mixed Media</option>
+                      <option value="portrait">Portrait</option>
+                      <option value="landscape">Landscape</option>
+                      <option value="abstract">Abstract</option>
+                      <option value="series">Series</option>
+                      <option value="mixed-media">Mixed Media</option>
                     </Select>
                   </FormGroup>
                   
@@ -443,7 +492,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   );
 };
 
-// Styled Components
+// Styled Components (keeping existing ones and adding new ones)
 const ModalOverlay = styled.div`
   position: fixed;
   inset: 0;
@@ -621,6 +670,34 @@ const ChangeButton = styled.button`
     background: #f9fafb;
     transform: translateY(-1px);
   }
+`;
+
+// NEW: Image info display
+const ImageInfo = styled.div`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  color: white;
+  padding: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+`;
+
+const ImageName = styled.div`
+  font-size: 0.875rem;
+  font-weight: 500;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const ImageSize = styled.div`
+  font-size: 0.75rem;
+  opacity: 0.9;
 `;
 
 const FormSection = styled.div`
