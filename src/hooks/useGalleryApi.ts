@@ -54,11 +54,12 @@ export function useGalleryPieces(
   options?: UseQueryOptions<GalleryApiResponse, APIError>
 ) {
   return useQuery({
-    queryKey: galleryQueryKeys.pieces.list(params),
+    queryKey: galleryQueryKeys.pieces.list(params ?? {}),
     queryFn: () => api.gallery.getPieces(params),
     ...options,
   });
 }
+
 
 export function useGalleryPiece(
   id: string,

@@ -1,10 +1,11 @@
 // src/app/dashboard/gallery/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/authProvider';
+import { usePortfolioManager, useGalleryOperations } from '@/services/portfolioService';
 
 // Import modular components
 import { 
@@ -17,7 +18,6 @@ import {
 
 // Import business logic hooks
 import {
-  useGalleryData,
   useGalleryFilters,
   useBulkActions,
   useImageUpload,
@@ -37,29 +37,32 @@ import { ErrorBoundary } from '@/components/gallery/utils/errorBoundary';
 import { trackEvent } from '@/components/gallery/utils/analytics';
 import { logger } from '@/components/gallery/utils/logger';
 
+// Import portfolio creation
+import { QuickCreateButton } from '@/components/portfolio/portfolioCreation';
+
 export default function GalleryPage() {
   // ============= STATE MANAGEMENT =============
-  const [galleryMode, setGalleryMode] = useState<GalleryMode>('public');
   const [viewLayout, setViewLayout] = useState<GalleryLayout>('masonry');
   const [showFilters, setShowFilters] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [accessChecked, setAccessChecked] = useState(false);
   
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
 
-  // ============= CUSTOM HOOKS =============
+  // ============= USE PORTFOLIO MANAGER =============
   const {
-    galleryPieces,
-    collections,
     portfolio,
+    galleryPieces,
     loading,
     error,
-    fetchData,
-    createPortfolio,
-    refreshData,
-    setGalleryPieces
-  } = useGalleryData();
+    refresh: refreshPortfolio,
+    hasCreativeCapability
+  } = usePortfolioManager();
 
+  const { uploadImage, batchUpload, uploading } = useGalleryOperations(portfolio);
+
+  // ============= CUSTOM HOOKS =============
   const {
     filterState,
     filteredItems,
@@ -68,7 +71,7 @@ export default function GalleryPage() {
     toggleTag,
     clearFilters,
     hasActiveFilters
-  } = useGalleryFilters(galleryPieces);
+  } = useGalleryFilters(galleryPieces || []);
 
   const {
     selectedItems,
@@ -90,45 +93,19 @@ export default function GalleryPage() {
     resetUpload
   } = useImageUpload();
 
-  // ============= MEMOIZED VALUES =============
-  const hasCreativeCapability = useMemo(() => 
-    portfolio && (portfolio.kind === 'creative' || portfolio.kind === 'hybrid'),
-    [portfolio]
-  );
-  
-  const canUpload = useMemo(() => {
-    // Must be authenticated and in portfolio mode
-    if (!isAuthenticated || galleryMode !== 'portfolio') {
-      return false;
-  }
-  
-  // If no portfolio exists, allow upload (modal will handle creation)
-  if (!portfolio) {
-    return true;
-  }
-  
-  // If portfolio exists, check if it supports creative work
-  return portfolio.kind === 'creative' || portfolio.kind === 'hybrid';
-}, [isAuthenticated, galleryMode, portfolio]);
+  // ============= ACCESS CONTROL =============
+  useEffect(() => {
+    if (!isAuthenticated) {
+      logger.info('User not authenticated, redirecting to login');
+      router.push('/login');
+      return;
+    }
+    
+    setAccessChecked(true);
+  }, [isAuthenticated, router]);
 
   // ============= EFFECTS =============
   
-  // Auto-detect portfolio mode if user is authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      setGalleryMode('portfolio');
-      trackEvent('gallery_mode_switched', { mode: 'portfolio', auto: true });
-    } else {
-      setGalleryMode('public');
-      trackEvent('gallery_mode_switched', { mode: 'public', auto: true });
-    }
-  }, [isAuthenticated]);
-
-  // Fetch data when mode changes
-  useEffect(() => {
-    fetchData(galleryMode);
-  }, [galleryMode, fetchData]);
-
   // Persist view layout preference
   useEffect(() => {
     const savedLayout = localStorage.getItem('galleryViewLayout') as GalleryLayout;
@@ -142,43 +119,30 @@ export default function GalleryPage() {
   }, [viewLayout]);
 
   // ============= HANDLERS =============
-  const handleCreatePortfolio = useCallback(async (type: 'creative' | 'hybrid') => {
-    try {
-      trackEvent('portfolio_create_started', { type });
-      await createPortfolio(type);
-      await refreshData(galleryMode);
-      trackEvent('portfolio_create_success', { type });
-    } catch (err) {
-      logger.error('Error creating portfolio:', err);
-      trackEvent('portfolio_create_error', { type, error: err });
-    }
-  }, [createPortfolio, refreshData, galleryMode]);
-
   const handleUploadSuccess = useCallback(async () => {
+    logger.info('Upload successful, refreshing gallery');
     setShowUploadModal(false);
     resetUpload();
-    await refreshData(galleryMode);
-    trackEvent('upload_success', { mode: galleryMode });
-  }, [resetUpload, refreshData, galleryMode]);
+    await refreshPortfolio();
+    trackEvent('upload_success', { count: uploadFiles.length });
+  }, [resetUpload, refreshPortfolio, uploadFiles.length]);
 
   const handleFilesDropped = useCallback(async (files: File[]) => {
-    if (!canUpload) {
-      logger.warn('Upload attempted without permission');
-      return;
-    }
-    
+    logger.info('Files dropped', { count: files.length });
     trackEvent('files_dropped', { count: files.length });
     addFiles(files);
     setShowUploadModal(true);
-  }, [canUpload, addFiles]);
+  }, [addFiles]);
 
   const handleBulkActionWithRefresh = useCallback(async (action: any) => {
     try {
+      logger.info('Bulk action started', { action, count: selectedItems.size });
       trackEvent('bulk_action_started', { action, count: selectedItems.size });
+      
       await handleBulkAction(action);
       
       if (action === 'delete') {
-        await refreshData(galleryMode);
+        await refreshPortfolio();
       }
       
       trackEvent('bulk_action_success', { action });
@@ -186,54 +150,25 @@ export default function GalleryPage() {
       logger.error('Bulk action failed:', err);
       trackEvent('bulk_action_error', { action, error: err });
     }
-  }, [handleBulkAction, selectedItems.size, refreshData, galleryMode]);
+  }, [handleBulkAction, selectedItems.size, refreshPortfolio]);
 
-// Replace your handleUploadClick function in page.tsx with this:
-
-const handleUploadClick = useCallback(() => {
-  // More detailed logging for debugging
-  logger.info('Upload button clicked', {
-    isAuthenticated,
-    galleryMode,
-    hasCreativeCapability,
-    portfolio: portfolio ? { id: portfolio.id, kind: portfolio.kind } : null,
-    canUpload
-  });
-
-  // Basic checks that should match the button visibility logic
-  if (!isAuthenticated) {
-    logger.warn('Upload blocked: User not authenticated');
-    return;
-  }
-
-  if (galleryMode !== 'portfolio') {
-    logger.warn('Upload blocked: Not in portfolio mode', { currentMode: galleryMode });
-    return;
-  }
-
-  // Allow upload even if portfolio doesn't exist yet - the modal will handle creation
-  // OR if portfolio exists and has creative capability
-  const canProceed = !portfolio || hasCreativeCapability;
-  
-  if (!canProceed) {
-    logger.warn('Upload blocked: Portfolio exists but lacks creative capability', {
-      portfolioKind: portfolio?.kind
-    });
-    // You might want to show a message to upgrade portfolio here
-    alert('This portfolio type doesn\'t support artwork uploads. Please upgrade to a Creative or Hybrid portfolio.');
-    return;
-  }
-  
-  logger.info('Opening upload modal');
-  trackEvent('upload_modal_opened', { trigger: 'button' });
-  setShowUploadModal(true);
-}, [isAuthenticated, galleryMode, portfolio, hasCreativeCapability]);
+  const handleUploadClick = useCallback(async () => {
+    logger.info('Upload button clicked');
+    trackEvent('upload_modal_opened', { trigger: 'button' });
+    setShowUploadModal(true);
+  }, []);
 
   const handleModalClose = useCallback(() => {
+    logger.info('Upload modal closed');
     setShowUploadModal(false);
     resetUpload();
     trackEvent('upload_modal_closed');
   }, [resetUpload]);
+
+  const handlePortfolioCreated = useCallback((portfolioId: string) => {
+    logger.info('Creative portfolio created, refreshing page');
+    refreshPortfolio();
+  }, [refreshPortfolio]);
 
   // ============= ERROR BOUNDARY FALLBACK =============
   const ErrorFallback = ({ error, resetErrorBoundary }: any) => (
@@ -244,14 +179,73 @@ const handleUploadClick = useCallback(() => {
     </ErrorContainer>
   );
 
+  // ============= EARLY RETURNS FOR ACCESS CONTROL =============
+  if (!isAuthenticated || !accessChecked) {
+    return (
+      <LoadingContainer>
+        <p>Checking authentication...</p>
+      </LoadingContainer>
+    );
+  }
+
+  if (loading) {
+    return (
+      <LoadingContainer>
+        <p>Loading portfolio...</p>
+      </LoadingContainer>
+    );
+  }
+
+  // Show portfolio creation if no portfolio exists
+  if (!portfolio) {
+    return (
+      <PageWrapper>
+        <Container>
+          <EmptyStateContainer>
+            <EmptyStateIcon>🎨</EmptyStateIcon>
+            <EmptyStateTitle>Welcome to Your Gallery</EmptyStateTitle>
+            <EmptyStateDescription>
+              Create a creative portfolio to start showcasing your artwork, photography, and design projects.
+            </EmptyStateDescription>
+            <QuickCreateButton 
+              type="creative"
+              size="large"
+              onSuccess={handlePortfolioCreated}
+            />
+          </EmptyStateContainer>
+        </Container>
+      </PageWrapper>
+    );
+  }
+
+  // Show upgrade prompt if portfolio lacks creative capability
+  if (!hasCreativeCapability) {
+    return (
+      <PageWrapper>
+        <Container>
+          <EmptyStateContainer>
+            <EmptyStateIcon>📸</EmptyStateIcon>
+            <EmptyStateTitle>Upgrade to Creative Portfolio</EmptyStateTitle>
+            <EmptyStateDescription>
+              Your current portfolio doesn't support gallery features. Upgrade to a creative or hybrid portfolio to access the gallery.
+            </EmptyStateDescription>
+            <UpgradeButton onClick={() => router.push('/dashboard/profile?upgrade=creative')}>
+              Upgrade Portfolio
+            </UpgradeButton>
+          </EmptyStateContainer>
+        </Container>
+      </PageWrapper>
+    );
+  }
+
   // ============= RENDER =============
   return (
     <ErrorBoundary fallback={ErrorFallback}>
       <PageWrapper>
         {/* Header with search, filters, and controls */}
         <GalleryHeader
-          galleryMode={galleryMode}
-          setGalleryMode={setGalleryMode}
+          galleryMode="portfolio"
+          setGalleryMode={() => {}}
           viewLayout={viewLayout}
           setViewLayout={setViewLayout}
           showFilters={showFilters}
@@ -264,9 +258,9 @@ const handleUploadClick = useCallback(() => {
           toggleTag={toggleTag}
           bulkActionMode={bulkActionMode}
           setBulkActionMode={setBulkActionMode}
-          hasCreativeCapability={!!hasCreativeCapability}
+          hasCreativeCapability={true}
           onUpload={handleUploadClick}
-          isAuthenticated={isAuthenticated}
+          isAuthenticated={true}
           portfolio={portfolio}
           galleryPieces={galleryPieces}
           filteredItemsCount={filteredItems.length}
@@ -288,12 +282,12 @@ const handleUploadClick = useCallback(() => {
             viewLayout={viewLayout}
             loading={loading}
             error={error}
-            galleryMode={galleryMode}
+            galleryMode="portfolio"
             bulkActionMode={bulkActionMode}
             selectedItems={selectedItems}
             onItemSelect={toggleItemSelection}
-            onRetry={() => fetchData(galleryMode)}
-            hasCreativeCapability={!!hasCreativeCapability}
+            onRetry={refreshPortfolio}
+            hasCreativeCapability={true}
             onUpload={handleUploadClick}
             searchQuery={filterState.searchQuery}
             selectedTags={filterState.selectedTags}
@@ -301,9 +295,8 @@ const handleUploadClick = useCallback(() => {
             portfolio={portfolio}
           />
 
-          {/* Upload Zone - show for authenticated users with creative capability */}
-          {canUpload && 
-           filteredItems.length === 0 && 
+          {/* Upload Zone - show when no artworks */}
+          {filteredItems.length === 0 && 
            !loading && 
            !error && (
             <UploadZone
@@ -314,7 +307,7 @@ const handleUploadClick = useCallback(() => {
         </GalleryContainer>
 
         {/* Floating action button */}
-        {canUpload && filteredItems.length > 0 && (
+        {filteredItems.length > 0 && (
           <FloatingActionButton 
             onClick={handleUploadClick}
             aria-label="Upload artwork"
@@ -322,9 +315,9 @@ const handleUploadClick = useCallback(() => {
         )}
 
         {/* Upload Modal */}
-        {showUploadModal && isAuthenticated && (
+        {showUploadModal && (
           <ArtworkUploadModal
-            portfolioId={portfolio?.id}
+            portfolioId={portfolio.id}
             onClose={handleModalClose}
             onSuccess={handleUploadSuccess}
             initialFiles={uploadFiles.length > 0 ? uploadFiles.map((f, index) => ({
@@ -352,6 +345,16 @@ const PageWrapper = styled.main`
   position: relative;
 `;
 
+const Container = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
+`;
+
 const GalleryContainer = styled.div`
   padding: 2rem;
   max-width: 1400px;
@@ -359,6 +362,18 @@ const GalleryContainer = styled.div`
   
   @media (max-width: 768px) {
     padding: 1rem;
+  }
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  
+  p {
+    color: var(--text-secondary, #666);
+    font-size: 1.1rem;
   }
 `;
 
@@ -395,5 +410,53 @@ const ErrorContainer = styled.div`
       background-color: var(--primary-hover, #2563eb);
       transform: translateY(-1px);
     }
+  }
+`;
+
+const EmptyStateContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: 3rem 2rem;
+`;
+
+const EmptyStateIcon = styled.div`
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+`;
+
+const EmptyStateTitle = styled.h1`
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary, #1a1a1a);
+  margin-bottom: 1rem;
+`;
+
+const EmptyStateDescription = styled.p`
+  font-size: 1.125rem;
+  color: var(--text-secondary, #666);
+  max-width: 500px;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+`;
+
+const UpgradeButton = styled.button`
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px -4px rgba(139, 92, 246, 0.3);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -8px rgba(139, 92, 246, 0.4);
   }
 `;

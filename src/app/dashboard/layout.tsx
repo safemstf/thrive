@@ -21,10 +21,13 @@ import {
   X,
   Plus,
   LogOut,
-  BookOpen,
-  Image as GalleryIcon,
+  GraduationCap,
+  Camera,
   FolderOpen,
-  GraduationCap
+  Briefcase,
+  Code,
+  BookOpen,
+  Brush
 } from 'lucide-react';
 
 interface NavItem {
@@ -46,37 +49,33 @@ const navItems: NavItem[] = [
   },
   {
     href: '/dashboard/profile',
-    label: 'Profile',
+    label: 'Portfolio Hub',
     icon: <User size={20} />,
-    description: 'Your profile & settings'
+    description: 'Manage your portfolio & profile'
   },
   {
     href: '/dashboard/gallery',
-    label: 'Gallery',
-    icon: <GalleryIcon size={20} />,
-    description: 'Manage your artwork',
+    label: 'Creative Studio',
+    icon: <Brush size={20} />,
+    description: 'Art, photography & design portfolio',
     requiresPortfolio: true,
     portfolioTypes: ['creative', 'hybrid']
   },
   {
     href: '/dashboard/writing',
-    label: 'Learning',
-    icon: <BookOpen size={20} />,
-    description: 'Educational content',
+    label: 'Teaching Portfolio',
+    icon: <GraduationCap size={20} />,
+    description: 'Educational content & curriculum',
     requiresPortfolio: true,
     portfolioTypes: ['educational', 'hybrid']
   },
   {
     href: '/dashboard/projects',
-    label: 'Projects',
-    icon: <FolderOpen size={20} />,
-    description: 'CS & creative projects'
-  },
-  {
-    href: '/dashboard/tutoring',
-    label: 'Tutoring',
-    icon: <GraduationCap size={20} />,
-    description: 'Tutoring services'
+    label: 'Tech Portfolio',
+    icon: <Code size={20} />,
+    description: 'Software projects & development',
+    requiresPortfolio: true,
+    portfolioTypes: ['professional', 'hybrid']
   },
   {
     href: '/dashboard/api-test',
@@ -85,11 +84,11 @@ const navItems: NavItem[] = [
     description: 'System administration',
     isAdmin: true
   },
-   {
+  {
     href: '/',
-    label: 'homepage',
+    label: 'Homepage',
     icon: <Home size={20} />,
-    description: 'Home'
+    description: 'Return to main site'
   }
 ];
 
@@ -134,6 +133,11 @@ export default function DashboardLayout({
       // Hide portfolio-required items if no portfolio
       if (item.requiresPortfolio && !portfolio) return false;
       
+      // Show portfolio items based on type
+      if (item.portfolioTypes && portfolio) {
+        return item.portfolioTypes.includes(portfolio.kind);
+      }
+      
       // Hide admin items if not admin
       if (item.isAdmin && user?.role !== 'admin') return false;
       
@@ -146,20 +150,46 @@ export default function DashboardLayout({
   const getPortfolioTypeInfo = (type?: string) => {
     switch (type) {
       case 'creative':
-        return { color: '#8b5cf6', label: 'Creative' };
+        return { 
+          color: '#8b5cf6', 
+          label: 'Creative Portfolio',
+          icon: <Brush size={16} />,
+          description: 'Art • Photography • Design'
+        };
       case 'educational':
-        return { color: '#3b82f6', label: 'Educational' };
+        return { 
+          color: '#3b82f6', 
+          label: 'Teaching Portfolio',
+          icon: <GraduationCap size={16} />,
+          description: 'Education • Curriculum • Training'
+        };
+      case 'professional':
+        return { 
+          color: '#059669', 
+          label: 'Tech Portfolio',
+          icon: <Code size={16} />,
+          description: 'Software • Development • Engineering'
+        };
       case 'hybrid':
-        return { color: '#10b981', label: 'Hybrid' };
+        return { 
+          color: '#10b981', 
+          label: 'Multi-Portfolio',
+          icon: <FolderOpen size={16} />,
+          description: 'Creative • Teaching • Professional'
+        };
       default:
-        return { color: '#6b7280', label: 'Portfolio' };
+        return { 
+          color: '#6b7280', 
+          label: 'Portfolio',
+          icon: <User size={16} />,
+          description: 'Professional Portfolio'
+        };
     }
   };
 
   const handleLogout = async () => {
     try {
       await logout();
-      // Optionally redirect or let auth provider handle it
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -173,7 +203,7 @@ export default function DashboardLayout({
           <MobileMenuButton onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </MobileMenuButton>
-          <MobileTitle>Dashboard</MobileTitle>
+          <MobileTitle>Portfolio Platform</MobileTitle>
           {portfolio && (
             <MobilePortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color} />
           )}
@@ -210,10 +240,17 @@ export default function DashboardLayout({
                   <PortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color} />
                   {!sidebarCollapsed && (
                     <PortfolioDetails>
-                      <PortfolioLabel>Portfolio</PortfolioLabel>
+                      <PortfolioLabel>Active Portfolio</PortfolioLabel>
                       <PortfolioType>
-                        <Palette size={14} />
-                        {getPortfolioTypeInfo(portfolio.kind).label}
+                        {getPortfolioTypeInfo(portfolio.kind).icon}
+                        <PortfolioTypeText>
+                          <PortfolioTypeName>
+                            {getPortfolioTypeInfo(portfolio.kind).label}
+                          </PortfolioTypeName>
+                          <PortfolioTypeDesc>
+                            {getPortfolioTypeInfo(portfolio.kind).description}
+                          </PortfolioTypeDesc>
+                        </PortfolioTypeText>
                       </PortfolioType>
                     </PortfolioDetails>
                   )}
@@ -225,8 +262,9 @@ export default function DashboardLayout({
                       <Plus size={16} />
                     </PromptIcon>
                     <PromptText>
-                      <PromptTitle>No Portfolio</PromptTitle>
-                      <PromptLink href="/dashboard/profile">Create one</PromptLink>
+                      <PromptTitle>Create Your Portfolio</PromptTitle>
+                      <PromptSubtitle>Choose your professional focus</PromptSubtitle>
+                      <PromptLink href="/dashboard/profile">Get Started</PromptLink>
                     </PromptText>
                   </CreatePortfolioPrompt>
                 )
@@ -283,7 +321,7 @@ export default function DashboardLayout({
   );
 }
 
-// Styled Components
+// Enhanced Styled Components
 const LayoutWrapper = styled.div`
   display: flex;
   min-height: 100vh;
@@ -357,7 +395,7 @@ const MobileOverlay = styled.div`
 `;
 
 const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
-  width: ${props => props.$collapsed ? '80px' : '280px'};
+  width: ${props => props.$collapsed ? '80px' : '320px'};
   background: white;
   border-right: 1px solid #e5e7eb;
   position: fixed;
@@ -369,7 +407,7 @@ const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
   z-index: 45;
   
   @media (max-width: 768px) {
-    width: 280px;
+    width: 320px;
     transform: ${props => props.$mobileOpen ? 'translateX(0)' : 'translateX(-100%)'};
     top: 64px;
     height: calc(100vh - 64px);
@@ -454,7 +492,7 @@ const PortfolioStatus = styled.div<{ $collapsed: boolean }>`
 
 const PortfolioInfo = styled.div`
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
 `;
 
@@ -464,6 +502,7 @@ const PortfolioIndicator = styled.div<{ $color: string }>`
   background: ${props => props.$color};
   border-radius: 50%;
   flex-shrink: 0;
+  margin-top: 0.25rem;
 `;
 
 const PortfolioDetails = styled.div`
@@ -473,37 +512,52 @@ const PortfolioDetails = styled.div`
 const PortfolioLabel = styled.div`
   font-size: 0.75rem;
   color: #6b7280;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  font-weight: 500;
 `;
 
 const PortfolioType = styled.div`
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: flex-start;
+  gap: 0.75rem;
+`;
+
+const PortfolioTypeText = styled.div`
+  flex: 1;
+`;
+
+const PortfolioTypeName = styled.div`
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   color: #374151;
+  margin-bottom: 0.25rem;
+`;
+
+const PortfolioTypeDesc = styled.div`
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.4;
 `;
 
 const CreatePortfolioPrompt = styled.div`
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
-  padding: 1rem;
-  background: #f8fafc;
-  border: 1px dashed #d1d5db;
-  border-radius: 8px;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
 `;
 
 const PromptIcon = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: #3b82f6;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
   color: white;
   border-radius: 50%;
   flex-shrink: 0;
@@ -515,18 +569,30 @@ const PromptText = styled.div`
 
 const PromptTitle = styled.div`
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   color: #374151;
   margin-bottom: 0.25rem;
+`;
+
+const PromptSubtitle = styled.div`
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 0.75rem;
 `;
 
 const PromptLink = styled(Link)`
   font-size: 0.75rem;
   color: #3b82f6;
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  display: inline-block;
+  transition: all 0.2s;
   
   &:hover {
+    background: rgba(59, 130, 246, 0.2);
     color: #2563eb;
   }
 `;
@@ -547,20 +613,21 @@ const NavItem = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.75rem;
+  padding: 0.875rem;
   color: ${props => props.$active ? '#3b82f6' : '#6b7280'};
   background: ${props => props.$active ? '#eff6ff' : 'transparent'};
-  border-radius: 8px;
+  border-radius: 10px;
   text-decoration: none;
   transition: all 0.2s;
   border-left: 3px solid ${props => props.$active ? '#3b82f6' : 'transparent'};
   margin-left: -1rem;
-  padding-left: ${props => props.$collapsed ? '1.5rem' : '1.75rem'};
+  padding-left: ${props => props.$collapsed ? '1.5rem' : '1.875rem'};
   justify-content: ${props => props.$collapsed ? 'center' : 'flex-start'};
 
   &:hover {
     background: ${props => props.$active ? '#eff6ff' : '#f9fafb'};
     color: ${props => props.$active ? '#3b82f6' : '#374151'};
+    transform: translateX(2px);
   }
 `;
 
@@ -641,15 +708,12 @@ const LogoutButton = styled.button`
 
 const MainContent = styled.main<{ $sidebarCollapsed: boolean }>`
   flex: 1;
-  margin-left: ${props => props.$sidebarCollapsed ? '80px' : '280px'};
+  margin-left: ${props => props.$sidebarCollapsed ? '80px' : '320px'};
   min-height: 100vh;
   transition: margin-left 0.3s ease;
   
-  /* Account for the sticky header */
-  padding-top: 0;
-  
   @media (max-width: 768px) {
     margin-left: 0;
-    padding-top: 64px; /* Mobile header height */
+    padding-top: 64px;
   }
 `;
