@@ -1,5 +1,5 @@
 // =============================================================================
-// src\components\profile\profileLogic.tsx
+// src\components\profile\profileLogic.tsx - Fixed integration
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,10 +9,10 @@ import {
   Brush, Brain, Layers, BarChart3, Images, BookOpen, 
   Settings, Plus, Check, X, ChevronRight, Upload, ExternalLink,
   Edit3, Globe, Lock, Loader2, Activity, CheckCircle, Clock,
-  Camera, Award, TrendingUp, ArrowUpRight
+  Camera, Award, TrendingUp, ArrowUpRight, Code, GraduationCap
 } from 'lucide-react';
 
-type PortfolioKind = 'creative' | 'educational' | 'hybrid';
+type PortfolioKind = 'creative' | 'educational' | 'professional' | 'hybrid';
 type TabType = 'overview' | 'gallery' | 'learning' | 'analytics' | 'settings' | 'create';
 
 interface PortfolioStats {
@@ -36,39 +36,16 @@ interface PortfolioStats {
   };
 }
 
-interface CreatePortfolioData {
-  title: string;
-  bio: string;
-  visibility: 'public' | 'private';
-  kind: PortfolioKind;
-}
-
 export function useProfileLogic(portfolioManagement: any) {
   const [stats, setStats] = useState({ visits: 0, averageRating: 0, totalRatings: 0 });
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [portfolioStats, setPortfolioStats] = useState<PortfolioStats | null>(null);
   const [showCreatePortfolio, setShowCreatePortfolio] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [createPortfolioData, setCreatePortfolioData] = useState<CreatePortfolioData>({
-    title: '',
-    bio: '',
-    visibility: 'public',
-    kind: 'creative'
-  });
 
   const { user } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { portfolio, createPortfolio, updatePortfolio } = portfolioManagement;
-
-  // Handle URL parameters
-  useEffect(() => {
-    const action = searchParams.get('create');
-    if (action === 'creative' && !portfolio) {
-      setCreatePortfolioData(prev => ({ ...prev, kind: 'creative' }));
-      setShowCreatePortfolio(true);
-    }
-  }, [searchParams, portfolio]);
+  const { portfolio, createPortfolio, updatePortfolio, isCreating, isUpdating, error } = portfolioManagement;
 
   // Fetch data
   useEffect(() => {
@@ -79,7 +56,7 @@ export function useProfileLogic(portfolioManagement: any) {
   }, [portfolio]);
 
   const fetchUserStats = async () => {
-    // Mock data for now
+    // Mock data for now - replace with actual API call
     setStats({
       visits: Math.floor(Math.random() * 1000) + 100,
       averageRating: Math.random() * 2 + 3,
@@ -88,7 +65,7 @@ export function useProfileLogic(portfolioManagement: any) {
   };
 
   const fetchPortfolioStats = async () => {
-    // Mock data for now
+    // Mock data for now - replace with actual API call
     const stats: PortfolioStats = {
       gallery: {
         totalPieces: Math.floor(Math.random() * 50) + 10,
@@ -112,26 +89,41 @@ export function useProfileLogic(portfolioManagement: any) {
     setPortfolioStats(stats);
   };
 
-  // Handlers
-  const handleCreatePortfolio = useCallback(async () => {
+  // Fixed handlers
+  const handleCreatePortfolio = useCallback(async (portfolioData: {
+    title: string;
+    tagline?: string;
+    bio: string;
+    visibility: 'public' | 'private' | 'unlisted';
+    kind: PortfolioKind;
+    specializations?: string[];
+    tags?: string[];
+  }) => {
     try {
       await createPortfolio({
-        title: createPortfolioData.title || `${user?.name}'s Portfolio`,
-        bio: createPortfolioData.bio || '',
-        visibility: createPortfolioData.visibility,
-        kind: createPortfolioData.kind
+        title: portfolioData.title || `${user?.name}'s Portfolio`,
+        tagline: portfolioData.tagline,
+        bio: portfolioData.bio || '',
+        visibility: portfolioData.visibility || 'public',
+        kind: portfolioData.kind,
+        specializations: portfolioData.specializations || [],
+        tags: portfolioData.tags || []
       });
       setShowCreatePortfolio(false);
       setActiveTab('overview');
     } catch (error) {
       console.error('Error creating portfolio:', error);
     }
-  }, [createPortfolioData, createPortfolio, user]);
+  }, [createPortfolio, user]);
 
   const handleUpgradePortfolio = useCallback(async (newKind: PortfolioKind) => {
-    if (!portfolio) return;
+    if (!portfolio) {
+      console.error('No portfolio to upgrade');
+      return;
+    }
     try {
       await updatePortfolio({ kind: newKind });
+      setActiveTab('overview'); // Return to overview after upgrade
     } catch (error) {
       console.error('Error upgrading portfolio:', error);
     }
@@ -154,12 +146,21 @@ export function useProfileLogic(portfolioManagement: any) {
         };
       case 'educational':
         return {
-          icon: <Brain size={24} />,
+          icon: <GraduationCap size={24} />,
           title: 'Educational Portfolio',
           color: '#3b82f6',
           gradient: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)',
           description: 'Track your academic progress and learning achievements',
           features: ['Progress tracking', 'Concept mastery', 'Learning analytics']
+        };
+      case 'professional':
+        return {
+          icon: <Code size={24} />,
+          title: 'Professional Portfolio',
+          color: '#059669',
+          gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+          description: 'Highlight your technical skills and professional experience',
+          features: ['Code repositories', 'Technical projects', 'Professional timeline']
         };
       case 'hybrid':
         return {
@@ -171,7 +172,6 @@ export function useProfileLogic(portfolioManagement: any) {
           features: ['Creative showcase', 'Learning progress', 'Unified dashboard']
         };
       default:
-        // Fallback for any unexpected portfolio types
         return {
           icon: <Layers size={24} />,
           title: 'Portfolio',
@@ -186,111 +186,165 @@ export function useProfileLogic(portfolioManagement: any) {
   // Render functions
   const renderPortfolioCreation = () => (
     <div>
-      {!showCreatePortfolio ? (
-        <div>
-          <h2>Create Your Portfolio</h2>
-          <p>Choose the type of portfolio that best represents your journey</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-            {(['creative', 'educational', 'hybrid'] as PortfolioKind[]).map(type => {
-              const config = getPortfolioTypeConfig(type);
-              return (
-                <div 
-                  key={type}
-                  onClick={() => {
-                    setCreatePortfolioData(prev => ({ ...prev, kind: type }));
-                    setShowCreatePortfolio(true);
-                  }}
-                  style={{ 
-                    padding: '2rem', 
-                    border: '2px solid #e5e7eb', 
-                    borderRadius: '12px', 
-                    cursor: 'pointer',
-                    background: 'white'
-                  }}
-                >
-                  <div style={{ marginBottom: '1rem', color: config.color }}>{config.icon}</div>
-                  <h3>{config.title}</h3>
-                  <p>{config.description}</p>
-                  <div style={{ marginBottom: '1rem' }}>
-                    {config.features.map(feature => (
-                      <div key={feature} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <Check size={14} style={{ color: '#10b981' }} />
-                        {feature}
-                      </div>
-                    ))}
-                  </div>
-                  <button style={{ 
-                    background: config.gradient, 
-                    color: 'white', 
-                    border: 'none', 
-                    padding: '0.75rem 1rem', 
-                    borderRadius: '8px',
-                    width: '100%',
-                    cursor: 'pointer'
+      <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+        <h2 style={{ fontSize: '2.5rem', fontWeight: '700', marginBottom: '1rem', color: '#111827' }}>
+          Create Your Portfolio
+        </h2>
+        <p style={{ fontSize: '1.125rem', color: '#6b7280', maxWidth: '600px', margin: '0 auto' }}>
+          Choose the type of portfolio that best represents your journey and goals
+        </p>
+      </div>
+      
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
+        gap: '2rem',
+        maxWidth: '1000px',
+        margin: '0 auto'
+      }}>
+        {(['creative', 'educational', 'professional', 'hybrid'] as PortfolioKind[]).map(type => {
+          const config = getPortfolioTypeConfig(type);
+          return (
+            <div 
+              key={type}
+              onClick={() => {
+                handleCreatePortfolio({
+                  title: `${user?.name}'s ${config.title}`,
+                  bio: `Welcome to my ${config.title.toLowerCase()}`,
+                  visibility: 'public',
+                  kind: type
+                });
+              }}
+              style={{ 
+                padding: '2.5rem', 
+                border: '2px solid #e5e7eb', 
+                borderRadius: '20px', 
+                cursor: 'pointer',
+                background: 'rgba(255, 255, 255, 0.95)',
+                backdropFilter: 'blur(20px)',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = config.color;
+                e.currentTarget.style.transform = 'translateY(-4px)';
+                e.currentTarget.style.boxShadow = `0 20px 40px rgba(0,0,0,0.1)`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '4px',
+                background: config.gradient
+              }} />
+              
+              <div style={{ 
+                marginBottom: '1.5rem', 
+                color: config.color,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '64px',
+                height: '64px',
+                background: `${config.color}20`,
+                borderRadius: '16px'
+              }}>
+                {config.icon}
+              </div>
+              
+              <h3 style={{ 
+                fontSize: '1.5rem', 
+                fontWeight: '700', 
+                marginBottom: '1rem',
+                color: '#111827'
+              }}>
+                {config.title}
+              </h3>
+              
+              <p style={{ 
+                color: '#6b7280', 
+                marginBottom: '2rem',
+                lineHeight: '1.6'
+              }}>
+                {config.description}
+              </p>
+              
+              <div style={{ marginBottom: '2rem' }}>
+                {config.features.map(feature => (
+                  <div key={feature} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.75rem', 
+                    marginBottom: '0.75rem',
+                    fontSize: '0.875rem'
                   }}>
-                    Create {config.title}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        <div style={{ maxWidth: '500px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-            <button onClick={() => setShowCreatePortfolio(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-              <X size={20} />
-            </button>
-            <h3>Create {getPortfolioTypeConfig(createPortfolioData.kind)?.title}</h3>
-          </div>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Portfolio Title</label>
-              <input
-                type="text"
-                value={createPortfolioData.title}
-                onChange={(e) => setCreatePortfolioData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter your portfolio title"
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px' }}
-              />
-            </div>
-            
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Bio</label>
-              <textarea
-                value={createPortfolioData.bio}
-                onChange={(e) => setCreatePortfolioData(prev => ({ ...prev, bio: e.target.value }))}
-                placeholder="Tell others about yourself..."
-                rows={4}
-                style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '8px', resize: 'vertical' }}
-              />
-            </div>
-            
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                    <Check size={16} style={{ color: '#10b981', flexShrink: 0 }} />
+                    <span style={{ color: '#374151' }}>{feature}</span>
+                  </div>
+                ))}
+              </div>
+              
               <button 
-                onClick={() => setShowCreatePortfolio(false)}
-                style={{ padding: '0.75rem 1.5rem', border: '1px solid #d1d5db', background: 'white', borderRadius: '8px', cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleCreatePortfolio}
-                disabled={!createPortfolioData.title.trim()}
                 style={{ 
-                  padding: '0.75rem 1.5rem', 
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)', 
+                  background: config.gradient, 
                   color: 'white', 
                   border: 'none', 
-                  borderRadius: '8px', 
+                  padding: '1rem 2rem', 
+                  borderRadius: '12px',
+                  width: '100%',
                   cursor: 'pointer',
-                  opacity: !createPortfolioData.title.trim() ? 0.6 : 1
+                  fontWeight: '600',
+                  fontSize: '1rem',
+                  transition: 'transform 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+                disabled={isCreating}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.02)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
-                Create Portfolio
+                {isCreating ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    Create {config.title}
+                    <ArrowUpRight size={16} />
+                  </>
+                )}
               </button>
             </div>
-          </div>
+          );
+        })}
+      </div>
+      
+      {error && (
+        <div style={{
+          marginTop: '2rem',
+          padding: '1rem',
+          background: '#fef2f2',
+          border: '1px solid #fecaca',
+          borderRadius: '8px',
+          color: '#dc2626',
+          textAlign: 'center'
+        }}>
+          Error: {error}
         </div>
       )}
     </div>
@@ -303,7 +357,7 @@ export function useProfileLogic(portfolioManagement: any) {
       { id: 'overview', label: 'Overview', icon: <BarChart3 size={16} /> },
     ];
 
-    if (portfolio.kind === 'creative' || portfolio.kind === 'hybrid') {
+    if (portfolio.kind === 'creative' || portfolio.kind === 'hybrid' || portfolio.kind === 'professional') {
       tabs.push({ id: 'gallery', label: 'Gallery', icon: <Images size={16} /> });
     }
     
@@ -316,12 +370,12 @@ export function useProfileLogic(portfolioManagement: any) {
       { id: 'settings', label: 'Settings', icon: <Settings size={16} /> }
     );
 
-    if (portfolio.kind === 'creative' || portfolio.kind === 'educational') {
+    if (portfolio.kind !== 'hybrid') {
       tabs.push({ id: 'create', label: 'Upgrade', icon: <Plus size={16} /> });
     }
 
     return (
-      <div style={{ display: 'flex', background: '#f8fafc', borderRadius: '12px', padding: '6px', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', background: '#f8fafc', borderRadius: '12px', padding: '6px', marginBottom: '2rem', overflow: 'auto' }}>
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -338,7 +392,8 @@ export function useProfileLogic(portfolioManagement: any) {
               fontWeight: activeTab === tab.id ? '600' : '400',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              boxShadow: activeTab === tab.id ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+              boxShadow: activeTab === tab.id ? '0 2px 4px rgba(0,0,0,0.05)' : 'none',
+              whiteSpace: 'nowrap'
             }}
           >
             {tab.icon}
@@ -353,14 +408,15 @@ export function useProfileLogic(portfolioManagement: any) {
     if (!portfolio || !portfolioStats) return null;
     
     const config = getPortfolioTypeConfig(portfolio.kind);
+    
     switch (activeTab) {
       case 'overview':
         return (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
-                <h2 style={{ margin: 0 }}>{portfolio.title}</h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                <h2 style={{ margin: 0, fontSize: '2rem', fontWeight: '700' }}>{portfolio.title}</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: config.color }}>
                     {config.icon}
                     {config.title}
@@ -371,7 +427,7 @@ export function useProfileLogic(portfolioManagement: any) {
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <button 
                   onClick={() => window.open(`/portfolio/${portfolio.username}`, '_blank')}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', border: '1px solid #d1d5db', background: 'white', borderRadius: '8px', cursor: 'pointer' }}
@@ -388,6 +444,8 @@ export function useProfileLogic(portfolioManagement: any) {
                 </button>
               </div>
             </div>
+            
+            {/* Portfolio overview cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
               <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
@@ -399,7 +457,7 @@ export function useProfileLogic(portfolioManagement: any) {
                     <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>{config.title}</p>
                   </div>
                 </div>
-                {(portfolio.kind === 'creative' || portfolio.kind === 'educational') && (
+                {portfolio.kind !== 'hybrid' && (
                   <button 
                     onClick={() => setActiveTab('create')}
                     style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '0.875rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -408,7 +466,9 @@ export function useProfileLogic(portfolioManagement: any) {
                   </button>
                 )}
               </div>
-              {(portfolio.kind === 'creative' || portfolio.kind === 'hybrid') && (
+              
+              {/* Portfolio type specific cards */}
+              {(portfolio.kind === 'creative' || portfolio.kind === 'hybrid' || portfolio.kind === 'professional') && (
                 <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                     <div style={{ background: '#8b5cf620', padding: '0.75rem', borderRadius: '12px', color: '#8b5cf6' }}>
@@ -427,6 +487,7 @@ export function useProfileLogic(portfolioManagement: any) {
                   </button>
                 </div>
               )}
+              
               {(portfolio.kind === 'educational' || portfolio.kind === 'hybrid') && (
                 <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
@@ -449,10 +510,11 @@ export function useProfileLogic(portfolioManagement: any) {
             </div>
           </div>
         );
+        
       case 'gallery':
         return (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Images size={24} />
                 Gallery Management
@@ -460,7 +522,7 @@ export function useProfileLogic(portfolioManagement: any) {
                   {portfolioStats.gallery.totalPieces} pieces
                 </span>
               </h2>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button 
                   onClick={() => setShowUploadModal(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
@@ -496,6 +558,7 @@ export function useProfileLogic(portfolioManagement: any) {
                 <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>This Week</div>
               </div>
             </div>
+            
             <div style={{ background: '#f8fafc', border: '2px dashed #d1d5db', borderRadius: '12px', padding: '3rem', textAlign: 'center' }}>
               <Images size={48} style={{ color: '#9ca3af', marginBottom: '1rem' }} />
               <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>Gallery management interface coming soon</p>
@@ -508,10 +571,11 @@ export function useProfileLogic(portfolioManagement: any) {
             </div>
           </div>
         );
+        
       case 'learning':
         return (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
               <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <BookOpen size={24} />
                 Learning Progress
@@ -558,6 +622,7 @@ export function useProfileLogic(portfolioManagement: any) {
                 </div>
               </div>
             </div>
+            
             <div style={{ marginBottom: '2rem' }}>
               <h3 style={{ marginBottom: '1rem' }}>Overall Progress</h3>
               <div style={{ height: '8px', background: '#e5e7eb', borderRadius: '4px', overflow: 'hidden', marginBottom: '0.5rem' }}>
@@ -575,6 +640,7 @@ export function useProfileLogic(portfolioManagement: any) {
                 • Average Score: {portfolioStats.learning.averageScore}%
               </div>
             </div>
+            
             <div style={{ background: '#f8fafc', border: '2px dashed #d1d5db', borderRadius: '12px', padding: '3rem', textAlign: 'center' }}>
               <BookOpen size={48} style={{ color: '#9ca3af', marginBottom: '1rem' }} />
               <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>Detailed learning analytics coming soon</p>
@@ -587,6 +653,7 @@ export function useProfileLogic(portfolioManagement: any) {
             </div>
           </div>
         );
+        
       case 'analytics':
         return (
           <div>
@@ -615,10 +682,11 @@ export function useProfileLogic(portfolioManagement: any) {
                   </div>
                 </div>
               </div>
+              
               <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <h3 style={{ margin: '0 0 1.5rem 0', fontSize: '1rem', fontWeight: '600' }}>Portfolio Breakdown</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {(portfolio.kind === 'creative' || portfolio.kind === 'hybrid') && (
+                  {(portfolio.kind === 'creative' || portfolio.kind === 'hybrid' || portfolio.kind === 'professional') && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                       <div style={{ background: '#8b5cf620', padding: '0.5rem', borderRadius: '8px', color: '#8b5cf6' }}>
                         <Images size={20} />
@@ -652,12 +720,14 @@ export function useProfileLogic(portfolioManagement: any) {
                 </div>
               </div>
             </div>
+            
             <div style={{ background: '#f8fafc', border: '2px dashed #d1d5db', borderRadius: '12px', padding: '4rem', textAlign: 'center' }}>
               <BarChart3 size={48} style={{ color: '#9ca3af', marginBottom: '1rem' }} />
               <p style={{ color: '#6b7280' }}>Advanced analytics charts and insights will be displayed here</p>
             </div>
           </div>
         );
+        
       case 'settings':
         return (
           <div>
@@ -690,6 +760,7 @@ export function useProfileLogic(portfolioManagement: any) {
                   </div>
                 </div>
               </div>
+              
               <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', fontWeight: '600' }}>Visibility</h3>
                 <p style={{ margin: '0 0 1rem 0', fontSize: '0.875rem', color: '#6b7280' }}>
@@ -698,11 +769,12 @@ export function useProfileLogic(portfolioManagement: any) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {[
                     { value: 'public', icon: <Globe size={16} />, label: 'Public', desc: 'Visible to everyone' },
+                    { value: 'unlisted', icon: <Lock size={16} />, label: 'Unlisted', desc: 'Only those with the link can view' },
                     { value: 'private', icon: <Lock size={16} />, label: 'Private', desc: 'Only visible to you' }
                   ].map(option => (
                     <div
                       key={option.value}
-                      onClick={() => updatePortfolio({ visibility: option.value as 'public' | 'private' })}
+                      onClick={() => updatePortfolio({ visibility: option.value as 'public' | 'private' | 'unlisted' })}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -724,6 +796,7 @@ export function useProfileLogic(portfolioManagement: any) {
                   ))}
                 </div>
               </div>
+              
               <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem', fontWeight: '600' }}>Portfolio Type</h3>
                 <div style={{ padding: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
@@ -736,7 +809,7 @@ export function useProfileLogic(portfolioManagement: any) {
                       <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{config.description}</div>
                     </div>
                   </div>
-                  {(portfolio.kind === 'creative' || portfolio.kind === 'educational') && (
+                  {portfolio.kind !== 'hybrid' && (
                     <button 
                       onClick={() => setActiveTab('create')}
                       style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', marginTop: '0.5rem' }}
@@ -746,6 +819,7 @@ export function useProfileLogic(portfolioManagement: any) {
                   )}
                 </div>
               </div>
+              
               <div style={{ background: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <div style={{ display: 'flex', gap: '1rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
                   <button 
@@ -771,6 +845,7 @@ export function useProfileLogic(portfolioManagement: any) {
             </div>
           </div>
         );
+        
       case 'create':
         return (
           <div>
@@ -805,58 +880,58 @@ export function useProfileLogic(portfolioManagement: any) {
                   <span>Enhanced analytics and insights</span>
                 </div>
               </div>
+              
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
                 <button 
                   onClick={() => handleUpgradePortfolio('hybrid')}
+                  disabled={isUpdating}
                   style={{ 
                     padding: '0.75rem 1.5rem', 
-                    background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)', 
+                    background: isUpdating ? '#9ca3af' : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)', 
                     color: 'white', 
                     border: 'none', 
                     borderRadius: '8px', 
-                    cursor: 'pointer' 
+                    cursor: isUpdating ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
                   }}
                 >
-                  Upgrade Portfolio
+                  {isUpdating ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Upgrading...
+                    </>
+                  ) : (
+                    'Upgrade Portfolio'
+                  )}
                 </button>
                 <button 
                   onClick={() => setActiveTab('overview')}
+                  disabled={isUpdating}
                   style={{ padding: '0.75rem 1.5rem', border: '1px solid #d1d5db', background: 'white', borderRadius: '8px', cursor: 'pointer' }}
                 >
                   Maybe Later
                 </button>
               </div>
+              
+              {error && (
+                <div style={{
+                  marginTop: '2rem',
+                  padding: '1rem',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  color: '#dc2626'
+                }}>
+                  Error: {error}
+                </div>
+              )}
             </div>
           </div>
         );
+        
       default:
         return null;
     }
-  };
-
-  return {
-    // State
-    activeTab,
-    setActiveTab,
-    stats,
-    portfolioStats,
-    showCreatePortfolio,
-    showUploadModal,
-    setShowUploadModal,
-    createPortfolioData,
-    setCreatePortfolioData,
-    
-    // Handlers
-    handleCreatePortfolio,
-    handleUpgradePortfolio,
-    
-    // Render functions
-    renderPortfolioCreation,
-    renderPortfolioTabs,
-    renderPortfolioContent,
-    
-    // Utils
-    getInitials,
-    getPortfolioTypeConfig
-  };
-}
+  }};

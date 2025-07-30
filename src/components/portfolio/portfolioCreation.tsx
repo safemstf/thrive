@@ -5,14 +5,14 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/authProvider';
-import { api } from '@/lib/api-client'; // Updated import to use your api object
+import { api } from '@/lib/api-client'; // Your existing API client
 import {
   User, Brush, GraduationCap, Code, FolderOpen, 
   CheckCircle, ArrowRight, Loader2, X, Plus,
   BookOpen, Camera, Palette, Users, Award,
   PenTool, Brain, Calculator
 } from 'lucide-react';
-import type { PortfolioVisibility } from '@/types/portfolio.types';
+import type { CreatePortfolioDto } from '@/types/portfolio.types';
 
 export interface PortfolioCreationProps {
   targetType: 'creative' | 'educational' | 'professional' | 'hybrid';
@@ -21,6 +21,9 @@ export interface PortfolioCreationProps {
   inline?: boolean;
   showCloseButton?: boolean;
 }
+
+// Fix: Update the visibility type to include 'unlisted'
+type VisibilityType = 'public' | 'private' | 'unlisted';
 
 export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
   targetType,
@@ -35,7 +38,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
     title: '',
     tagline: '',
     bio: '',
-    visibility: 'public' as PortfolioVisibility,
+    visibility: 'public' as VisibilityType, // Fix: Use the updated type
     specializations: [] as string[],
     tags: [] as string[]
   });
@@ -121,16 +124,17 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
 
     setIsCreating(true);
     try {
-      // Fixed: Using api.portfolio.create with correct DTO structure
-      const response = await api.portfolio.create({
+      // Using your existing API client structure
+      const portfolioData: CreatePortfolioDto = {
         title: formData.title.trim(),
-        tagline: formData.tagline.trim(),
+        tagline: formData.tagline.trim() || undefined,
         bio: formData.bio.trim(),
         visibility: formData.visibility,
         specializations: formData.specializations,
         tags: formData.tags
-        // Removed settings since we don't know the correct properties
-      });
+      };
+
+      const response = await api.portfolio.create(portfolioData);
 
       if (onSuccess) {
         onSuccess(response.id);
@@ -150,6 +154,11 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
     } finally {
       setIsCreating(false);
     }
+  };
+
+  // Fix: Update the visibility change handler to use the correct type
+  const handleVisibilityChange = (value: VisibilityType) => {
+    setFormData(prev => ({ ...prev, visibility: value }));
   };
 
   const Container = inline ? InlineContainer : ModalContainer;
@@ -237,7 +246,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
                 name="visibility"
                 value="public"
                 checked={formData.visibility === 'public'}
-                onChange={(e) => setFormData(prev => ({ ...prev, visibility: e.target.value as PortfolioVisibility }))}
+                onChange={() => handleVisibilityChange('public')}
               />
               <RadioLabel>
                 <strong>Public</strong>
@@ -250,7 +259,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
                 name="visibility"
                 value="unlisted"
                 checked={formData.visibility === 'unlisted'}
-                onChange={(e) => setFormData(prev => ({ ...prev, visibility: e.target.value as PortfolioVisibility }))}
+                onChange={() => handleVisibilityChange('unlisted')}
               />
               <RadioLabel>
                 <strong>Unlisted</strong>
@@ -263,7 +272,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
                 name="visibility"
                 value="private"
                 checked={formData.visibility === 'private'}
-                onChange={(e) => setFormData(prev => ({ ...prev, visibility: e.target.value as PortfolioVisibility }))}
+                onChange={() => handleVisibilityChange('private')}
               />
               <RadioLabel>
                 <strong>Private</strong>

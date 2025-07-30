@@ -1,4 +1,4 @@
-// src/types/portfolio.types.ts
+// src/types/portfolio.types.ts - Updated with professional portfolio support
 
 import { GalleryPiece } from './gallery.types';
 
@@ -6,6 +6,9 @@ import { GalleryPiece } from './gallery.types';
 export type PortfolioVisibility = 'public' | 'private' | 'unlisted';
 export type PortfolioStatus = 'active' | 'inactive' | 'suspended';
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+
+// Updated to include 'professional' portfolio kind
+export type PortfolioKind = 'educational' | 'hybrid' | 'creative' | 'professional';
 
 // ==================== Main Portfolio Interface ====================
 export interface Portfolio extends BaseEntity {
@@ -15,8 +18,7 @@ export interface Portfolio extends BaseEntity {
   title: string;
   tagline?: string;
   bio: string;
-  kind: 'educational' | 'hybrid' | 'creative'; // adjust as needed
-
+  kind: PortfolioKind; // Now uses the proper union type
   
   // Images
   profileImage?: string;
@@ -41,6 +43,7 @@ export interface Portfolio extends BaseEntity {
     twitter?: string;
     linkedin?: string;
     behance?: string;
+    github?: string; // Added for professional portfolios
   };
   contactEmail?: string;
   showContactInfo: boolean;
@@ -212,13 +215,14 @@ export interface CreatePortfolioDto {
   tagline?: string;
   bio: string;
   visibility: PortfolioVisibility;
+  kind?: PortfolioKind; // Added kind support for creation
   specializations: string[];
   tags: string[];
   settings?: Partial<PortfolioSettings>;
 }
 
 export interface UpdatePortfolioDto extends Partial<CreatePortfolioDto> {
-  location: string | number | readonly string[] | undefined;
+  location?: string;
   profileImage?: string;
   coverImage?: string;
   socialLinks?: Portfolio['socialLinks'];
@@ -226,6 +230,7 @@ export interface UpdatePortfolioDto extends Partial<CreatePortfolioDto> {
   showContactInfo?: boolean;
   customUrl?: string;
   featuredPieces?: string[];
+  kind?: PortfolioKind; // Added kind support for updates
 }
 
 export interface CreateReviewDto {
@@ -240,6 +245,7 @@ export interface CreateReviewDto {
 export interface PortfolioFilters {
   visibility?: PortfolioVisibility;
   status?: PortfolioStatus;
+  kind?: PortfolioKind; // Added kind filtering
   specializations?: string[];
   tags?: string[];
   location?: string;
@@ -311,8 +317,6 @@ export interface PortfolioReport {
   createdAt: Date;
 }
 
-// Add these types to the top of your portfolio.types.ts file:
-
 // ==================== Base Types (moved from educational.types) ====================
 export interface BaseEntity {
   id: string;
@@ -377,3 +381,44 @@ export const defaultSections: SectionConfig[] = [
   { key: 'ap-science', title: 'AP Science', mainCategory: 'science', subCategory: 'ap' },
   { key: 'ap-calc', title: 'AP Calculus', mainCategory: 'math', subCategory: 'ap' }
 ];
+
+// ==================== Portfolio Kind Utilities ====================
+export const PORTFOLIO_KINDS: Record<PortfolioKind, {
+  label: string;
+  description: string;
+  features: string[];
+}> = {
+  creative: {
+    label: 'Creative Portfolio',
+    description: 'Showcase your artwork, designs, and creative projects',
+    features: ['Image galleries', 'Portfolio showcase', 'Creative collections']
+  },
+  educational: {
+    label: 'Educational Portfolio',
+    description: 'Track your academic progress and learning achievements',
+    features: ['Progress tracking', 'Concept mastery', 'Learning analytics']
+  },
+  professional: {
+    label: 'Professional Portfolio',
+    description: 'Highlight your technical skills and professional experience',
+    features: ['Code repositories', 'Technical projects', 'Professional timeline']
+  },
+  hybrid: {
+    label: 'Hybrid Portfolio',
+    description: 'Combine creative works with educational progress',
+    features: ['Creative showcase', 'Learning progress', 'Unified dashboard']
+  }
+};
+
+// Helper functions for portfolio capabilities
+export const hasGalleryCapability = (kind: PortfolioKind): boolean => {
+  return kind === 'creative' || kind === 'hybrid' || kind === 'professional';
+};
+
+export const hasLearningCapability = (kind: PortfolioKind): boolean => {
+  return kind === 'educational' || kind === 'hybrid';
+};
+
+export const canUpgrade = (currentKind: PortfolioKind): boolean => {
+  return currentKind !== 'hybrid';
+};

@@ -1,4 +1,4 @@
-// lib/api-client.ts - Fixed version
+// lib/api-client.ts 
 import { BaseApiClient } from './api/base-api-client';
 import { PortfolioApiClient } from './api/portfolio-api-client';
 import { GalleryApiClient } from './api/gallery-api-client';
