@@ -1,7 +1,7 @@
 // src/services/portfolioService.ts
 import { useApiClient } from '@/lib/api-client';
 import { useState, useEffect, useCallback } from 'react';
-import type { Portfolio } from '@/types/portfolio.types';
+import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
 import type { GalleryPiece } from '@/types/gallery.types';
 
 // Enhanced Portfolio type with client-side kind tracking
@@ -17,7 +17,7 @@ export interface EnhancedPortfolio extends Portfolio {
 // Portfolio metadata stored in localStorage
 interface PortfolioMetadata {
   portfolioId: string;
-  kind: 'creative' | 'educational' | 'hybrid';
+  kind: PortfolioKind;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,10 +58,10 @@ class PortfolioService {
     };
   }
   
-  // Get capabilities based on portfolio kind
-  static getCapabilities(kind: 'creative' | 'educational' | 'hybrid') {
+  // Get capabilities based on portfolio kind (updated to handle all 4 types)
+  static getCapabilities(kind: PortfolioKind) {
     return {
-      gallery: kind === 'creative' || kind === 'hybrid',
+      gallery: kind === 'creative' || kind === 'hybrid' || kind === 'professional',
       learning: kind === 'educational' || kind === 'hybrid',
       projects: true, // All portfolios can have projects
       tutoring: true  // All portfolios can offer tutoring
@@ -72,7 +72,7 @@ class PortfolioService {
   static async createPortfolioWithType(
     apiClient: any,
     data: any,
-    kind: 'creative' | 'educational' | 'hybrid'
+    kind: PortfolioKind
   ): Promise<EnhancedPortfolio> {
     // Create the portfolio with kind in the data
     const portfolioData = {
@@ -99,7 +99,7 @@ class PortfolioService {
   static async updatePortfolioType(
     apiClient: any,
     portfolioId: string, 
-    kind: 'creative' | 'educational' | 'hybrid'
+    kind: PortfolioKind
   ): Promise<void> {
     // Update in backend
     await apiClient.portfolio.update(portfolioId, { kind });
@@ -217,7 +217,7 @@ export function usePortfolioManager() {
   // Create portfolio with type
   const createPortfolio = useCallback(async (
     data: any,
-    kind: 'creative' | 'educational' | 'hybrid'
+    kind: PortfolioKind
   ) => {
     try {
       setLoading(true);
@@ -233,7 +233,7 @@ export function usePortfolioManager() {
       
       setPortfolio(enhanced);
       
-      // If it's a creative portfolio, initialize empty gallery
+      // If it's a portfolio with gallery capability, initialize empty gallery
       if (enhanced.capabilities.gallery) {
         setGalleryPieces([]);
       }
@@ -251,7 +251,7 @@ export function usePortfolioManager() {
   }, [apiClient]);
   
   // Update portfolio type
-  const updatePortfolioType = useCallback(async (kind: 'creative' | 'educational' | 'hybrid') => {
+  const updatePortfolioType = useCallback(async (kind: PortfolioKind) => {
     if (!portfolio) {
       throw new Error('No portfolio to update');
     }
@@ -381,7 +381,7 @@ export function useGalleryOperations(portfolio: EnhancedPortfolio | null) {
       // Upload using the correct API method
       const piece = await apiClient.gallery.uploadImage(file);
       
-        console.log('Image uploaded successfully:', piece.url); 
+      console.log('Image uploaded successfully:', piece.url); 
       return piece;
       
     } catch (err: any) {
