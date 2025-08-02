@@ -1,59 +1,22 @@
-// src/components/profile/utils/overview.tsx
+// src/components/profile/utils/overview.tsx - Professional design
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { 
-  ExternalLink, 
-  Edit3, 
-  Globe, 
-  Lock, 
-  Eye, 
-  TrendingUp, 
-  Calendar,
-  Users,
-  Heart,
-  MessageCircle,
-  Share2,
-  Copy,
-  CheckCircle,
-  BarChart3,
-  Target,
-  Award,
-  Zap,
-  Star,
-  ArrowUpRight,
-  Download,
-  Settings,
-  Brush,
-  GraduationCap,
-  Code,
-  Layers
+  ExternalLink, Edit3, Globe, Lock, Eye, TrendingUp, Users,
+  Share2, Copy, CheckCircle, Settings, ArrowUpRight,
+  Brush, GraduationCap, Code, Layers
 } from 'lucide-react';
 import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
 
 interface OverviewProps {
   portfolio: Portfolio;
   stats: {
-    gallery?: {
-      totalPieces: number;
-      totalViews: number;
-      totalLikes: number;
-      recentUploads: number;
-    };
-    learning?: {
-      totalConcepts: number;
-      completed: number;
-      inProgress: number;
-      weeklyStreak: number;
-      averageScore: number;
-    };
-    analytics: {
-      weeklyGrowth: number;
-      monthlyViews: number;
-      engagementRate: number;
-    };
+    gallery?: { totalPieces: number; totalViews: number; totalLikes: number; recentUploads: number; };
+    learning?: { totalConcepts: number; completed: number; inProgress: number; weeklyStreak: number; averageScore: number; };
+    analytics: { weeklyGrowth: number; monthlyViews: number; engagementRate: number; };
   };
   onEditClick: () => void;
   onUpgradeClick?: () => void;
@@ -74,40 +37,30 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
         return {
           icon: <Brush size={24} />,
           title: 'Creative Portfolio',
-          color: '#8b5cf6',
-          gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)',
           capabilities: ['Gallery Management', 'Visual Showcase', 'Client Presentations']
         };
       case 'educational':
         return {
           icon: <GraduationCap size={24} />,
           title: 'Educational Portfolio',
-          color: '#3b82f6',
-          gradient: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)',
           capabilities: ['Learning Progress', 'Concept Mastery', 'Achievement Tracking']
         };
       case 'professional':
         return {
           icon: <Code size={24} />,
           title: 'Professional Portfolio',
-          color: '#059669',
-          gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
           capabilities: ['Project Showcase', 'Technical Skills', 'Career Timeline']
         };
       case 'hybrid':
         return {
           icon: <Layers size={24} />,
           title: 'Hybrid Portfolio',
-          color: '#10b981',
-          gradient: 'linear-gradient(135deg, #10b981 0%, #f59e0b 100%)',
           capabilities: ['Multi-discipline Showcase', 'Comprehensive Portfolio', 'All Features Unlocked']
         };
       default:
         return {
           icon: <Layers size={24} />,
           title: 'Portfolio',
-          color: '#6b7280',
-          gradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)',
           capabilities: ['Basic Portfolio']
         };
     }
@@ -140,10 +93,10 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
   return (
     <OverviewContainer>
       {/* Hero Section */}
-      <HeroSection $gradient={config.gradient}>
+      <HeroSection>
         <HeroContent>
           <PortfolioHeader>
-            <PortfolioIcon style={{ color: 'white' }}>
+            <PortfolioIcon>
               {config.icon}
             </PortfolioIcon>
             <PortfolioInfo>
@@ -196,7 +149,7 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
         <SectionTitle>Quick Actions</SectionTitle>
         <QuickActionsGrid>
           <QuickActionCard onClick={() => router.push('/dashboard/gallery')}>
-            <ActionIcon $color="#8b5cf6">
+            <ActionIcon>
               <Brush size={20} />
             </ActionIcon>
             <ActionContent>
@@ -210,7 +163,7 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
           </QuickActionCard>
 
           <QuickActionCard onClick={() => router.push('/dashboard/writing')}>
-            <ActionIcon $color="#3b82f6">
+            <ActionIcon>
               <GraduationCap size={20} />
             </ActionIcon>
             <ActionContent>
@@ -224,7 +177,7 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
           </QuickActionCard>
 
           <QuickActionCard onClick={() => router.push('/dashboard/projects')}>
-            <ActionIcon $color="#059669">
+            <ActionIcon>
               <Code size={20} />
             </ActionIcon>
             <ActionContent>
@@ -236,7 +189,7 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
           </QuickActionCard>
 
           <QuickActionCard onClick={onEditClick}>
-            <ActionIcon $color="#f59e0b">
+            <ActionIcon>
               <Settings size={20} />
             </ActionIcon>
             <ActionContent>
@@ -255,7 +208,7 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
         <CapabilitiesList>
           {config.capabilities.map((capability, index) => (
             <CapabilityItem key={index}>
-              <CheckCircle size={16} color="#10b981" />
+              <CheckCircle size={16} />
               <span>{capability}</span>
             </CapabilityItem>
           ))}
@@ -264,7 +217,7 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
         {portfolio.kind !== 'hybrid' && onUpgradeClick && (
           <UpgradePrompt>
             <UpgradeIcon>
-              <Zap size={20} />
+              <Layers size={20} />
             </UpgradeIcon>
             <UpgradeContent>
               <UpgradeTitle>Unlock More Features</UpgradeTitle>
@@ -297,36 +250,20 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
   );
 }
 
-// Styled Components
+// Professional Styled Components
 const OverviewContainer = styled.div`
   display: flex;
   flex-direction: column;
   gap: 2rem;
 `;
 
-const HeroSection = styled.div<{ $gradient: string }>`
-  background: ${props => props.$gradient};
-  border-radius: 20px;
+const HeroSection = styled.div`
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
   padding: 2.5rem;
-  color: white;
-  position: relative;
-  overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(20px);
-  }
-
-  > * {
-    position: relative;
-    z-index: 1;
-  }
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 
   @media (max-width: 768px) {
     padding: 1.5rem;
@@ -358,9 +295,9 @@ const PortfolioIcon = styled.div`
   justify-content: center;
   width: 64px;
   height: 64px;
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
   border-radius: 16px;
-  backdrop-filter: blur(10px);
+  color: white;
 `;
 
 const PortfolioInfo = styled.div`
@@ -369,8 +306,10 @@ const PortfolioInfo = styled.div`
 
 const PortfolioTitle = styled.h1`
   font-size: 2.5rem;
-  font-weight: 700;
+  font-weight: 400;
   margin: 0 0 0.5rem 0;
+  color: #2c2c2c;
+  font-family: 'Cormorant Garamond', serif;
   
   @media (max-width: 768px) {
     font-size: 2rem;
@@ -379,15 +318,17 @@ const PortfolioTitle = styled.h1`
 
 const PortfolioType = styled.div`
   font-size: 1.125rem;
-  opacity: 0.9;
+  color: #666666;
   margin-bottom: 0.5rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const PortfolioTagline = styled.p`
   font-size: 1rem;
-  opacity: 0.8;
+  color: #666666;
   margin: 0;
   line-height: 1.5;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const ActionButtons = styled.div`
@@ -400,19 +341,22 @@ const PrimaryButton = styled.button`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
   color: white;
+  border: none;
   padding: 0.875rem 1.5rem;
-  border-radius: 12px;
+  border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  font-family: 'Work Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 0.875rem;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(44, 44, 44, 0.3);
   }
 `;
 
@@ -421,16 +365,18 @@ const SecondaryButton = styled.button`
   align-items: center;
   gap: 0.5rem;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  border: 1px solid #d1d5db;
+  color: #2c2c2c;
   padding: 0.875rem 1.5rem;
-  border-radius: 12px;
+  border-radius: 8px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  font-family: 'Work Sans', sans-serif;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: #f8f9fa;
+    border-color: #2c2c2c;
   }
 `;
 
@@ -439,16 +385,17 @@ const ShareButton = styled.button`
   align-items: center;
   gap: 0.5rem;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  border: 1px solid #d1d5db;
+  color: #2c2c2c;
   padding: 0.875rem 1rem;
-  border-radius: 12px;
+  border-radius: 8px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  font-family: 'Work Sans', sans-serif;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: #f8f9fa;
   }
 `;
 
@@ -459,41 +406,57 @@ const HeroStats = styled.div`
 `;
 
 const StatCard = styled.div`
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
   padding: 1.5rem;
   border-radius: 12px;
   text-align: center;
-  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-2px);
+  }
 `;
 
 const StatIcon = styled.div`
   margin-bottom: 0.5rem;
-  opacity: 0.8;
+  color: #666666;
 `;
 
 const StatValue = styled.div`
   font-size: 1.75rem;
   font-weight: 700;
   margin-bottom: 0.25rem;
+  color: #2c2c2c;
+  font-family: 'Cormorant Garamond', serif;
 `;
 
 const StatLabel = styled.div`
   font-size: 0.875rem;
-  opacity: 0.8;
+  color: #666666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const QuickActionsSection = styled.section`
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
   border-radius: 16px;
   padding: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 `;
 
 const SectionTitle = styled.h2`
   font-size: 1.5rem;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 600;
+  color: #2c2c2c;
   margin: 0 0 1.5rem 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const QuickActionsGrid = styled.div`
@@ -511,22 +474,23 @@ const QuickActionCard = styled.div`
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.8);
 
   &:hover {
-    border-color: #3b82f6;
+    border-color: #2c2c2c;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 `;
 
-const ActionIcon = styled.div<{ $color: string }>`
+const ActionIcon = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
   width: 48px;
   height: 48px;
-  background: ${props => `${props.$color}20`};
-  color: ${props => props.$color};
+  background: rgba(44, 44, 44, 0.1);
+  color: #2c2c2c;
   border-radius: 12px;
   flex-shrink: 0;
 `;
@@ -538,36 +502,41 @@ const ActionContent = styled.div`
 const ActionTitle = styled.h3`
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: #2c2c2c;
   margin: 0 0 0.25rem 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const ActionDescription = styled.p`
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #666666;
   margin: 0 0 0.5rem 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const ActionMeta = styled.div`
   font-size: 0.75rem;
   color: #9ca3af;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const ActionArrow = styled.div`
-  color: #6b7280;
+  color: #666666;
   transition: all 0.2s;
 
   ${QuickActionCard}:hover & {
-    color: #3b82f6;
+    color: #2c2c2c;
     transform: translateX(2px);
   }
 `;
 
 const CapabilitiesSection = styled.section`
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
   border-radius: 16px;
   padding: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 `;
 
 const CapabilitiesList = styled.div`
@@ -583,6 +552,12 @@ const CapabilityItem = styled.div`
   gap: 0.75rem;
   font-size: 0.875rem;
   color: #374151;
+  font-family: 'Work Sans', sans-serif;
+  
+  svg {
+    color: #666666;
+    flex-shrink: 0;
+  }
 `;
 
 const UpgradePrompt = styled.div`
@@ -590,8 +565,8 @@ const UpgradePrompt = styled.div`
   align-items: center;
   gap: 1rem;
   padding: 1.5rem;
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  border: 1px solid #f59e0b;
+  background: rgba(44, 44, 44, 0.05);
+  border: 1px solid rgba(44, 44, 44, 0.1);
   border-radius: 12px;
 `;
 
@@ -601,7 +576,7 @@ const UpgradeIcon = styled.div`
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: #f59e0b;
+  background: #2c2c2c;
   color: white;
   border-radius: 50%;
 `;
@@ -613,18 +588,20 @@ const UpgradeContent = styled.div`
 const UpgradeTitle = styled.h4`
   font-size: 1rem;
   font-weight: 600;
-  color: #92400e;
+  color: #2c2c2c;
   margin: 0 0 0.25rem 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const UpgradeDescription = styled.p`
   font-size: 0.875rem;
-  color: #b45309;
+  color: #666666;
   margin: 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const UpgradeButton = styled.button`
-  background: #f59e0b;
+  background: #2c2c2c;
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -632,17 +609,20 @@ const UpgradeButton = styled.button`
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  font-family: 'Work Sans', sans-serif;
 
   &:hover {
-    background: #d97706;
+    background: #1a1a1a;
   }
 `;
 
 const UrlSection = styled.section`
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
   border-radius: 16px;
   padding: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 `;
 
 const UrlContainer = styled.div`
@@ -666,7 +646,7 @@ const CopyButton = styled.button<{ $copied: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: ${props => props.$copied ? '#10b981' : '#3b82f6'};
+  background: ${props => props.$copied ? '#666666' : '#2c2c2c'};
   color: white;
   border: none;
   padding: 0.875rem 1rem;
@@ -674,14 +654,16 @@ const CopyButton = styled.button<{ $copied: boolean }>`
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  font-family: 'Work Sans', sans-serif;
 
   &:hover {
-    background: ${props => props.$copied ? '#059669' : '#2563eb'};
+    background: ${props => props.$copied ? '#4b5563' : '#1a1a1a'};
   }
 `;
 
 const UrlHelp = styled.p`
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #666666;
   margin: 0;
+  font-family: 'Work Sans', sans-serif;
 `;

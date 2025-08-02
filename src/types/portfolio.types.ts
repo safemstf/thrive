@@ -1,14 +1,74 @@
-// src/types/portfolio.types.ts - Updated with professional portfolio support
+// src/types/portfolio.types.ts - Main index file for all portfolio-related types
 
 import { GalleryPiece } from './gallery.types';
 
-// ==================== Core Types ====================
+// ==================== Base Types ====================
+export interface BaseEntity {
+  id: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// ==================== Core Portfolio Types ====================
 export type PortfolioVisibility = 'public' | 'private' | 'unlisted';
 export type PortfolioStatus = 'active' | 'inactive' | 'suspended';
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
-
-// Updated to include 'professional' portfolio kind
 export type PortfolioKind = 'educational' | 'hybrid' | 'creative' | 'professional';
+
+// ==================== Educational/Learning Types ====================
+export type MainCategory = 'math' | 'english' | 'science';
+export type SubCategory = 'sat' | 'foundations' | 'ap';
+export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
+export type CategoryIcon = MainCategory | SubCategory;
+
+export interface Concept {
+  id: string;
+  tags?: string[];
+  difficulty?: DifficultyLevel;
+  title: string;
+  summary?: string;
+  estimatedMinutes?: number;
+}
+
+export interface ConceptProgress {
+  conceptId: string;
+  status: 'not-started' | 'in-progress' | 'completed';
+  startedAt?: string;  // ISO timestamp
+  completedAt?: string; // ISO timestamp
+  score?: number;
+  attempts?: number;
+  notes?: string;
+}
+
+export interface Book extends BaseEntity {
+  title: string;
+  subtitle?: string;
+  year: string;
+  mainCategory: MainCategory;
+  subCategory: SubCategory;
+  colors: {
+    primary: string;
+    secondary: string;
+    accent?: string;
+  };
+  excerpt: string;
+  description: string;
+}
+
+export interface SectionConfig {
+  key: string;
+  title: string;
+  mainCategory: MainCategory;
+  subCategory: SubCategory;
+}
+
+export const defaultSections: SectionConfig[] = [
+  { key: 'sat', title: 'SAT Guides', mainCategory: 'math', subCategory: 'sat' },
+  { key: 'workbooks', title: 'Workbooks', mainCategory: 'english', subCategory: 'foundations' },
+  { key: 'ms-science', title: 'MS Science', mainCategory: 'science', subCategory: 'foundations' },
+  { key: 'ap-science', title: 'AP Science', mainCategory: 'science', subCategory: 'ap' },
+  { key: 'ap-calc', title: 'AP Calculus', mainCategory: 'math', subCategory: 'ap' }
+];
 
 // ==================== Main Portfolio Interface ====================
 export interface Portfolio extends BaseEntity {
@@ -18,7 +78,7 @@ export interface Portfolio extends BaseEntity {
   title: string;
   tagline?: string;
   bio: string;
-  kind: PortfolioKind; // Now uses the proper union type
+  kind: PortfolioKind;
   
   // Images
   profileImage?: string;
@@ -43,7 +103,7 @@ export interface Portfolio extends BaseEntity {
     twitter?: string;
     linkedin?: string;
     behance?: string;
-    github?: string; // Added for professional portfolios
+    github?: string;
   };
   contactEmail?: string;
   showContactInfo: boolean;
@@ -215,7 +275,7 @@ export interface CreatePortfolioDto {
   tagline?: string;
   bio: string;
   visibility: PortfolioVisibility;
-  kind?: PortfolioKind; // Added kind support for creation
+  kind?: PortfolioKind;
   specializations: string[];
   tags: string[];
   settings?: Partial<PortfolioSettings>;
@@ -230,7 +290,7 @@ export interface UpdatePortfolioDto extends Partial<CreatePortfolioDto> {
   showContactInfo?: boolean;
   customUrl?: string;
   featuredPieces?: string[];
-  kind?: PortfolioKind; // Added kind support for updates
+  kind?: PortfolioKind;
 }
 
 export interface CreateReviewDto {
@@ -245,7 +305,7 @@ export interface CreateReviewDto {
 export interface PortfolioFilters {
   visibility?: PortfolioVisibility;
   status?: PortfolioStatus;
-  kind?: PortfolioKind; // Added kind filtering
+  kind?: PortfolioKind;
   specializations?: string[];
   tags?: string[];
   location?: string;
@@ -316,71 +376,6 @@ export interface PortfolioReport {
   status: 'pending' | 'reviewed' | 'resolved';
   createdAt: Date;
 }
-
-// ==================== Base Types (moved from educational.types) ====================
-export interface BaseEntity {
-  id: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-// Main category types
-export type MainCategory = 'math' | 'english' | 'science';
-export type SubCategory = 'sat' | 'foundations' | 'ap';
-export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
-export type CategoryIcon = MainCategory | SubCategory;
-
-// ==================== Educational/Concept Types ====================
-export interface Concept {
-  id: string;
-  tags?: string[];
-  difficulty?: DifficultyLevel;
-  title: string;
-  summary?: string;
-  estimatedMinutes?: number;
-}
-
-export interface ConceptProgress {
-  conceptId: string;
-  status: 'not-started' | 'in-progress' | 'completed';
-  startedAt?: string;  // ISO timestamp
-  completedAt?: string; // ISO timestamp
-  score?: number;
-  attempts?: number;
-  notes?: string;
-}
-
-// Book types
-export interface Book extends BaseEntity {
-  title: string;
-  subtitle?: string;
-  year: string;
-  mainCategory: MainCategory;
-  subCategory: SubCategory;
-  colors: {
-    primary: string;
-    secondary: string;
-    accent?: string;
-  };
-  excerpt: string;
-  description: string;
-}
-
-// Section configuration for UI
-export interface SectionConfig {
-  key: string;
-  title: string;
-  mainCategory: MainCategory;
-  subCategory: SubCategory;
-}
-
-export const defaultSections: SectionConfig[] = [
-  { key: 'sat', title: 'SAT Guides', mainCategory: 'math', subCategory: 'sat' },
-  { key: 'workbooks', title: 'Workbooks', mainCategory: 'english', subCategory: 'foundations' },
-  { key: 'ms-science', title: 'MS Science', mainCategory: 'science', subCategory: 'foundations' },
-  { key: 'ap-science', title: 'AP Science', mainCategory: 'science', subCategory: 'ap' },
-  { key: 'ap-calc', title: 'AP Calculus', mainCategory: 'math', subCategory: 'ap' }
-];
 
 // ==================== Portfolio Kind Utilities ====================
 export const PORTFOLIO_KINDS: Record<PortfolioKind, {

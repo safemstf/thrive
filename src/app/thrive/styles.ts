@@ -1,4 +1,4 @@
-// src/app/thrive/sat/styles.ts
+// src\app\thrive\styles.ts
 import styled from 'styled-components';
 
 export const PageWrapper = styled.div`

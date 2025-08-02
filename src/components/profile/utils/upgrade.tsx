@@ -1,36 +1,13 @@
-// src/components/profile/utils/upgrade.tsx
+// src/components/profile/utils/upgrade.tsx - Fixed with proper error handling
 'use client';
 
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { 
-  Zap, 
-  CheckCircle, 
-  X, 
-  Brush, 
-  GraduationCap, 
-  Code, 
-  Layers,
-  ArrowRight,
-  Star,
-  Users,
-  TrendingUp,
-  Shield,
-  Camera,
-  BookOpen,
-  Briefcase,
-  Target,
-  Award,
-  Loader2,
-  Crown,
-  Sparkles,
-  Lock,
-  Unlock,
-  Plus,
-  ArrowUpRight
+  Zap, CheckCircle, Brush, GraduationCap, Code, Layers,
+  ArrowUpRight, Star, Crown, Sparkles, Plus, Unlock, Loader2
 } from 'lucide-react';
 import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
-import { PORTFOLIO_KINDS, canUpgrade } from '@/types/portfolio.types';
 
 interface UpgradeProps {
   portfolio: Portfolio;
@@ -38,71 +15,57 @@ interface UpgradeProps {
   isUpgrading?: boolean;
 }
 
+// Safe portfolio configuration with fallbacks
+const getPortfolioConfig = (kind: PortfolioKind) => {
+  const configs = {
+    creative: {
+      icon: <Brush size={24} />,
+      title: 'Creative Portfolio',
+      description: 'Showcase your artwork, designs, and creative projects',
+      features: ['Image galleries', 'Portfolio showcase', 'Creative collections']
+    },
+    educational: {
+      icon: <GraduationCap size={24} />,
+      title: 'Educational Portfolio', 
+      description: 'Track your academic progress and learning achievements',
+      features: ['Progress tracking', 'Concept mastery', 'Learning analytics']
+    },
+    professional: {
+      icon: <Code size={24} />,
+      title: 'Professional Portfolio',
+      description: 'Highlight your technical skills and professional experience', 
+      features: ['Code repositories', 'Technical projects', 'Professional timeline']
+    },
+    hybrid: {
+      icon: <Layers size={24} />,
+      title: 'Hybrid Portfolio',
+      description: 'Combine creative works with educational progress',
+      features: ['Creative showcase', 'Learning progress', 'Unified dashboard']
+    }
+  };
+
+  return configs[kind] || {
+    icon: <Layers size={24} />,
+    title: 'Portfolio',
+    description: 'Your portfolio',
+    features: ['Basic Portfolio']
+  };
+};
+
+const canUpgrade = (currentKind: PortfolioKind): boolean => {
+  return currentKind !== 'hybrid';
+};
+
 export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: UpgradeProps) {
   const [selectedUpgrade, setSelectedUpgrade] = useState<PortfolioKind>('hybrid');
   const [showConfirmation, setShowConfirmation] = useState(false);
 
-  const getCurrentConfig = () => {
-    switch (portfolio.kind) {
-      case 'creative':
-        return {
-          icon: <Brush size={24} />,
-          title: 'Creative Portfolio',
-          color: '#8b5cf6',
-          gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)'
-        };
-      case 'educational':
-        return {
-          icon: <GraduationCap size={24} />,
-          title: 'Educational Portfolio',
-          color: '#3b82f6',
-          gradient: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)'
-        };
-      case 'professional':
-        return {
-          icon: <Code size={24} />,
-          title: 'Professional Portfolio',
-          color: '#059669',
-          gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
-        };
-      default:
-        return {
-          icon: <Layers size={24} />,
-          title: 'Portfolio',
-          color: '#6b7280',
-          gradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)'
-        };
-    }
-  };
-
+  // Safe access to portfolio configuration
+  const currentConfig = getPortfolioConfig(portfolio.kind);
+  
   const getUpgradeOptions = (): PortfolioKind[] => {
     if (portfolio.kind === 'hybrid') return [];
     return ['hybrid']; // For now, all paths lead to hybrid
-  };
-
-  const getUpgradeConfig = (kind: PortfolioKind) => {
-    switch (kind) {
-      case 'hybrid':
-        return {
-          icon: <Layers size={32} />,
-          title: 'Hybrid Portfolio',
-          color: '#10b981',
-          gradient: 'linear-gradient(135deg, #10b981 0%, #f59e0b 100%)',
-          price: 'Free Upgrade',
-          description: 'Combine all portfolio capabilities into one powerful platform',
-          features: [
-            'Creative gallery & showcase',
-            'Learning progress tracking',
-            'Professional project display',
-            'Advanced analytics',
-            'Enhanced customization',
-            'Priority support'
-          ],
-          newFeatures: getNewFeatures()
-        };
-      default:
-        return null;
-    }
   };
 
   const getNewFeatures = () => {
@@ -125,7 +88,6 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
     return features;
   };
 
-  const currentConfig = getCurrentConfig();
   const upgradeOptions = getUpgradeOptions();
 
   if (!canUpgrade(portfolio.kind)) {
@@ -141,29 +103,29 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
           </MaxedDescription>
           <FeatureGrid>
             <FeatureCard>
-              <FeatureIcon $color="#8b5cf6">
+              <FeatureIcon>
                 <Brush size={20} />
               </FeatureIcon>
               <FeatureTitle>Creative Studio</FeatureTitle>
               <FeatureDescription>Full gallery management</FeatureDescription>
             </FeatureCard>
             <FeatureCard>
-              <FeatureIcon $color="#3b82f6">
+              <FeatureIcon>
                 <GraduationCap size={20} />
               </FeatureIcon>
               <FeatureTitle>Learning Center</FeatureTitle>
               <FeatureDescription>Progress tracking</FeatureDescription>
             </FeatureCard>
             <FeatureCard>
-              <FeatureIcon $color="#059669">
+              <FeatureIcon>
                 <Code size={20} />
               </FeatureIcon>
               <FeatureTitle>Professional Hub</FeatureTitle>
               <FeatureDescription>Project showcase</FeatureDescription>
             </FeatureCard>
             <FeatureCard>
-              <FeatureIcon $color="#f59e0b">
-                <TrendingUp size={20} />
+              <FeatureIcon>
+                <Sparkles size={20} />
               </FeatureIcon>
               <FeatureTitle>Advanced Analytics</FeatureTitle>
               <FeatureDescription>Detailed insights</FeatureDescription>
@@ -183,12 +145,23 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
     }
   };
 
+  const hybridConfig = getPortfolioConfig('hybrid');
+  const newFeatures = getNewFeatures();
+  const allHybridFeatures = [
+    'Creative gallery & showcase',
+    'Learning progress tracking', 
+    'Professional project display',
+    'Advanced analytics',
+    'Enhanced customization',
+    'Priority support'
+  ];
+
   return (
     <UpgradeContainer>
       {/* Current Plan Section */}
       <CurrentPlanSection>
         <CurrentPlanHeader>
-          <CurrentPlanIcon $gradient={currentConfig.gradient}>
+          <CurrentPlanIcon>
             {currentConfig.icon}
           </CurrentPlanIcon>
           <CurrentPlanInfo>
@@ -197,7 +170,7 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
           </CurrentPlanInfo>
         </CurrentPlanHeader>
         <CurrentFeatures>
-          {PORTFOLIO_KINDS[portfolio.kind].features.map((feature, index) => (
+          {currentConfig.features.map((feature, index) => (
             <CurrentFeature key={index}>
               <CheckCircle size={16} />
               {feature}
@@ -217,8 +190,7 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
         </UpgradeHeader>
 
         {upgradeOptions.map(kind => {
-          const config = getUpgradeConfig(kind);
-          if (!config) return null;
+          if (kind !== 'hybrid') return null;
 
           return (
             <UpgradeOption
@@ -227,12 +199,12 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
               onClick={() => setSelectedUpgrade(kind)}
             >
               <UpgradeOptionHeader>
-                <UpgradeOptionIcon $gradient={config.gradient}>
-                  {config.icon}
+                <UpgradeOptionIcon>
+                  {hybridConfig.icon}
                 </UpgradeOptionIcon>
                 <UpgradeOptionInfo>
-                  <UpgradeOptionTitle>{config.title}</UpgradeOptionTitle>
-                  <UpgradeOptionPrice>{config.price}</UpgradeOptionPrice>
+                  <UpgradeOptionTitle>{hybridConfig.title}</UpgradeOptionTitle>
+                  <UpgradeOptionPrice>Free Upgrade</UpgradeOptionPrice>
                 </UpgradeOptionInfo>
                 <RecommendedBadge>
                   <Star size={14} />
@@ -240,29 +212,31 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
                 </RecommendedBadge>
               </UpgradeOptionHeader>
 
-              <UpgradeDescription>{config.description}</UpgradeDescription>
+              <UpgradeDescription>{hybridConfig.description}</UpgradeDescription>
 
               {/* New Features You'll Get */}
-              <NewFeaturesSection>
-                <NewFeaturesTitle>
-                  <Plus size={16} />
-                  New features you'll unlock:
-                </NewFeaturesTitle>
-                <NewFeaturesList>
-                  {config.newFeatures.map((feature, index) => (
-                    <NewFeature key={index}>
-                      <Unlock size={14} />
-                      {feature}
-                    </NewFeature>
-                  ))}
-                </NewFeaturesList>
-              </NewFeaturesSection>
+              {newFeatures.length > 0 && (
+                <NewFeaturesSection>
+                  <NewFeaturesTitle>
+                    <Plus size={16} />
+                    New features you'll unlock:
+                  </NewFeaturesTitle>
+                  <NewFeaturesList>
+                    {newFeatures.map((feature, index) => (
+                      <NewFeature key={index}>
+                        <Unlock size={14} />
+                        {feature}
+                      </NewFeature>
+                    ))}
+                  </NewFeaturesList>
+                </NewFeaturesSection>
+              )}
 
               {/* All Features */}
               <AllFeatures>
                 <AllFeaturesTitle>All features included:</AllFeaturesTitle>
                 <FeatureColumns>
-                  {config.features.map((feature, index) => (
+                  {allHybridFeatures.map((feature, index) => (
                     <Feature key={index}>
                       <CheckCircle size={14} />
                       {feature}
@@ -274,7 +248,6 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
               <UpgradeButton
                 onClick={() => setShowConfirmation(true)}
                 disabled={isUpgrading}
-                $gradient={config.gradient}
               >
                 {isUpgrading ? (
                   <>
@@ -283,7 +256,7 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
                   </>
                 ) : (
                   <>
-                    Upgrade to {config.title}
+                    Upgrade to {hybridConfig.title}
                     <ArrowUpRight size={16} />
                   </>
                 )}
@@ -299,13 +272,13 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
           <ModalOverlay onClick={() => setShowConfirmation(false)} />
           <ModalContent>
             <ModalHeader>
-              <Zap size={24} color="#f59e0b" />
+              <Zap size={24} />
               <ModalTitle>Confirm Portfolio Upgrade</ModalTitle>
             </ModalHeader>
             <ModalBody>
               <ConfirmationText>
                 You're about to upgrade from <strong>{currentConfig.title}</strong> to{' '}
-                <strong>{getUpgradeConfig(selectedUpgrade)?.title}</strong>.
+                <strong>{hybridConfig.title}</strong>.
               </ConfirmationText>
               <ConfirmationNote>
                 ✅ All your existing content will be preserved<br/>
@@ -365,7 +338,7 @@ export function PortfolioUpgrade({ portfolio, onUpgrade, isUpgrading = false }: 
   );
 }
 
-// Styled Components
+// Professional Styled Components
 const UpgradeContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -373,10 +346,12 @@ const UpgradeContainer = styled.div`
 `;
 
 const CurrentPlanSection = styled.div`
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
   border-radius: 16px;
   padding: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 `;
 
 const CurrentPlanHeader = styled.div`
@@ -386,10 +361,10 @@ const CurrentPlanHeader = styled.div`
   margin-bottom: 1.5rem;
 `;
 
-const CurrentPlanIcon = styled.div<{ $gradient: string }>`
+const CurrentPlanIcon = styled.div`
   width: 64px;
   height: 64px;
-  background: ${props => props.$gradient};
+  background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -403,14 +378,16 @@ const CurrentPlanInfo = styled.div`
 
 const CurrentPlanTitle = styled.div`
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #666666;
   margin-bottom: 0.25rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const CurrentPlanName = styled.div`
   font-size: 1.5rem;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 600;
+  color: #2c2c2c;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const CurrentFeatures = styled.div`
@@ -425,9 +402,10 @@ const CurrentFeature = styled.div`
   gap: 0.5rem;
   font-size: 0.875rem;
   color: #374151;
+  font-family: 'Work Sans', sans-serif;
   
   svg {
-    color: #10b981;
+    color: #666666;
     flex-shrink: 0;
   }
 `;
@@ -445,33 +423,36 @@ const UpgradeHeader = styled.div`
 
 const UpgradeTitle = styled.h2`
   font-size: 2rem;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 600;
+  color: #2c2c2c;
   margin: 0.5rem 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const UpgradeSubtitle = styled.p`
   font-size: 1.125rem;
-  color: #6b7280;
+  color: #666666;
   margin: 0;
   max-width: 600px;
   margin: 0 auto;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const UpgradeOption = styled.div<{ $selected: boolean }>`
-  background: white;
-  border: 2px solid ${props => props.$selected ? '#3b82f6' : '#e5e7eb'};
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
+  border: 2px solid ${props => props.$selected ? '#2c2c2c' : '#e5e7eb'};
+  border-radius: 16px;
   padding: 2.5rem;
   position: relative;
   transition: all 0.3s ease;
   
   &:hover {
-    border-color: #3b82f6;
+    border-color: #2c2c2c;
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
   }
@@ -485,16 +466,16 @@ const UpgradeOptionHeader = styled.div`
   position: relative;
 `;
 
-const UpgradeOptionIcon = styled.div<{ $gradient: string }>`
+const UpgradeOptionIcon = styled.div`
   width: 80px;
   height: 80px;
-  background: ${props => props.$gradient};
+  background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
   border-radius: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 25px rgba(44, 44, 44, 0.15);
 `;
 
 const UpgradeOptionInfo = styled.div`
@@ -503,22 +484,24 @@ const UpgradeOptionInfo = styled.div`
 
 const UpgradeOptionTitle = styled.h3`
   font-size: 1.75rem;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 600;
+  color: #2c2c2c;
   margin: 0 0 0.5rem 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const UpgradeOptionPrice = styled.div`
   font-size: 1.125rem;
-  color: #10b981;
+  color: #666666;
   font-weight: 600;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const RecommendedBadge = styled.div`
   position: absolute;
   top: -8px;
   right: 0;
-  background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+  background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 999px;
@@ -527,22 +510,24 @@ const RecommendedBadge = styled.div`
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  box-shadow: 0 4px 12px rgba(44, 44, 44, 0.3);
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const UpgradeDescription = styled.p`
   font-size: 1rem;
-  color: #6b7280;
+  color: #666666;
   margin-bottom: 2rem;
   line-height: 1.6;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const NewFeaturesSection = styled.div`
-  background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+  background: rgba(44, 44, 44, 0.05);
   padding: 1.5rem;
   border-radius: 12px;
   margin-bottom: 2rem;
-  border: 1px solid #dbeafe;
+  border: 1px solid rgba(44, 44, 44, 0.1);
 `;
 
 const NewFeaturesTitle = styled.div`
@@ -550,8 +535,9 @@ const NewFeaturesTitle = styled.div`
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
-  color: #1e40af;
+  color: #2c2c2c;
   margin-bottom: 1rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const NewFeaturesList = styled.div`
@@ -565,10 +551,11 @@ const NewFeature = styled.div`
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: #1e40af;
+  color: #2c2c2c;
+  font-family: 'Work Sans', sans-serif;
   
   svg {
-    color: #10b981;
+    color: #666666;
     flex-shrink: 0;
   }
 `;
@@ -581,6 +568,7 @@ const AllFeaturesTitle = styled.div`
   font-weight: 600;
   color: #374151;
   margin-bottom: 1rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const FeatureColumns = styled.div`
@@ -595,15 +583,16 @@ const Feature = styled.div`
   gap: 0.5rem;
   font-size: 0.875rem;
   color: #374151;
+  font-family: 'Work Sans', sans-serif;
   
   svg {
-    color: #10b981;
+    color: #666666;
     flex-shrink: 0;
   }
 `;
 
-const UpgradeButton = styled.button<{ $gradient: string }>`
-  background: ${props => props.$gradient};
+const UpgradeButton = styled.button`
+  background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
   color: white;
   border: none;
   padding: 1rem 2rem;
@@ -617,11 +606,14 @@ const UpgradeButton = styled.button<{ $gradient: string }>`
   justify-content: center;
   gap: 0.5rem;
   width: 100%;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 15px rgba(44, 44, 44, 0.1);
+  font-family: 'Work Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 
   &:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 25px rgba(44, 44, 44, 0.15);
   }
 
   &:disabled {
@@ -632,32 +624,36 @@ const UpgradeButton = styled.button<{ $gradient: string }>`
 `;
 
 const MaxedOutSection = styled.div`
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
   padding: 4rem 2rem;
   text-align: center;
-  border: 2px solid #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 `;
 
 const CrownIcon = styled.div`
-  color: #f59e0b;
+  color: #2c2c2c;
   margin-bottom: 1.5rem;
 `;
 
 const MaxedTitle = styled.h2`
   font-size: 2rem;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 600;
+  color: #2c2c2c;
   margin-bottom: 1rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const MaxedDescription = styled.p`
   font-size: 1.125rem;
-  color: #6b7280;
+  color: #666666;
   margin-bottom: 3rem;
   max-width: 500px;
   margin-left: auto;
   margin-right: auto;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const FeatureGrid = styled.div`
@@ -669,18 +665,25 @@ const FeatureGrid = styled.div`
 `;
 
 const FeatureCard = styled.div`
-  background: white;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
   padding: 1.5rem;
   border-radius: 12px;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.95);
+  }
 `;
 
-const FeatureIcon = styled.div<{ $color: string }>`
+const FeatureIcon = styled.div`
   width: 48px;
   height: 48px;
-  background: ${props => `${props.$color}20`};
-  color: ${props => props.$color};
+  background: rgba(44, 44, 44, 0.1);
+  color: #2c2c2c;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -690,16 +693,19 @@ const FeatureIcon = styled.div<{ $color: string }>`
 
 const FeatureTitle = styled.h4`
   font-weight: 600;
-  color: #111827;
+  color: #2c2c2c;
   margin: 0 0 0.5rem 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const FeatureDescription = styled.p`
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #666666;
   margin: 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
+// Modal Components (continuing with professional styling)
 const Modal = styled.div`
   position: fixed;
   top: 0;
@@ -741,9 +747,10 @@ const ModalHeader = styled.div`
 
 const ModalTitle = styled.h3`
   font-size: 1.25rem;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 600;
+  color: #2c2c2c;
   margin: 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const ModalBody = styled.div`
@@ -754,16 +761,18 @@ const ConfirmationText = styled.p`
   color: #374151;
   margin: 0 0 1rem 0;
   line-height: 1.6;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const ConfirmationNote = styled.div`
-  background: #f0f9ff;
-  border: 1px solid #0ea5e9;
+  background: rgba(44, 44, 44, 0.05);
+  border: 1px solid rgba(44, 44, 44, 0.1);
   border-radius: 8px;
   padding: 1rem;
   font-size: 0.875rem;
-  color: #0c4a6e;
+  color: #2c2c2c;
   line-height: 1.6;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const ModalActions = styled.div`
@@ -782,15 +791,16 @@ const ModalButton = styled.button<{ $primary?: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-family: 'Work Sans', sans-serif;
   
   ${props => props.$primary ? `
-    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
     color: white;
     border: none;
     
     &:hover:not(:disabled) {
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      box-shadow: 0 4px 12px rgba(44, 44, 44, 0.3);
     }
   ` : `
     background: white;
@@ -810,18 +820,21 @@ const ModalButton = styled.button<{ $primary?: boolean }>`
 `;
 
 const FAQSection = styled.div`
-  background: white;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
   border-radius: 16px;
   padding: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 `;
 
 const FAQTitle = styled.h3`
   font-size: 1.5rem;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 600;
+  color: #2c2c2c;
   margin: 0 0 2rem 0;
   text-align: center;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const FAQGrid = styled.div`
@@ -834,19 +847,28 @@ const FAQItem = styled.div`
   padding: 1.5rem;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  background: #f9fafb;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-2px);
+  }
 `;
 
 const FAQQuestion = styled.h4`
   font-weight: 600;
-  color: #111827;
+  color: #2c2c2c;
   margin: 0 0 0.75rem 0;
   font-size: 0.875rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const FAQAnswer = styled.p`
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #666666;
   margin: 0;
   line-height: 1.5;
+  font-family: 'Work Sans', sans-serif;
 `;

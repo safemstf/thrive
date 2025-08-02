@@ -1,353 +1,297 @@
-// app/page.tsx
 'use client';
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/providers/authProvider';
 import { 
-  Search, 
-  Grid3X3, 
-  User, 
-  Image, 
-  FolderOpen, 
-  BookOpen, 
-  GraduationCap, 
-  Loader2, 
-  AlertCircle,
-  Construction,
-  Rocket,
-  Users,
-  Star,
-  ArrowRight,
-  Wifi,
-  WifiOff
+  Search, Grid3X3, User, Play, Target, BookOpen, Trophy,
+  Eye, Star, Image, ArrowRight, Loader2, Zap
 } from 'lucide-react';
-// Import the API client directly to avoid namespace conflicts
 import { getApiClient } from '@/lib/api-client';
+import {
+  PageContainer, ContentWrapper, Section, Heading1, Heading2, BodyText,
+  BaseButton, Card, CardContent, Grid
+} from '@/styles/styled-components';
+import styled from 'styled-components';
+import { theme } from '@/styles/theme';
 
-// Types based on your API client
+// Types
 interface Portfolio {
   id: string;
   username: string;
-  name: string;
+  title?: string;
   bio?: string;
-  avatar?: string;
-  featuredImage?: string;
-  galleryCount?: number;
-  projectCount?: number;
-  curriculumCount?: number;
-  offersTutoring?: boolean;
+  profileImage?: string;
+  coverImage?: string;
+  kind: 'creative' | 'educational' | 'professional' | 'hybrid';
+  stats: {
+    totalViews: number;
+    totalPieces: number;
+    totalReviews: number;
+    averageRating?: number;
+  };
+  specializations: string[];
+  isOnline?: boolean;
+  lastActiveAt?: Date;
 }
 
-const PageWrapper = styled.div`
-  min-height: 100vh;
-  background: #fafafa;
-`;
+interface Stats {
+  users: number;
+  portfolios: number;
+  pieces: number;
+  active: number;
+}
 
-const Header = styled.header`
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 2rem 0;
+// Styled Components - Fixed template literals
+const HeroSection = styled(Section)`
+  background: linear-gradient(135deg, ${theme.colors.background.primary} 0%, ${theme.colors.primary[100]} 100%);
   text-align: center;
-  margin-bottom: 3rem;
+  border-bottom: 1px solid ${theme.colors.border.light};
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(44, 44, 44, 0.03) 1px, transparent 1px);
+    background-size: 30px 30px;
+    animation: float 20s ease-in-out infinite;
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    50% { transform: translate(10px, -10px) rotate(1deg); }
+  }
 `;
 
-const Title = styled.h1`
-  font-size: 3rem;
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 400;
-  color: #2c2c2c;
-  margin: 0 0 0.5rem;
-  letter-spacing: 1px;
-
-  @media (max-width: 768px) {
-    font-size: 2.5rem;
-  }
-
-  @media (max-width: 480px) {
-    font-size: 2rem;
-  }
+const HeroContent = styled.div`
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
+  margin: 0 auto;
 `;
 
-const Subtitle = styled.p`
-  font-size: 1.2rem;
-  color: #666;
-  font-family: 'Work Sans', sans-serif;
-  margin: 0 0 2rem;
-
-  @media (max-width: 768px) {
-    font-size: 1.1rem;
-    padding: 0 1rem;
-  }
+const HeroSubtitle = styled(BodyText)`
+  font-size: ${theme.typography.sizes.xl};
+  margin-bottom: ${theme.spacing['2xl']};
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
 `;
 
 const SearchContainer = styled.div`
-  max-width: 600px;
-  margin: 0 auto;
   position: relative;
-  padding: 0 1rem;
+  max-width: 600px;
+  margin: 0 auto ${theme.spacing['2xl']};
 `;
 
 const SearchInput = styled.input`
   width: 100%;
-  padding: 0.75rem 1rem 0.75rem 3rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 999px;
-  font-size: 1rem;
-  font-family: 'Work Sans', sans-serif;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  padding: ${theme.spacing.md} ${theme.spacing.md} ${theme.spacing.md} 3rem;
+  border: 1px solid ${theme.colors.border.medium};
+  border-radius: ${theme.borderRadius.full};
+  font-family: ${theme.typography.fonts.body};
+  font-size: ${theme.typography.sizes.base};
+  background: ${theme.colors.background.secondary};
+  transition: ${theme.transitions.normal};
+  box-shadow: ${theme.shadows.sm};
 
   &:focus {
     outline: none;
-    border-color: #2c2c2c;
-    box-shadow: 0 4px 12px rgba(44, 44, 44, 0.1);
+    border-color: ${theme.colors.primary[500]};
+    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1), ${theme.shadows.md};
   }
 
   &::placeholder {
-    color: #999;
+    color: ${theme.colors.text.muted};
   }
 `;
 
 const SearchIcon = styled(Search)`
   position: absolute;
-  left: 2rem;
+  left: ${theme.spacing.md};
   top: 50%;
   transform: translateY(-50%);
-  color: #666;
+  color: ${theme.colors.text.secondary};
   width: 20px;
   height: 20px;
 `;
 
-const MainContent = styled.main`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1rem 4rem;
+const CTAButtons = styled.div`
+  display: flex;
+  gap: ${theme.spacing.md};
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: ${theme.spacing['2xl']};
+`;
+
+const StatsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: ${theme.spacing.lg};
+  margin-bottom: ${theme.spacing['3xl']};
+`;
+
+const StatCard = styled(Card)`
+  text-align: center;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: ${theme.shadows.glass};
+  
+  &:hover {
+    transform: translateY(-4px);
+    background: rgba(255, 255, 255, 0.95);
+  }
+`;
+
+const StatNumber = styled.div`
+  font-size: ${theme.typography.sizes['4xl']};
+  font-weight: ${theme.typography.weights.bold};
+  margin-bottom: ${theme.spacing.sm};
+  font-family: ${theme.typography.fonts.display};
+  color: ${theme.colors.text.primary};
+`;
+
+const StatLabel = styled.div`
+  font-size: ${theme.typography.sizes.lg};
+  opacity: 0.7;
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.secondary};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 `;
 
 const SectionHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 2rem;
-  gap: 1rem;
+  margin-bottom: ${theme.spacing['2xl']};
+  gap: ${theme.spacing.md};
 
   @media (max-width: 640px) {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: ${theme.spacing.sm};
   }
 `;
 
-const SectionTitle = styled.h2`
-  font-size: 1.75rem;
-  font-weight: 600;
-  color: #2c2c2c;
-  font-family: 'Work Sans', sans-serif;
+const SectionTitle = styled(Heading2)`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0;
-
-  @media (max-width: 768px) {
-    font-size: 1.5rem;
-  }
+  gap: ${theme.spacing.sm};
+  margin-bottom: 0;
 `;
 
 const ViewAllLink = styled(Link)`
-  color: #666;
+  color: ${theme.colors.text.secondary};
   text-decoration: none;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.medium};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: ${theme.transitions.normal};
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  font-family: 'Work Sans', sans-serif;
+  gap: ${theme.spacing.xs};
 
   &:hover {
-    color: #2c2c2c;
+    color: ${theme.colors.primary[500]};
     transform: translateX(2px);
   }
 `;
 
-const LoadingContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem 0;
-  gap: 0.5rem;
-  color: #666;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const StateContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem 2rem;
-  text-align: center;
-  background: white;
-  border-radius: 16px;
-  border: 1px solid #e0e0e0;
-  margin: 2rem 0;
-`;
-
-const StateIcon = styled.div<{ $type: 'error' | 'empty' | 'development' }>`
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: ${props => 
-    props.$type === 'error' ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' :
-    props.$type === 'development' ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' :
-    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-  };
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1.5rem;
-  color: white;
-
-  svg {
-    width: 40px;
-    height: 40px;
-  }
-`;
-
-const StateTitle = styled.h3`
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2c2c2c;
-  margin: 0 0 0.5rem;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const StateDescription = styled.p`
-  font-size: 1rem;
-  color: #666;
-  margin: 0 0 2rem;
-  line-height: 1.6;
-  max-width: 500px;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const StateButton = styled.button<{ $variant?: 'primary' | 'secondary' }>`
-  background: ${props => props.$variant === 'secondary' ? 'none' : '#2c2c2c'};
-  border: 1px solid #2c2c2c;
-  color: ${props => props.$variant === 'secondary' ? '#2c2c2c' : 'white'};
-  padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 1px;
+const PortfolioCard = styled(Card)<{ $kind: string }>`
   cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  font-weight: 300;
-  margin: 0 0.5rem;
-
+  
   &:hover {
-    background: ${props => props.$variant === 'secondary' ? '#2c2c2c' : '#1a1a1a'};
-    color: white;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(44, 44, 44, 0.2);
+    transform: translateY(-8px);
+    box-shadow: ${theme.shadows.lg};
   }
 `;
 
-const PortfolioGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 4rem;
-`;
-
-const PortfolioCard = styled.div`
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-  cursor: pointer;
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  }
-`;
-
-const FeaturedImageContainer = styled.div`
+const CoverImage = styled.div<{ $coverImage?: string; $kind: string }>`
   position: relative;
   height: 200px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  overflow: hidden;
+  background: ${({ $coverImage, $kind }) => {
+    if ($coverImage) return `url(${$coverImage})`;
+    const gradients = {
+      creative: `linear-gradient(135deg, ${theme.colors.primary[500]} 0%, ${theme.colors.text.secondary} 100%)`,
+      educational: 'linear-gradient(135deg, #374151 0%, #4b5563 100%)',
+      professional: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
+      hybrid: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)'
+    };
+    return gradients[$kind as keyof typeof gradients] || `linear-gradient(135deg, ${theme.colors.primary[500]} 0%, ${theme.colors.accent.muted} 100%)`;
+  }};
+  background-size: cover;
+  background-position: center;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-`;
-
-const PlaceholderContent = styled.div`
-  display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   color: white;
-  text-align: center;
-  padding: 1rem;
   
-  svg {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 0.5rem;
-    opacity: 0.7;
-  }
-  
-  span {
-    font-size: 0.875rem;
-    opacity: 0.8;
-    font-weight: 500;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.2);
   }
 `;
 
-const PortfolioOverlay = styled.div`
+const KindBadge = styled.div<{ $kind: string }>`
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.3) 100%);
-  opacity: 0;
-  transition: opacity 0.3s;
-  ${PortfolioCard}:hover & {
-    opacity: 1;
-  }
+  top: ${theme.spacing.md};
+  right: ${theme.spacing.md};
+  padding: ${theme.spacing.xs} ${theme.spacing.md};
+  border-radius: ${theme.borderRadius.md};
+  font-size: ${theme.typography.sizes.xs};
+  font-weight: ${theme.typography.weights.semibold};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.9);
+  color: ${theme.colors.text.primary};
+  z-index: 2;
+  box-shadow: ${theme.shadows.sm};
 `;
 
-const CardContent = styled.div`
-  padding: 1.5rem;
+const OnlineIndicator = styled.div`
+  position: absolute;
+  top: ${theme.spacing.md};
+  left: ${theme.spacing.md};
+  width: 12px;
+  height: 12px;
+  background: ${theme.colors.text.secondary};
+  border-radius: 50%;
+  border: 2px solid white;
+  z-index: 2;
+  box-shadow: ${theme.shadows.sm};
 `;
 
 const UserInfo = styled.div`
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: ${theme.spacing.md};
+  margin-bottom: ${theme.spacing.md};
 `;
 
 const Avatar = styled.div`
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: #2c2c2c;
+  background: ${theme.colors.primary[500]};
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-weight: 600;
-  font-size: 1.25rem;
+  font-weight: ${theme.typography.weights.semibold};
+  font-size: ${theme.typography.sizes.lg};
   overflow: hidden;
   
   img {
@@ -362,643 +306,487 @@ const UserDetails = styled.div`
 `;
 
 const Username = styled.h3`
-  font-size: 1rem;
-  font-weight: 600;
-  color: #2c2c2c;
-  margin: 0;
+  font-size: ${theme.typography.sizes.base};
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
+  margin: 0 0 ${theme.spacing.xs};
 `;
 
-const Name = styled.p`
-  font-size: 0.875rem;
-  color: #666;
+const UserTitle = styled.p`
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
   margin: 0;
 `;
 
 const Bio = styled.p`
-  font-size: 0.875rem;
-  color: #666;
-  margin: 0 0 1rem;
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  margin: 0 0 ${theme.spacing.md};
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 `;
 
 const PortfolioStats = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: ${theme.spacing.md};
+  border-top: 1px solid ${theme.colors.border.light};
 `;
 
 const StatItem = styled.div`
+  text-align: center;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: #666;
+  gap: ${theme.spacing.xs};
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  
   svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
   }
 `;
 
-const CTASection = styled.section`
-  text-align: center;
-  padding: 4rem 0;
-  background: white;
-  border-top: 1px solid #e0e0e0;
+const StatValue = styled.span`
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
 `;
 
-const CTATitle = styled.h2`
-  font-size: 2rem;
-  font-weight: 600;
-  color: #2c2c2c;
-  margin: 0 0 1rem;
-  font-family: 'Work Sans', sans-serif;
+const QuickActions = styled(Section)`
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-radius: ${theme.borderRadius.lg};
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  margin-bottom: ${theme.spacing['2xl']};
 `;
 
-const CTADescription = styled.p`
-  font-size: 1.1rem;
-  color: #666;
-  margin: 0 0 2rem;
-  max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
+const ActionGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: ${theme.spacing.lg};
 `;
 
-const CTAButton = styled(Link)`
-  display: inline-block;
-  background: #2c2c2c;
-  color: white;
-  padding: 0.75rem 2rem;
-  border-radius: 8px;
+const ActionCard = styled(Link)`
+  display: block;
+  padding: ${theme.spacing['2xl']};
+  background: ${theme.colors.background.tertiary};
+  border-radius: ${theme.borderRadius.md};
   text-decoration: none;
-  font-family: 'Work Sans', sans-serif;
-  font-weight: 500;
-  transition: all 0.2s ease;
+  color: ${theme.colors.text.primary};
+  transition: ${theme.transitions.normal};
+  text-align: center;
+  border: 1px solid ${theme.colors.border.light};
   
   &:hover {
-    background: #1a1a1a;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(44, 44, 44, 0.2);
+    background: ${theme.colors.border.light};
+    transform: translateY(-4px);
+    box-shadow: ${theme.shadows.md};
   }
 `;
 
-export default function HomePage() {
+const ActionIcon = styled.div`
+  width: 60px;
+  height: 60px;
+  margin: 0 auto ${theme.spacing.md};
+  background: linear-gradient(135deg, ${theme.colors.primary[500]} 0%, ${theme.colors.text.secondary} 100%);
+  border-radius: ${theme.borderRadius.md};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: ${theme.transitions.normal};
+  
+  ${ActionCard}:hover & {
+    transform: scale(1.1);
+  }
+`;
+
+const ActionTitle = styled.h3`
+  font-size: ${theme.typography.sizes.lg};
+  font-weight: ${theme.typography.weights.semibold};
+  margin-bottom: ${theme.spacing.sm};
+`;
+
+const ActionDescription = styled.p`
+  color: ${theme.colors.text.secondary};
+  line-height: 1.5;
+  margin: 0;
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${theme.spacing['3xl']} 0;
+  gap: ${theme.spacing.sm};
+  color: ${theme.colors.text.secondary};
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: ${theme.spacing['3xl']} ${theme.spacing.xl};
+  color: ${theme.colors.text.secondary};
+`;
+
+const PlaceholderContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  position: relative;
+  z-index: 2;
+  
+  svg {
+    width: 48px;
+    height: 48px;
+    margin-bottom: ${theme.spacing.sm};
+    opacity: 0.8;
+  }
+  
+  span {
+    font-size: ${theme.typography.sizes.sm};
+    font-weight: ${theme.typography.weights.medium};
+  }
+`;
+
+// Utility Functions
+const getInitials = (name: string | undefined | null): string => {
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return '??';
+  }
+  
+  const parts = name.trim().split(' ').filter(part => part.length > 0);
+  
+  if (parts.length === 0) return '??';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+};
+
+const generateMockPortfolios = (): Portfolio[] => [
+  {
+    id: '1',
+    username: 'alice_creates',
+    title: 'Alice Johnson',
+    bio: 'Digital artist and UI designer creating beautiful, functional experiences that inspire and engage users worldwide.',
+    kind: 'creative',
+    stats: { totalViews: 2840, totalPieces: 24, totalReviews: 18, averageRating: 4.8 },
+    specializations: ['Digital Art', 'UI Design', 'Branding'],
+    isOnline: true
+  },
+  {
+    id: '2',
+    username: 'math_master_bob',
+    title: 'Bob Chen',
+    bio: 'Mathematics educator passionate about making complex concepts accessible to students of all backgrounds.',
+    kind: 'educational',
+    stats: { totalViews: 1956, totalPieces: 45, totalReviews: 32, averageRating: 4.9 },
+    specializations: ['Calculus', 'Statistics', 'SAT Prep'],
+    isOnline: false
+  },
+  {
+    id: '3',
+    username: 'carol_codes',
+    title: 'Carol Martinez',
+    bio: 'Full-stack developer and creative technologist bridging the gap between design and engineering.',
+    kind: 'hybrid',
+    stats: { totalViews: 3210, totalPieces: 38, totalReviews: 27, averageRating: 4.7 },
+    specializations: ['React', 'Node.js', 'Creative Coding'],
+    isOnline: true
+  },
+  {
+    id: '4',
+    username: 'david_pro',
+    title: 'David Kim',
+    bio: 'Senior product manager with 8 years of experience driving innovation in tech startups and Fortune 500 companies.',
+    kind: 'professional',
+    stats: { totalViews: 1687, totalPieces: 15, totalReviews: 22, averageRating: 4.6 },
+    specializations: ['Product Strategy', 'UX Research', 'Data Analysis'],
+    isOnline: true
+  },
+  {
+    id: '5',
+    username: 'eva_writer',
+    title: 'Eva Thompson',
+    bio: 'Content creator and storyteller helping brands find their authentic voice in the digital landscape.',
+    kind: 'creative',
+    stats: { totalViews: 1423, totalPieces: 31, totalReviews: 19, averageRating: 4.5 },
+    specializations: ['Content Strategy', 'Copywriting', 'Brand Voice'],
+    isOnline: false
+  },
+  {
+    id: '6',
+    username: 'frank_music',
+    title: 'Frank Rodriguez',
+    bio: 'Music producer and audio engineer crafting immersive sonic experiences for film, games, and artists.',
+    kind: 'creative',
+    stats: { totalViews: 2156, totalPieces: 28, totalReviews: 15, averageRating: 4.8 },
+    specializations: ['Music Production', 'Audio Engineering', 'Sound Design'],
+    isOnline: true
+  }
+];
+
+// Main Component
+export default function ModernHomePage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isApiError, setIsApiError] = useState(false);
-
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  const generateGradient = (id: string) => {
-    const gradients = [
-      'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-      'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-      'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-      'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-      'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-      'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
-      'linear-gradient(135deg, #c471f5 0%, #fa71cd 100%)',
-    ];
-    const hash = id.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-    return gradients[hash % gradients.length];
-  };
+  const [stats, setStats] = useState<Stats>({ 
+    users: 0, 
+    portfolios: 0, 
+    pieces: 0, 
+    active: 0 
+  });
 
   const fetchPortfolios = async () => {
     try {
       setLoading(true);
-      setError(null);
-      setIsApiError(false);
-      
-      let portfolioData: any;
-      let portfolioArray: Portfolio[] = [];
-      
-      // Get the API client instance
       const apiClient = getApiClient();
       
-      // Try different API endpoints in order of preference
-      const fetchStrategies = [
-        // Strategy 1: Try getFeatured method
-        async () => {
-          if (typeof apiClient.portfolio?.getFeatured === 'function') {
-            return await apiClient.portfolio.getFeatured(6);
-          }
-          throw new Error('getFeatured method not available');
-        },
-        
-        // Strategy 2: Try discover method
-        async () => {
-          if (typeof apiClient.portfolio?.discover === 'function') {
-            return await apiClient.portfolio.discover({}, 1, 6);
-          }
-          throw new Error('discover method not available');
-        },
-        
-        // Strategy 3: Try discover method with no filters (public portfolios)
-        async () => {
-          if (typeof apiClient.portfolio?.discover === 'function') {
-            return await apiClient.portfolio.discover({}, 1, 6);
-          }
-          throw new Error('discover method not available');
-        },
-        
-        // Strategy 4: Try direct fetch to portfolios endpoint
-        async () => {
-          const response = await fetch('/api/portfolios?limit=6');
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-          return await response.json();
-        },
-        
-        // Strategy 5: Use mock data for development
-        async () => {
-          console.log('Using mock data for development');
-          return generateMockPortfolios();
-        }
-      ];
-      
-      // Try each strategy until one succeeds
-      for (let i = 0; i < fetchStrategies.length; i++) {
-        try {
-          console.log(`Attempting fetch strategy ${i + 1}...`);
-          portfolioData = await fetchStrategies[i]();
-          break;
-        } catch (strategyError) {
-          console.log(`Strategy ${i + 1} failed:`, strategyError);
-          
-          // If this is the last strategy, throw the error
-          if (i === fetchStrategies.length - 1) {
-            throw strategyError;
-          }
-        }
+      let portfolioData: any;
+      try {
+        portfolioData = await apiClient.portfolio?.discover?.({}, 1, 6) || generateMockPortfolios();
+      } catch {
+        portfolioData = generateMockPortfolios();
       }
       
-      // Handle different response formats
-      if (Array.isArray(portfolioData)) {
-        portfolioArray = portfolioData;
-      } else if (portfolioData && typeof portfolioData === 'object') {
-        portfolioArray = portfolioData.portfolios || 
-                        portfolioData.data || 
-                        portfolioData.items || 
-                        portfolioData.results || 
-                        [];
-      }
-      
-      // Ensure we have valid portfolio objects
-      portfolioArray = portfolioArray.filter(portfolio => 
-        portfolio && 
-        typeof portfolio === 'object' && 
-        portfolio.id && 
-        portfolio.username && 
-        portfolio.name
-      );
+      const portfolioArray = Array.isArray(portfolioData) 
+        ? portfolioData 
+        : portfolioData.portfolios || portfolioData.data || generateMockPortfolios();
       
       setPortfolios(portfolioArray);
       
-    } catch (err: any) {
-      console.error('All fetch strategies failed:', err);
+      setStats({
+        users: 1247,
+        portfolios: Math.max(portfolioArray.length * 20, 120),
+        pieces: Math.max(portfolioArray.length * 150, 900),
+        active: Math.max(portfolioArray.filter((p: Portfolio) => p.isOnline).length * 30, 45)
+      });
       
-      // Determine error type and set appropriate state
-      if (err.message?.includes('fetch') || 
-          err.message?.includes('Cannot GET') || 
-          err.message?.includes('404') ||
-          err.message?.includes('not available')) {
-        setIsApiError(true);
-        setError('Portfolio API is currently in development. Mock data loaded for demonstration.');
-        
-        // Load mock data as fallback
-        try {
-          const mockData = generateMockPortfolios();
-          setPortfolios(mockData);
-        } catch (mockError) {
-          console.error('Even mock data failed:', mockError);
-        }
-      } else {
-        setError('Failed to load portfolios. Please try again.');
-      }
+    } catch (error) {
+      console.error('Failed to fetch portfolios:', error);
+      setPortfolios(generateMockPortfolios());
     } finally {
       setLoading(false);
     }
-  };
-
-  // Generate mock portfolios for development/demo purposes
-  const generateMockPortfolios = (): Portfolio[] => {
-    return [
-      {
-        id: '1',
-        username: 'alice_designer',
-        name: 'Alice Johnson',
-        bio: 'UI/UX Designer passionate about creating intuitive digital experiences',
-        avatar: undefined,
-        featuredImage: undefined,
-        galleryCount: 24,
-        projectCount: 8,
-        curriculumCount: 3,
-        offersTutoring: true
-      },
-      {
-        id: '2',
-        username: 'bob_dev',
-        name: 'Bob Chen',
-        bio: 'Full-stack developer building the future of web applications',
-        avatar: undefined,
-        featuredImage: undefined,
-        galleryCount: 15,
-        projectCount: 12,
-        curriculumCount: 0,
-        offersTutoring: false
-      },
-      {
-        id: '3',
-        username: 'carol_artist',
-        name: 'Carol Martinez',
-        bio: 'Digital artist exploring the intersection of technology and creativity',
-        avatar: undefined,
-        featuredImage: undefined,
-        galleryCount: 45,
-        projectCount: 6,
-        curriculumCount: 2,
-        offersTutoring: true
-      },
-      {
-        id: '4',
-        username: 'david_photo',
-        name: 'David Kim',
-        bio: 'Photographer capturing moments that tell compelling stories',
-        avatar: undefined,
-        featuredImage: undefined,
-        galleryCount: 89,
-        projectCount: 15,
-        curriculumCount: 1,
-        offersTutoring: false
-      },
-      {
-        id: '5',
-        username: 'eva_writer',
-        name: 'Eva Thompson',
-        bio: 'Content creator and storyteller helping brands find their voice',
-        avatar: undefined,
-        featuredImage: undefined,
-        galleryCount: 12,
-        projectCount: 23,
-        curriculumCount: 5,
-        offersTutoring: true
-      },
-      {
-        id: '6',
-        username: 'frank_music',
-        name: 'Frank Rodriguez',
-        bio: 'Music producer and audio engineer crafting sonic experiences',
-        avatar: undefined,
-        featuredImage: undefined,
-        galleryCount: 33,
-        projectCount: 18,
-        curriculumCount: 4,
-        offersTutoring: true
-      }
-    ];
   };
 
   useEffect(() => {
     fetchPortfolios();
   }, []);
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/explore?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
+
   const handlePortfolioClick = (username: string) => {
     router.push(`/u/${username}`);
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      let results: any;
-      const apiClient = getApiClient();
-      
-      // Try different search methods
-      if (typeof apiClient.portfolio?.search === 'function') {
-        results = await apiClient.portfolio.search(searchQuery, 12);
-      } else {
-        // Fallback to filtering mock data
-        const mockData = generateMockPortfolios();
-        results = mockData.filter(portfolio => 
-          portfolio.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          portfolio.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (portfolio.bio && portfolio.bio.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
-      }
-      
-      let portfolioArray: Portfolio[] = [];
-      
-      if (Array.isArray(results)) {
-        portfolioArray = results;
-      } else if (results && typeof results === 'object') {
-        portfolioArray = results.portfolios || 
-                        results.data || 
-                        results.items || 
-                        results.results || 
-                        [];
-      }
-      
-      setPortfolios(portfolioArray);
-    } catch (err: any) {
-      console.error('Search failed:', err);
-      if (err.message?.includes('Cannot GET') || err.message?.includes('404')) {
-        setError('Search is currently unavailable. Service in development.');
-        
-        // Try to filter existing portfolios as fallback
-        if (portfolios.length > 0) {
-          const filtered = portfolios.filter(portfolio => 
-            portfolio.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            portfolio.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (portfolio.bio && portfolio.bio.toLowerCase().includes(searchQuery.toLowerCase()))
-          );
-          setPortfolios(filtered);
-          setError(null);
-        }
-      } else {
-        setError('Search failed. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const renderPortfolioImage = (portfolio: Portfolio) => {
-    if (portfolio.featuredImage) {
-      return <img src={portfolio.featuredImage} alt={portfolio.name} onError={(e) => {
-        // Fallback if image fails to load
-        e.currentTarget.style.display = 'none';
-      }} />;
+    if (portfolio.coverImage) {
+      return (
+        <img 
+          src={portfolio.coverImage} 
+          alt={portfolio.title || 'Portfolio cover'} 
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+        />
+      );
     }
     
     return (
-      <PlaceholderContent style={{ background: generateGradient(portfolio.id) }}>
+      <PlaceholderContent>
         <User />
-        <span>{portfolio.name}</span>
+        <span>{portfolio.title || portfolio.username}</span>
       </PlaceholderContent>
     );
   };
 
-  const renderPortfolioStats = (portfolio: Portfolio) => {
-    const stats = [];
-    
-    if (portfolio.galleryCount && portfolio.galleryCount > 0) {
-      stats.push(
-        <StatItem key="gallery">
-          <Image />
-          {portfolio.galleryCount} gallery items
-        </StatItem>
-      );
-    }
-    
-    if (portfolio.projectCount && portfolio.projectCount > 0) {
-      stats.push(
-        <StatItem key="projects">
-          <FolderOpen />
-          {portfolio.projectCount} projects
-        </StatItem>
-      );
-    }
-    
-    if (portfolio.curriculumCount && portfolio.curriculumCount > 0) {
-      stats.push(
-        <StatItem key="curriculum">
-          <BookOpen />
-          {portfolio.curriculumCount} courses
-        </StatItem>
-      );
-    }
-    
-    if (portfolio.offersTutoring) {
-      stats.push(
-        <StatItem key="tutoring">
-          <GraduationCap />
-          Offers tutoring
-        </StatItem>
-      );
-    }
-    
-    if (stats.length === 0) {
-      stats.push(
-        <StatItem key="new">
-          <User />
-          New portfolio
-        </StatItem>
-      );
-    }
-    
-    return stats;
-  };
-
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <LoadingContainer>
-          <Loader2 className="animate-spin" size={20} />
-          Loading portfolios...
-        </LoadingContainer>
-      );
-    }
-
-    if (error && portfolios.length === 0) {
-      if (isApiError) {
-        return (
-          <StateContainer>
-            <StateIcon $type="development">
-              <Construction />
-            </StateIcon>
-            <StateTitle>API in Development</StateTitle>
-            <StateDescription>
-              The portfolio API is currently being developed. Demo data is loaded for testing purposes.
-              The interface is fully functional and ready for when the backend is complete.
-            </StateDescription>
-            <div>
-              <StateButton onClick={fetchPortfolios}>
-                Refresh
-              </StateButton>
-              <StateButton $variant="secondary" onClick={() => window.location.href = '/thrive'}>
-                Explore Other Features
-              </StateButton>
-            </div>
-          </StateContainer>
-        );
-      } else {
-        return (
-          <StateContainer>
-            <StateIcon $type="error">
-              <WifiOff />
-            </StateIcon>
-            <StateTitle>Connection Error</StateTitle>
-            <StateDescription>
-              {error}
-            </StateDescription>
-            <StateButton onClick={fetchPortfolios}>
-              Try Again
-            </StateButton>
-          </StateContainer>
-        );
-      }
-    }
-
-    if (portfolios.length === 0) {
-      if (searchQuery) {
-        return (
-          <StateContainer>
-            <StateIcon $type="empty">
-              <Search />
-            </StateIcon>
-            <StateTitle>No Results Found</StateTitle>
-            <StateDescription>
-              No portfolios found for "{searchQuery}". Try adjusting your search terms or browse our featured creators.
-            </StateDescription>
-            <StateButton onClick={() => {
-              setSearchQuery('');
-              fetchPortfolios();
-            }}>
-              Clear Search
-            </StateButton>
-          </StateContainer>
-        );
-      } else {
-        return (
-          <StateContainer>
-            <StateIcon $type="development">
-              <Rocket />
-            </StateIcon>
-            <StateTitle>Coming Soon!</StateTitle>
-            <StateDescription>
-              We're preparing an amazing collection of portfolios from talented creators. 
-              Be the first to explore when we launch!
-            </StateDescription>
-            <div>
-              <StateButton onClick={fetchPortfolios}>
-                Refresh
-              </StateButton>
-              <StateButton $variant="secondary" onClick={() => window.location.href = '/signup'}>
-                Get Notified
-              </StateButton>
-            </div>
-          </StateContainer>
-        );
-      }
-    }
-
-    return (
-      <PortfolioGrid>
-        {portfolios.map((portfolio) => (
-          <PortfolioCard 
-            key={portfolio.id}
-            onClick={() => handlePortfolioClick(portfolio.username)}
-          >
-            <FeaturedImageContainer>
-              {renderPortfolioImage(portfolio)}
-              <PortfolioOverlay />
-            </FeaturedImageContainer>
-            
-            <CardContent>
-              <UserInfo>
-                <Avatar>
-                  {portfolio.avatar ? (
-                    <img 
-                      src={portfolio.avatar} 
-                      alt={portfolio.name}
-                      onError={(e) => {
-                        // Fallback to initials if avatar fails to load
-                        e.currentTarget.style.display = 'none';
-                        const parent = e.currentTarget.parentElement;
-                        if (parent) {
-                          parent.textContent = getInitials(portfolio.name);
-                        }
-                      }}
-                    />
-                  ) : (
-                    getInitials(portfolio.name)
-                  )}
-                </Avatar>
-                <UserDetails>
-                  <Username>@{portfolio.username}</Username>
-                  <Name>{portfolio.name}</Name>
-                </UserDetails>
-              </UserInfo>
-              
-              {portfolio.bio && <Bio>{portfolio.bio}</Bio>}
-              
-              <PortfolioStats>
-                {renderPortfolioStats(portfolio)}
-              </PortfolioStats>
-            </CardContent>
-          </PortfolioCard>
-        ))}
-      </PortfolioGrid>
-    );
-  };
-
   return (
-    <PageWrapper>
-      <Header>
-        <Title>Explore Creative Portfolios</Title>
-        <Subtitle>Discover talented creators and their work</Subtitle>
-        
-        <SearchContainer>
-          <form onSubmit={handleSearch}>
-            <SearchIcon />
-            <SearchInput
-              type="text"
-              placeholder="Search portfolios by name, skill, or interest..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </form>
-        </SearchContainer>
-      </Header>
+    <PageContainer>
+      <HeroSection>
+        <ContentWrapper>
+          <HeroContent>
+            <Heading1>Discover Creative Excellence</Heading1>
+            <HeroSubtitle>
+              Connect with talented creators, develop your skills, and showcase your work in our thriving professional community
+            </HeroSubtitle>
+            
+            <SearchContainer>
+              <form onSubmit={handleSearch}>
+                <SearchIcon />
+                <SearchInput
+                  type="text"
+                  placeholder="Search portfolios, skills, or creators..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </form>
+            </SearchContainer>
 
-      <MainContent>
-        <SectionHeader>
-          <SectionTitle>
-            <Grid3X3 size={24} />
-            {searchQuery ? 'Search Results' : 'Featured Portfolios'}
-          </SectionTitle>
-          {!searchQuery && portfolios.length > 0 && (
+            <CTAButtons>
+              {user ? (
+                <BaseButton as={Link} href="/dashboard" $variant="primary">
+                  <User size={16} />
+                  Dashboard
+                </BaseButton>
+              ) : (
+                <BaseButton as={Link} href="/login" $variant="primary">
+                  <Play size={16} />
+                  Get Started
+                </BaseButton>
+              )}
+              <BaseButton as={Link} href="/thrive" $variant="secondary">
+                <Zap size={16} />
+                Skills Arena
+              </BaseButton>
+            </CTAButtons>
+          </HeroContent>
+        </ContentWrapper>
+      </HeroSection>
+
+      <ContentWrapper>
+        <Section>
+          <StatsGrid>
+            <StatCard>
+              <CardContent>
+                <StatNumber>{(stats?.users || 0).toLocaleString()}</StatNumber>
+                <StatLabel>Active Creators</StatLabel>
+              </CardContent>
+            </StatCard>
+            <StatCard>
+              <CardContent>
+                <StatNumber>{(stats?.portfolios || 0).toLocaleString()}</StatNumber>
+                <StatLabel>Portfolios</StatLabel>
+              </CardContent>
+            </StatCard>
+            <StatCard>
+              <CardContent>
+                <StatNumber>{(stats?.pieces || 0).toLocaleString()}</StatNumber>
+                <StatLabel>Creative Works</StatLabel>
+              </CardContent>
+            </StatCard>
+            <StatCard>
+              <CardContent>
+                <StatNumber>{stats?.active || 0}</StatNumber>
+                <StatLabel>Online Now</StatLabel>
+              </CardContent>
+            </StatCard>
+          </StatsGrid>
+
+          <SectionHeader>
+            <SectionTitle>
+              <Grid3X3 size={24} />
+              Featured Creators
+            </SectionTitle>
             <ViewAllLink href="/explore">
               View all <ArrowRight size={16} />
             </ViewAllLink>
+          </SectionHeader>
+
+          {loading ? (
+            <LoadingContainer>
+              <Loader2 className="animate-spin" size={24} />
+              Loading portfolios...
+            </LoadingContainer>
+          ) : portfolios.length > 0 ? (
+            <Grid $minWidth="320px">
+              {portfolios.map((portfolio) => (
+                <PortfolioCard 
+                  key={portfolio.id}
+                  $kind={portfolio.kind}
+                  onClick={() => handlePortfolioClick(portfolio.username)}
+                >
+                  <CoverImage $coverImage={portfolio.coverImage} $kind={portfolio.kind}>
+                    <KindBadge $kind={portfolio.kind}>{portfolio.kind}</KindBadge>
+                    {portfolio.isOnline && <OnlineIndicator />}
+                    {renderPortfolioImage(portfolio)}
+                  </CoverImage>
+                  
+                  <CardContent>
+                    <UserInfo>
+                      <Avatar>
+                        {portfolio.profileImage ? (
+                          <img 
+                            src={portfolio.profileImage} 
+                            alt={portfolio.title || portfolio.username} 
+                          />
+                        ) : (
+                          getInitials(portfolio.title || portfolio.username)
+                        )}
+                      </Avatar>
+                      <UserDetails>
+                        <Username>@{portfolio.username}</Username>
+                        <UserTitle>{portfolio.title || 'Creative Professional'}</UserTitle>
+                      </UserDetails>
+                    </UserInfo>
+                    
+                    {portfolio.bio && portfolio.bio.trim() && <Bio>{portfolio.bio}</Bio>}
+                    
+                    <PortfolioStats>
+                      <StatItem>
+                        <Eye size={14} />
+                        <StatValue>{(portfolio.stats?.totalViews || 0).toLocaleString()}</StatValue>
+                      </StatItem>
+                      <StatItem>
+                        <Image size={14} />
+                        <StatValue>{portfolio.stats?.totalPieces || 0}</StatValue>
+                      </StatItem>
+                      <StatItem>
+                        <Star size={14} />
+                        <StatValue>{portfolio.stats?.averageRating?.toFixed(1) || 'N/A'}</StatValue>
+                      </StatItem>
+                    </PortfolioStats>
+                  </CardContent>
+                </PortfolioCard>
+              ))}
+            </Grid>
+          ) : (
+            <EmptyState>
+              <p>No portfolios available at the moment. Check back soon!</p>
+            </EmptyState>
           )}
-        </SectionHeader>
+        </Section>
 
-        {/* Show error message if API failed but we have data */}
-        {error && portfolios.length > 0 && (
-          <div style={{ 
-            background: '#fff3cd', 
-            border: '1px solid #ffeaa7', 
-            borderRadius: '8px', 
-            padding: '1rem', 
-            marginBottom: '2rem',
-            color: '#856404',
-            fontSize: '0.9rem'
-          }}>
-            ⚠️ {error}
-          </div>
-        )}
-
-        {renderContent()}
-      </MainContent>
-
-      <CTASection>
-        <CTATitle>Ready to Share Your Work?</CTATitle>
-        <CTADescription>
-          Create your own portfolio and join our community of creators, educators, and innovators.
-        </CTADescription>
-        <CTAButton href="/signup">Get Started</CTAButton>
-      </CTASection>
-    </PageWrapper>
+        <QuickActions>
+          <ContentWrapper>
+            <SectionTitle>Quick Actions</SectionTitle>
+            <ActionGrid>
+              <ActionCard href="/thrive">
+                <ActionIcon><Target size={24} /></ActionIcon>
+                <ActionTitle>Skills Arena</ActionTitle>
+                <ActionDescription>Challenge yourself with interactive professional development games</ActionDescription>
+              </ActionCard>
+              <ActionCard href="/writing">
+                <ActionIcon><BookOpen size={24} /></ActionIcon>
+                <ActionTitle>Learning Center</ActionTitle>
+                <ActionDescription>Explore educational content and track your learning progress</ActionDescription>
+              </ActionCard>
+              <ActionCard href="/explore">
+                <ActionIcon><Grid3X3 size={24} /></ActionIcon>
+                <ActionTitle>Browse Gallery</ActionTitle>
+                <ActionDescription>Discover creative works from our talented community</ActionDescription>
+              </ActionCard>
+              <ActionCard href="/dashboard/profile">
+                <ActionIcon><Trophy size={24} /></ActionIcon>
+                <ActionTitle>Build Portfolio</ActionTitle>
+                <ActionDescription>Create and showcase your professional work and achievements</ActionDescription>
+              </ActionCard>
+            </ActionGrid>
+          </ContentWrapper>
+        </QuickActions>
+      </ContentWrapper>
+    </PageContainer>
   );
 }

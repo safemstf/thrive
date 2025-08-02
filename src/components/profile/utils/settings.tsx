@@ -1,34 +1,13 @@
-// src/components/profile/utils/settings.tsx
+// src/components/profile/utils/settings.tsx - Professional design
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { 
-  Save, 
-  Eye, 
-  EyeOff, 
-  Globe, 
-  Lock, 
-  Users, 
-  Palette, 
-  Type, 
-  Image,
-  MapPin,
-  Link as LinkIcon,
-  Twitter,
-  Linkedin,
-  Github,
-  Instagram,
-  Mail,
-  Phone,
-  Trash2,
-  AlertTriangle,
-  CheckCircle,
-  X,
-  Plus,
-  Upload,
-  Loader2,
-  Settings as SettingsIcon
+  Save, Eye, EyeOff, Globe, Lock, Users, Palette, Type, Image,
+  MapPin, Link as LinkIcon, Twitter, Linkedin, Github, Instagram,
+  Mail, Phone, Trash2, AlertTriangle, CheckCircle, X, Plus,
+  Upload, Loader2, Settings as SettingsIcon
 } from 'lucide-react';
 import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
 
@@ -83,7 +62,7 @@ export function PortfolioSettings({ portfolio, onUpdate, onDelete, isUpdating = 
     },
     customization: {
       theme: 'light',
-      accentColor: '#3b82f6',
+      accentColor: '#2c2c2c',
       headerImage: undefined
     }
   });
@@ -123,16 +102,6 @@ export function PortfolioSettings({ portfolio, onUpdate, onDelete, isUpdating = 
       socialLinks: {
         ...prev.socialLinks,
         [platform]: value
-      }
-    }));
-  };
-
-  const handleCustomizationChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      customization: {
-        ...prev.customization,
-        [field]: value
       }
     }));
   };
@@ -548,7 +517,7 @@ export function PortfolioSettings({ portfolio, onUpdate, onDelete, isUpdating = 
                 <ModalOverlay onClick={() => setShowDeleteConfirm(false)} />
                 <ModalContent>
                   <ModalHeader>
-                    <AlertTriangle size={24} color="#dc2626" />
+                    <AlertTriangle size={24} />
                     <h3>Delete Portfolio</h3>
                   </ModalHeader>
                   <ModalBody>
@@ -580,7 +549,7 @@ export function PortfolioSettings({ portfolio, onUpdate, onDelete, isUpdating = 
   );
 }
 
-// Styled Components
+// Professional Styled Components
 const SettingsContainer = styled.div`
   display: flex;
   gap: 2rem;
@@ -610,18 +579,19 @@ const NavButton = styled.button<{ $active: boolean }>`
   gap: 0.75rem;
   width: 100%;
   padding: 0.875rem 1rem;
-  background: ${props => props.$active ? '#eff6ff' : 'transparent'};
-  border: 1px solid ${props => props.$active ? '#3b82f6' : 'transparent'};
+  background: ${props => props.$active ? 'rgba(44, 44, 44, 0.05)' : 'transparent'};
+  border: 1px solid ${props => props.$active ? 'rgba(44, 44, 44, 0.1)' : 'transparent'};
   border-radius: 8px;
-  color: ${props => props.$active ? '#3b82f6' : '#6b7280'};
+  color: ${props => props.$active ? '#2c2c2c' : '#666666'};
   font-weight: ${props => props.$active ? '600' : '400'};
   cursor: pointer;
   transition: all 0.2s;
   margin-bottom: 0.5rem;
+  font-family: 'Work Sans', sans-serif;
   
   &:hover {
-    background: #f3f4f6;
-    color: #374151;
+    background: rgba(44, 44, 44, 0.05);
+    color: #2c2c2c;
   }
   
   @media (max-width: 768px) {
@@ -639,7 +609,7 @@ const SaveBar = styled.div<{ $visible: boolean }>`
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #3b82f6;
+  background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
   color: white;
   padding: 1rem 1.5rem;
   border-radius: 8px;
@@ -647,7 +617,8 @@ const SaveBar = styled.div<{ $visible: boolean }>`
   display: ${props => props.$visible ? 'flex' : 'none'};
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(44, 44, 44, 0.3);
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const SaveInfo = styled.div`
@@ -661,13 +632,14 @@ const SaveButton = styled.button`
   align-items: center;
   gap: 0.5rem;
   background: white;
-  color: #3b82f6;
+  color: #2c2c2c;
   border: none;
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  font-family: 'Work Sans', sans-serif;
   
   &:hover:not(:disabled) {
     background: #f8fafc;
@@ -680,10 +652,12 @@ const SaveButton = styled.button`
 `;
 
 const Section = styled.section`
-  background: white;
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
   padding: 2rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 `;
 
 const SectionHeader = styled.div`
@@ -692,14 +666,16 @@ const SectionHeader = styled.div`
 
 const SectionTitle = styled.h2`
   font-size: 1.5rem;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 600;
+  color: #2c2c2c;
   margin: 0 0 0.5rem 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const SectionDescription = styled.p`
-  color: #6b7280;
+  color: #666666;
   margin: 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const FormGrid = styled.div`
@@ -720,8 +696,9 @@ const Label = styled.label`
   align-items: center;
   gap: 0.5rem;
   font-weight: 600;
-  color: #374151;
+  color: #2c2c2c;
   font-size: 0.875rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const Input = styled.input`
@@ -730,11 +707,17 @@ const Input = styled.input`
   border-radius: 8px;
   font-size: 0.875rem;
   transition: border-color 0.2s;
+  font-family: 'Work Sans', sans-serif;
+  background: white;
   
   &:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: #2c2c2c;
+    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
+  }
+  
+  &::placeholder {
+    color: #9ca3af;
   }
 `;
 
@@ -745,19 +728,25 @@ const TextArea = styled.textarea`
   font-size: 0.875rem;
   resize: vertical;
   min-height: 100px;
-  font-family: inherit;
+  font-family: 'Work Sans', sans-serif;
   transition: border-color 0.2s;
+  background: white;
   
   &:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: #2c2c2c;
+    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
+  }
+  
+  &::placeholder {
+    color: #9ca3af;
   }
 `;
 
 const FieldHelp = styled.div`
   font-size: 0.75rem;
-  color: #6b7280;
+  color: #666666;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const TagInput = styled.div`
@@ -769,10 +758,11 @@ const TagInput = styled.div`
   border: 1px solid #d1d5db;
   border-radius: 8px;
   min-height: 42px;
+  background: white;
   
   &:focus-within {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: #2c2c2c;
+    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
   }
 `;
 
@@ -786,11 +776,12 @@ const Tag = styled.span`
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  background: #eff6ff;
-  color: #3b82f6;
+  background: rgba(44, 44, 44, 0.1);
+  color: #2c2c2c;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const TagRemove = styled.button`
@@ -814,10 +805,12 @@ const TagInputField = styled.input`
   flex: 1;
   min-width: 120px;
   font-size: 0.875rem;
+  font-family: 'Work Sans', sans-serif;
+  background: transparent;
 `;
 
 const TagAddButton = styled.button`
-  background: #3b82f6;
+  background: #2c2c2c;
   color: white;
   border: none;
   padding: 0.25rem;
@@ -826,9 +819,10 @@ const TagAddButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.2s;
   
   &:hover {
-    background: #2563eb;
+    background: #1a1a1a;
   }
 `;
 
@@ -843,18 +837,20 @@ const VisibilityOption = styled.div<{ $active: boolean }>`
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  border: 2px solid ${props => props.$active ? '#3b82f6' : '#e5e7eb'};
+  border: 2px solid ${props => props.$active ? '#2c2c2c' : '#e5e7eb'};
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
   
   &:hover {
-    border-color: #3b82f6;
+    border-color: #2c2c2c;
   }
 `;
 
 const VisibilityIcon = styled.div`
-  color: #6b7280;
+  color: #666666;
 `;
 
 const VisibilityContent = styled.div`
@@ -863,23 +859,26 @@ const VisibilityContent = styled.div`
 
 const VisibilityTitle = styled.div`
   font-weight: 600;
-  color: #111827;
+  color: #2c2c2c;
   margin-bottom: 0.25rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const VisibilityDescription = styled.div`
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #666666;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const ComingSoonMessage = styled.div`
   text-align: center;
   padding: 3rem;
-  color: #6b7280;
+  color: #666666;
+  font-family: 'Work Sans', sans-serif;
   
   h3 {
     margin: 1rem 0 0.5rem 0;
-    color: #374151;
+    color: #2c2c2c;
   }
 `;
 
@@ -908,12 +907,14 @@ const DangerTitle = styled.h4`
   font-weight: 600;
   color: #dc2626;
   margin: 0 0 0.25rem 0;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const DangerDescription = styled.p`
   color: #991b1b;
   margin: 0;
   font-size: 0.875rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const DangerButton = styled.button`
@@ -925,6 +926,7 @@ const DangerButton = styled.button`
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  font-family: 'Work Sans', sans-serif;
   
   &:hover {
     background: #b91c1c;
@@ -950,11 +952,12 @@ const ModalOverlay = styled.div`
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
 `;
 
 const ModalContent = styled.div`
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
   max-width: 400px;
   width: 90%;
@@ -970,7 +973,8 @@ const ModalHeader = styled.div`
   
   h3 {
     margin: 0;
-    color: #111827;
+    color: #2c2c2c;
+    font-family: 'Work Sans', sans-serif;
   }
 `;
 
@@ -978,8 +982,9 @@ const ModalBody = styled.div`
   padding: 0 1.5rem 1rem 1.5rem;
   
   p {
-    color: #6b7280;
+    color: #666666;
     margin: 0 0 1rem 0;
+    font-family: 'Work Sans', sans-serif;
   }
 `;
 
@@ -990,7 +995,8 @@ const CheckboxGroup = styled.div`
   
   label {
     font-size: 0.875rem;
-    color: #374151;
+    color: #2c2c2c;
+    font-family: 'Work Sans', sans-serif;
   }
 `;
 
@@ -1014,7 +1020,8 @@ const ModalButton = styled.button<{ $danger?: boolean }>`
   transition: all 0.2s;
   border: 1px solid ${props => props.$danger ? '#dc2626' : '#d1d5db'};
   background: ${props => props.$danger ? '#dc2626' : 'white'};
-  color: ${props => props.$danger ? 'white' : '#374151'};
+  color: ${props => props.$danger ? 'white' : '#2c2c2c'};
+  font-family: 'Work Sans', sans-serif;
   
   &:hover {
     background: ${props => props.$danger ? '#b91c1c' : '#f9fafb'};

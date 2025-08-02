@@ -1,9 +1,12 @@
-/* 1) Reset & Font Import */
-@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Poppins:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap');
+/* Font Imports - Must be first */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&family=Great+Vibes&display=swap');
+
+/* Tailwind Directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* 2) CSS Reset & Base Styles */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -12,286 +15,317 @@
 
 html {
   scroll-behavior: smooth;
+  font-size: 16px;
 }
 
 body {
-  font-family: 'Poppins', sans-serif;
-  background: #f0f4f8;
-  color: #102a43;
+  font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #fafafa;
+  color: #2c2c2c;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 3) Design System CSS Variables */
+:root {
+  /* Colors */
+  --color-primary-50: #f0f4f8;
+  --color-primary-100: #d9e2ec;
+  --color-primary-500: #2c2c2c;
+  --color-primary-600: #1a1a1a;
+  --color-primary-900: #102a43;
+  
+  --color-accent-blue: #2196f3;
+  --color-accent-light-blue: #64b5f6;
+  --color-accent-muted: #486581;
+  
+  --color-background-primary: #fafafa;
+  --color-background-secondary: #ffffff;
+  --color-background-tertiary: #f8f9fa;
+  
+  --color-text-primary: #2c2c2c;
+  --color-text-secondary: #666666;
+  --color-text-muted: #999999;
+  --color-text-light: #627d98;
+  
+  --color-border-light: #f0f0f0;
+  --color-border-medium: #e0e0e0;
+  --color-border-dark: #d9e2ec;
+  
+  /* Typography */
+  --font-display: 'Cormorant Garamond', serif;
+  --font-body: 'Work Sans', sans-serif;
+  --font-accent: 'Great Vibes', cursive;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+  
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.15);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.1);
+  
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  
+  /* Glass Effect */
+  --glass-background: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-blur: 15px;
+}
+
+/* 4) Typography Base */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--color-text-primary);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+h1 { font-size: 3rem; }
+h2 { font-size: 2.25rem; }
+h3 { font-size: 1.875rem; }
+h4 { font-size: 1.5rem; }
+h5 { font-size: 1.25rem; }
+h6 { font-size: 1.125rem; }
+
+p, li, span {
+  font-family: var(--font-body);
   line-height: 1.6;
 }
 
-/* 2) CSS variables for theme & glassmorphism */
-:root {
-  --background-start: #f0f4f8;
-  --background-end:   #d9e2ec;
-  --muted:            #486581;
-  --accent-primary:   #2196f3;
-  --accent-secondary: #64b5f6;
-
-  --glass-bg:     rgba(255,255,255,0.85);
-  --glass-border: rgba(255,255,255,0.3);
-  --glass-blur:   15px;
-
-  --shadow-sm: 0 2px 8px rgba(0,0,0,0.1);
-  --shadow-md: 0 8px 20px rgba(0,0,0,0.15);
-
-  --radius-sm:  12px;
-  --radius-md:  20px;
-
-  --transition: all 0.3s ease;
-  --gradient-angle: 135deg;
-
-}
-
-/* 3) Typography */
-h1,h2,h3,h4,h5,h6 {
-  font-family: 'Playfair Display', serif;
-  color: var(--foreground);
-  margin-bottom: 1rem;
-}
-p, li {
-  margin-bottom: 0.75rem;
-}
-
-/* 4) Utility classes */
-.container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
-.grid, .cards {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.grid-4, .cards {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-/* 5) Taskbar & Buttons */
-.taskbar {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-
-.task-button,
-.button {
-  background: #fff;
-  border: 2px solid transparent;
-  border-radius: var(--radius-sm);
-  padding: 0.75rem 1.5rem;
-  font-weight: 600;
-  color: var(--foreground);
-  box-shadow: var(--shadow-sm);
+a {
+  color: inherit;
   text-decoration: none;
-  transition: var(--transition);
-  cursor: pointer;
+  transition: var(--transition-normal);
 }
 
-.task-button:hover,
-.button:hover {
-  background: #f0f4f8;
-  transform: translateY(-2px);
+/* 5) Utility Classes */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-md);
 }
 
-.task-button.active,
-.button.active {
-  background: var(--muted);
-  color: #fff;
-  border-color: var(--muted);
-}
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
 
-/* 6) Cards & Covers */
-.card, .book-card {
-  background: #fff;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  cursor: pointer;
-  transition: var(--transition);
-}
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
 
-.card:hover,
-.book-card:hover {
-  transform: translateY(-8px);
-  box-shadow: var(--shadow-md);
-}
+.grid { display: grid; }
+.gap-sm { gap: var(--spacing-sm); }
+.gap-md { gap: var(--spacing-md); }
+.gap-lg { gap: var(--spacing-lg); }
+.gap-xl { gap: var(--spacing-xl); }
 
-.cover {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 2rem;
-  color: #fff;
-  gap: 0.5rem;
+.p-sm { padding: var(--spacing-sm); }
+.p-md { padding: var(--spacing-md); }
+.p-lg { padding: var(--spacing-lg); }
+.p-xl { padding: var(--spacing-xl); }
 
-  /* fallback colors if custom props aren't set */
-  background: linear-gradient(
-    var(--gradient-angle),
-    var(--primary, var(--accent-primary)),
-    var(--secondary, var(--accent-secondary))
-  );
-  transition: var(--transition);
-}
+.m-sm { margin: var(--spacing-sm); }
+.m-md { margin: var(--spacing-md); }
+.m-lg { margin: var(--spacing-lg); }
+.m-xl { margin: var(--spacing-xl); }
 
-.meta {
-  font-size: 0.875rem;
-  opacity: 0.85;
-}
+.mb-sm { margin-bottom: var(--spacing-sm); }
+.mb-md { margin-bottom: var(--spacing-md); }
+.mb-lg { margin-bottom: var(--spacing-lg); }
+.mb-xl { margin-bottom: var(--spacing-xl); }
 
-/* 7) Section Titles & Grids */
-.section-title, .text-title {
-  font-size: 1.75rem;
-  font-weight: 600;
-  color: var(--foreground);
-  margin-bottom: 1rem;
-  text-align: center;
-  font-family: 'Great Vibes', cursive;
-}
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-full { border-radius: var(--radius-full); }
 
-header .logo {
-  font-size: 1.25rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--foreground);
-  margin-bottom: 1rem;
-}
-
-header .logo img {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-}
-
-/* 8) Specific SAT cards */
-.card__content {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem;
-}
-
-.text-body {
-  font-size: 1rem;
-  color: #627d98;
-  text-align: center;
-}
-
-.exercises {
-  background: #fff;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  padding: 2rem;
-  margin-bottom: 2rem;
-}
-
-.exercises h2 {
-  font-size: 2rem;
-  color: var(--foreground);
-  text-align: center;
-  margin-bottom: 1rem;
-  font-family: 'Playfair Display', serif;
-}
-
-.exercises ul {
-  list-style: disc;
-  padding-left: 1.5rem;
-}
-
-.exercises li {
-  margin-bottom: 0.75rem;
-  font-size: 1rem;
-  color: #334e68;
-}
-
-/* 9) Glass panel utility */
+/* 6) Glass Effect Utility */
 .glass {
-  background: var(--glass-bg);
+  background: var(--glass-background);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--shadow-sm);
 }
 
-/* 10) Modal */
-.modal-overlay,
-.ModalOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
+/* 7) Button Base Styles */
+.btn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: var(--transition-normal);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  gap: var(--spacing-sm);
+  text-decoration: none;
 }
 
-.modal-content,
-.ModalContent {
-  background: #fff;
-  padding: 2rem;
-  border-radius: var(--radius-md);
-  max-width: 500px;
-  width: 90%;
-  position: relative;
+.btn-primary {
+  background: var(--color-primary-500);
+  color: white;
+  border-color: var(--color-primary-500);
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-600);
+  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
-.close-btn,
-.CloseBtn {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
+.btn-secondary {
   background: transparent;
-  border: none;
-  cursor: pointer;
+  color: var(--color-primary-500);
+  border-color: var(--color-primary-500);
 }
 
-/* 11) Footer */
-.footer {
-  margin-top: auto;
-  padding: 2rem 0;
-  text-align: center;
-  color: var(--muted);
+.btn-secondary:hover {
+  background: var(--color-primary-500);
+  color: white;
+  transform: translateY(-2px);
 }
 
+/* 8) Card Styles */
+.card {
+  background: var(--color-background-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: var(--transition-normal);
+}
 
-/* 12) Responsive tweaks */
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.card-content {
+  padding: var(--spacing-xl);
+}
+
+/* 9) Form Styles */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-label {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.form-input {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  transition: var(--transition-fast);
+  width: 100%;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
+}
+
+.form-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* 10) Animation Classes */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* 11) Responsive Utilities */
 @media (max-width: 768px) {
-  .cards, .grid-4 {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  .container {
+    padding: 0 var(--spacing-sm);
   }
-  .task-button, .button {
-    padding: 0.5rem 1rem;
+  
+  h1 { font-size: 2.5rem; }
+  h2 { font-size: 2rem; }
+  h3 { font-size: 1.5rem; }
+  
+  .btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.8rem;
   }
-  .cover {
-    padding: 1.5rem;
-  }
-  .section-title, .text-title {
-    font-size: 1.5rem;
-  }
-  .exercises {
-    padding: 1.5rem;
-  }
-  .exercises h2 {
-    font-size: 1.75rem;
-  }
-  header .logo {
-    flex-direction: column;
-    font-size: 1rem;
-  }
-  header .logo img {
-    width: 32px;
-    height: 32px;
+  
+  .card-content {
+    padding: var(--spacing-lg);
   }
 }
 
+@media (max-width: 480px) {
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.75rem; }
+  
+  .card-content {
+    padding: var(--spacing-md);
+  }
+}
+
+/* 12) Tailwind Layer Overrides */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -320,6 +354,7 @@ header .logo img {
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;

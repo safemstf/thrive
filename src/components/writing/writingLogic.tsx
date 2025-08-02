@@ -9,9 +9,10 @@ import { defaultSections as sections } from '@/types/educational.types';
 import type { 
   Book, 
   ConceptProgress as BaseConceptProgress, 
-  Concept as BaseConcept 
+  Concept as BaseConcept,
 } from '@/types/educational.types';
 
+import { PortfolioKind } from '@/types/portfolio.types';
 // Types
 type ViewMode = 'books' | 'concepts' | 'progress' | 'achievements';
 type DisplayMode = 'grid' | 'list';
@@ -26,7 +27,7 @@ interface ErrorInfo {
 interface PortfolioIntegration {
   isAuthenticated: boolean;
   hasPortfolio: boolean;
-  portfolioType?: 'educational' | 'creative' | 'hybrid';
+  portfolioType?: PortfolioKind; // Use the imported PortfolioKind type
   conceptProgress: Map<string, ConceptProgress>;
   totalConcepts: number;
   completedConcepts: number;
