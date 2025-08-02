@@ -1,7 +1,7 @@
 // src/components/Header.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import styled from 'styled-components';
@@ -12,6 +12,8 @@ import { Taskbar } from './taskbar';
 interface HeaderProps {
   title: string;
   subtitle?: string;
+  children?: ReactNode;
+
 }
 
 const HeaderContainer = styled.header<{ $scrolled: boolean }>`

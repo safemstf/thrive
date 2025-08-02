@@ -22,8 +22,9 @@ import { PortfolioCreation } from '@/components/portfolio/portfolioCreation';
 
 // Import our new modular components
 import { PortfolioOverview } from '@/components/profile/utils/overview';
-import { PortfolioSettings } from '@/components/profile/utils/settings';
 import { PortfolioUpgrade } from '@/components/profile/utils/upgrade';
+import ProfessionalSettingsPage from '@/components/profile/utils/settings';
+
 import { 
   HeaderSection,
   ErrorDisplay,
@@ -193,7 +194,7 @@ export default function PortfolioHubPage() {
 
       case 'settings':
         return (
-          <PortfolioSettings
+          <ProfessionalSettingsPage
             portfolio={portfolio}
             onUpdate={handlePortfolioUpdate}
             onDelete={handlePortfolioDelete}

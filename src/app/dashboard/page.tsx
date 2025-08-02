@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - Elegant & Refined Version
+// src/app/dashboard/page.tsx - Enhanced with Thrive Integration
 "use client";
 
 import { useEffect, useState } from "react";
@@ -27,7 +27,11 @@ import {
   BarChart3,
   MessageSquare,
   Star,
-  Zap
+  Zap,
+  Target,
+  ArrowRight,
+  Clock,
+  Briefcase
 } from "lucide-react";
 
 // Import refined styled components
@@ -45,7 +49,6 @@ import {
   LoadingContainer,
   LoadingSpinner,
   LoadingText,
-  LoadingSubtext,
   ErrorContainer,
   ErrorIcon,
   ErrorTitle,
@@ -84,8 +87,6 @@ import {
   Section,
   SectionHeader,
   SectionTitle,
-  SectionActions,
-  ActionButton,
   ViewAllLink,
   ActivityList,
   ActivityItem,
@@ -102,19 +103,184 @@ import {
   QuickActionContent,
   QuickActionTitle,
   QuickActionDescription,
-  QuickActionArrow,
-  EmptyStateCard,
-  EmptyIcon,
-  EmptyTitle,
-  EmptyMessage
+  QuickActionArrow
 } from '@/components/dashboard/dashboardStyles';
+
+// Import additional styled components for skills integration
+import styled from 'styled-components';
+import { theme } from '@/styles/theme';
+
+const SkillsHighlightCard = styled.div`
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: ${theme.borderRadius.lg};
+  padding: ${theme.spacing.lg};
+  margin-bottom: ${theme.spacing.xl};
+  position: relative;
+  overflow: hidden;
+`;
+
+const SkillsHighlightHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: ${theme.spacing.md};
+`;
+
+const SkillsHighlightTitle = styled.h3`
+  font-size: ${theme.typography.sizes.lg};
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
+  margin: 0 0 ${theme.spacing.xs} 0;
+`;
+
+const SkillsHighlightSubtitle = styled.p`
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  margin: 0;
+`;
+
+const SkillsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: ${theme.spacing.md};
+  margin-top: ${theme.spacing.lg};
+`;
+
+const SkillCard = styled.div`
+  background: white;
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: ${theme.borderRadius.md};
+  padding: ${theme.spacing.md};
+  transition: all 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: ${theme.shadows.sm};
+    border-color: #3b82f6;
+  }
+`;
+
+const SkillCardHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: ${theme.spacing.sm};
+`;
+
+const SkillName = styled.h4`
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.primary};
+  margin: 0;
+`;
+
+const SkillLevel = styled.span`
+  font-size: ${theme.typography.sizes.xs};
+  font-weight: ${theme.typography.weights.semibold};
+  color: #3b82f6;
+`;
+
+const SkillProgress = styled.div`
+  height: 6px;
+  background: ${theme.colors.border.light};
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: ${theme.spacing.xs};
+`;
+
+const SkillProgressFill = styled.div<{ $percentage: number }>`
+  height: 100%;
+  width: ${props => props.$percentage}%;
+  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+  transition: width 0.5s ease;
+`;
+
+const SkillMetrics = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: ${theme.typography.sizes.xs};
+  color: ${theme.colors.text.secondary};
+`;
+
+const IntegrationBanner = styled.div`
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #fbbf24;
+  border-radius: ${theme.borderRadius.md};
+  padding: ${theme.spacing.md};
+  margin-bottom: ${theme.spacing.lg};
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.md};
+`;
+
+const IntegrationIcon = styled.div`
+  width: 40px;
+  height: 40px;
+  background: white;
+  border-radius: ${theme.borderRadius.sm};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f59e0b;
+  box-shadow: ${theme.shadows.sm};
+`;
+
+const IntegrationContent = styled.div`
+  flex: 1;
+`;
+
+const IntegrationTitle = styled.h4`
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.semibold};
+  color: #92400e;
+  margin: 0 0 2px 0;
+`;
+
+const IntegrationText = styled.p`
+  font-size: ${theme.typography.sizes.xs};
+  color: #78350f;
+  margin: 0;
+`;
+
+const IntegrationAction = styled.button`
+  background: white;
+  color: #92400e;
+  border: 1px solid #fbbf24;
+  padding: ${theme.spacing.xs} ${theme.spacing.md};
+  border-radius: ${theme.borderRadius.sm};
+  font-size: ${theme.typography.sizes.xs};
+  font-weight: ${theme.typography.weights.medium};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: #fef3c7;
+    transform: translateY(-1px);
+  }
+`;
 
 // View components
 import { GalleryView } from '@/components/dashboard/views/GalleryView';
 import { LearningView } from '@/components/dashboard/views/learningView';
 import { AnalyticsView } from '@/components/dashboard/views/analyticsView';
 
-export default function DashboardOverview() {
+// Skills data interface
+interface SkillSummary {
+  id: string;
+  name: string;
+  category: string;
+  proficiency: number;
+  marketDemand: number;
+  lastPracticed: string;
+  trending: boolean;
+}
+
+export default function EnhancedDashboard() {
   const { user } = useAuth();
   const {
     portfolioTypeConfig,
@@ -143,6 +309,42 @@ export default function DashboardOverview() {
     achievements: [],
     error: null
   });
+
+  // Skills state for Thrive integration
+  const [topSkills] = useState<SkillSummary[]>([
+    {
+      id: '1',
+      name: 'React Development',
+      category: 'Technical',
+      proficiency: 78,
+      marketDemand: 92,
+      lastPracticed: '2 days ago',
+      trending: true
+    },
+    {
+      id: '2',
+      name: 'UI/UX Design',
+      category: 'Creative',
+      proficiency: 65,
+      marketDemand: 87,
+      lastPracticed: '1 week ago',
+      trending: false
+    },
+    {
+      id: '3',
+      name: 'Data Analysis',
+      category: 'Analytical',
+      proficiency: 82,
+      marketDemand: 95,
+      lastPracticed: 'Today',
+      trending: true
+    }
+  ]);
+
+  // Check if user has skills data
+  const hasSkillsData = topSkills.length > 0;
+  const averageSkillProficiency = topSkills.reduce((acc, skill) => acc + skill.proficiency, 0) / topSkills.length;
+  const trendingSkillsCount = topSkills.filter(skill => skill.trending).length;
 
   // Data fetching effect
   useEffect(() => {
@@ -213,41 +415,6 @@ export default function DashboardOverview() {
     }
   };
 
-  // Retry handler
-  const handleRetry = async () => {
-    if (!user) return;
-    
-    try {
-      setState(prev => ({ ...prev, loading: true, error: null }));
-      const portfolioData = await fetchPortfolioData();
-      
-      if (portfolioData) {
-        const contentData = await fetchPortfolioContent(portfolioData);
-        const activity = generateEnhancedActivity(portfolioData.kind);
-        const achievements = generateAchievements();
-        
-        setState(prev => ({
-          ...prev,
-          portfolio: portfolioData,
-          stats: contentData.stats,
-          galleryItems: contentData.galleryItems,
-          conceptProgress: contentData.conceptProgress,
-          recentActivity: activity,
-          achievements,
-          loading: false
-        }));
-      } else {
-        setState(prev => ({ ...prev, portfolio: null, loading: false }));
-      }
-    } catch (error: any) {
-      setState(prev => ({
-        ...prev,
-        error: error.message,
-        loading: false
-      }));
-    }
-  };
-
   // View change handler
   const handleViewChange = (view: 'overview' | 'gallery' | 'learning' | 'analytics') => {
     setState(prev => ({ ...prev, activeView: view }));
@@ -278,7 +445,7 @@ export default function DashboardOverview() {
             <ErrorIcon>⚠️</ErrorIcon>
             <ErrorTitle>Something went wrong</ErrorTitle>
             <ErrorMessage>{state.error}</ErrorMessage>
-            <RetryButton onClick={handleRetry}>Try Again</RetryButton>
+            <RetryButton onClick={() => window.location.reload()}>Try Again</RetryButton>
           </ErrorContainer>
         </PageWrapper>
       </ProtectedRoute>
@@ -289,7 +456,7 @@ export default function DashboardOverview() {
     <ProtectedRoute>
       <PageWrapper>
         <Container>
-          {/* Refined Header Section */}
+          {/* Header Section */}
           <Header>
             <HeaderContent>
               <WelcomeSection>
@@ -307,7 +474,7 @@ export default function DashboardOverview() {
                 </WelcomeSubtitle>
               </WelcomeSection>
               
-              {/* Simplified View Toggle */}
+              {/* View Toggle */}
               {state.portfolio && (
                 <ViewToggle>
                   <ViewButton 
@@ -408,7 +575,26 @@ export default function DashboardOverview() {
               {/* Overview View */}
               {state.activeView === 'overview' && (
                 <>
-                  {/* Simplified Stats Grid */}
+                  {/* Skills Integration Banner */}
+                  {hasSkillsData && (
+                    <IntegrationBanner>
+                      <IntegrationIcon>
+                        <Sparkles size={20} />
+                      </IntegrationIcon>
+                      <IntegrationContent>
+                        <IntegrationTitle>Skills Development Available</IntegrationTitle>
+                        <IntegrationText>
+                          Track your professional growth with {trendingSkillsCount} trending skills
+                        </IntegrationText>
+                      </IntegrationContent>
+                      <IntegrationAction as="a" href="/dashboard/thrive">
+                        Explore Skills
+                        <ArrowRight size={14} />
+                      </IntegrationAction>
+                    </IntegrationBanner>
+                  )}
+
+                  {/* Enhanced Stats Grid with Skills */}
                   <StatsGrid>
                     <MainStatCard>
                       <StatHeader>
@@ -442,6 +628,19 @@ export default function DashboardOverview() {
                       </StatContent>
                     </StatCard>
 
+                    {hasSkillsData && (
+                      <StatCard>
+                        <StatIcon $color="#3b82f6">
+                          <Target size={18} />
+                        </StatIcon>
+                        <StatContent>
+                          <StatValue>{Math.round(averageSkillProficiency)}%</StatValue>
+                          <StatLabel>Skill Level</StatLabel>
+                          <StatChange $positive>{trendingSkillsCount} trending</StatChange>
+                        </StatContent>
+                      </StatCard>
+                    )}
+
                     {(state.portfolio.kind === 'creative' || state.portfolio.kind === 'hybrid') && (
                       <StatCard>
                         <StatIcon $color="#8b5cf6">
@@ -454,22 +653,42 @@ export default function DashboardOverview() {
                         </StatContent>
                       </StatCard>
                     )}
-
-                    {(state.portfolio.kind === 'educational' || state.portfolio.kind === 'hybrid') && (
-                      <StatCard>
-                        <StatIcon $color="#3b82f6">
-                          <BookOpenCheck size={18} />
-                        </StatIcon>
-                        <StatContent>
-                          <StatValue>{state.conceptProgress.filter(c => c.status === 'completed').length}</StatValue>
-                          <StatLabel>Completed</StatLabel>
-                          <StatChange $positive>
-                            {state.stats.averageScore ? `${state.stats.averageScore.toFixed(0)}%` : 'Keep going'}
-                          </StatChange>
-                        </StatContent>
-                      </StatCard>
-                    )}
                   </StatsGrid>
+
+                  {/* Skills Highlight Section */}
+                  {hasSkillsData && (
+                    <SkillsHighlightCard>
+                      <SkillsHighlightHeader>
+                        <div>
+                          <SkillsHighlightTitle>Your Top Skills</SkillsHighlightTitle>
+                          <SkillsHighlightSubtitle>
+                            Monitor your professional development and market alignment
+                          </SkillsHighlightSubtitle>
+                        </div>
+                        <ViewAllLink as="a" href="/dashboard/thrive">
+                          View all skills
+                        </ViewAllLink>
+                      </SkillsHighlightHeader>
+                      
+                      <SkillsGrid>
+                        {topSkills.map(skill => (
+                          <SkillCard key={skill.id}>
+                            <SkillCardHeader>
+                              <SkillName>{skill.name}</SkillName>
+                              <SkillLevel>{skill.proficiency}%</SkillLevel>
+                            </SkillCardHeader>
+                            <SkillProgress>
+                              <SkillProgressFill $percentage={skill.proficiency} />
+                            </SkillProgress>
+                            <SkillMetrics>
+                              <span>{skill.marketDemand}% demand</span>
+                              <span>{skill.lastPracticed}</span>
+                            </SkillMetrics>
+                          </SkillCard>
+                        ))}
+                      </SkillsGrid>
+                    </SkillsHighlightCard>
+                  )}
 
                   {/* Content Grid */}
                   <ContentGrid>
@@ -512,7 +731,7 @@ export default function DashboardOverview() {
                       </ActivityList>
                     </Section>
 
-                    {/* Quick Actions */}
+                    {/* Enhanced Quick Actions */}
                     <Section>
                       <SectionHeader>
                         <SectionTitle>
@@ -521,6 +740,34 @@ export default function DashboardOverview() {
                         </SectionTitle>
                       </SectionHeader>
                       <QuickActionGrid>
+                        {/* Skills Development */}
+                        <QuickAction as="a" href="/dashboard/thrive">
+                          <QuickActionIcon $color="#3b82f6">
+                            <Target size={20} />
+                          </QuickActionIcon>
+                          <QuickActionContent>
+                            <QuickActionTitle>Skills Hub</QuickActionTitle>
+                            <QuickActionDescription>Track & develop</QuickActionDescription>
+                          </QuickActionContent>
+                          <QuickActionArrow>
+                            <ChevronRight size={14} />
+                          </QuickActionArrow>
+                        </QuickAction>
+
+                        {/* Market Intelligence */}
+                        <QuickAction as="a" href="/dashboard/market">
+                          <QuickActionIcon $color="#f59e0b">
+                            <Briefcase size={20} />
+                          </QuickActionIcon>
+                          <QuickActionContent>
+                            <QuickActionTitle>Market Intel</QuickActionTitle>
+                            <QuickActionDescription>Opportunities</QuickActionDescription>
+                          </QuickActionContent>
+                          <QuickActionArrow>
+                            <ChevronRight size={14} />
+                          </QuickActionArrow>
+                        </QuickAction>
+
                         {(state.portfolio.kind === 'creative' || state.portfolio.kind === 'hybrid') && (
                           <QuickAction onClick={() => handleViewChange('gallery')}>
                             <QuickActionIcon $color="#8b5cf6">
@@ -536,61 +783,18 @@ export default function DashboardOverview() {
                           </QuickAction>
                         )}
 
-                        {(state.portfolio.kind === 'educational' || state.portfolio.kind === 'hybrid') && (
-                          <QuickAction onClick={() => handleViewChange('learning')}>
-                            <QuickActionIcon $color="#3b82f6">
-                              <BookOpen size={20} />
-                            </QuickActionIcon>
-                            <QuickActionContent>
-                              <QuickActionTitle>Learning</QuickActionTitle>
-                              <QuickActionDescription>Continue progress</QuickActionDescription>
-                            </QuickActionContent>
-                            <QuickActionArrow>
-                              <ChevronRight size={14} />
-                            </QuickActionArrow>
-                          </QuickAction>
-                        )}
-
-                        <QuickAction as="a" href="/dashboard/tutoring">
-                          <QuickActionIcon $color="#10b981">
-                            <MessageSquare size={20} />
-                          </QuickActionIcon>
-                          <QuickActionContent>
-                            <QuickActionTitle>Tutoring</QuickActionTitle>
-                            <QuickActionDescription>Get help</QuickActionDescription>
-                          </QuickActionContent>
-                          <QuickActionArrow>
-                            <ChevronRight size={14} />
-                          </QuickActionArrow>
-                        </QuickAction>
-
                         <QuickAction as="a" href="/dashboard/profile">
                           <QuickActionIcon $color="#6b7280">
                             <Settings size={20} />
                           </QuickActionIcon>
                           <QuickActionContent>
-                            <QuickActionTitle>Settings</QuickActionTitle>
-                            <QuickActionDescription>Configure profile</QuickActionDescription>
+                            <QuickActionTitle>Portfolio</QuickActionTitle>
+                            <QuickActionDescription>Manage & edit</QuickActionDescription>
                           </QuickActionContent>
                           <QuickActionArrow>
                             <ChevronRight size={14} />
                           </QuickActionArrow>
                         </QuickAction>
-
-                        {user?.role === 'admin' && (
-                          <QuickAction as="a" href="/dashboard/api-test">
-                            <QuickActionIcon $color="#dc2626">
-                              <Shield size={20} />
-                            </QuickActionIcon>
-                            <QuickActionContent>
-                              <QuickActionTitle>Admin</QuickActionTitle>
-                              <QuickActionDescription>System controls</QuickActionDescription>
-                            </QuickActionContent>
-                            <QuickActionArrow>
-                              <ChevronRight size={14} />
-                            </QuickActionArrow>
-                          </QuickAction>
-                        )}
                       </QuickActionGrid>
                     </Section>
                   </ContentGrid>

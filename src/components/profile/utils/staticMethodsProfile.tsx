@@ -10,7 +10,15 @@ import {
 } from 'lucide-react';
 import type { PortfolioKind } from '@/types/portfolio.types';
 
+// src/components/profile/utils/staticMethodsProfile.tsx - Simple fix
+// Just update your existing PortfolioStats interface to include the missing properties
+
 export interface PortfolioStats {
+  totalItems: number;
+  completionRate: number;
+  weeklyGrowth: number;
+  
+  // Keep your existing structure
   gallery: {
     totalPieces: number;
     totalViews: number;
@@ -118,6 +126,12 @@ export const generateMockUserStats = (): UserStats => {
  */
 export const generateMockPortfolioStats = (): PortfolioStats => {
   return {
+    // Add the missing properties
+    totalItems: Math.floor(Math.random() * 50) + 10,
+    completionRate: Math.floor(Math.random() * 40) + 60,
+    weeklyGrowth: Math.floor(Math.random() * 25) + 5,
+    
+    // Keep your existing mock data
     gallery: {
       totalPieces: Math.floor(Math.random() * 50) + 10,
       totalViews: Math.floor(Math.random() * 1000) + 100,

@@ -1,1029 +1,679 @@
-// src/components/profile/utils/settings.tsx - Professional design
+// src/app/dashboard/settings/page.tsx - Professional Configuration Hub
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
-import { 
-  Save, Eye, EyeOff, Globe, Lock, Users, Palette, Type, Image,
-  MapPin, Link as LinkIcon, Twitter, Linkedin, Github, Instagram,
-  Mail, Phone, Trash2, AlertTriangle, CheckCircle, X, Plus,
-  Upload, Loader2, Settings as SettingsIcon
+import React, { useState } from 'react';
+import { useAuth } from '@/providers/authProvider';
+import { useRouter } from 'next/navigation';
+import {
+  Settings,
+  Bell,
+  Eye,
+  Shield,
+  Palette,
+  Globe,
+  Mail,
+  Smartphone,
+  Monitor,
+  Moon,
+  Sun,
+  ChevronRight,
+  Check,
+  X,
+  AlertCircle,
+  Info,
+  Save,
+  RefreshCw
 } from 'lucide-react';
-import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
 
-interface SettingsProps {
-  portfolio: Portfolio;
-  onUpdate: (updates: Partial<Portfolio>) => Promise<void>;
-  onDelete?: (deleteGalleryPieces: boolean) => Promise<void>;
-  isUpdating?: boolean;
-}
+import {
+  PageWrapper,
+  Container,
+  Header,
+  HeaderContent,
+  WelcomeSection,
+  WelcomeTitle,
+  WelcomeSubtitle,
+  ViewToggle,
+  ViewButton
+} from '@/components/dashboard/dashboardStyles';
 
-interface FormData {
-  title: string;
-  tagline: string;
-  bio: string;
-  location: string;
-  visibility: 'public' | 'private' | 'unlisted';
-  specializations: string[];
-  tags: string[];
-  socialLinks: {
-    website?: string;
-    twitter?: string;
-    linkedin?: string;
-    github?: string;
-    instagram?: string;
-    email?: string;
-    phone?: string;
-  };
-  customization: {
-    theme: 'light' | 'dark' | 'auto';
-    accentColor: string;
-    headerImage?: string;
-  };
-}
+import { Card, CardContent } from '@/styles/styled-components';
+import styled from 'styled-components';
+import { theme } from '@/styles/theme';
 
-export function PortfolioSettings({ portfolio, onUpdate, onDelete, isUpdating = false }: SettingsProps) {
-  const [formData, setFormData] = useState<FormData>({
-    title: portfolio.title,
-    tagline: portfolio.tagline || '',
-    bio: portfolio.bio || '',
-    location: portfolio.location || '',
-    visibility: portfolio.visibility,
-    specializations: portfolio.specializations || [],
-    tags: portfolio.tags || [],
-    socialLinks: {
-      website: '',
-      twitter: '',
-      linkedin: '',
-      github: '',
-      instagram: '',
-      email: '',
-      phone: ''
-    },
-    customization: {
-      theme: 'light',
-      accentColor: '#2c2c2c',
-      headerImage: undefined
-    }
-  });
+// Professional styled components
+const SettingsGrid = styled.div`
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: ${theme.spacing.xl};
+  margin-top: ${theme.spacing.xl};
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
 
-  const [activeSection, setActiveSection] = useState<'basic' | 'social' | 'customization' | 'privacy' | 'danger'>('basic');
-  const [newSpecialization, setNewSpecialization] = useState('');
-  const [newTag, setNewTag] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteGalleryPieces, setDeleteGalleryPieces] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-
-  // Track changes
-  useEffect(() => {
-    const hasBasicChanges = 
-      formData.title !== portfolio.title ||
-      formData.tagline !== (portfolio.tagline || '') ||
-      formData.bio !== (portfolio.bio || '') ||
-      formData.location !== (portfolio.location || '') ||
-      formData.visibility !== portfolio.visibility ||
-      JSON.stringify(formData.specializations) !== JSON.stringify(portfolio.specializations || []) ||
-      JSON.stringify(formData.tags) !== JSON.stringify(portfolio.tags || []);
-
-    setHasChanges(hasBasicChanges);
-  }, [formData, portfolio]);
-
-  const handleInputChange = (field: keyof FormData, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleSocialLinkChange = (platform: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      socialLinks: {
-        ...prev.socialLinks,
-        [platform]: value
-      }
-    }));
-  };
-
-  const addSpecialization = () => {
-    if (newSpecialization.trim() && !formData.specializations.includes(newSpecialization.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        specializations: [...prev.specializations, newSpecialization.trim()]
-      }));
-      setNewSpecialization('');
-    }
-  };
-
-  const removeSpecialization = (spec: string) => {
-    setFormData(prev => ({
-      ...prev,
-      specializations: prev.specializations.filter(s => s !== spec)
-    }));
-  };
-
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }));
-      setNewTag('');
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(t => t !== tag)
-    }));
-  };
-
-  const handleSave = async () => {
-    if (!hasChanges) return;
-
-    setSaveStatus('saving');
-    try {
-      await onUpdate({
-        title: formData.title,
-        tagline: formData.tagline,
-        bio: formData.bio,
-        location: formData.location,
-        visibility: formData.visibility,
-        specializations: formData.specializations,
-        tags: formData.tags,
-        socialLinks: formData.socialLinks
-      });
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch (error) {
-      setSaveStatus('error');
-      setTimeout(() => setSaveStatus('idle'), 3000);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!onDelete) return;
-    
-    try {
-      await onDelete(deleteGalleryPieces);
-      setShowDeleteConfirm(false);
-    } catch (error) {
-      console.error('Failed to delete portfolio:', error);
-    }
-  };
-
-  const sections = [
-    { id: 'basic', label: 'Basic Info', icon: <SettingsIcon size={16} /> },
-    { id: 'social', label: 'Social Links', icon: <LinkIcon size={16} /> },
-    { id: 'customization', label: 'Appearance', icon: <Palette size={16} /> },
-    { id: 'privacy', label: 'Privacy & Sharing', icon: <Eye size={16} /> },
-    { id: 'danger', label: 'Danger Zone', icon: <AlertTriangle size={16} /> }
-  ] as const;
-
-  return (
-    <SettingsContainer>
-      {/* Navigation */}
-      <SettingsNav>
-        {sections.map(section => (
-          <NavButton
-            key={section.id}
-            $active={activeSection === section.id}
-            onClick={() => setActiveSection(section.id)}
-          >
-            {section.icon}
-            {section.label}
-          </NavButton>
-        ))}
-      </SettingsNav>
-
-      {/* Content */}
-      <SettingsContent>
-        {/* Save Button */}
-        <SaveBar $visible={hasChanges}>
-          <SaveInfo>
-            <CheckCircle size={16} />
-            You have unsaved changes
-          </SaveInfo>
-          <SaveButton onClick={handleSave} disabled={saveStatus === 'saving'}>
-            {saveStatus === 'saving' && <Loader2 size={16} className="animate-spin" />}
-            {saveStatus === 'saved' ? 'Saved!' : 'Save Changes'}
-          </SaveButton>
-        </SaveBar>
-
-        {/* Basic Information */}
-        {activeSection === 'basic' && (
-          <Section>
-            <SectionHeader>
-              <SectionTitle>Basic Information</SectionTitle>
-              <SectionDescription>
-                Update your portfolio's basic information and public profile details.
-              </SectionDescription>
-            </SectionHeader>
-
-            <FormGrid>
-              <FormGroup>
-                <Label>Portfolio Title *</Label>
-                <Input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
-                  placeholder="My Creative Portfolio"
-                  maxLength={100}
-                />
-                <FieldHelp>This appears as your portfolio's main headline</FieldHelp>
-              </FormGroup>
-
-              <FormGroup>
-                <Label>Tagline</Label>
-                <Input
-                  type="text"
-                  value={formData.tagline}
-                  onChange={(e) => handleInputChange('tagline', e.target.value)}
-                  placeholder="Visual designer & creative director"
-                  maxLength={150}
-                />
-                <FieldHelp>A brief description of what you do</FieldHelp>
-              </FormGroup>
-
-              <FormGroup $span="full">
-                <Label>Bio</Label>
-                <TextArea
-                  value={formData.bio}
-                  onChange={(e) => handleInputChange('bio', e.target.value)}
-                  placeholder="Tell visitors about yourself, your background, and your work..."
-                  rows={4}
-                  maxLength={1000}
-                />
-                <FieldHelp>{formData.bio.length}/1000 characters</FieldHelp>
-              </FormGroup>
-
-              <FormGroup>
-                <Label>Location</Label>
-                <Input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  placeholder="San Francisco, CA"
-                />
-              </FormGroup>
-
-              <FormGroup>
-                <Label>Specializations</Label>
-                <TagInput>
-                  <TagList>
-                    {formData.specializations.map((spec, index) => (
-                      <Tag key={index}>
-                        {spec}
-                        <TagRemove onClick={() => removeSpecialization(spec)}>
-                          <X size={12} />
-                        </TagRemove>
-                      </Tag>
-                    ))}
-                  </TagList>
-                  <TagInputField
-                    value={newSpecialization}
-                    onChange={(e) => setNewSpecialization(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialization())}
-                    placeholder="Add specialization..."
-                  />
-                  <TagAddButton onClick={addSpecialization} type="button">
-                    <Plus size={14} />
-                  </TagAddButton>
-                </TagInput>
-                <FieldHelp>Your main areas of expertise</FieldHelp>
-              </FormGroup>
-
-              <FormGroup>
-                <Label>Tags</Label>
-                <TagInput>
-                  <TagList>
-                    {formData.tags.map((tag, index) => (
-                      <Tag key={index}>
-                        {tag}
-                        <TagRemove onClick={() => removeTag(tag)}>
-                          <X size={12} />
-                        </TagRemove>
-                      </Tag>
-                    ))}
-                  </TagList>
-                  <TagInputField
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                    placeholder="Add tag..."
-                  />
-                  <TagAddButton onClick={addTag} type="button">
-                    <Plus size={14} />
-                  </TagAddButton>
-                </TagInput>
-                <FieldHelp>Keywords that describe your work</FieldHelp>
-              </FormGroup>
-            </FormGrid>
-          </Section>
-        )}
-
-        {/* Social Links */}
-        {activeSection === 'social' && (
-          <Section>
-            <SectionHeader>
-              <SectionTitle>Social Links</SectionTitle>
-              <SectionDescription>
-                Connect your social media profiles and contact information.
-              </SectionDescription>
-            </SectionHeader>
-
-            <FormGrid>
-              <FormGroup>
-                <Label><Globe size={16} /> Website</Label>
-                <Input
-                  type="url"
-                  value={formData.socialLinks.website || ''}
-                  onChange={(e) => handleSocialLinkChange('website', e.target.value)}
-                  placeholder="https://yourwebsite.com"
-                />
-              </FormGroup>
-
-              <FormGroup>
-                <Label><Mail size={16} /> Email</Label>
-                <Input
-                  type="email"
-                  value={formData.socialLinks.email || ''}
-                  onChange={(e) => handleSocialLinkChange('email', e.target.value)}
-                  placeholder="contact@yourname.com"
-                />
-              </FormGroup>
-
-              <FormGroup>
-                <Label><Phone size={16} /> Phone</Label>
-                <Input
-                  type="tel"
-                  value={formData.socialLinks.phone || ''}
-                  onChange={(e) => handleSocialLinkChange('phone', e.target.value)}
-                  placeholder="+1 (555) 123-4567"
-                />
-              </FormGroup>
-
-              <FormGroup>
-                <Label><Twitter size={16} /> Twitter</Label>
-                <Input
-                  type="url"
-                  value={formData.socialLinks.twitter || ''}
-                  onChange={(e) => handleSocialLinkChange('twitter', e.target.value)}
-                  placeholder="https://twitter.com/username"
-                />
-              </FormGroup>
-
-              <FormGroup>
-                <Label><Linkedin size={16} /> LinkedIn</Label>
-                <Input
-                  type="url"
-                  value={formData.socialLinks.linkedin || ''}
-                  onChange={(e) => handleSocialLinkChange('linkedin', e.target.value)}
-                  placeholder="https://linkedin.com/in/username"
-                />
-              </FormGroup>
-
-              <FormGroup>
-                <Label><Github size={16} /> GitHub</Label>
-                <Input
-                  type="url"
-                  value={formData.socialLinks.github || ''}
-                  onChange={(e) => handleSocialLinkChange('github', e.target.value)}
-                  placeholder="https://github.com/username"
-                />
-              </FormGroup>
-
-              <FormGroup>
-                <Label><Instagram size={16} /> Instagram</Label>
-                <Input
-                  type="url"
-                  value={formData.socialLinks.instagram || ''}
-                  onChange={(e) => handleSocialLinkChange('instagram', e.target.value)}
-                  placeholder="https://instagram.com/username"
-                />
-              </FormGroup>
-            </FormGrid>
-          </Section>
-        )}
-
-        {/* Privacy & Sharing */}
-        {activeSection === 'privacy' && (
-          <Section>
-            <SectionHeader>
-              <SectionTitle>Privacy & Sharing</SectionTitle>
-              <SectionDescription>
-                Control who can see your portfolio and how it appears in search results.
-              </SectionDescription>
-            </SectionHeader>
-
-            <FormGrid>
-              <FormGroup $span="full">
-                <Label>Portfolio Visibility</Label>
-                <VisibilityOptions>
-                  <VisibilityOption 
-                    $active={formData.visibility === 'public'}
-                    onClick={() => handleInputChange('visibility', 'public')}
-                  >
-                    <VisibilityIcon><Globe size={20} /></VisibilityIcon>
-                    <VisibilityContent>
-                      <VisibilityTitle>Public</VisibilityTitle>
-                      <VisibilityDescription>
-                        Anyone can find and view your portfolio
-                      </VisibilityDescription>
-                    </VisibilityContent>
-                  </VisibilityOption>
-
-                  <VisibilityOption 
-                    $active={formData.visibility === 'unlisted'}
-                    onClick={() => handleInputChange('visibility', 'unlisted')}
-                  >
-                    <VisibilityIcon><LinkIcon size={20} /></VisibilityIcon>
-                    <VisibilityContent>
-                      <VisibilityTitle>Unlisted</VisibilityTitle>
-                      <VisibilityDescription>
-                        Only people with the link can view your portfolio
-                      </VisibilityDescription>
-                    </VisibilityContent>
-                  </VisibilityOption>
-
-                  <VisibilityOption 
-                    $active={formData.visibility === 'private'}
-                    onClick={() => handleInputChange('visibility', 'private')}
-                  >
-                    <VisibilityIcon><Lock size={20} /></VisibilityIcon>
-                    <VisibilityContent>
-                      <VisibilityTitle>Private</VisibilityTitle>
-                      <VisibilityDescription>
-                        Only you can view your portfolio
-                      </VisibilityDescription>
-                    </VisibilityContent>
-                  </VisibilityOption>
-                </VisibilityOptions>
-              </FormGroup>
-            </FormGrid>
-          </Section>
-        )}
-
-        {/* Appearance */}
-        {activeSection === 'customization' && (
-          <Section>
-            <SectionHeader>
-              <SectionTitle>Appearance</SectionTitle>
-              <SectionDescription>
-                Customize how your portfolio looks and feels.
-              </SectionDescription>
-            </SectionHeader>
-
-            <ComingSoonMessage>
-              <Palette size={48} />
-              <h3>Customization Options Coming Soon</h3>
-              <p>We're working on advanced customization features including themes, colors, and layouts.</p>
-            </ComingSoonMessage>
-          </Section>
-        )}
-
-        {/* Danger Zone */}
-        {activeSection === 'danger' && onDelete && (
-          <Section>
-            <SectionHeader>
-              <SectionTitle>Danger Zone</SectionTitle>
-              <SectionDescription>
-                Irreversible actions that will permanently affect your portfolio.
-              </SectionDescription>
-            </SectionHeader>
-
-            <DangerZone>
-              <DangerCard>
-                <DangerIcon>
-                  <Trash2 size={24} />
-                </DangerIcon>
-                <DangerContent>
-                  <DangerTitle>Delete Portfolio</DangerTitle>
-                  <DangerDescription>
-                    Permanently delete your portfolio and all associated data. This action cannot be undone.
-                  </DangerDescription>
-                </DangerContent>
-                <DangerButton onClick={() => setShowDeleteConfirm(true)}>
-                  Delete Portfolio
-                </DangerButton>
-              </DangerCard>
-            </DangerZone>
-
-            {/* Delete Confirmation Modal */}
-            {showDeleteConfirm && (
-              <Modal>
-                <ModalOverlay onClick={() => setShowDeleteConfirm(false)} />
-                <ModalContent>
-                  <ModalHeader>
-                    <AlertTriangle size={24} />
-                    <h3>Delete Portfolio</h3>
-                  </ModalHeader>
-                  <ModalBody>
-                    <p>Are you sure you want to delete your portfolio? This action cannot be undone.</p>
-                    <CheckboxGroup>
-                      <Checkbox
-                        type="checkbox"
-                        checked={deleteGalleryPieces}
-                        onChange={(e) => setDeleteGalleryPieces(e.target.checked)}
-                      />
-                      <label>Also delete all gallery pieces and uploaded images</label>
-                    </CheckboxGroup>
-                  </ModalBody>
-                  <ModalActions>
-                    <ModalButton onClick={() => setShowDeleteConfirm(false)}>
-                      Cancel
-                    </ModalButton>
-                    <ModalButton $danger onClick={handleDelete}>
-                      Delete Portfolio
-                    </ModalButton>
-                  </ModalActions>
-                </ModalContent>
-              </Modal>
-            )}
-          </Section>
-        )}
-      </SettingsContent>
-    </SettingsContainer>
-  );
-}
-
-// Professional Styled Components
-const SettingsContainer = styled.div`
+const SettingsSidebar = styled.div`
   display: flex;
-  gap: 2rem;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    gap: 1rem;
-  }
+  flex-direction: column;
+  gap: ${theme.spacing.sm};
 `;
 
-const SettingsNav = styled.nav`
-  width: 240px;
-  flex-shrink: 0;
-  
-  @media (max-width: 768px) {
-    width: 100%;
-    display: flex;
-    overflow-x: auto;
-    gap: 0.5rem;
-    padding-bottom: 0.5rem;
-  }
-`;
-
-const NavButton = styled.button<{ $active: boolean }>`
+const SidebarItem = styled.button<{ $active: boolean }>`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 0.875rem 1rem;
-  background: ${props => props.$active ? 'rgba(44, 44, 44, 0.05)' : 'transparent'};
-  border: 1px solid ${props => props.$active ? 'rgba(44, 44, 44, 0.1)' : 'transparent'};
-  border-radius: 8px;
-  color: ${props => props.$active ? '#2c2c2c' : '#666666'};
-  font-weight: ${props => props.$active ? '600' : '400'};
+  gap: ${theme.spacing.sm};
+  padding: ${theme.spacing.md};
+  background: ${props => props.$active ? 'white' : 'transparent'};
+  border: 1px solid ${props => props.$active ? '#e5e7eb' : 'transparent'};
+  border-radius: ${theme.borderRadius.md};
   cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 0.5rem;
-  font-family: 'Work Sans', sans-serif;
-  
+  transition: all 0.2s ease;
+  text-align: left;
+  font-family: ${theme.typography.fonts.body};
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${props => props.$active ? theme.typography.weights.medium : theme.typography.weights.normal};
+  color: ${props => props.$active ? theme.colors.text.primary : theme.colors.text.secondary};
+
   &:hover {
-    background: rgba(44, 44, 44, 0.05);
-    color: #2c2c2c;
+    background: ${props => props.$active ? 'white' : '#f9fafb'};
+    border-color: #e5e7eb;
   }
-  
-  @media (max-width: 768px) {
-    white-space: nowrap;
-    margin-bottom: 0;
+
+  svg {
+    color: ${props => props.$active ? '#3b82f6' : '#9ca3af'};
   }
 `;
 
 const SettingsContent = styled.div`
-  flex: 1;
-  position: relative;
-`;
-
-const SaveBar = styled.div<{ $visible: boolean }>`
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
-  color: white;
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
-  margin-bottom: 2rem;
-  display: ${props => props.$visible ? 'flex' : 'none'};
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(44, 44, 44, 0.3);
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const SaveInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const SaveButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   background: white;
-  color: #2c2c2c;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: 'Work Sans', sans-serif;
-  
-  &:hover:not(:disabled) {
-    background: #f8fafc;
-  }
-  
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
+  border-radius: ${theme.borderRadius.lg};
+  border: 1px solid ${theme.colors.border.light};
+  padding: ${theme.spacing.xl};
+`;
+
+const SettingsSection = styled.div`
+  margin-bottom: ${theme.spacing['2xl']};
+
+  &:last-child {
+    margin-bottom: 0;
   }
 `;
 
-const Section = styled.section`
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(15px);
-  border-radius: 16px;
-  padding: 2rem;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
-`;
-
-const SectionHeader = styled.div`
-  margin-bottom: 2rem;
-`;
-
-const SectionTitle = styled.h2`
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2c2c2c;
-  margin: 0 0 0.5rem 0;
-  font-family: 'Work Sans', sans-serif;
+const SectionTitle = styled.h3`
+  font-size: ${theme.typography.sizes.lg};
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
+  margin: 0 0 ${theme.spacing.xs} 0;
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
 `;
 
 const SectionDescription = styled.p`
-  color: #666666;
-  margin: 0;
-  font-family: 'Work Sans', sans-serif;
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  margin: 0 0 ${theme.spacing.lg} 0;
 `;
 
-const FormGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-`;
-
-const FormGroup = styled.div<{ $span?: 'full' }>`
+const SettingItem = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  grid-column: ${props => props.$span === 'full' ? '1 / -1' : 'auto'};
-`;
-
-const Label = styled.label`
-  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-  color: #2c2c2c;
-  font-size: 0.875rem;
-  font-family: 'Work Sans', sans-serif;
-`;
+  padding: ${theme.spacing.md} 0;
+  border-bottom: 1px solid ${theme.colors.border.light};
 
-const Input = styled.input`
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  transition: border-color 0.2s;
-  font-family: 'Work Sans', sans-serif;
-  background: white;
-  
-  &:focus {
-    outline: none;
-    border-color: #2c2c2c;
-    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
-  }
-  
-  &::placeholder {
-    color: #9ca3af;
+  &:last-child {
+    border-bottom: none;
   }
 `;
 
-const TextArea = styled.textarea`
-  padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  resize: vertical;
-  min-height: 100px;
-  font-family: 'Work Sans', sans-serif;
-  transition: border-color 0.2s;
-  background: white;
-  
-  &:focus {
-    outline: none;
-    border-color: #2c2c2c;
-    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
-  }
-  
-  &::placeholder {
-    color: #9ca3af;
-  }
-`;
-
-const FieldHelp = styled.div`
-  font-size: 0.75rem;
-  color: #666666;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const TagInput = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  min-height: 42px;
-  background: white;
-  
-  &:focus-within {
-    border-color: #2c2c2c;
-    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
-  }
-`;
-
-const TagList = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-`;
-
-const Tag = styled.span`
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  background: rgba(44, 44, 44, 0.1);
-  color: #2c2c2c;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const TagRemove = styled.button`
-  background: none;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  &:hover {
-    opacity: 0.7;
-  }
-`;
-
-const TagInputField = styled.input`
-  border: none;
-  outline: none;
-  flex: 1;
-  min-width: 120px;
-  font-size: 0.875rem;
-  font-family: 'Work Sans', sans-serif;
-  background: transparent;
-`;
-
-const TagAddButton = styled.button`
-  background: #2c2c2c;
-  color: white;
-  border: none;
-  padding: 0.25rem;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: #1a1a1a;
-  }
-`;
-
-const VisibilityOptions = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`;
-
-const VisibilityOption = styled.div<{ $active: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  border: 2px solid ${props => props.$active ? '#2c2c2c' : '#e5e7eb'};
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  
-  &:hover {
-    border-color: #2c2c2c;
-  }
-`;
-
-const VisibilityIcon = styled.div`
-  color: #666666;
-`;
-
-const VisibilityContent = styled.div`
+const SettingLabel = styled.div`
   flex: 1;
 `;
 
-const VisibilityTitle = styled.div`
-  font-weight: 600;
-  color: #2c2c2c;
-  margin-bottom: 0.25rem;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const VisibilityDescription = styled.div`
-  font-size: 0.875rem;
-  color: #666666;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const ComingSoonMessage = styled.div`
-  text-align: center;
-  padding: 3rem;
-  color: #666666;
-  font-family: 'Work Sans', sans-serif;
-  
-  h3 {
-    margin: 1rem 0 0.5rem 0;
-    color: #2c2c2c;
-  }
-`;
-
-const DangerZone = styled.div`
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  background: #fef2f2;
-`;
-
-const DangerCard = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-`;
-
-const DangerIcon = styled.div`
-  color: #dc2626;
-`;
-
-const DangerContent = styled.div`
-  flex: 1;
-`;
-
-const DangerTitle = styled.h4`
-  font-weight: 600;
-  color: #dc2626;
+const SettingTitle = styled.h4`
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.primary};
   margin: 0 0 0.25rem 0;
-  font-family: 'Work Sans', sans-serif;
 `;
 
-const DangerDescription = styled.p`
-  color: #991b1b;
+const SettingHint = styled.p`
+  font-size: ${theme.typography.sizes.xs};
+  color: ${theme.colors.text.secondary};
   margin: 0;
-  font-size: 0.875rem;
-  font-family: 'Work Sans', sans-serif;
 `;
 
-const DangerButton = styled.button`
-  background: #dc2626;
-  color: white;
+const Toggle = styled.button<{ $active: boolean }>`
+  width: 48px;
+  height: 28px;
+  background: ${props => props.$active ? '#3b82f6' : '#e5e7eb'};
   border: none;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: 'Work Sans', sans-serif;
-  
-  &:hover {
-    background: #b91c1c;
-  }
-`;
-
-const Modal = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const ModalOverlay = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-`;
-
-const ModalContent = styled.div`
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  max-width: 400px;
-  width: 90%;
+  border-radius: 999px;
   position: relative;
-  z-index: 1;
-`;
-
-const ModalHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem 1.5rem 1rem 1.5rem;
-  
-  h3 {
-    margin: 0;
-    color: #2c2c2c;
-    font-family: 'Work Sans', sans-serif;
-  }
-`;
-
-const ModalBody = styled.div`
-  padding: 0 1.5rem 1rem 1.5rem;
-  
-  p {
-    color: #666666;
-    margin: 0 0 1rem 0;
-    font-family: 'Work Sans', sans-serif;
-  }
-`;
-
-const CheckboxGroup = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  
-  label {
-    font-size: 0.875rem;
-    color: #2c2c2c;
-    font-family: 'Work Sans', sans-serif;
-  }
-`;
-
-const Checkbox = styled.input`
-  width: 16px;
-  height: 16px;
-`;
-
-const ModalActions = styled.div`
-  display: flex;
-  gap: 0.75rem;
-  padding: 1rem 1.5rem 1.5rem 1.5rem;
-  justify-content: flex-end;
-`;
-
-const ModalButton = styled.button<{ $danger?: boolean }>`
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid ${props => props.$danger ? '#dc2626' : '#d1d5db'};
-  background: ${props => props.$danger ? '#dc2626' : 'white'};
-  color: ${props => props.$danger ? 'white' : '#2c2c2c'};
-  font-family: 'Work Sans', sans-serif;
-  
-  &:hover {
-    background: ${props => props.$danger ? '#b91c1c' : '#f9fafb'};
+  transition: all 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: ${props => props.$active ? '23px' : '3px'};
+    width: 22px;
+    height: 22px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 `;
+
+const Select = styled.select`
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  border: 1px solid ${theme.colors.border.light};
+  border-radius: ${theme.borderRadius.sm};
+  font-family: ${theme.typography.fonts.body};
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.primary};
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+`;
+
+const NotificationBadge = styled.div`
+  background: #ef4444;
+  color: white;
+  font-size: ${theme.typography.sizes.xs};
+  font-weight: ${theme.typography.weights.semibold};
+  padding: 0.125rem 0.375rem;
+  border-radius: 999px;
+  min-width: 20px;
+  text-align: center;
+`;
+
+const ActionButton = styled.button<{ $variant?: 'primary' | 'danger' }>`
+  padding: ${theme.spacing.sm} ${theme.spacing.lg};
+  border-radius: ${theme.borderRadius.sm};
+  font-family: ${theme.typography.fonts.body};
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.medium};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+
+  ${props => props.$variant === 'danger' ? `
+    background: white;
+    color: #ef4444;
+    border: 1px solid #ef4444;
+
+    &:hover {
+      background: #fef2f2;
+    }
+  ` : `
+    background: #3b82f6;
+    color: white;
+    border: 1px solid #3b82f6;
+
+    &:hover {
+      background: #2563eb;
+      border-color: #2563eb;
+    }
+  `}
+`;
+
+const InfoBox = styled.div`
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: ${theme.borderRadius.md};
+  padding: ${theme.spacing.md};
+  display: flex;
+  gap: ${theme.spacing.sm};
+  margin-bottom: ${theme.spacing.lg};
+
+  svg {
+    color: #3b82f6;
+    flex-shrink: 0;
+  }
+
+  p {
+    font-size: ${theme.typography.sizes.sm};
+    color: #1e40af;
+    margin: 0;
+    line-height: 1.6;
+  }
+`;
+
+interface SettingsState {
+  notifications: {
+    email: boolean;
+    portfolio: boolean;
+    marketing: boolean;
+    weekly: boolean;
+  };
+  privacy: {
+    profileVisibility: 'public' | 'followers' | 'private';
+    showEmail: boolean;
+    showActivity: boolean;
+  };
+  display: {
+    theme: 'light' | 'dark' | 'auto';
+    language: string;
+    timezone: string;
+  };
+}
+import { 
+  type Portfolio
+} from '@/types/portfolio.types';
+
+type ProfessionalSettingsPageProps = {
+  portfolio: Portfolio;
+  onUpdate: (updates: Partial<Portfolio>) => Promise<void>;
+  onDelete: (deleteGalleryPieces?: boolean) => Promise<void>;
+  isUpdating: boolean;
+};
+
+export default function ProfessionalSettingsPage({
+  portfolio,
+  onUpdate,
+  onDelete,
+  isUpdating
+}: ProfessionalSettingsPageProps) {  const { user } = useAuth();
+  const router = useRouter();
+  const [activeSection, setActiveSection] = useState<'notifications' | 'privacy' | 'display' | 'account'>('notifications');
+  const [hasChanges, setHasChanges] = useState(false);
+  const [saving, setSaving] = useState(false);
+  
+  const [settings, setSettings] = useState<SettingsState>({
+    notifications: {
+      email: true,
+      portfolio: true,
+      marketing: false,
+      weekly: true
+    },
+    privacy: {
+      profileVisibility: 'public',
+      showEmail: false,
+      showActivity: true
+    },
+    display: {
+      theme: 'light',
+      language: 'en',
+      timezone: 'America/Los_Angeles'
+    }
+  });
+
+  const handleToggle = (category: keyof SettingsState, setting: string) => {
+    setSettings(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [setting]: !prev[category][setting as keyof typeof prev[typeof category]]
+      }
+    }));
+    setHasChanges(true);
+  };
+
+  const handleSelect = (category: keyof SettingsState, setting: string, value: string) => {
+    setSettings(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [setting]: value
+      }
+    }));
+    setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setSaving(false);
+    setHasChanges(false);
+  };
+
+  const sidebarItems = [
+    { id: 'notifications', label: 'Notifications', icon: <Bell size={18} /> },
+    { id: 'privacy', label: 'Privacy & Security', icon: <Shield size={18} /> },
+    { id: 'display', label: 'Display & Preferences', icon: <Palette size={18} /> },
+    { id: 'account', label: 'Account Settings', icon: <Settings size={18} /> }
+  ];
+
+  return (
+    <PageWrapper>
+      <Container>
+        <Header>
+          <HeaderContent>
+            <WelcomeSection>
+              <WelcomeTitle>Settings & Preferences</WelcomeTitle>
+              <WelcomeSubtitle>
+                Manage your account settings and configure your experience
+              </WelcomeSubtitle>
+            </WelcomeSection>
+          </HeaderContent>
+        </Header>
+
+        <SettingsGrid>
+          <SettingsSidebar>
+            {sidebarItems.map(item => (
+              <SidebarItem
+                key={item.id}
+                $active={activeSection === item.id}
+                onClick={() => setActiveSection(item.id as any)}
+              >
+                {item.icon}
+                {item.label}
+              </SidebarItem>
+            ))}
+          </SettingsSidebar>
+
+          <SettingsContent>
+            {activeSection === 'notifications' && (
+              <>
+                <SettingsSection>
+                  <SectionTitle>
+                    <Bell size={20} />
+                    Email Notifications
+                  </SectionTitle>
+                  <SectionDescription>
+                    Choose which emails you'd like to receive from us
+                  </SectionDescription>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Activity Updates</SettingTitle>
+                      <SettingHint>Get notified about portfolio views, comments, and ratings</SettingHint>
+                    </SettingLabel>
+                    <Toggle 
+                      $active={settings.notifications.email}
+                      onClick={() => handleToggle('notifications', 'email')}
+                    />
+                  </SettingItem>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Portfolio Milestones</SettingTitle>
+                      <SettingHint>Celebrate achievements and track your progress</SettingHint>
+                    </SettingLabel>
+                    <Toggle 
+                      $active={settings.notifications.portfolio}
+                      onClick={() => handleToggle('notifications', 'portfolio')}
+                    />
+                  </SettingItem>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Weekly Digest</SettingTitle>
+                      <SettingHint>Summary of your portfolio performance and insights</SettingHint>
+                    </SettingLabel>
+                    <Toggle 
+                      $active={settings.notifications.weekly}
+                      onClick={() => handleToggle('notifications', 'weekly')}
+                    />
+                  </SettingItem>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Marketing & Updates</SettingTitle>
+                      <SettingHint>Product updates, tips, and promotional content</SettingHint>
+                    </SettingLabel>
+                    <Toggle 
+                      $active={settings.notifications.marketing}
+                      onClick={() => handleToggle('notifications', 'marketing')}
+                    />
+                  </SettingItem>
+                </SettingsSection>
+
+                <InfoBox>
+                  <Info size={16} />
+                  <p>
+                    You can unsubscribe from all emails at any time by clicking the link in the footer of our emails.
+                  </p>
+                </InfoBox>
+              </>
+            )}
+
+            {activeSection === 'privacy' && (
+              <>
+                <SettingsSection>
+                  <SectionTitle>
+                    <Shield size={20} />
+                    Privacy Settings
+                  </SectionTitle>
+                  <SectionDescription>
+                    Control who can see your profile and activity
+                  </SectionDescription>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Profile Visibility</SettingTitle>
+                      <SettingHint>Choose who can view your portfolio</SettingHint>
+                    </SettingLabel>
+                    <Select 
+                      value={settings.privacy.profileVisibility}
+                      onChange={(e) => handleSelect('privacy', 'profileVisibility', e.target.value)}
+                    >
+                      <option value="public">Public</option>
+                      <option value="followers">Followers Only</option>
+                      <option value="private">Private</option>
+                    </Select>
+                  </SettingItem>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Show Email Address</SettingTitle>
+                      <SettingHint>Display your email on your public profile</SettingHint>
+                    </SettingLabel>
+                    <Toggle 
+                      $active={settings.privacy.showEmail}
+                      onClick={() => handleToggle('privacy', 'showEmail')}
+                    />
+                  </SettingItem>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Activity Status</SettingTitle>
+                      <SettingHint>Show when you're active on the platform</SettingHint>
+                    </SettingLabel>
+                    <Toggle 
+                      $active={settings.privacy.showActivity}
+                      onClick={() => handleToggle('privacy', 'showActivity')}
+                    />
+                  </SettingItem>
+                </SettingsSection>
+
+                <SettingsSection>
+                  <SectionTitle>
+                    <Shield size={20} />
+                    Security
+                  </SectionTitle>
+                  <SectionDescription>
+                    Keep your account secure
+                  </SectionDescription>
+
+                  <div style={{ display: 'flex', gap: theme.spacing.md }}>
+                    <ActionButton>
+                      Change Password
+                    </ActionButton>
+                    <ActionButton>
+                      Enable 2FA
+                    </ActionButton>
+                  </div>
+                </SettingsSection>
+              </>
+            )}
+
+            {activeSection === 'display' && (
+              <>
+                <SettingsSection>
+                  <SectionTitle>
+                    <Palette size={20} />
+                    Display Preferences
+                  </SectionTitle>
+                  <SectionDescription>
+                    Customize how the platform looks and feels
+                  </SectionDescription>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Theme</SettingTitle>
+                      <SettingHint>Choose your preferred color scheme</SettingHint>
+                    </SettingLabel>
+                    <Select 
+                      value={settings.display.theme}
+                      onChange={(e) => handleSelect('display', 'theme', e.target.value)}
+                    >
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="auto">Auto (System)</option>
+                    </Select>
+                  </SettingItem>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Language</SettingTitle>
+                      <SettingHint>Select your preferred language</SettingHint>
+                    </SettingLabel>
+                    <Select 
+                      value={settings.display.language}
+                      onChange={(e) => handleSelect('display', 'language', e.target.value)}
+                    >
+                      <option value="en">English</option>
+                      <option value="es">Español</option>
+                      <option value="fr">Français</option>
+                    </Select>
+                  </SettingItem>
+
+                  <SettingItem>
+                    <SettingLabel>
+                      <SettingTitle>Timezone</SettingTitle>
+                      <SettingHint>Set your local timezone for accurate timestamps</SettingHint>
+                    </SettingLabel>
+                    <Select 
+                      value={settings.display.timezone}
+                      onChange={(e) => handleSelect('display', 'timezone', e.target.value)}
+                    >
+                      <option value="America/Los_Angeles">Pacific Time</option>
+                      <option value="America/Chicago">Central Time</option>
+                      <option value="America/New_York">Eastern Time</option>
+                    </Select>
+                  </SettingItem>
+                </SettingsSection>
+              </>
+            )}
+
+            {activeSection === 'account' && (
+              <>
+                <SettingsSection>
+                  <SectionTitle>
+                    <Settings size={20} />
+                    Account Information
+                  </SectionTitle>
+                  <SectionDescription>
+                    Manage your account details and preferences
+                  </SectionDescription>
+
+                  <div style={{ 
+                    background: '#f9fafb', 
+                    padding: theme.spacing.lg, 
+                    borderRadius: theme.borderRadius.md,
+                    marginBottom: theme.spacing.lg 
+                  }}>
+                    <div style={{ marginBottom: theme.spacing.md }}>
+                      <div style={{ fontWeight: theme.typography.weights.medium }}>Name</div>
+                      <div style={{ color: theme.colors.text.secondary }}>{user?.name}</div>
+                    </div>
+                    <div style={{ marginBottom: theme.spacing.md }}>
+                      <div style={{ fontWeight: theme.typography.weights.medium }}>Email</div>
+                      <div style={{ color: theme.colors.text.secondary }}>{user?.email}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: theme.typography.weights.medium }}>Member Since</div>
+                      <div style={{ color: theme.colors.text.secondary }}>January 2024</div>
+                    </div>
+                  </div>
+
+                  <ActionButton>
+                    <Mail size={16} />
+                    Update Email
+                  </ActionButton>
+                </SettingsSection>
+
+                <SettingsSection>
+                  <SectionTitle style={{ color: '#ef4444' }}>
+                    <AlertCircle size={20} />
+                    Danger Zone
+                  </SectionTitle>
+                  <SectionDescription>
+                    Irreversible actions - please be careful
+                  </SectionDescription>
+
+                  <ActionButton $variant="danger">
+                    Delete Account
+                  </ActionButton>
+                </SettingsSection>
+              </>
+            )}
+
+            {hasChanges && (
+              <div style={{ 
+                position: 'sticky', 
+                bottom: 0, 
+                background: 'white',
+                padding: theme.spacing.lg,
+                borderTop: `1px solid ${theme.colors.border.light}`,
+                marginTop: theme.spacing.xl,
+                marginLeft: `-${theme.spacing.xl}`,
+                marginRight: `-${theme.spacing.xl}`,
+                marginBottom: `-${theme.spacing.xl}`,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: theme.spacing.md
+              }}>
+                <button
+                  onClick={() => {
+                    window.location.reload();
+                  }}
+                  style={{
+                    padding: `${theme.spacing.sm} ${theme.spacing.lg}`,
+                    background: 'white',
+                    border: `1px solid ${theme.colors.border.medium}`,
+                    borderRadius: theme.borderRadius.sm,
+                    cursor: 'pointer',
+                    fontFamily: theme.typography.fonts.body,
+                    fontSize: theme.typography.sizes.sm,
+                    fontWeight: theme.typography.weights.medium
+                  }}
+                >
+                  Discard Changes
+                </button>
+                <ActionButton onClick={handleSave}>
+                  {saving ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Save Changes
+                    </>
+                  )}
+                </ActionButton>
+              </div>
+            )}
+          </SettingsContent>
+        </SettingsGrid>
+      </Container>
+    </PageWrapper>
+  );
+}

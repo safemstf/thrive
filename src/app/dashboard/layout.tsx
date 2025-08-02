@@ -10,7 +10,8 @@ import { useAuth } from '@/providers/authProvider';
 import { useApiClient } from '@/lib/api-client';
 import type { Portfolio } from '@/types/portfolio.types';
 import { 
-  User, 
+  User,
+  Target, 
   Home,
   Settings,
   Shield,
@@ -46,6 +47,12 @@ const navItems: NavItem[] = [
     label: 'Overview',
     icon: <Home size={20} />,
     description: 'Dashboard home'
+  },
+  {
+    href: '/dashboard/thrive',
+    label: 'Survival of the Fittest',
+    icon: <Target size={20} />,
+    description: 'Challenges & skill development'
   },
   {
     href: '/dashboard/profile',
@@ -298,7 +305,7 @@ export default function DashboardLayout({
 
           {/* Sidebar Footer */}
           <SidebarFooter>
-            <FooterLink href="/dashboard/profile">
+            <FooterLink href="/dashboard/settings">
               <Settings size={16} />
               {!sidebarCollapsed && 'Settings'}
             </FooterLink>
