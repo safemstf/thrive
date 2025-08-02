@@ -14,7 +14,7 @@ const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Accessible Education Hub | learnmorra.com',
+  title: 'Accessible Portfolio Hub | learnmorra.com',
   description: 'Connecting people to knowledge and resources',
   openGraph: {
     title: 'Learn More Everyday – learnmorra.com',
