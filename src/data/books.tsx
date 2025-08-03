@@ -1,5 +1,6 @@
 // src/data/books.ts
-import { Book, MainCategory, ScientificDiscipline, SectionConfig, SubCategory } from '@/types/educational.types';
+import { Book, MainCategory, SectionConfig, SubCategory } from '@/types/educational.types';
+import {ScientificDiscipline} from '@/types/portfolio.types'
 
 export const sections: SectionConfig[] = [
   {
