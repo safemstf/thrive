@@ -20,6 +20,8 @@ export type MainCategory = 'math' | 'english' | 'science';
 export type SubCategory = 'sat' | 'foundations' | 'ap';
 export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
 export type CategoryIcon = MainCategory | SubCategory;
+export type ScientificDiscipline = 'physics' | 'chemistry' | 'biology';
+
 
 export interface Concept {
   id: string;

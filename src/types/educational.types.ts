@@ -1,5 +1,7 @@
 // src/types/educational.types.ts
 
+import { ScientificDiscipline } from "./portfolio.types";
+
 // Base types for better database migration
 export interface BaseEntity {
   id: string;
@@ -10,7 +12,6 @@ export interface BaseEntity {
 // Main category types
 export type MainCategory = 'math' | 'english' | 'science';
 export type SubCategory = 'sat' | 'foundations' | 'ap';
-export type ScientificDiscipline = 'physics' | 'chemistry' | 'biology';
 
 // Difficulty levels
 export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
