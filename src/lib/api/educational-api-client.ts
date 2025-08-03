@@ -10,7 +10,6 @@ import type {
   Book,
   MainCategory,
   SubCategory,
-  ScientificDiscipline,
   DifficultyLevel,
 } from '@/types/educational.types';
 import type {
@@ -19,6 +18,7 @@ import type {
   SearchResult,
   UserProgress,
 } from '@/types/api.types';
+import {ScientificDiscipline} from '@/types/portfolio.types'
 
 // ============================================
 // New Types for Concepts & Lessons
