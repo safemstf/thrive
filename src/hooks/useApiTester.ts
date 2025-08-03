@@ -79,12 +79,13 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
       }
 
       // Extract token from auth responses
-      if (category === 'auth' && route.name === 'Login' && response.ok) {
-        if (data.token) {
-          setAuthToken(data.token);
-        } else if (data.access_token) {
-          setAuthToken(data.access_token);
-        }
+      if (
+        category === 'auth' &&
+        route.endpoint.includes('/login') &&
+        response.ok
+      ) {
+        const token = data.token ?? data.access_token;
+        if (token) setAuthToken(token);
       }
 
       // Update results

@@ -23,8 +23,8 @@ export const authRoutes: RouteCategory = {
       method: 'POST',
       description: 'User login',
       body: {
-        email: 'admin@example.com',
-        password: 'admin'
+        email: 'admin@admin.com',
+        password: 'admin123'
       }
     },
     {
