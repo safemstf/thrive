@@ -1,13 +1,13 @@
-// src/components/profile/utils/overview.tsx - Professional design
+// src/components/profile/utils/overview.tsx - Improved spacing and content
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { 
-  ExternalLink, Edit3, Globe, Lock, Eye, TrendingUp, Users,
+  ExternalLink, Edit3, Globe, Eye, TrendingUp, Users,
   Share2, Copy, CheckCircle, Settings, ArrowUpRight,
-  Brush, GraduationCap, Code, Layers
+  Brush, GraduationCap, Code, Layers, BookOpen, Images
 } from 'lucide-react';
 import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
 
@@ -92,109 +92,136 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
 
   return (
     <OverviewContainer>
-      {/* Hero Section */}
+      {/* Hero Section - Improved spacing */}
       <HeroSection>
-        <HeroContent>
-          <PortfolioHeader>
-            <PortfolioIcon>
-              {config.icon}
-            </PortfolioIcon>
-            <PortfolioInfo>
-              <PortfolioTitle>{portfolio.title}</PortfolioTitle>
-              <PortfolioType>{config.title}</PortfolioType>
-              {portfolio.tagline && (
-                <PortfolioTagline>{portfolio.tagline}</PortfolioTagline>
-              )}
-            </PortfolioInfo>
-          </PortfolioHeader>
+        <PortfolioHeader>
+          <PortfolioIcon>
+            {config.icon}
+          </PortfolioIcon>
+          <PortfolioInfo>
+            <PortfolioTitle>{portfolio.title}</PortfolioTitle>
+            <PortfolioType>{config.title}</PortfolioType>
+            {portfolio.tagline && (
+              <PortfolioTagline>{portfolio.tagline}</PortfolioTagline>
+            )}
+          </PortfolioInfo>
+        </PortfolioHeader>
 
-          <ActionButtons>
-            <PrimaryButton onClick={() => window.open(portfolioUrl, '_blank')}>
-              <Globe size={16} />
-              View Live Portfolio
-              <ArrowUpRight size={14} />
-            </PrimaryButton>
-            <SecondaryButton onClick={onEditClick}>
-              <Edit3 size={16} />
-              Edit Portfolio
-            </SecondaryButton>
-            <ShareButton onClick={handleSharePortfolio}>
-              {copied ? <CheckCircle size={16} /> : <Share2 size={16} />}
-              {copied ? 'Copied!' : 'Share'}
-            </ShareButton>
-          </ActionButtons>
-        </HeroContent>
-
-        <HeroStats>
-          <StatCard>
-            <StatIcon><Eye size={20} /></StatIcon>
-            <StatValue>{stats.analytics.monthlyViews.toLocaleString()}</StatValue>
-            <StatLabel>Monthly Views</StatLabel>
-          </StatCard>
-          <StatCard>
-            <StatIcon><TrendingUp size={20} /></StatIcon>
-            <StatValue>+{stats.analytics.weeklyGrowth}%</StatValue>
-            <StatLabel>Weekly Growth</StatLabel>
-          </StatCard>
-          <StatCard>
-            <StatIcon><Users size={20} /></StatIcon>
-            <StatValue>{stats.analytics.engagementRate}%</StatValue>
-            <StatLabel>Engagement</StatLabel>
-          </StatCard>
-        </HeroStats>
+        <ActionButtonsContainer>
+          <PrimaryButton onClick={() => window.open(portfolioUrl, '_blank')}>
+            <Globe size={16} />
+            View Live Portfolio
+            <ArrowUpRight size={14} />
+          </PrimaryButton>
+          <SecondaryButton onClick={onEditClick}>
+            <Edit3 size={16} />
+            Edit Portfolio
+          </SecondaryButton>
+          <ShareButton onClick={handleSharePortfolio}>
+            {copied ? <CheckCircle size={16} /> : <Share2 size={16} />}
+            {copied ? 'Copied!' : 'Share'}
+          </ShareButton>
+        </ActionButtonsContainer>
       </HeroSection>
 
-      {/* Quick Actions */}
+      {/* Content Overview - New focused stats */}
+      <ContentOverviewSection>
+        <SectionTitle>Portfolio Content Overview</SectionTitle>
+        <ContentStatsGrid>
+          {stats.gallery && (
+            <ContentStatCard>
+              <ContentStatIcon style={{ color: '#8b5cf6' }}>
+                <Images size={24} />
+              </ContentStatIcon>
+              <ContentStatInfo>
+                <ContentStatValue>{stats.gallery.totalPieces}</ContentStatValue>
+                <ContentStatLabel>Gallery Pieces</ContentStatLabel>
+                <ContentStatMeta>{stats.gallery.recentUploads} added recently</ContentStatMeta>
+              </ContentStatInfo>
+            </ContentStatCard>
+          )}
+
+          {stats.learning && (
+            <ContentStatCard>
+              <ContentStatIcon style={{ color: '#10b981' }}>
+                <BookOpen size={24} />
+              </ContentStatIcon>
+              <ContentStatInfo>
+                <ContentStatValue>{stats.learning.completed}/{stats.learning.totalConcepts}</ContentStatValue>
+                <ContentStatLabel>Learning Progress</ContentStatLabel>
+                <ContentStatMeta>{stats.learning.averageScore}% average score</ContentStatMeta>
+              </ContentStatInfo>
+            </ContentStatCard>
+          )}
+
+          <ContentStatCard>
+            <ContentStatIcon style={{ color: '#3b82f6' }}>
+              <TrendingUp size={24} />
+            </ContentStatIcon>
+            <ContentStatInfo>
+              <ContentStatValue>+{stats.analytics.weeklyGrowth}%</ContentStatValue>
+              <ContentStatLabel>Weekly Growth</ContentStatLabel>
+              <ContentStatMeta>Audience engagement up</ContentStatMeta>
+            </ContentStatInfo>
+          </ContentStatCard>
+        </ContentStatsGrid>
+      </ContentOverviewSection>
+
+      {/* Quick Actions - Improved */}
       <QuickActionsSection>
         <SectionTitle>Quick Actions</SectionTitle>
         <QuickActionsGrid>
-          <QuickActionCard onClick={() => router.push('/dashboard/gallery')}>
-            <ActionIcon>
-              <Brush size={20} />
-            </ActionIcon>
-            <ActionContent>
-              <ActionTitle>Manage Gallery</ActionTitle>
-              <ActionDescription>Upload and organize your creative work</ActionDescription>
-              {stats.gallery && (
-                <ActionMeta>{stats.gallery.totalPieces} pieces</ActionMeta>
-              )}
-            </ActionContent>
-            <ActionArrow><ArrowUpRight size={16} /></ActionArrow>
-          </QuickActionCard>
+          {(['creative', 'hybrid', 'professional'].includes(portfolio.kind)) && (
+            <QuickActionCard onClick={() => router.push('/dashboard/gallery')}>
+              <ActionIcon style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6' }}>
+                <Brush size={20} />
+              </ActionIcon>
+              <ActionContent>
+                <ActionTitle>Manage Gallery</ActionTitle>
+                <ActionDescription>Upload and organize your creative work</ActionDescription>
+                {stats.gallery && (
+                  <ActionMeta>{stats.gallery.totalPieces} pieces • {stats.gallery.totalLikes} likes</ActionMeta>
+                )}
+              </ActionContent>
+              <ActionArrow><ArrowUpRight size={16} /></ActionArrow>
+            </QuickActionCard>
+          )}
 
-          <QuickActionCard onClick={() => router.push('/dashboard/writing')}>
-            <ActionIcon>
-              <GraduationCap size={20} />
-            </ActionIcon>
-            <ActionContent>
-              <ActionTitle>Learning Progress</ActionTitle>
-              <ActionDescription>Track your educational achievements</ActionDescription>
-              {stats.learning && (
-                <ActionMeta>{stats.learning.completed} concepts completed</ActionMeta>
-              )}
-            </ActionContent>
-            <ActionArrow><ArrowUpRight size={16} /></ActionArrow>
-          </QuickActionCard>
+          {(['educational', 'hybrid'].includes(portfolio.kind)) && (
+            <QuickActionCard onClick={() => router.push('/dashboard/writing')}>
+              <ActionIcon style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+                <GraduationCap size={20} />
+              </ActionIcon>
+              <ActionContent>
+                <ActionTitle>Learning Hub</ActionTitle>
+                <ActionDescription>Track your educational achievements</ActionDescription>
+                {stats.learning && (
+                  <ActionMeta>{stats.learning.completed} completed • {stats.learning.weeklyStreak} day streak</ActionMeta>
+                )}
+              </ActionContent>
+              <ActionArrow><ArrowUpRight size={16} /></ActionArrow>
+            </QuickActionCard>
+          )}
 
-          <QuickActionCard onClick={() => router.push('/dashboard/projects')}>
-            <ActionIcon>
-              <Code size={20} />
+          <QuickActionCard onClick={() => router.push('/dashboard/analytics')}>
+            <ActionIcon style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+              <TrendingUp size={20} />
             </ActionIcon>
             <ActionContent>
-              <ActionTitle>Tech Projects</ActionTitle>
-              <ActionDescription>Showcase your development work</ActionDescription>
-              <ActionMeta>Coming soon</ActionMeta>
+              <ActionTitle>Analytics Dashboard</ActionTitle>
+              <ActionDescription>View detailed performance insights</ActionDescription>
+              <ActionMeta>{stats.analytics.engagementRate}% engagement rate</ActionMeta>
             </ActionContent>
             <ActionArrow><ArrowUpRight size={16} /></ActionArrow>
           </QuickActionCard>
 
           <QuickActionCard onClick={onEditClick}>
-            <ActionIcon>
+            <ActionIcon style={{ background: 'rgba(107, 114, 128, 0.1)', color: '#6b7280' }}>
               <Settings size={20} />
             </ActionIcon>
             <ActionContent>
               <ActionTitle>Portfolio Settings</ActionTitle>
-              <ActionDescription>Customize your portfolio appearance</ActionDescription>
+              <ActionDescription>Customize appearance and privacy</ActionDescription>
               <ActionMeta>Privacy: {portfolio.visibility}</ActionMeta>
             </ActionContent>
             <ActionArrow><ArrowUpRight size={16} /></ActionArrow>
@@ -234,7 +261,7 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
 
       {/* Portfolio URL Section */}
       <UrlSection>
-        <SectionTitle>Portfolio URL</SectionTitle>
+        <SectionTitle>Share Your Portfolio</SectionTitle>
         <UrlContainer>
           <UrlInput value={portfolioUrl} readOnly />
           <CopyButton onClick={handleCopyUrl} $copied={copied}>
@@ -250,11 +277,11 @@ export function PortfolioOverview({ portfolio, stats, onEditClick, onUpgradeClic
   );
 }
 
-// Professional Styled Components
+// Improved Styled Components with better spacing
 const OverviewContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 2.5rem;
 `;
 
 const HeroSection = styled.div`
@@ -266,72 +293,75 @@ const HeroSection = styled.div`
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 
   @media (max-width: 768px) {
-    padding: 1.5rem;
-  }
-`;
-
-const HeroContent = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-  gap: 2rem;
-
-  @media (max-width: 768px) {
-    flex-direction: column;
-    gap: 1.5rem;
+    padding: 2rem;
   }
 `;
 
 const PortfolioHeader = styled.div`
   display: flex;
   align-items: flex-start;
-  gap: 1.5rem;
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+
+  @media (max-width: 768px) {
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
 `;
 
 const PortfolioIcon = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
-  border-radius: 16px;
+  border-radius: 18px;
   color: white;
+  flex-shrink: 0;
+
+  @media (max-width: 768px) {
+    width: 64px;
+    height: 64px;
+  }
 `;
 
 const PortfolioInfo = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
 const PortfolioTitle = styled.h1`
-  font-size: 2.5rem;
+  font-size: 2.75rem;
   font-weight: 400;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.75rem 0;
   color: #2c2c2c;
   font-family: 'Cormorant Garamond', serif;
+  line-height: 1.1;
   
   @media (max-width: 768px) {
-    font-size: 2rem;
+    font-size: 2.25rem;
+    margin-bottom: 0.5rem;
   }
 `;
 
 const PortfolioType = styled.div`
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   color: #666666;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
   font-family: 'Work Sans', sans-serif;
+  font-weight: 500;
 `;
 
 const PortfolioTagline = styled.p`
-  font-size: 1rem;
+  font-size: 1.125rem;
   color: #666666;
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.6;
   font-family: 'Work Sans', sans-serif;
 `;
 
-const ActionButtons = styled.div`
+const ActionButtonsContainer = styled.div`
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
@@ -340,12 +370,12 @@ const ActionButtons = styled.div`
 const PrimaryButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   background: linear-gradient(135deg, #2c2c2c 0%, #666666 100%);
   color: white;
   border: none;
-  padding: 0.875rem 1.5rem;
-  border-radius: 8px;
+  padding: 1rem 1.75rem;
+  border-radius: 10px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -363,12 +393,12 @@ const PrimaryButton = styled.button`
 const SecondaryButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   background: transparent;
   border: 1px solid #d1d5db;
   color: #2c2c2c;
-  padding: 0.875rem 1.5rem;
-  border-radius: 8px;
+  padding: 1rem 1.75rem;
+  border-radius: 10px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -383,12 +413,12 @@ const SecondaryButton = styled.button`
 const ShareButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   background: transparent;
   border: 1px solid #d1d5db;
   color: #2c2c2c;
-  padding: 0.875rem 1rem;
-  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -399,46 +429,71 @@ const ShareButton = styled.button`
   }
 `;
 
-const HeroStats = styled.div`
+const ContentOverviewSection = styled.section`
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+`;
+
+const ContentStatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1.5rem;
 `;
 
-const StatCard = styled.div`
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
+const ContentStatCard = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   padding: 1.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
-  text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  transition: all 0.3s ease;
-  
+  transition: all 0.2s ease;
+
   &:hover {
-    background: rgba(255, 255, 255, 0.95);
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 `;
 
-const StatIcon = styled.div`
-  margin-bottom: 0.5rem;
-  color: #666666;
+const ContentStatIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  flex-shrink: 0;
 `;
 
-const StatValue = styled.div`
-  font-size: 1.75rem;
+const ContentStatInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const ContentStatValue = styled.div`
+  font-size: 1.5rem;
   font-weight: 700;
+  color: #111827;
   margin-bottom: 0.25rem;
-  color: #2c2c2c;
   font-family: 'Cormorant Garamond', serif;
 `;
 
-const StatLabel = styled.div`
+const ContentStatLabel = styled.div`
   font-size: 0.875rem;
-  color: #666666;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 500;
+  color: #374151;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const ContentStatMeta = styled.div`
+  font-size: 0.75rem;
+  color: #6b7280;
   font-family: 'Work Sans', sans-serif;
 `;
 
@@ -461,7 +516,7 @@ const SectionTitle = styled.h2`
 
 const QuickActionsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1.5rem;
 `;
 
@@ -489,21 +544,20 @@ const ActionIcon = styled.div`
   justify-content: center;
   width: 48px;
   height: 48px;
-  background: rgba(44, 44, 44, 0.1);
-  color: #2c2c2c;
   border-radius: 12px;
   flex-shrink: 0;
 `;
 
 const ActionContent = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
 const ActionTitle = styled.h3`
   font-size: 1rem;
   font-weight: 600;
   color: #2c2c2c;
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 0.5rem 0;
   font-family: 'Work Sans', sans-serif;
 `;
 
@@ -512,6 +566,7 @@ const ActionDescription = styled.p`
   color: #666666;
   margin: 0 0 0.5rem 0;
   font-family: 'Work Sans', sans-serif;
+  line-height: 1.4;
 `;
 
 const ActionMeta = styled.div`
@@ -665,5 +720,4 @@ const UrlHelp = styled.p`
   font-size: 0.875rem;
   color: #666666;
   margin: 0;
-  font-family: 'Work Sans', sans-serif;
-`;
+  font-family: 'Work Sans', sans-serif;`

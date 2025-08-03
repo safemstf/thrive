@@ -1,3 +1,5 @@
+import { Portfolio } from "./portfolio.types";
+
 // types/auth.types.ts
 export interface User {
   id: string;
@@ -13,6 +15,8 @@ export interface User {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  portfolios?: Portfolio[];
+
 }
 
 export interface AuthResponse {

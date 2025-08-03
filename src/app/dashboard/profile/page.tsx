@@ -1,4 +1,4 @@
-// src/app/dashboard/profile/page.tsx - Clean modular version
+// src/app/dashboard/profile/page.tsx - Clean modular version (FIXED)
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -22,20 +22,23 @@ import { PortfolioCreation } from '@/components/portfolio/portfolioCreation';
 
 // Import our new modular components
 import { PortfolioOverview } from '@/components/profile/utils/overview';
-import { PortfolioUpgrade } from '@/components/profile/utils/upgrade';
+import { UpgradeTabContent } from '@/components/profile/utils/upgradeTab';
 import ProfessionalSettingsPage from '@/components/profile/utils/settings';
 
+// Import from structureProfile (without AnalyticsTabContent)
 import { 
   HeaderSection,
   ErrorDisplay,
   StatsGrid,
   PortfolioCreationGrid,
   PortfolioTabs,
-  GalleryTabContent,
-  LearningTabContent,
-  AnalyticsTabContent,
   ComingSoonTab
 } from '@/components/profile/utils/structureProfile';
+
+import { GalleryTabContent } from '@/components/profile/utils/galleryTab';
+import { LearningTabContent } from '@/components/profile/utils/learningTab';
+import { AnalyticsTabContent } from '@/components/profile/utils/analytics';
+
 import { 
   generateMockUserStats,
   generateMockPortfolioStats,
@@ -114,7 +117,7 @@ export default function PortfolioHubPage() {
   };
 
   // Handle portfolio upgrade
-  const handlePortfolioUpgrade = async (newKind: PortfolioKind) => {
+  const handleUpgradeTabContent = async (newKind: PortfolioKind) => {
     try {
       await portfolioManagement.updatePortfolio({ kind: newKind });
       showSuccessNotification('Portfolio upgraded successfully!');
@@ -204,9 +207,9 @@ export default function PortfolioHubPage() {
 
       case 'upgrade':
         return (
-          <PortfolioUpgrade
+          <UpgradeTabContent
             portfolio={portfolio}
-            onUpgrade={handlePortfolioUpgrade}
+            onUpgrade={handleUpgradeTabContent}
             isUpgrading={portfolioManagement.isUpdating}
           />
         );

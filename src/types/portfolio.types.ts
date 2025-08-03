@@ -75,6 +75,8 @@ export interface Portfolio extends BaseEntity {
   // Basic Info
   userId: string;
   username: string;
+  name?: string;
+
   title: string;
   tagline?: string;
   bio: string;

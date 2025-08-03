@@ -1,8 +1,9 @@
-// src/app/dashboard/settings/page.tsx - Professional Configuration Hub
+// src\components\profile\utils\settings.tsx
 'use client';
 
 import React, { useState } from 'react';
 import { useAuth } from '@/providers/authProvider';
+import type { Portfolio } from '@/types/portfolio.types';
 import { useRouter } from 'next/navigation';
 import {
   Settings,
@@ -22,26 +23,60 @@ import {
   AlertCircle,
   Info,
   Save,
-  RefreshCw
+  RefreshCw,
+  User,
+  Lock,
+  CreditCard,
+  Download,
+  Trash2
 } from 'lucide-react';
 
-import {
-  PageWrapper,
-  Container,
-  Header,
-  HeaderContent,
-  WelcomeSection,
-  WelcomeTitle,
-  WelcomeSubtitle,
-  ViewToggle,
-  ViewButton
-} from '@/components/dashboard/dashboardStyles';
-
-import { Card, CardContent } from '@/styles/styled-components';
-import styled from 'styled-components';
 import { theme } from '@/styles/theme';
+import styled from 'styled-components';
 
 // Professional styled components
+const PageWrapper = styled.div`
+  min-height: 100vh;
+  background: #fafafa;
+  padding: 2rem 1rem;
+  font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #2c2c2c;
+`;
+
+const Container = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+`;
+
+const Header = styled.div`
+  margin-bottom: 2rem;
+`;
+
+const HeaderContent = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+`;
+
+const WelcomeSection = styled.div``;
+
+const WelcomeTitle = styled.h1`
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2c2c2c;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.5px;
+`;
+
+const WelcomeSubtitle = styled.p`
+  font-size: 1.125rem;
+  color: #666;
+  margin: 0;
+  font-weight: 300;
+`;
+
 const SettingsGrid = styled.div`
   display: grid;
   grid-template-columns: 260px 1fr;
@@ -187,18 +222,7 @@ const Select = styled.select`
   }
 `;
 
-const NotificationBadge = styled.div`
-  background: #ef4444;
-  color: white;
-  font-size: ${theme.typography.sizes.xs};
-  font-weight: ${theme.typography.weights.semibold};
-  padding: 0.125rem 0.375rem;
-  border-radius: 999px;
-  min-width: 20px;
-  text-align: center;
-`;
-
-const ActionButton = styled.button<{ $variant?: 'primary' | 'danger' }>`
+const ActionButton = styled.button<{ $variant?: 'primary' | 'danger' | 'secondary' }>`
   padding: ${theme.spacing.sm} ${theme.spacing.lg};
   border-radius: ${theme.borderRadius.sm};
   font-family: ${theme.typography.fonts.body};
@@ -218,6 +242,14 @@ const ActionButton = styled.button<{ $variant?: 'primary' | 'danger' }>`
     &:hover {
       background: #fef2f2;
     }
+  ` : props.$variant === 'secondary' ? `
+    background: white;
+    color: #374151;
+    border: 1px solid #d1d5db;
+
+    &:hover {
+      background: #f9fafb;
+    }
   ` : `
     background: #3b82f6;
     color: white;
@@ -230,9 +262,17 @@ const ActionButton = styled.button<{ $variant?: 'primary' | 'danger' }>`
   `}
 `;
 
-const InfoBox = styled.div`
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
+const InfoBox = styled.div<{ $type?: 'info' | 'warning' | 'success' }>`
+  background: ${props => 
+    props.$type === 'warning' ? '#fef3cd' :
+    props.$type === 'success' ? '#d1e7dd' :
+    '#eff6ff'
+  };
+  border: 1px solid ${props => 
+    props.$type === 'warning' ? '#fecba6' :
+    props.$type === 'success' ? '#badbcc' :
+    '#dbeafe'
+  };
   border-radius: ${theme.borderRadius.md};
   padding: ${theme.spacing.md};
   display: flex;
@@ -240,29 +280,71 @@ const InfoBox = styled.div`
   margin-bottom: ${theme.spacing.lg};
 
   svg {
-    color: #3b82f6;
+    color: ${props => 
+      props.$type === 'warning' ? '#f59e0b' :
+      props.$type === 'success' ? '#10b981' :
+      '#3b82f6'
+    };
     flex-shrink: 0;
   }
 
   p {
     font-size: ${theme.typography.sizes.sm};
-    color: #1e40af;
+    color: ${props => 
+      props.$type === 'warning' ? '#92400e' :
+      props.$type === 'success' ? '#065f46' :
+      '#1e40af'
+    };
     margin: 0;
     line-height: 1.6;
   }
 `;
 
+const AccountCard = styled.div`
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: ${theme.borderRadius.md};
+  padding: ${theme.spacing.lg};
+  margin-bottom: ${theme.spacing.lg};
+`;
+
+const AccountDetail = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: ${theme.spacing.md};
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const AccountLabel = styled.div`
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.primary};
+`;
+
+const AccountValue = styled.div`
+  color: ${theme.colors.text.secondary};
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: ${theme.spacing.md};
+  flex-wrap: wrap;
+`;
+
 interface SettingsState {
   notifications: {
     email: boolean;
-    portfolio: boolean;
     marketing: boolean;
+    security: boolean;
     weekly: boolean;
   };
   privacy: {
-    profileVisibility: 'public' | 'followers' | 'private';
+    profileVisibility: 'public' | 'private';
     showEmail: boolean;
-    showActivity: boolean;
+    analyticsOptOut: boolean;
   };
   display: {
     theme: 'light' | 'dark' | 'auto';
@@ -270,11 +352,9 @@ interface SettingsState {
     timezone: string;
   };
 }
-import { 
-  type Portfolio
-} from '@/types/portfolio.types';
 
-type ProfessionalSettingsPageProps = {
+
+type Props = {
   portfolio: Portfolio;
   onUpdate: (updates: Partial<Portfolio>) => Promise<void>;
   onDelete: (deleteGalleryPieces?: boolean) => Promise<void>;
@@ -286,23 +366,23 @@ export default function ProfessionalSettingsPage({
   onUpdate,
   onDelete,
   isUpdating
-}: ProfessionalSettingsPageProps) {  const { user } = useAuth();
+}: Props) {  const { user } = useAuth();
   const router = useRouter();
-  const [activeSection, setActiveSection] = useState<'notifications' | 'privacy' | 'display' | 'account'>('notifications');
+  const [activeSection, setActiveSection] = useState<'account' | 'notifications' | 'privacy' | 'display' | 'security' | 'billing'>('account');
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   
   const [settings, setSettings] = useState<SettingsState>({
     notifications: {
       email: true,
-      portfolio: true,
       marketing: false,
+      security: true,
       weekly: true
     },
     privacy: {
       profileVisibility: 'public',
       showEmail: false,
-      showActivity: true
+      analyticsOptOut: false
     },
     display: {
       theme: 'light',
@@ -342,10 +422,12 @@ export default function ProfessionalSettingsPage({
   };
 
   const sidebarItems = [
+    { id: 'account', label: 'Account Info', icon: <User size={18} /> },
     { id: 'notifications', label: 'Notifications', icon: <Bell size={18} /> },
-    { id: 'privacy', label: 'Privacy & Security', icon: <Shield size={18} /> },
-    { id: 'display', label: 'Display & Preferences', icon: <Palette size={18} /> },
-    { id: 'account', label: 'Account Settings', icon: <Settings size={18} /> }
+    { id: 'privacy', label: 'Privacy', icon: <Eye size={18} /> },
+    { id: 'display', label: 'Display', icon: <Palette size={18} /> },
+    { id: 'security', label: 'Security', icon: <Shield size={18} /> },
+    { id: 'billing', label: 'Billing', icon: <CreditCard size={18} /> }
   ];
 
   return (
@@ -354,9 +436,9 @@ export default function ProfessionalSettingsPage({
         <Header>
           <HeaderContent>
             <WelcomeSection>
-              <WelcomeTitle>Settings & Preferences</WelcomeTitle>
+              <WelcomeTitle>Account Settings</WelcomeTitle>
               <WelcomeSubtitle>
-                Manage your account settings and configure your experience
+                Manage your account preferences and global settings
               </WelcomeSubtitle>
             </WelcomeSection>
           </HeaderContent>
@@ -377,6 +459,62 @@ export default function ProfessionalSettingsPage({
           </SettingsSidebar>
 
           <SettingsContent>
+            {activeSection === 'account' && (
+              <>
+                <SettingsSection>
+                  <SectionTitle>
+                    <User size={20} />
+                    Account Information
+                  </SectionTitle>
+                  <SectionDescription>
+                    Your basic account details and personal information
+                  </SectionDescription>
+
+                  <AccountCard>
+                    <AccountDetail>
+                      <AccountLabel>Full Name</AccountLabel>
+                      <AccountValue>{user?.name}</AccountValue>
+                    </AccountDetail>
+                    <AccountDetail>
+                      <AccountLabel>Email Address</AccountLabel>
+                      <AccountValue>{user?.email}</AccountValue>
+                    </AccountDetail>
+                    <AccountDetail>
+                      <AccountLabel>Account Type</AccountLabel>
+                      <AccountValue>{user?.role || 'User'}</AccountValue>
+                    </AccountDetail>
+                    <AccountDetail>
+                      <AccountLabel>Member Since</AccountLabel>
+                      <AccountValue>January 2024</AccountValue>
+                    </AccountDetail>
+                    <AccountDetail>
+                      <AccountLabel>Last Login</AccountLabel>
+                      <AccountValue>2 hours ago</AccountValue>
+                    </AccountDetail>
+                  </AccountCard>
+
+                  <ButtonGroup>
+                    <ActionButton>
+                      <Mail size={16} />
+                      Update Email
+                    </ActionButton>
+                    <ActionButton $variant="secondary">
+                      <User size={16} />
+                      Edit Profile
+                    </ActionButton>
+                  </ButtonGroup>
+                </SettingsSection>
+
+                <InfoBox $type="info">
+                  <Info size={16} />
+                  <p>
+                    Account settings affect your entire platform experience. For portfolio-specific settings, 
+                    visit your portfolio settings page.
+                  </p>
+                </InfoBox>
+              </>
+            )}
+
             {activeSection === 'notifications' && (
               <>
                 <SettingsSection>
@@ -390,8 +528,8 @@ export default function ProfessionalSettingsPage({
 
                   <SettingItem>
                     <SettingLabel>
-                      <SettingTitle>Activity Updates</SettingTitle>
-                      <SettingHint>Get notified about portfolio views, comments, and ratings</SettingHint>
+                      <SettingTitle>Account Activity</SettingTitle>
+                      <SettingHint>Login alerts, password changes, and security updates</SettingHint>
                     </SettingLabel>
                     <Toggle 
                       $active={settings.notifications.email}
@@ -401,19 +539,19 @@ export default function ProfessionalSettingsPage({
 
                   <SettingItem>
                     <SettingLabel>
-                      <SettingTitle>Portfolio Milestones</SettingTitle>
-                      <SettingHint>Celebrate achievements and track your progress</SettingHint>
+                      <SettingTitle>Security Alerts</SettingTitle>
+                      <SettingHint>Important security notifications and suspicious activity</SettingHint>
                     </SettingLabel>
                     <Toggle 
-                      $active={settings.notifications.portfolio}
-                      onClick={() => handleToggle('notifications', 'portfolio')}
+                      $active={settings.notifications.security}
+                      onClick={() => handleToggle('notifications', 'security')}
                     />
                   </SettingItem>
 
                   <SettingItem>
                     <SettingLabel>
-                      <SettingTitle>Weekly Digest</SettingTitle>
-                      <SettingHint>Summary of your portfolio performance and insights</SettingHint>
+                      <SettingTitle>Weekly Summary</SettingTitle>
+                      <SettingHint>Weekly digest of your account activity and updates</SettingHint>
                     </SettingLabel>
                     <Toggle 
                       $active={settings.notifications.weekly}
@@ -436,7 +574,8 @@ export default function ProfessionalSettingsPage({
                 <InfoBox>
                   <Info size={16} />
                   <p>
-                    You can unsubscribe from all emails at any time by clicking the link in the footer of our emails.
+                    Security notifications cannot be disabled for your account protection. 
+                    You can unsubscribe from marketing emails at any time.
                   </p>
                 </InfoBox>
               </>
@@ -446,24 +585,23 @@ export default function ProfessionalSettingsPage({
               <>
                 <SettingsSection>
                   <SectionTitle>
-                    <Shield size={20} />
-                    Privacy Settings
+                    <Eye size={20} />
+                    Privacy Controls
                   </SectionTitle>
                   <SectionDescription>
-                    Control who can see your profile and activity
+                    Control your privacy and data sharing preferences
                   </SectionDescription>
 
                   <SettingItem>
                     <SettingLabel>
-                      <SettingTitle>Profile Visibility</SettingTitle>
-                      <SettingHint>Choose who can view your portfolio</SettingHint>
+                      <SettingTitle>Public Profile</SettingTitle>
+                      <SettingHint>Allow others to find your public profile</SettingHint>
                     </SettingLabel>
                     <Select 
                       value={settings.privacy.profileVisibility}
                       onChange={(e) => handleSelect('privacy', 'profileVisibility', e.target.value)}
                     >
                       <option value="public">Public</option>
-                      <option value="followers">Followers Only</option>
                       <option value="private">Private</option>
                     </Select>
                   </SettingItem>
@@ -481,34 +619,22 @@ export default function ProfessionalSettingsPage({
 
                   <SettingItem>
                     <SettingLabel>
-                      <SettingTitle>Activity Status</SettingTitle>
-                      <SettingHint>Show when you're active on the platform</SettingHint>
+                      <SettingTitle>Opt out of Analytics</SettingTitle>
+                      <SettingHint>Disable usage analytics and tracking</SettingHint>
                     </SettingLabel>
                     <Toggle 
-                      $active={settings.privacy.showActivity}
-                      onClick={() => handleToggle('privacy', 'showActivity')}
+                      $active={settings.privacy.analyticsOptOut}
+                      onClick={() => handleToggle('privacy', 'analyticsOptOut')}
                     />
                   </SettingItem>
                 </SettingsSection>
 
-                <SettingsSection>
-                  <SectionTitle>
-                    <Shield size={20} />
-                    Security
-                  </SectionTitle>
-                  <SectionDescription>
-                    Keep your account secure
-                  </SectionDescription>
-
-                  <div style={{ display: 'flex', gap: theme.spacing.md }}>
-                    <ActionButton>
-                      Change Password
-                    </ActionButton>
-                    <ActionButton>
-                      Enable 2FA
-                    </ActionButton>
-                  </div>
-                </SettingsSection>
+                <ButtonGroup>
+                  <ActionButton $variant="secondary">
+                    <Download size={16} />
+                    Download My Data
+                  </ActionButton>
+                </ButtonGroup>
               </>
             )}
 
@@ -550,6 +676,7 @@ export default function ProfessionalSettingsPage({
                       <option value="en">English</option>
                       <option value="es">Español</option>
                       <option value="fr">Français</option>
+                      <option value="de">Deutsch</option>
                     </Select>
                   </SettingItem>
 
@@ -563,49 +690,85 @@ export default function ProfessionalSettingsPage({
                       onChange={(e) => handleSelect('display', 'timezone', e.target.value)}
                     >
                       <option value="America/Los_Angeles">Pacific Time</option>
+                      <option value="America/Denver">Mountain Time</option>
                       <option value="America/Chicago">Central Time</option>
                       <option value="America/New_York">Eastern Time</option>
+                      <option value="Europe/London">London Time</option>
+                      <option value="Europe/Paris">Central European Time</option>
                     </Select>
                   </SettingItem>
                 </SettingsSection>
               </>
             )}
 
-            {activeSection === 'account' && (
+            {activeSection === 'security' && (
               <>
                 <SettingsSection>
                   <SectionTitle>
-                    <Settings size={20} />
-                    Account Information
+                    <Shield size={20} />
+                    Security Settings
                   </SectionTitle>
                   <SectionDescription>
-                    Manage your account details and preferences
+                    Keep your account secure with these settings
                   </SectionDescription>
 
-                  <div style={{ 
-                    background: '#f9fafb', 
-                    padding: theme.spacing.lg, 
-                    borderRadius: theme.borderRadius.md,
-                    marginBottom: theme.spacing.lg 
-                  }}>
-                    <div style={{ marginBottom: theme.spacing.md }}>
-                      <div style={{ fontWeight: theme.typography.weights.medium }}>Name</div>
-                      <div style={{ color: theme.colors.text.secondary }}>{user?.name}</div>
-                    </div>
-                    <div style={{ marginBottom: theme.spacing.md }}>
-                      <div style={{ fontWeight: theme.typography.weights.medium }}>Email</div>
-                      <div style={{ color: theme.colors.text.secondary }}>{user?.email}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: theme.typography.weights.medium }}>Member Since</div>
-                      <div style={{ color: theme.colors.text.secondary }}>January 2024</div>
-                    </div>
-                  </div>
+                  <ButtonGroup>
+                    <ActionButton>
+                      <Lock size={16} />
+                      Change Password
+                    </ActionButton>
+                    <ActionButton $variant="secondary">
+                      <Shield size={16} />
+                      Enable 2FA
+                    </ActionButton>
+                  </ButtonGroup>
+                </SettingsSection>
 
-                  <ActionButton>
-                    <Mail size={16} />
-                    Update Email
-                  </ActionButton>
+                <InfoBox $type="warning">
+                  <AlertCircle size={16} />
+                  <p>
+                    Two-factor authentication adds an extra layer of security to your account. 
+                    We recommend enabling it for better protection.
+                  </p>
+                </InfoBox>
+              </>
+            )}
+
+            {activeSection === 'billing' && (
+              <>
+                <SettingsSection>
+                  <SectionTitle>
+                    <CreditCard size={20} />
+                    Billing & Subscription
+                  </SectionTitle>
+                  <SectionDescription>
+                    Manage your subscription and billing information
+                  </SectionDescription>
+
+                  <AccountCard>
+                    <AccountDetail>
+                      <AccountLabel>Current Plan</AccountLabel>
+                      <AccountValue>Free Tier</AccountValue>
+                    </AccountDetail>
+                    <AccountDetail>
+                      <AccountLabel>Monthly Usage</AccountLabel>
+                      <AccountValue>12 / 100 API calls</AccountValue>
+                    </AccountDetail>
+                    <AccountDetail>
+                      <AccountLabel>Next Billing Date</AccountLabel>
+                      <AccountValue>-</AccountValue>
+                    </AccountDetail>
+                  </AccountCard>
+
+                  <ButtonGroup>
+                    <ActionButton>
+                      Upgrade Plan
+                    </ActionButton>
+                    <ActionButton $variant="secondary">
+                      <Download size={16} />
+                      Download Invoice
+                    </ActionButton>
+                  </ButtonGroup>
                 </SettingsSection>
 
                 <SettingsSection>
@@ -617,10 +780,21 @@ export default function ProfessionalSettingsPage({
                     Irreversible actions - please be careful
                   </SectionDescription>
 
-                  <ActionButton $variant="danger">
-                    Delete Account
-                  </ActionButton>
+                  <ButtonGroup>
+                    <ActionButton $variant="danger">
+                      <Trash2 size={16} />
+                      Delete Account
+                    </ActionButton>
+                  </ButtonGroup>
                 </SettingsSection>
+
+                <InfoBox $type="warning">
+                  <AlertCircle size={16} />
+                  <p>
+                    <strong>Account Deletion:</strong> This action cannot be undone. All your data, 
+                    portfolios, and gallery pieces will be permanently deleted.
+                  </p>
+                </InfoBox>
               </>
             )}
 
@@ -637,7 +811,8 @@ export default function ProfessionalSettingsPage({
                 marginBottom: `-${theme.spacing.xl}`,
                 display: 'flex',
                 justifyContent: 'flex-end',
-                gap: theme.spacing.md
+                gap: theme.spacing.md,
+                boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)'
               }}>
                 <button
                   onClick={() => {

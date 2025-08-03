@@ -1,471 +1,303 @@
-// src\app\dashboard\settings\page.tsx
+// src/app/settings/page.tsx - Central Settings Hub (FIXED)
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/providers/authProvider';
+import { useRouter } from 'next/navigation';
 import {
-  Bell,
+  Settings,
+  Briefcase,
+  User,
+  Gauge,
+  ChevronRight,
   Shield,
+  Bell,
   Palette,
-  Settings as SettingsIcon,
-  Mail,
-  AlertCircle,
-  Save,
-  RefreshCw
+  CreditCard,
+  Globe
 } from 'lucide-react';
-import { theme } from '@/styles/theme';
 import styled from 'styled-components';
-import { PageContainer, Container, Heading1 } from '@/styles/styled-components';
-import { PageWrapper } from '@/app/thrive/styles';
-import { HeaderContent, WelcomeSection, WelcomeTitle, WelcomeSubtitle } from '@/components/dashboard/dashboardStyles';
-import { Header } from '@/components/misc/header';
+import { theme } from '@/styles/theme';
+import { Portfolio } from '@/types/portfolio.types';
 
+const PageWrapper = styled.div`
+  min-height: 100vh;
+  background: #fafafa;
+  padding: 2rem 1rem;
+  font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #2c2c2c;
+`;
 
+const Container = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+`;
 
-// Professional styled components
+const Header = styled.div`
+  margin-bottom: 3rem;
+  text-align: center;
+`;
+
+const Title = styled.h1`
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2c2c2c;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.5px;
+`;
+
+const Subtitle = styled.p`
+  font-size: 1.125rem;
+  color: #666;
+  margin: 0;
+  font-weight: 300;
+`;
+
 const SettingsGrid = styled.div`
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: ${theme.spacing.xl};
-  margin-top: ${theme.spacing.xl};
-  
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: ${theme.spacing.lg};
+  margin-bottom: 3rem;
 `;
 
-const SettingsSidebar = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-
-const SidebarItem = styled.button<{ $active: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.sm};
-  padding: ${theme.spacing.md};
-  background: ${props => props.$active ? 'white' : 'transparent'};
-  border: 1px solid ${props => props.$active ? '#e5e7eb' : 'transparent'};
-  border-radius: ${theme.borderRadius.md};
-  cursor: pointer;
+const SettingsCard = styled(Link)`
+  display: block;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: ${theme.borderRadius.lg};
+  padding: ${theme.spacing.xl};
+  text-decoration: none;
   transition: all 0.2s ease;
-  text-align: left;
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.sm};
-  font-weight: ${props => props.$active ? theme.typography.weights.medium : theme.typography.weights.normal};
-  color: ${props => props.$active ? theme.colors.text.primary : theme.colors.text.secondary};
+  cursor: pointer;
 
   &:hover {
-    background: ${props => props.$active ? 'white' : '#f9fafb'};
-    border-color: #e5e7eb;
-  }
-
-  svg {
-    color: ${props => props.$active ? '#3b82f6' : '#9ca3af'};
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    transform: translateY(-2px);
   }
 `;
 
-const SettingsContent = styled.div`
-  background: white;
-  border-radius: ${theme.borderRadius.lg};
-  border: 1px solid ${theme.colors.border.light};
-  padding: ${theme.spacing.xl};
+const CardHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: ${theme.spacing.md};
 `;
 
-const SettingsSection = styled.div`
-  margin-bottom: ${theme.spacing['2xl']};
-
-  &:last-child {
-    margin-bottom: 0;
-  }
+const CardIcon = styled.div<{ $color: string }>`
+  width: 48px;
+  height: 48px;
+  background: ${props => props.$color};
+  border-radius: ${theme.borderRadius.md};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
 `;
 
-const SectionTitle = styled.h3`
+const CardTitle = styled.h3`
   font-size: ${theme.typography.sizes.lg};
   font-weight: ${theme.typography.weights.semibold};
   color: ${theme.colors.text.primary};
   margin: 0 0 ${theme.spacing.xs} 0;
+`;
+
+const CardDescription = styled.p`
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  margin: 0;
+  line-height: 1.6;
+`;
+
+const QuickLinks = styled.div`
+  margin-top: ${theme.spacing.sm};
+  display: flex;
+  flex-wrap: wrap;
+  gap: ${theme.spacing.xs};
+`;
+
+const QuickLink = styled.span`
+  font-size: ${theme.typography.sizes.xs};
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+`;
+
+const PortfolioSection = styled.div`
+  margin-top: 3rem;
+`;
+
+const SectionHeader = styled.h2`
+  font-size: ${theme.typography.sizes.xl};
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
+  margin: 0 0 ${theme.spacing.lg} 0;
   display: flex;
   align-items: center;
   gap: ${theme.spacing.sm};
 `;
 
-const SectionDescription = styled.p`
-  font-size: ${theme.typography.sizes.sm};
-  color: ${theme.colors.text.secondary};
-  margin: 0 0 ${theme.spacing.lg} 0;
+const PortfolioGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: ${theme.spacing.md};
 `;
 
-const SettingItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: ${theme.spacing.md} 0;
-  border-bottom: 1px solid ${theme.colors.border.light};
+const PortfolioCard = styled(Link)`
+  display: block;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: ${theme.borderRadius.md};
+  padding: ${theme.spacing.lg};
+  text-decoration: none;
+  transition: all 0.2s ease;
 
-  &:last-child {
-    border-bottom: none;
+  &:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
   }
 `;
 
-const SettingLabel = styled.div`
-  flex: 1;
-`;
-
-const SettingTitle = styled.h4`
-  font-size: ${theme.typography.sizes.sm};
+const PortfolioName = styled.h4`
   font-weight: ${theme.typography.weights.medium};
   color: ${theme.colors.text.primary};
-  margin: 0 0 0.25rem 0;
+  margin: 0 0 ${theme.spacing.xs} 0;
 `;
 
-const SettingHint = styled.p`
-  font-size: ${theme.typography.sizes.xs};
+const PortfolioUsername = styled.p`
+  font-size: ${theme.typography.sizes.sm};
   color: ${theme.colors.text.secondary};
   margin: 0;
 `;
 
-const Toggle = styled.button<{ $active: boolean }>`
-  width: 48px;
-  height: 28px;
-  background: ${props => props.$active ? '#3b82f6' : '#e5e7eb'};
-  border: none;
-  border-radius: 999px;
-  position: relative;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: ${props => props.$active ? '23px' : '3px'};
-    width: 22px;
-    height: 22px;
-    background: white;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-`;
-
-const Select = styled.select`
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  border: 1px solid ${theme.colors.border.light};
-  border-radius: ${theme.borderRadius.sm};
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.sm};
-  color: ${theme.colors.text.primary};
-  background: white;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
-`;
-
-const NotificationBadge = styled.div`
-  background: #ef4444;
-  color: white;
-  font-size: ${theme.typography.sizes.xs};
-  font-weight: ${theme.typography.weights.semibold};
-  padding: 0.125rem 0.375rem;
-  border-radius: 999px;
-  min-width: 20px;
-  text-align: center;
-`;
-
-const ActionButton = styled.button<{ $variant?: 'primary' | 'danger' }>`
-  padding: ${theme.spacing.sm} ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.sm};
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.sm};
-  font-weight: ${theme.typography.weights.medium};
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-
-  ${props => props.$variant === 'danger' ? `
-    background: white;
-    color: #ef4444;
-    border: 1px solid #ef4444;
-
-    &:hover {
-      background: #fef2f2;
-    }
-  ` : `
-    background: #3b82f6;
-    color: white;
-    border: 1px solid #3b82f6;
-
-    &:hover {
-      background: #2563eb;
-      border-color: #2563eb;
-    }
-  `}
-`;
-
-const InfoBox = styled.div`
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
-  border-radius: ${theme.borderRadius.md};
-  padding: ${theme.spacing.md};
-  display: flex;
-  gap: ${theme.spacing.sm};
-  margin-bottom: ${theme.spacing.lg};
-
-  svg {
-    color: #3b82f6;
-    flex-shrink: 0;
-  }
-
-  p {
-    font-size: ${theme.typography.sizes.sm};
-    color: #1e40af;
-    margin: 0;
-    line-height: 1.6;
-  }
-`;
-
-type SettingsState = {
-  notifications: {
-    email: boolean;
-    marketing: boolean;
-    updates: boolean;
-  };
-  display: {
-    theme: 'light' | 'dark' | 'auto';
-    language: string;
-  };
-};
-
-export default function GlobalSettingsPage() {
+export default function SettingsHub() {
   const { user } = useAuth();
-  const [activeSection, setActiveSection] = useState<'notifications' | 'display' | 'account'>('notifications');
-  const [hasChanges, setHasChanges] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const router = useRouter();
 
-  const [settings, setSettings] = useState<SettingsState>({
-    notifications: {
-      email: true,
-      marketing: false,
-      updates: true
+  const mainSettings = [
+    {
+      id: 'quick',
+      title: 'Quick Settings',
+      description: 'Access your most-used settings from the dashboard',
+      icon: Gauge,
+      color: '#3b82f6',
+      href: '/dashboard/settings',
+      quickLinks: ['Notifications', 'Theme', 'Language']
     },
-    display: {
-      theme: 'light',
-      language: 'en'
+    {
+      id: 'account',
+      title: 'Account Settings',
+      description: 'Comprehensive account management including security, billing, and profile',
+      icon: User,
+      color: '#10b981',
+      href: '/settings/account',
+      quickLinks: ['Profile', 'Security', 'Billing', 'Privacy']
     }
+  ];
+
+  // Create proper Portfolio objects that match the interface
+  const createMockPortfolio = (id: string, name: string, username: string): Portfolio => ({
+    id,
+    userId: user?.id || 'user-1',
+    username,
+    name,
+    title: name,
+    bio: `This is ${name} portfolio`,
+    kind: 'creative',
+    visibility: 'public',
+    status: 'active',
+    specializations: [],
+    tags: [],
+    showContactInfo: false,
+    settings: {
+      allowReviews: true,
+      requireReviewApproval: false,
+      allowAnonymousReviews: true,
+      showStats: true,
+      showPrices: false,
+      defaultGalleryView: 'grid',
+      piecesPerPage: 12,
+      notifyOnReview: true,
+      notifyOnView: false,
+      weeklyAnalyticsEmail: true
+    },
+    stats: {
+      totalViews: 0,
+      uniqueVisitors: 0,
+      totalPieces: 0,
+      totalReviews: 0,
+      viewsThisWeek: 0,
+      viewsThisMonth: 0,
+      shareCount: 0,
+      savedCount: 0
+    },
+    createdAt: new Date(),
+    updatedAt: new Date()
   });
 
-  const handleToggle = (category: keyof SettingsState, setting: string) => {
-    setSettings(prev => ({
-      ...prev,
-      [category]: {
-        ...prev[category],
-        [setting]: !prev[category][setting as keyof typeof prev[typeof category]]
-      }
-    }));
-    setHasChanges(true);
-  };
-
-  const handleSelect = (category: keyof SettingsState, setting: string, value: string) => {
-    setSettings(prev => ({
-      ...prev,
-      [category]: {
-        ...prev[category],
-        [setting]: value
-      }
-    }));
-    setHasChanges(true);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-    setSaving(false);
-    setHasChanges(false);
-  };
-
-  const sidebarItems = [
-    { id: 'notifications', label: 'Notifications', icon: <Bell size={18} /> },
-    { id: 'display', label: 'Display', icon: <Palette size={18} /> },
-    { id: 'account', label: 'Account Info', icon: <SettingsIcon size={18} /> }
+  // Use actual portfolios from user context or create type-safe mock data
+  const userPortfolios: Portfolio[] = user?.portfolios || [
+    createMockPortfolio('1', 'My Portfolio', 'johndoe'),
+    createMockPortfolio('2', 'Photography', 'johndoe-photos')
   ];
 
   return (
     <PageWrapper>
       <Container>
-        <Header title={''}>
-          <HeaderContent>
-            <WelcomeSection>
-              <WelcomeTitle>Settings</WelcomeTitle>
-              <WelcomeSubtitle>Manage your personal preferences across the platform</WelcomeSubtitle>
-            </WelcomeSection>
-          </HeaderContent>
+        <Header>
+          <Title>Settings Center</Title>
+          <Subtitle>
+            Manage all your account and portfolio settings in one place
+          </Subtitle>
         </Header>
 
         <SettingsGrid>
-          <SettingsSidebar>
-            {sidebarItems.map(item => (
-              <SidebarItem
-                key={item.id}
-                $active={activeSection === item.id}
-                onClick={() => setActiveSection(item.id as any)}
-              >
-                {item.icon}
-                {item.label}
-              </SidebarItem>
-            ))}
-          </SettingsSidebar>
-
-          <SettingsContent>
-            {activeSection === 'notifications' && (
-              <SettingsSection>
-                <SectionTitle>
-                  <Bell size={20} />
-                  Notification Preferences
-                </SectionTitle>
-                <SectionDescription>
-                  Manage what you receive from us
-                </SectionDescription>
-
-                <SettingItem>
-                  <SettingLabel>
-                    <SettingTitle>Email Alerts</SettingTitle>
-                    <SettingHint>Get notified about major activity</SettingHint>
-                  </SettingLabel>
-                  <Toggle $active={settings.notifications.email} onClick={() => handleToggle('notifications', 'email')} />
-                </SettingItem>
-
-                <SettingItem>
-                  <SettingLabel>
-                    <SettingTitle>Platform Updates</SettingTitle>
-                    <SettingHint>Receive important changes and news</SettingHint>
-                  </SettingLabel>
-                  <Toggle $active={settings.notifications.updates} onClick={() => handleToggle('notifications', 'updates')} />
-                </SettingItem>
-
-                <SettingItem>
-                  <SettingLabel>
-                    <SettingTitle>Marketing</SettingTitle>
-                    <SettingHint>Get product announcements and tips</SettingHint>
-                  </SettingLabel>
-                  <Toggle $active={settings.notifications.marketing} onClick={() => handleToggle('notifications', 'marketing')} />
-                </SettingItem>
-              </SettingsSection>
-            )}
-
-            {activeSection === 'display' && (
-              <SettingsSection>
-                <SectionTitle>
-                  <Palette size={20} />
-                  Display Settings
-                </SectionTitle>
-                <SectionDescription>Customize how the app looks for you</SectionDescription>
-
-                <SettingItem>
-                  <SettingLabel>
-                    <SettingTitle>Theme</SettingTitle>
-                    <SettingHint>Choose between light or dark mode</SettingHint>
-                  </SettingLabel>
-                  <Select value={settings.display.theme} onChange={(e) => handleSelect('display', 'theme', e.target.value)}>
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="auto">Auto</option>
-                  </Select>
-                </SettingItem>
-
-                <SettingItem>
-                  <SettingLabel>
-                    <SettingTitle>Language</SettingTitle>
-                    <SettingHint>Select your preferred language</SettingHint>
-                  </SettingLabel>
-                  <Select value={settings.display.language} onChange={(e) => handleSelect('display', 'language', e.target.value)}>
-                    <option value="en">English</option>
-                    <option value="es">Español</option>
-                    <option value="fr">Français</option>
-                  </Select>
-                </SettingItem>
-              </SettingsSection>
-            )}
-
-            {activeSection === 'account' && (
-              <SettingsSection>
-                <SectionTitle>
-                  <SettingsIcon size={20} />
-                  Account Info
-                </SectionTitle>
-                <SectionDescription>Basic info tied to your user account</SectionDescription>
-
-                <div style={{ background: '#f9fafb', padding: 16, borderRadius: 8, marginBottom: 24 }}>
-                  <div style={{ marginBottom: 12 }}>
-                    <strong>Name:</strong> {user?.name}
-                  </div>
-                  <div style={{ marginBottom: 12 }}>
-                    <strong>Email:</strong> {user?.email}
-                  </div>
-                  <div>
-                    <strong>Role:</strong> {user?.role}
-                  </div>
+          {mainSettings.map((setting) => (
+            <SettingsCard key={setting.id} href={setting.href}>
+              <CardHeader>
+                <div style={{ flex: 1 }}>
+                  <CardTitle>{setting.title}</CardTitle>
+                  <CardDescription>{setting.description}</CardDescription>
+                  <QuickLinks>
+                    {setting.quickLinks.map((link) => (
+                      <QuickLink key={link}>{link}</QuickLink>
+                    ))}
+                  </QuickLinks>
                 </div>
-
-                <ActionButton>
-                  <Mail size={16} />
-                  Update Email
-                </ActionButton>
-
-                <SettingsSection>
-                  <SectionTitle style={{ color: '#ef4444' }}>
-                    <AlertCircle size={20} />
-                    Danger Zone
-                  </SectionTitle>
-                  <SectionDescription>
-                    This action cannot be undone
-                  </SectionDescription>
-                  <ActionButton $variant="danger">
-                    Delete Account
-                  </ActionButton>
-                </SettingsSection>
-              </SettingsSection>
-            )}
-
-            {hasChanges && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, padding: 16, marginTop: 24, borderTop: '1px solid #eee' }}>
-                <button
-                  onClick={() => window.location.reload()}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid #ccc',
-                    padding: '8px 16px',
-                    borderRadius: 4,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Discard Changes
-                </button>
-                <ActionButton onClick={handleSave}>
-                  {saving ? (
-                    <>
-                      <RefreshCw size={16} className="animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save size={16} />
-                      Save Changes
-                    </>
-                  )}
-                </ActionButton>
-              </div>
-            )}
-          </SettingsContent>
+                <CardIcon $color={setting.color}>
+                  <setting.icon size={24} />
+                </CardIcon>
+              </CardHeader>
+            </SettingsCard>
+          ))}
         </SettingsGrid>
+
+        {userPortfolios.length > 0 && (
+          <PortfolioSection>
+            <SectionHeader>
+              <Briefcase size={24} />
+              Portfolio Settings
+            </SectionHeader>
+            <PortfolioGrid>
+              {userPortfolios.map((portfolio) => (
+                <PortfolioCard
+                  key={portfolio.id}
+                  href={`/portfolio/${portfolio.username}/settings`}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <PortfolioName>{portfolio.name || portfolio.title}</PortfolioName>
+                      <PortfolioUsername>@{portfolio.username}</PortfolioUsername>
+                    </div>
+                    <ChevronRight size={20} color="#9ca3af" />
+                  </div>
+                </PortfolioCard>
+              ))}
+            </PortfolioGrid>
+          </PortfolioSection>
+        )}
       </Container>
     </PageWrapper>
   );
