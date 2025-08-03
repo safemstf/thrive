@@ -21,6 +21,8 @@ import type {
   UpdatePortfolioDto,
   PortfolioFilters,
   CreateReviewDto,
+  ScientificDiscipline,
+
 } from '@/types/portfolio.types';
 import type {
   GalleryPiece,
@@ -32,7 +34,6 @@ import type {
   Book,
   MainCategory,
   SubCategory,
-  ScientificDiscipline,
   DifficultyLevel,
 } from '@/types/educational.types';
 import type {
