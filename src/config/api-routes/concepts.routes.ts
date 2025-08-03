@@ -1,5 +1,5 @@
 // src/config/api-routes/concepts.routes.ts
-import { RouteCategory } from '../api-routes';
+import { RouteCategory } from '@/types/api.types';
 
 export const conceptsRoutes: RouteCategory = {
   name: 'Concepts',
@@ -8,7 +8,14 @@ export const conceptsRoutes: RouteCategory = {
       name: 'Get All Concepts',
       endpoint: '/api/concepts',
       method: 'GET',
-      description: 'Get all concepts with filtering'
+      description: 'Get all concepts with filtering',
+      queryParams: {
+        page: '1',
+        limit: '20',
+        category: 'all',
+        difficulty: 'all',
+        type: 'all'
+      }
     },
     {
       name: 'Search Concepts',
@@ -16,7 +23,9 @@ export const conceptsRoutes: RouteCategory = {
       method: 'GET',
       description: 'Search concepts',
       queryParams: {
-        q: 'algebra'
+        q: 'algebra',
+        category: 'math',
+        difficulty: 'beginner'
       }
     },
     {
@@ -45,7 +54,7 @@ export const conceptsRoutes: RouteCategory = {
       method: 'GET',
       description: 'Get concepts by type',
       params: {
-        type: 'math'
+        type: 'lesson' // Changed from 'math' to match backend
       }
     },
     {
@@ -57,6 +66,11 @@ export const conceptsRoutes: RouteCategory = {
       params: {
         id: 'PLACEHOLDER_CONCEPT_ID'
       },
+      body: {
+        score: 95,
+        timeSpent: 30,
+        notes: 'Completed successfully'
+      },
       skipInBatchTest: true
     },
     {
@@ -66,11 +80,12 @@ export const conceptsRoutes: RouteCategory = {
       description: 'Create new concept',
       needsAuth: true,
       body: () => ({
-        name: `Test Concept ${Date.now()}`,
-        type: 'math',
-        description: 'Test concept description',
-        category: 'algebra',
-        difficulty: 'beginner'
+        title: `Test Concept ${Date.now()}`, // Changed from 'name' to 'title'
+        description: 'A test concept for API testing',
+        type: 'lesson',
+        difficulty: 'beginner',
+        estimatedMinutes: 15,
+        category: 'programming'
       })
     },
     {
@@ -83,8 +98,8 @@ export const conceptsRoutes: RouteCategory = {
         id: 'PLACEHOLDER_CONCEPT_ID'
       },
       body: {
-        name: 'Updated Concept',
-        description: 'Updated description'
+        title: 'Updated Concept', // Changed from 'name' to 'title'
+        difficulty: 'intermediate'
       },
       skipInBatchTest: true
     }

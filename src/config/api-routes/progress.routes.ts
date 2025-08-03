@@ -1,5 +1,5 @@
-// src/config/api-routes/progress.routes.ts
-import { RouteCategory } from '../api-routes';
+// src/config/api-routes/progress.routes.ts - Fixed
+import { RouteCategory } from '@/types/api.types';
 
 export const progressRoutes: RouteCategory = {
   name: 'Progress',
@@ -9,7 +9,14 @@ export const progressRoutes: RouteCategory = {
       endpoint: '/api/progress',
       method: 'GET',
       description: 'Get user progress summary',
-      needsAuth: true
+      needsAuth: true,
+      tags: {
+        dataCategory: 'user',
+        readOnly: true,
+        requiresAuth: true,
+        educational: true,
+        analytics: true
+      }
     },
     {
       name: 'Get Book Progress',
@@ -20,7 +27,16 @@ export const progressRoutes: RouteCategory = {
       params: {
         bookId: 'PLACEHOLDER_BOOK_ID'
       },
-      skipInBatchTest: true
+      skipInBatchTest: true,
+      tags: {
+        needsIdGenerator: true,
+        placeholderIds: ['BOOK_ID'],
+        dataCategory: 'user',
+        readOnly: true,
+        requiresAuth: true,
+        educational: true,
+        requiresExistingData: true
+      }
     },
     {
       name: 'Update Concept Progress',
@@ -33,17 +49,38 @@ export const progressRoutes: RouteCategory = {
         conceptId: 'PLACEHOLDER_CONCEPT_ID'
       },
       body: {
-        completed: true,
-        score: 95
+        status: 'completed',
+        score: 90,
+        timeSpent: 25,
+        completedAt: new Date().toISOString()
       },
-      skipInBatchTest: true
+      skipInBatchTest: true,
+      tags: {
+        needsIdGenerator: true,
+        placeholderIds: ['BOOK_ID', 'CONCEPT_ID'],
+        dataCategory: 'user',
+        requiresAuth: true,
+        modifiesData: true,
+        educational: true,
+        requiresExistingData: true
+      }
     },
     {
       name: 'Get Progress Stats',
       endpoint: '/api/progress/stats',
       method: 'GET',
       description: 'Get detailed progress statistics',
-      needsAuth: true
+      needsAuth: true,
+      queryParams: {
+        period: '30d'
+      },
+      tags: {
+        dataCategory: 'user',
+        readOnly: true,
+        requiresAuth: true,
+        educational: true,
+        analytics: true
+      }
     },
     {
       name: 'Reset Book Progress',
@@ -54,7 +91,17 @@ export const progressRoutes: RouteCategory = {
       params: {
         bookId: 'PLACEHOLDER_BOOK_ID'
       },
-      skipInBatchTest: true
+      skipInBatchTest: true,
+      tags: {
+        needsIdGenerator: true,
+        placeholderIds: ['BOOK_ID'],
+        dataCategory: 'user',
+        requiresAuth: true,
+        destructive: true,
+        educational: true,
+        requiresExistingData: true,
+        dangerousOperation: true
+      }
     }
   ]
 };

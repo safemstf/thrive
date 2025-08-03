@@ -1,10 +1,10 @@
-// src/config/api-routes/gallery.routes.ts
-import { RouteCategory } from '../api-routes';
-import { generateUniqueId } from '@/types/api.types';
+// src/config/api-routes/gallery.routes.ts - Fixed
+import { RouteCategory, generateUniqueId } from '@/types/api.types';
+
 export const galleryRoutes: RouteCategory = {
   name: 'Gallery',
   routes: [
-    // Public endpoints
+    // ===== Public Endpoints =====
     {
       name: 'Get Gallery Pieces',
       endpoint: '/api/gallery',
@@ -16,6 +16,10 @@ export const galleryRoutes: RouteCategory = {
         visibility: 'public',
         sortBy: 'createdAt',
         sortOrder: 'desc'
+      },
+      tags: {
+        dataCategory: 'gallery',
+        readOnly: true
       }
     },
     {
@@ -25,35 +29,93 @@ export const galleryRoutes: RouteCategory = {
       description: 'Get featured items',
       queryParams: {
         limit: '6'
+      },
+      tags: {
+        dataCategory: 'gallery',
+        readOnly: true
       }
     },
     {
       name: 'Get Gallery Stats',
       endpoint: '/api/gallery/stats',
       method: 'GET',
-      description: 'Get gallery statistics'
+      description: 'Get gallery statistics',
+      tags: {
+        dataCategory: 'gallery',
+        readOnly: true,
+        analytics: true
+      }
     },
     {
-      name: 'Debug Upload Directory',
-      endpoint: '/api/gallery/debug/uploads',
+      name: 'Get Gallery Collections',
+      endpoint: '/api/gallery/collections',
       method: 'GET',
-      description: 'Debug upload directory contents'
+      description: 'Get all collections',
+      tags: {
+        dataCategory: 'gallery',
+        readOnly: true
+      }
     },
     {
-      name: 'Verify Gallery Setup',
-      endpoint: '/api/gallery/verify-setup',
+      name: 'Get Single Collection',
+      endpoint: '/api/gallery/collections/:id',
       method: 'GET',
-      description: 'Verify upload configuration'
-    },
-    {
-      name: 'Test Image Access',
-      endpoint: '/api/gallery/test-image/:filename',
-      method: 'GET',
-      description: 'Test direct image access',
+      description: 'Get specific collection',
       params: {
-        filename: 'test.jpg'
+        id: 'PLACEHOLDER_COLLECTION_ID'
       },
-      skipInBatchTest: true
+      skipInBatchTest: true,
+      tags: {
+        needsIdGenerator: true,
+        placeholderIds: ['COLLECTION_ID'],
+        dataCategory: 'gallery',
+        readOnly: true,
+        requiresExistingData: true
+      }
+    },
+    {
+      name: 'Get Gallery Artists',
+      endpoint: '/api/gallery/artists',
+      method: 'GET',
+      description: 'Get all artists',
+      tags: {
+        dataCategory: 'gallery',
+        readOnly: true
+      }
+    },
+    {
+      name: 'Get Single Artist',
+      endpoint: '/api/gallery/artists/:id',
+      method: 'GET',
+      description: 'Get specific artist',
+      params: {
+        id: 'PLACEHOLDER_ARTIST_ID'
+      },
+      skipInBatchTest: true,
+      tags: {
+        needsIdGenerator: true,
+        placeholderIds: ['ARTIST_ID'],
+        dataCategory: 'gallery',
+        readOnly: true,
+        requiresExistingData: true
+      }
+    },
+    {
+      name: 'Get Artist Pieces',
+      endpoint: '/api/gallery/artists/:id/pieces',
+      method: 'GET',
+      description: 'Get all pieces by artist',
+      params: {
+        id: 'PLACEHOLDER_ARTIST_ID'
+      },
+      skipInBatchTest: true,
+      tags: {
+        needsIdGenerator: true,
+        placeholderIds: ['ARTIST_ID'],
+        dataCategory: 'gallery',
+        readOnly: true,
+        requiresExistingData: true
+      }
     },
     {
       name: 'Get Single Piece',
@@ -63,10 +125,53 @@ export const galleryRoutes: RouteCategory = {
       params: {
         id: 'PLACEHOLDER_GALLERY_ID'
       },
-      skipInBatchTest: true
+      skipInBatchTest: true,
+      tags: {
+        needsIdGenerator: true,
+        placeholderIds: ['GALLERY_ID'],
+        dataCategory: 'gallery',
+        readOnly: true,
+        requiresExistingData: true
+      }
+    },
+
+    // ===== Debug & Utility Endpoints =====
+    {
+      name: 'Debug Upload Directory',
+      endpoint: '/api/gallery/debug/uploads',
+      method: 'GET',
+      description: 'Debug upload directory contents',
+      tags: {
+        dataCategory: 'gallery',
+        readOnly: true
+      }
+    },
+    {
+      name: 'Verify Gallery Setup',
+      endpoint: '/api/gallery/verify-setup',
+      method: 'GET',
+      description: 'Verify upload configuration',
+      tags: {
+        dataCategory: 'gallery',
+        readOnly: true
+      }
+    },
+    {
+      name: 'Test Image Access',
+      endpoint: '/api/gallery/test-image/:filename',
+      method: 'GET',
+      description: 'Test direct image access',
+      params: {
+        filename: 'test.jpg'
+      },
+      skipInBatchTest: true,
+      tags: {
+        dataCategory: 'gallery',
+        readOnly: true
+      }
     },
     
-    // Auth required endpoints
+    // ===== Auth Required Endpoints =====
     {
       name: 'Create Gallery Piece',
       endpoint: '/api/gallery',
@@ -83,7 +188,13 @@ export const galleryRoutes: RouteCategory = {
         price: 100,
         currency: 'USD',
         portfolioId: generateUniqueId() // Temporary ID for testing
-      })
+      }),
+      tags: {
+        dataCategory: 'gallery',
+        requiresAuth: true,
+        modifiesData: true,
+        setupRoute: true
+      }
     },
     {
       name: 'Upload Gallery Image',
@@ -94,7 +205,12 @@ export const galleryRoutes: RouteCategory = {
       body: {
         note: 'Requires multipart/form-data with file upload'
       },
-      skipInBatchTest: true // File uploads don't work in batch tests
+      skipInBatchTest: true, // File uploads don't work in batch tests
+      tags: {
+        dataCategory: 'gallery',
+        needsFileUpload: true,
+        fileUploadType: 'image'
+      }
     },
     {
       name: 'Debug Upload',
@@ -103,6 +219,10 @@ export const galleryRoutes: RouteCategory = {
       description: 'Debug multer upload (dev only)',
       body: {
         test: 'debug'
+      },
+      tags: {
+        dataCategory: 'gallery',
+        needsFileUpload: true
       }
     },
     {
@@ -119,7 +239,15 @@ export const galleryRoutes: RouteCategory = {
         description: 'Updated description',
         visibility: 'public'
       },
-      skipInBatchTest: true
+      skipInBatchTest: true,
+      tags: {
+        needsIdGenerator: true,
+        placeholderIds: ['GALLERY_ID'],
+        dataCategory: 'gallery',
+        requiresAuth: true,
+        modifiesData: true,
+        requiresExistingData: true
+      }
     },
     {
       name: 'Delete Gallery Piece',
@@ -130,8 +258,19 @@ export const galleryRoutes: RouteCategory = {
       params: {
         id: 'PLACEHOLDER_GALLERY_ID'
       },
-      skipInBatchTest: true
+      skipInBatchTest: true,
+      tags: {
+        needsIdGenerator: true,
+        placeholderIds: ['GALLERY_ID'],
+        dataCategory: 'gallery',
+        requiresAuth: true,
+        destructive: true,
+        requiresExistingData: true,
+        cleanupRoute: true
+      }
     },
+
+    // ===== Batch Operations =====
     {
       name: 'Batch Update Visibility',
       endpoint: '/api/gallery/batch-visibility',
@@ -142,7 +281,14 @@ export const galleryRoutes: RouteCategory = {
         ids: [],
         visibility: 'public'
       },
-      skipInBatchTest: true
+      skipInBatchTest: true,
+      tags: {
+        dataCategory: 'gallery',
+        requiresAuth: true,
+        modifiesData: true,
+        batchOperation: true,
+        requiresExistingData: true
+      }
     },
     {
       name: 'Batch Delete Pieces',
@@ -153,7 +299,16 @@ export const galleryRoutes: RouteCategory = {
       body: {
         ids: []
       },
-      skipInBatchTest: true
+      skipInBatchTest: true,
+      tags: {
+        dataCategory: 'gallery',
+        requiresAuth: true,
+        destructive: true,
+        batchOperation: true,
+        requiresExistingData: true,
+        cleanupRoute: true,
+        dangerousOperation: true
+      }
     }
   ]
 };

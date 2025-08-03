@@ -1,5 +1,5 @@
 // src/config/api-routes/books.routes.ts
-import { RouteCategory } from '../api-routes';
+import { RouteCategory } from '@/types/api.types';
 
 export const booksRoutes: RouteCategory = {
   name: 'Books',
@@ -11,7 +11,9 @@ export const booksRoutes: RouteCategory = {
       description: 'Get all books with filtering',
       queryParams: {
         page: '1',
-        limit: '10'
+        limit: '10',
+        category: 'all',
+        difficulty: 'all'
       }
     },
     {
@@ -30,7 +32,7 @@ export const booksRoutes: RouteCategory = {
       method: 'GET',
       description: 'Get books by category',
       params: {
-        mainCategory: 'Mathematics'
+        mainCategory: 'programming'
       }
     },
     {
@@ -39,17 +41,14 @@ export const booksRoutes: RouteCategory = {
       method: 'POST',
       description: 'Create new book',
       needsAuth: true,
-      body: () => ({
-        title: `Test Book ${Date.now()}`,
-        author: 'Test Author',
-        description: 'A test book',
-        mainCategory: 'Mathematics',
-        subCategory: 'Algebra',
-        gradeLevel: 'High School',
-        difficulty: 'Intermediate',
-        isbn: `TEST-${Date.now()}`,
-        concepts: []
-      })
+      body: {
+        title: 'Test Book',
+        description: 'A test book for API testing',
+        mainCategory: 'programming',
+        subCategory: 'web-development',
+        difficulty: 'beginner',
+        estimatedHours: 10
+      }
     },
     {
       name: 'Compose Custom Book',
@@ -58,10 +57,10 @@ export const booksRoutes: RouteCategory = {
       description: 'Create custom book from concepts',
       needsAuth: true,
       body: {
-        title: 'Custom Book',
-        conceptIds: []
-      },
-      skipInBatchTest: true // Needs concept IDs
+        title: 'My Custom Book',
+        conceptIds: [],
+        description: 'A custom learning path'
+      }
     },
     {
       name: 'Get Book Suggestions',

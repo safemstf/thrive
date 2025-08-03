@@ -1,11 +1,11 @@
 // src/config/api-routes/portfolios.routes.ts
-import { RouteCategory } from '../api-routes';
+import { RouteCategory } from '@/types/api.types';
 import { generateUniqueUsername } from '@/types/api.types';
 
 export const portfoliosRoutes: RouteCategory = {
   name: 'Portfolios',
   routes: [
-    // ===== Public Portfolio Discovery =====
+    // ===== Core Public Discovery Endpoints =====
     {
       name: 'List All Portfolios',
       endpoint: '/api/portfolios',
@@ -21,7 +21,7 @@ export const portfoliosRoutes: RouteCategory = {
       name: 'Discover Portfolios',
       endpoint: '/api/portfolios/discover',
       method: 'GET',
-      description: 'Discover portfolios with pagination and type filtering',
+      description: 'Discover portfolios with pagination',
       queryParams: {
         page: '1',
         limit: '10',
@@ -32,9 +32,18 @@ export const portfoliosRoutes: RouteCategory = {
       name: 'Get Featured Portfolios',
       endpoint: '/api/portfolios/featured',
       method: 'GET',
-      description: 'Get featured portfolios by type',
+      description: 'Get featured portfolios',
       queryParams: {
         type: 'all'
+      }
+    },
+    {
+      name: 'Get Trending Portfolios',
+      endpoint: '/api/portfolios/trending',
+      method: 'GET',
+      description: 'Get trending portfolios by period',
+      queryParams: {
+        period: 'week' // 'day' | 'week' | 'month'
       }
     },
     {
@@ -51,15 +60,15 @@ export const portfoliosRoutes: RouteCategory = {
       name: 'Get Portfolio Stats',
       endpoint: '/api/portfolios/stats',
       method: 'GET',
-      description: 'Get portfolio statistics by type'
+      description: 'Get portfolio statistics'
     },
 
-    // ===== Portfolio Management (Auth Required) =====
+    // ===== User Portfolio Management (Auth Required) =====
     {
       name: 'Get My Portfolio',
       endpoint: '/api/portfolios/me',
       method: 'GET',
-      description: 'Get current user\'s portfolio with full details',
+      description: 'Get current user\'s portfolio',
       needsAuth: true
     },
     {
@@ -94,17 +103,6 @@ export const portfoliosRoutes: RouteCategory = {
       }
     },
     {
-      name: 'Set Portfolio Type',
-      endpoint: '/api/portfolios/me/type',
-      method: 'PUT',
-      description: 'Change portfolio type',
-      needsAuth: true,
-      body: {
-        type: 'educational',
-        preserveContent: true // Keep existing content when changing type
-      }
-    },
-    {
       name: 'Delete My Portfolio',
       endpoint: '/api/portfolios/me',
       method: 'DELETE',
@@ -112,8 +110,43 @@ export const portfoliosRoutes: RouteCategory = {
       needsAuth: true,
       skipInBatchTest: true
     },
+    {
+      name: 'Create Portfolio (Admin/User)',
+      endpoint: '/api/portfolios',
+      method: 'POST',
+      description: 'Create a portfolio (admin or user)',
+      needsAuth: true,
+      body: () => ({
+        username: generateUniqueUsername(),
+        name: 'Admin Created Portfolio',
+        bio: 'Portfolio created by admin',
+        type: 'creative',
+        userId: 'PLACEHOLDER_USER_ID'
+      }),
+      skipInBatchTest: true
+    },
 
-    // ===== Creative Portfolio - Gallery Management =====
+    // ===== Dashboard and Upgrade Endpoints =====
+    {
+      name: 'Get Portfolio Dashboard',
+      endpoint: '/api/portfolios/me/dashboard',
+      method: 'GET',
+      description: 'Get current user\'s portfolio dashboard metrics',
+      needsAuth: true
+    },
+    {
+      name: 'Upgrade Portfolio to Hybrid',
+      endpoint: '/api/portfolios/me/upgrade',
+      method: 'POST',
+      description: 'Upgrade current user\'s portfolio to hybrid plan',
+      needsAuth: true,
+      body: {
+        plan: 'hybrid',
+        preserveContent: true
+      }
+    },
+
+    // ===== Gallery Management Through Portfolio Context =====
     {
       name: 'Get My Gallery Pieces',
       endpoint: '/api/portfolios/me/gallery',
@@ -169,128 +202,6 @@ export const portfoliosRoutes: RouteCategory = {
       },
       skipInBatchTest: true
     },
-
-    // ===== Educational Portfolio - Concepts Management =====
-    {
-      name: 'Get My Portfolio Concepts',
-      endpoint: '/api/portfolios/me/concepts',
-      method: 'GET',
-      description: 'Get all concepts in my educational portfolio',
-      needsAuth: true,
-      queryParams: {
-        status: 'all', // 'all' | 'completed' | 'in-progress' | 'not-started'
-        category: 'all',
-        bookId: null
-      }
-    },
-    {
-      name: 'Add Concept to Portfolio',
-      endpoint: '/api/portfolios/me/concepts/:conceptId',
-      method: 'POST',
-      description: 'Add concept to educational portfolio',
-      needsAuth: true,
-      params: {
-        conceptId: 'PLACEHOLDER_CONCEPT_ID'
-      },
-      body: {
-        status: 'in-progress',
-        notes: 'Starting to learn this concept'
-      },
-      skipInBatchTest: true
-    },
-    {
-      name: 'Update Concept Progress',
-      endpoint: '/api/portfolios/me/concepts/:conceptId',
-      method: 'PUT',
-      description: 'Update concept progress in portfolio',
-      needsAuth: true,
-      params: {
-        conceptId: 'PLACEHOLDER_CONCEPT_ID'
-      },
-      body: {
-        status: 'completed',
-        completedAt: new Date().toISOString(),
-        score: 95,
-        notes: 'Mastered this concept!'
-      },
-      skipInBatchTest: true
-    },
-    {
-      name: 'Remove Concept from Portfolio',
-      endpoint: '/api/portfolios/me/concepts/:conceptId',
-      method: 'DELETE',
-      description: 'Remove concept from portfolio',
-      needsAuth: true,
-      params: {
-        conceptId: 'PLACEHOLDER_CONCEPT_ID'
-      },
-      skipInBatchTest: true
-    },
-    {
-      name: 'Get My Learning Path',
-      endpoint: '/api/portfolios/me/learning-path',
-      method: 'GET',
-      description: 'Get personalized learning path',
-      needsAuth: true
-    },
-    {
-      name: 'Get My Certificates',
-      endpoint: '/api/portfolios/me/certificates',
-      method: 'GET',
-      description: 'Get earned certificates',
-      needsAuth: true
-    },
-
-    // ===== Collections Management (Both Types) =====
-    {
-      name: 'Get My Collections',
-      endpoint: '/api/portfolios/me/collections',
-      method: 'GET',
-      description: 'Get all collections in portfolio',
-      needsAuth: true
-    },
-    {
-      name: 'Create Collection',
-      endpoint: '/api/portfolios/me/collections',
-      method: 'POST',
-      description: 'Create a new collection',
-      needsAuth: true,
-      body: {
-        name: 'My Best Work',
-        description: 'A curated collection of my best pieces',
-        type: 'artwork', // 'artwork' | 'concept' | 'mixed'
-        visibility: 'public'
-      }
-    },
-    {
-      name: 'Get Collection Items',
-      endpoint: '/api/portfolios/me/collections/:collectionId/items',
-      method: 'GET',
-      description: 'Get items in a collection',
-      needsAuth: true,
-      params: {
-        collectionId: 'PLACEHOLDER_COLLECTION_ID'
-      },
-      skipInBatchTest: true
-    },
-    {
-      name: 'Add Item to Collection',
-      endpoint: '/api/portfolios/me/collections/:collectionId/items',
-      method: 'POST',
-      description: 'Add item to collection',
-      needsAuth: true,
-      params: {
-        collectionId: 'PLACEHOLDER_COLLECTION_ID'
-      },
-      body: {
-        itemType: 'gallery_piece', // 'gallery_piece' | 'concept'
-        itemId: 'PLACEHOLDER_ITEM_ID',
-        position: 1
-      },
-      skipInBatchTest: true
-    },
-
-    // ===== Batch Operations =====
     {
       name: 'Batch Delete Gallery Pieces',
       endpoint: '/api/portfolios/me/gallery/batch',
@@ -299,6 +210,20 @@ export const portfoliosRoutes: RouteCategory = {
       needsAuth: true,
       body: {
         pieceIds: []
+      },
+      skipInBatchTest: true
+    },
+    {
+      name: 'Update Gallery Piece Visibility',
+      endpoint: '/api/portfolios/me/gallery/:pieceId/visibility',
+      method: 'PUT',
+      description: 'Update gallery piece visibility',
+      needsAuth: true,
+      params: {
+        pieceId: 'PLACEHOLDER_PIECE_ID'
+      },
+      body: {
+        visibility: 'public'
       },
       skipInBatchTest: true
     },
@@ -315,87 +240,269 @@ export const portfoliosRoutes: RouteCategory = {
       skipInBatchTest: true
     },
     {
-      name: 'Batch Update Concept Status',
-      endpoint: '/api/portfolios/me/concepts/batch/status',
-      method: 'PUT',
-      description: 'Batch update concept completion status',
-      needsAuth: true,
-      body: {
-        conceptIds: [],
-        status: 'completed'
-      },
-      skipInBatchTest: true
-    },
-
-    // ===== Portfolio Statistics =====
-    {
       name: 'Get Gallery Stats',
       endpoint: '/api/portfolios/me/gallery/stats',
       method: 'GET',
       description: 'Get gallery statistics for current user portfolio',
       needsAuth: true
     },
+
+    // ===== Concept Management (Educational/Hybrid Portfolios) =====
     {
-      name: 'Get Learning Stats',
-      endpoint: '/api/portfolios/me/learning/stats',
+      name: 'Get My Portfolio Concepts',
+      endpoint: '/api/portfolios/me/concepts',
       method: 'GET',
-      description: 'Get learning statistics for educational portfolio',
-      needsAuth: true
-    },
-    {
-      name: 'Get Portfolio Analytics',
-      endpoint: '/api/portfolios/me/analytics',
-      method: 'GET',
-      description: 'Get comprehensive portfolio analytics',
+      description: 'Get current user\'s concept progress',
       needsAuth: true,
       queryParams: {
-        period: '30d' // '7d' | '30d' | '90d' | '1y' | 'all'
+        status: 'all', // 'all' | 'completed' | 'in-progress' | 'not-started'
+        category: 'all',
+        bookId: ''
       }
     },
+    {
+      name: 'Add Concept to Portfolio',
+      endpoint: '/api/portfolios/me/concepts/:conceptId',
+      method: 'POST',
+      description: 'Add concept to current user\'s portfolio',
+      needsAuth: true,
+      params: {
+        conceptId: 'PLACEHOLDER_CONCEPT_ID'
+      },
+      body: {
+        status: 'in-progress',
+        notes: 'Starting to learn this concept'
+      },
+      skipInBatchTest: true
+    },
+    {
+      name: 'Update Concept Progress',
+      endpoint: '/api/portfolios/me/concepts/:conceptId',
+      method: 'PATCH',
+      description: 'Update concept progress',
+      needsAuth: true,
+      params: {
+        conceptId: 'PLACEHOLDER_CONCEPT_ID'
+      },
+      body: {
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        score: 95,
+        notes: 'Mastered this concept!'
+      },
+      skipInBatchTest: true
+    },
 
-    // ===== Public Portfolio Access =====
+    // ===== Portfolio Lookup and Access =====
     {
       name: 'Get Portfolio by Username',
       endpoint: '/api/portfolios/by-username/:username',
       method: 'GET',
-      description: 'Get public portfolio by username',
+      description: 'Get portfolio by username',
       params: {
         username: 'admin'
       }
     },
     {
-      name: 'Get Portfolio Gallery by Username',
-      endpoint: '/api/portfolios/by-username/:username/gallery',
+      name: 'Get Portfolio by ID',
+      endpoint: '/api/portfolios/by-id/:id',
       method: 'GET',
-      description: 'Get public gallery pieces for a portfolio',
+      description: 'Get portfolio by ID',
+      params: {
+        id: 'PLACEHOLDER_PORTFOLIO_ID'
+      },
+      skipInBatchTest: true
+    },
+    {
+      name: 'Get Portfolio by User ID',
+      endpoint: '/api/portfolios/user/:userId',
+      method: 'GET',
+      description: 'Get portfolio by user ID',
+      params: {
+        userId: 'PLACEHOLDER_USER_ID'
+      },
+      skipInBatchTest: true
+    },
+    {
+      name: 'Update Portfolio by Username',
+      endpoint: '/api/portfolios/by-username/:username',
+      method: 'PUT',
+      description: 'Update portfolio by username',
+      needsAuth: true,
       params: {
         username: 'admin'
+      },
+      body: {
+        name: 'Updated Portfolio Name',
+        bio: 'Updated via username endpoint'
+      },
+      skipInBatchTest: true
+    },
+    {
+      name: 'Delete Portfolio by ID',
+      endpoint: '/api/portfolios/by-id/:id',
+      method: 'DELETE',
+      description: 'Delete portfolio by ID',
+      needsAuth: true,
+      params: {
+        id: 'PLACEHOLDER_PORTFOLIO_ID'
+      },
+      skipInBatchTest: true
+    },
+
+    // ===== Gallery for Specific Portfolio =====
+    {
+      name: 'Get Portfolio Gallery by ID',
+      endpoint: '/api/portfolios/by-id/:id/gallery',
+      method: 'GET',
+      description: 'Get gallery pieces for specific portfolio',
+      params: {
+        id: 'PLACEHOLDER_PORTFOLIO_ID'
       },
       queryParams: {
         page: '1',
         limit: '20'
-      }
+      },
+      skipInBatchTest: true
     },
     {
-      name: 'Get Portfolio Concepts by Username',
-      endpoint: '/api/portfolios/by-username/:username/concepts',
-      method: 'GET',
-      description: 'Get public learning progress for a portfolio',
+      name: 'Add Gallery Piece to Specific Portfolio',
+      endpoint: '/api/portfolios/by-id/:id/gallery',
+      method: 'POST',
+      description: 'Add gallery piece to specific portfolio',
+      needsAuth: true,
       params: {
-        username: 'admin'
+        id: 'PLACEHOLDER_PORTFOLIO_ID'
+      },
+      body: {
+        title: 'New Gallery Piece',
+        description: 'Added to specific portfolio',
+        visibility: 'public'
+      },
+      skipInBatchTest: true
+    },
+
+    // ===== Reviews System =====
+    {
+      name: 'Get Portfolio Reviews',
+      endpoint: '/api/portfolios/by-id/:id/reviews',
+      method: 'GET',
+      description: 'Get reviews for portfolio',
+      params: {
+        id: 'PLACEHOLDER_PORTFOLIO_ID'
       },
       queryParams: {
-        status: 'completed'
+        page: '1',
+        limit: '10'
+      },
+      skipInBatchTest: true
+    },
+    {
+      name: 'Add Portfolio Review',
+      endpoint: '/api/portfolios/by-id/:id/reviews',
+      method: 'POST',
+      description: 'Add review to portfolio',
+      needsAuth: true,
+      params: {
+        id: 'PLACEHOLDER_PORTFOLIO_ID'
+      },
+      body: {
+        rating: 5,
+        comment: 'Excellent portfolio!',
+        reviewerName: 'Test Reviewer'
+      },
+      skipInBatchTest: true
+    },
+
+    // ===== Analytics and Tracking =====
+    {
+      name: 'Track Portfolio View',
+      endpoint: '/api/portfolios/by-id/:id/views',
+      method: 'POST',
+      description: 'Track portfolio view',
+      params: {
+        id: 'PLACEHOLDER_PORTFOLIO_ID'
+      },
+      body: {
+        referrer: 'direct',
+        duration: 30
+      },
+      skipInBatchTest: true
+    },
+    {
+      name: 'Get Portfolio Analytics',
+      endpoint: '/api/portfolios/by-id/:id/analytics',
+      method: 'GET',
+      description: 'Get portfolio analytics',
+      needsAuth: true,
+      params: {
+        id: 'PLACEHOLDER_PORTFOLIO_ID'
+      },
+      queryParams: {
+        period: 'month'
+      },
+      skipInBatchTest: true
+    },
+    {
+      name: 'Get Portfolio Activity Feed',
+      endpoint: '/api/portfolios/me/activity',
+      method: 'GET',
+      description: 'Get user portfolio activity feed',
+      needsAuth: true,
+      queryParams: {
+        limit: '20',
+        page: '1'
       }
     },
     {
-      name: 'Get Portfolio Collections by Username',
-      endpoint: '/api/portfolios/by-username/:username/collections',
+      name: 'Get Portfolio Growth Insights',
+      endpoint: '/api/portfolios/me/insights',
       method: 'GET',
-      description: 'Get public collections for a portfolio',
-      params: {
-        username: 'admin'
+      description: 'Get portfolio growth insights',
+      needsAuth: true,
+      queryParams: {
+        period: '30d'
       }
+    },
+
+    // ===== File Upload System =====
+    {
+      name: 'Upload Portfolio Image',
+      endpoint: '/api/portfolios/upload-image',
+      method: 'POST',
+      description: 'Upload portfolio images (profile/cover)',
+      needsAuth: true,
+      body: {
+        note: 'Requires multipart/form-data with file upload'
+      },
+      skipInBatchTest: true // File uploads don't work in batch tests
+    },
+
+    // ===== Sharing and Collaboration =====
+    {
+      name: 'Generate Portfolio Share Link',
+      endpoint: '/api/portfolios/by-id/:id/share',
+      method: 'POST',
+      description: 'Generate portfolio share link',
+      needsAuth: true,
+      params: {
+        id: 'PLACEHOLDER_PORTFOLIO_ID'
+      },
+      body: {
+        expiresIn: 7, // days
+        maxViews: 100
+      },
+      skipInBatchTest: true
+    },
+    {
+      name: 'Access Portfolio via Share Token',
+      endpoint: '/api/portfolios/shared/:token',
+      method: 'GET',
+      description: 'Access portfolio via share token',
+      params: {
+        token: 'PLACEHOLDER_SHARE_TOKEN'
+      },
+      skipInBatchTest: true
     }
   ]
 };

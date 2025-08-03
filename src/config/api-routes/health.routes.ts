@@ -1,5 +1,5 @@
 // src/config/api-routes/health.routes.ts
-import { RouteCategory } from '../api-routes';
+import { RouteCategory } from '@/types/api.types';
 
 export const healthRoutes: RouteCategory = {
   name: 'Health',
@@ -9,6 +9,12 @@ export const healthRoutes: RouteCategory = {
       endpoint: '/api/health',
       method: 'GET',
       description: 'Basic health check'
+    },
+    {
+      name: 'Test Connection',
+      endpoint: '/api/health/test-connection',
+      method: 'GET',
+      description: 'Test API connection and functionality'
     },
     {
       name: 'Detailed Health',
@@ -27,6 +33,12 @@ export const healthRoutes: RouteCategory = {
       endpoint: '/api/health/live',
       method: 'GET',
       description: 'Liveness probe'
+    },
+    {
+      name: 'Simulations Health',
+      endpoint: '/api/health/simulations',
+      method: 'GET',
+      description: 'Simulation system health check'
     },
     {
       name: 'API Documentation',

@@ -1,34 +1,30 @@
+
 // src/config/api-routes/auth.routes.ts
-import {
-  RouteCategory,
-  generateUniqueUsername,
-  generateUniqueEmail
-} from '@/types/api.types';
+import { RouteCategory, generateUniqueUsername, generateUniqueEmail } from '@/types/api.types';
 
 export const authRoutes: RouteCategory = {
   name: 'Authentication',
   routes: [
     {
-      name: 'Register',
+      name: 'Register User',
       endpoint: '/api/auth/register',
       method: 'POST',
       description: 'Register new user',
       body: () => ({
         username: generateUniqueUsername(),
         email: generateUniqueEmail(),
-        password: 'password123',
+        password: 'TestPassword123!',
         name: 'Test User'
-      }),
-      skipInBatchTest: true // Skip to avoid creating too many users
+      })
     },
     {
-      name: 'Login',
+      name: 'Login User',
       endpoint: '/api/auth/login',
       method: 'POST',
       description: 'User login',
       body: {
-        usernameOrEmail: 'admin@admin.com',
-        password: 'admin123'
+        email: 'admin@example.com',
+        password: 'admin'
       }
     },
     {
@@ -39,16 +35,14 @@ export const authRoutes: RouteCategory = {
       needsAuth: true
     },
     {
-      name: 'Update Profile',
+      name: 'Update User Profile',
       endpoint: '/api/auth/me',
       method: 'PUT',
       description: 'Update user profile',
       needsAuth: true,
       body: {
-        name: 'Updated User',
-        preferences: {
-          theme: 'dark'
-        }
+        name: 'Updated Name',
+        bio: 'Updated bio'
       }
     },
     {
@@ -59,7 +53,7 @@ export const authRoutes: RouteCategory = {
       needsAuth: true
     },
     {
-      name: 'Logout',
+      name: 'Logout User',
       endpoint: '/api/auth/logout',
       method: 'POST',
       description: 'Logout user',
