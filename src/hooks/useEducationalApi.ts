@@ -8,11 +8,11 @@ import {
   Book, 
   MainCategory, 
   SubCategory, 
-  ScientificDiscipline,
   MathConcept,
   ScienceConcept,
   GrammarRule
 } from '@/types/educational.types';
+import { ScientificDiscipline } from '@/types/portfolio.types'
 import {
   BookQueryParams,
   SearchFilters,
