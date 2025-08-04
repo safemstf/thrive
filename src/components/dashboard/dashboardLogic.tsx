@@ -3,9 +3,10 @@
 
 import { useCallback, useMemo } from 'react';
 import { useAuth } from '@/providers/authProvider';
-import { useApiClient } from '@/lib/api-client';
-import type { Portfolio } from '@/types/portfolio.types';
+import { api, useApiClient } from '@/lib/api-client';
+import type { CreatePortfolioDto, Portfolio } from '@/types/portfolio.types';
 import type { GalleryPiece } from '@/types/gallery.types';
+import { getAuthToken } from '@/lib/utils/auth';
 
 // Enhanced types
 export interface QuickStats {
@@ -270,22 +271,29 @@ export const useDashboardLogic = () => {
     ];
   }, []);
 
-  const createPortfolio = useCallback(async (type: 'creative' | 'educational' | 'hybrid') => {
-    try {
-      const newPortfolio = await apiClient.portfolio.create({
-        title: `${user?.name}'s ${portfolioTypeConfig[type].title}`,
-        bio: `Welcome to my ${type} portfolio. I'm excited to share my journey with you.`,
-        visibility: 'public',
-        specializations: [],
-        tags: []
-      });
-      
-      return newPortfolio;
-    } catch (error) {
-      console.error('Error creating portfolio:', error);
-      throw new Error('Failed to create portfolio. Please try again.');
-    }
-  }, [user, apiClient, portfolioTypeConfig]);
+const createPortfolio = async (type: 'creative' | 'educational' | 'hybrid') => {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('Authentication token not found. Please login again.');
+  }
+
+  const data: CreatePortfolioDto = {
+    kind: type,
+    title: '',
+    bio: '',
+    visibility: 'public',
+    specializations: [],
+    tags: []
+  };
+
+  try {
+    const portfolio = await api.portfolio.create(data);
+    return portfolio;
+  } catch (err: any) {
+    const message = err?.message || 'Failed to create portfolio';
+    throw new Error(message);
+  }
+};
 
   const formatTimeAgo = useCallback((date: Date): string => {
     const now = new Date();
