@@ -101,7 +101,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
               <GalleryIcon size={48} />
             </EmptyIcon>
             <EmptyTitle>Your gallery awaits</EmptyTitle>
-            <EmptyMessage>Upload your first artwork to start building your creative portfolio</EmptyMessage>
+            <EmptyMessage>
+              Upload your first artwork to start building your creative portfolio
+            </EmptyMessage>
             <ActionButton $primary onClick={handleUploadClick}>
               <Upload size={16} />
               Upload first piece
