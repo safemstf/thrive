@@ -573,6 +573,7 @@ export default function EnhancedDashboard() {
               </PortfolioTypes>
             </CreatePortfolioSection>
           ) : (
+
             <DashboardContent>
               {/* Overview View */}
               {state.activeView === 'overview' && (
@@ -602,8 +603,8 @@ export default function EnhancedDashboard() {
                       <StatHeader>
                         <StatIcon $gradient={portfolioTypeConfig[state.portfolio.kind as keyof typeof portfolioTypeConfig]?.gradient}>
                           {state.portfolio.kind === 'creative' ? <Brush size={20} /> : 
-                           state.portfolio.kind === 'educational' ? <Brain size={20} /> : 
-                           <Layers size={20} />}
+                          state.portfolio.kind === 'educational' ? <Brain size={20} /> : 
+                          <Layers size={20} />}
                         </StatIcon>
                         <div>
                           <StatTitle>Portfolio</StatTitle>
@@ -803,7 +804,7 @@ export default function EnhancedDashboard() {
                 </>
               )}
 
-              {/* View Components */}
+              {/* Gallery View - Only shows when gallery tab is active */}
               {state.activeView === 'gallery' && (
                 <GalleryView 
                   galleryItems={state.galleryItems}
@@ -811,6 +812,7 @@ export default function EnhancedDashboard() {
                 />
               )}
 
+              {/* Learning View - Only shows when learning tab is active */}
               {state.activeView === 'learning' && (
                 <LearningView 
                   conceptProgress={state.conceptProgress}
@@ -818,6 +820,7 @@ export default function EnhancedDashboard() {
                 />
               )}
 
+              {/* Analytics View - Only shows when analytics tab is active */}
               {state.activeView === 'analytics' && (
                 <AnalyticsView 
                   stats={state.stats}
