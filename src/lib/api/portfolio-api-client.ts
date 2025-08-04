@@ -39,13 +39,10 @@ export interface BatchOperationResult {
   errors?: string[];
 }
 
-interface PortfolioMeResponse {
-  hasPortfolio?: boolean;
-  portfolio?: Portfolio | null;
-  _id?: string;
-  id?: string;
-  [key: string]: any;
-}
+type PortfolioMeResponse =
+  | { hasPortfolio: false }
+  | { hasPortfolio: true; portfolio: Portfolio }
+  | Portfolio;
 
 export class PortfolioApiClient extends BaseApiClient {
   // ==================== CORE PORTFOLIO OPERATIONS ====================
@@ -98,19 +95,28 @@ export class PortfolioApiClient extends BaseApiClient {
   async getMyPortfolio(): Promise<Portfolio | null> {
     try {
       const response = await this.requestWithRetry<PortfolioMeResponse>('/portfolios/me');
-      
-      // Handle the backend response format properly
-      if (response.hasPortfolio === false || !response) {
+
+      // Case A: explicit “no portfolio” shape
+      if (
+        response === null || // backend might return null
+        (typeof response === 'object' && 'hasPortfolio' in response && response.hasPortfolio === false)
+      ) {
         return null;
       }
-      
-      // If response has portfolio property, return it; otherwise response is the portfolio
-      return response.portfolio || (response as Portfolio);
-    } catch (error) {
-      if (error instanceof APIError && error.status === 404) {
+
+      // Case B: wrapped portfolio
+      if (typeof response === 'object' && 'hasPortfolio' in response && response.hasPortfolio === true) {
+        return response.portfolio;
+      }
+
+      // Case C: raw portfolio object
+      return response as Portfolio;
+    } catch (err: any) {
+      // Treat 404 as “no portfolio”
+      if (err instanceof APIError && err.status === 404) {
         return null;
       }
-      throw error;
+      throw err;
     }
   }
 
