@@ -1,5 +1,4 @@
-// src/components/dashboard/views/GalleryView.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Upload, Settings, ExternalLink, Image as GalleryIcon } from 'lucide-react';
 import type { GalleryPiece } from '@/types/gallery.types';
@@ -17,12 +16,25 @@ import {
   EmptyMessage
 } from '../dashboardStyles';
 
+// Import the upload modal
+import { ArtworkUploadModal } from '@/components/gallery/utils/uploadModal';
+
 interface GalleryViewProps {
   galleryItems: GalleryPiece[];
-  onUpload: () => void;
+  /** Optional portfolio ID to associate uploads with */
+  portfolioId?: string;
 }
 
-export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, onUpload }) => {
+export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfolioId }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleUploadClick = () => setIsModalOpen(true);
+  const handleModalClose = () => setIsModalOpen(false);
+  const handleUploadSuccess = () => {
+    // optionally refresh gallery items here
+    setIsModalOpen(false);
+  };
+
   return (
     <Section>
       <SectionHeader>
@@ -32,7 +44,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, onUpload
           <Badge>{galleryItems.length} pieces</Badge>
         </SectionTitle>
         <SectionActions>
-          <ActionButton $primary onClick={onUpload}>
+          <ActionButton $primary onClick={handleUploadClick}>
             <Upload size={16} />
             Upload New
           </ActionButton>
@@ -90,13 +102,22 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, onUpload
             </EmptyIcon>
             <EmptyTitle>Your gallery awaits</EmptyTitle>
             <EmptyMessage>Upload your first artwork to start building your creative portfolio</EmptyMessage>
-            <ActionButton $primary onClick={onUpload}>
+            <ActionButton $primary onClick={handleUploadClick}>
               <Upload size={16} />
               Upload first piece
             </ActionButton>
           </EmptyStateCard>
         )}
       </GalleryGrid>
+
+      {isModalOpen && (
+        <ArtworkUploadModal
+          portfolioId={portfolioId}
+          onClose={handleModalClose}
+          onSuccess={handleUploadSuccess}
+          initialFiles={[]}
+        />
+      )}
     </Section>
   );
 };
@@ -244,5 +265,5 @@ const VisibilityIndicator = styled.span<{ $public: boolean }>`
   font-size: ${theme.typography.sizes.xs};
   color: ${props => props.$public ? '#059669' : theme.colors.text.secondary};
   font-weight: ${theme.typography.weights.medium};
-  text-transform: capitalize;
+  text-transform: capitalize; 
 `;
