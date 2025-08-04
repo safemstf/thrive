@@ -1,6 +1,5 @@
-
 // src/config/api-routes/auth.routes.ts
-import { RouteCategory, generateUniqueUsername, generateUniqueEmail } from '@/types/api.types';
+import { RouteCategory } from '@/types/api.types';
 
 export const authRoutes: RouteCategory = {
   name: 'Authentication',
@@ -9,36 +8,36 @@ export const authRoutes: RouteCategory = {
       name: 'Register User',
       endpoint: '/api/auth/register',
       method: 'POST',
-      description: 'Register new user',
-      body: () => ({
-        username: generateUniqueUsername(),
-        email: generateUniqueEmail(),
-        password: 'TestPassword123!',
-        name: 'Test User'
-      })
+      description: 'Register a new user account',
+      body: {
+        email: 'test@example.com',
+        password: 'password123',
+        name: 'Test User',
+        username: 'testuser'
+      }
     },
     {
-      name: 'Login User',
+      name: 'Login',
       endpoint: '/api/auth/login',
       method: 'POST',
-      description: 'User login',
+      description: 'Login with email/username and password',
       body: {
-        usernameOrEmail: 'admin@admin.com',
-        password: 'admin123'
+        usernameOrEmail: 'admin@admin.com', // FIXED: Using correct field name
+        password: 'admin123' // FIXED: Using correct admin password
       }
     },
     {
       name: 'Get Current User',
       endpoint: '/api/auth/me',
       method: 'GET',
-      description: 'Get current user profile',
+      description: 'Get current authenticated user profile',
       needsAuth: true
     },
     {
-      name: 'Update User Profile',
+      name: 'Update Profile',
       endpoint: '/api/auth/me',
       method: 'PUT',
-      description: 'Update user profile',
+      description: 'Update current user profile',
       needsAuth: true,
       body: {
         name: 'Updated Name',
@@ -49,14 +48,14 @@ export const authRoutes: RouteCategory = {
       name: 'Verify Token',
       endpoint: '/api/auth/verify',
       method: 'POST',
-      description: 'Verify JWT token',
+      description: 'Verify JWT token validity',
       needsAuth: true
     },
     {
       name: 'Logout User',
       endpoint: '/api/auth/logout',
       method: 'POST',
-      description: 'Logout user',
+      description: 'Logout current user',
       needsAuth: true
     }
   ]

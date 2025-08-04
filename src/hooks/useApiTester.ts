@@ -30,7 +30,13 @@ interface BatchTestOptions {
 
 export function useApiTester({ baseUrl }: UseApiTesterOptions) {
   const [results, setResults] = useState<Record<string, TestResult>>({});
-  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(() => {
+    // Initialize from localStorage if available
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('api_test_token');
+    }
+    return null;
+  });
   const [isRunning, setIsRunning] = useState(false);
   const [currentOperation, setCurrentOperation] = useState<string>('');
   
@@ -59,7 +65,30 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
       }
     }
     
+    // Check user object
+    if (data?.user) {
+      for (const field of tokenFields) {
+        if (data.user[field]) {
+          return data.user[field];
+        }
+      }
+    }
+    
     return null;
+  }, []);
+
+  /**
+   * Update auth token and persist to localStorage
+   */
+  const updateAuthToken = useCallback((token: string | null) => {
+    setAuthToken(token);
+    if (typeof window !== 'undefined') {
+      if (token) {
+        localStorage.setItem('api_test_token', token);
+      } else {
+        localStorage.removeItem('api_test_token');
+      }
+    }
   }, []);
 
   /**
@@ -80,9 +109,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 headers: { 'ngrok-skip-browser-warning': 'true' }
               });
               if (collRes.ok) {
-                const collList: Array<{ id: string }> = await collRes.json();
-                if (collList.length > 0) {
-                  cache.PLACEHOLDER_COLLECTION_ID = collList[0].id;
+                const collData = await collRes.json();
+                const collList = collData.collections || collData || [];
+                if (Array.isArray(collList) && collList.length > 0) {
+                  cache.PLACEHOLDER_COLLECTION_ID = collList[0].id || collList[0]._id;
                 } else {
                   cache.PLACEHOLDER_COLLECTION_ID = 'fallback-collection-id';
                 }
@@ -100,9 +130,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 headers: { 'ngrok-skip-browser-warning': 'true' }
               });
               if (artRes.ok) {
-                const artList: Array<{ id: string }> = await artRes.json();
-                if (artList.length > 0) {
-                  cache.PLACEHOLDER_ARTIST_ID = artList[0].id;
+                const artData = await artRes.json();
+                const artList = artData.artists || artData || [];
+                if (Array.isArray(artList) && artList.length > 0) {
+                  cache.PLACEHOLDER_ARTIST_ID = artList[0].id || artList[0]._id;
                 } else {
                   cache.PLACEHOLDER_ARTIST_ID = 'fallback-artist-id';
                 }
@@ -120,9 +151,9 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 headers: { 'ngrok-skip-browser-warning': 'true' }
               });
               if (pieceRes.ok) {
-                const pieceList: Array<{ _id?: string; id?: string }> = await pieceRes.json();
-                if (pieceList.length > 0) {
-                  // Handle both _id and id field names
+                const pieceData = await pieceRes.json();
+                const pieceList = pieceData.pieces || pieceData.items || pieceData || [];
+                if (Array.isArray(pieceList) && pieceList.length > 0) {
                   cache.PLACEHOLDER_GALLERY_ID = pieceList[0]._id || pieceList[0].id || 'fallback-gallery-id';
                 } else {
                   cache.PLACEHOLDER_GALLERY_ID = 'fallback-gallery-id';
@@ -147,9 +178,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 }
               });
               if (portfolioRes.ok) {
-                const portfolioList: Array<{ id: string }> = await portfolioRes.json();
-                if (portfolioList.length > 0) {
-                  cache.PLACEHOLDER_PORTFOLIO_ID = portfolioList[0].id;
+                const portfolioData = await portfolioRes.json();
+                const portfolioList = portfolioData.portfolios || portfolioData || [];
+                if (Array.isArray(portfolioList) && portfolioList.length > 0) {
+                  cache.PLACEHOLDER_PORTFOLIO_ID = portfolioList[0].id || portfolioList[0]._id;
                 } else {
                   cache.PLACEHOLDER_PORTFOLIO_ID = 'fallback-portfolio-id';
                 }
@@ -172,8 +204,9 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 }
               });
               if (pieceRes.ok) {
-                const pieceList: Array<{ id?: string; _id?: string }> = await pieceRes.json();
-                if (pieceList.length > 0) {
+                const pieceData = await pieceRes.json();
+                const pieceList = pieceData.pieces || pieceData || [];
+                if (Array.isArray(pieceList) && pieceList.length > 0) {
                   cache.PLACEHOLDER_PIECE_ID = pieceList[0].id || pieceList[0]._id || 'fallback-piece-id';
                 } else {
                   cache.PLACEHOLDER_PIECE_ID = 'fallback-piece-id';
@@ -197,9 +230,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 }
               });
               if (conceptRes.ok) {
-                const conceptList: Array<{ id: string }> = await conceptRes.json();
-                if (conceptList.length > 0) {
-                  cache.PLACEHOLDER_CONCEPT_ID = conceptList[0].id;
+                const conceptData = await conceptRes.json();
+                const conceptList = conceptData.concepts || conceptData || [];
+                if (Array.isArray(conceptList) && conceptList.length > 0) {
+                  cache.PLACEHOLDER_CONCEPT_ID = conceptList[0].id || conceptList[0]._id;
                 }
               }
             } catch (error) {
@@ -225,9 +259,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 }
               });
               if (userRes.ok) {
-                const userList: Array<{ id: string }> = await userRes.json();
-                if (userList.length > 0) {
-                  cache.PLACEHOLDER_USER_ID = userList[0].id;
+                const userData = await userRes.json();
+                const userList = userData.users || userData || [];
+                if (Array.isArray(userList) && userList.length > 0) {
+                  cache.PLACEHOLDER_USER_ID = userList[0].id || userList[0]._id;
                 }
               }
             } catch (error) {
@@ -248,9 +283,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 }
               });
               if (bookRes.ok) {
-                const bookList: Array<{ id: string }> = await bookRes.json();
-                if (bookList.length > 0) {
-                  cache.PLACEHOLDER_BOOK_ID = bookList[0].id;
+                const bookData = await bookRes.json();
+                const bookList = bookData.books || bookData || [];
+                if (Array.isArray(bookList) && bookList.length > 0) {
+                  cache.PLACEHOLDER_BOOK_ID = bookList[0].id || bookList[0]._id;
                 }
               }
             } catch (error) {
@@ -271,9 +307,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 }
               });
               if (conceptRes.ok) {
-                const conceptList: Array<{ id: string }> = await conceptRes.json();
-                if (conceptList.length > 0) {
-                  cache.PLACEHOLDER_CONCEPT_ID = conceptList[0].id;
+                const conceptData = await conceptRes.json();
+                const conceptList = conceptData.concepts || conceptData || [];
+                if (Array.isArray(conceptList) && conceptList.length > 0) {
+                  cache.PLACEHOLDER_CONCEPT_ID = conceptList[0].id || conceptList[0]._id;
                 }
               }
             } catch (error) {
@@ -294,9 +331,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 }
               });
               if (userRes.ok) {
-                const userList: Array<{ id: string }> = await userRes.json();
-                if (userList.length > 0) {
-                  cache.PLACEHOLDER_USER_ID = userList[0].id;
+                const userData = await userRes.json();
+                const userList = userData.users || userData || [];
+                if (Array.isArray(userList) && userList.length > 0) {
+                  cache.PLACEHOLDER_USER_ID = userList[0].id || userList[0]._id;
                 }
               }
             } catch (error) {
@@ -313,9 +351,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 }
               });
               if (bookRes.ok) {
-                const bookList: Array<{ id: string }> = await bookRes.json();
-                if (bookList.length > 0) {
-                  cache.PLACEHOLDER_BOOK_ID = bookList[0].id;
+                const bookData = await bookRes.json();
+                const bookList = bookData.books || bookData || [];
+                if (Array.isArray(bookList) && bookList.length > 0) {
+                  cache.PLACEHOLDER_BOOK_ID = bookList[0].id || bookList[0]._id;
                 }
               }
             } catch (error) {
@@ -336,9 +375,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
                 }
               });
               if (simRes.ok) {
-                const simList: Array<{ id: string }> = await simRes.json();
-                if (simList.length > 0) {
-                  cache.PLACEHOLDER_SIMULATION_ID = simList[0].id;
+                const simData = await simRes.json();
+                const simList = simData.simulations || simData || [];
+                if (Array.isArray(simList) && simList.length > 0) {
+                  cache.PLACEHOLDER_SIMULATION_ID = simList[0].id || simList[0]._id;
                 }
               }
             } catch (error) {
@@ -424,9 +464,10 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
         'ngrok-skip-browser-warning': 'true',
       };
 
-      // Add auth token if route needs auth
+      // IMPORTANT: Always add auth token if available and route needs auth
       if (processedRoute.needsAuth && authToken) {
         headers['Authorization'] = `Bearer ${authToken}`;
+        console.log(`🔐 Adding auth header for ${route.name}`);
       }
 
       // Prepare request body
@@ -435,6 +476,13 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
         const bodyData = typeof processedRoute.body === 'function' ? processedRoute.body() : processedRoute.body;
         body = JSON.stringify(bodyData);
       }
+
+      console.log(`🚀 Testing ${testKey}:`, {
+        url,
+        method: processedRoute.method,
+        hasAuth: !!headers['Authorization'],
+        hasBody: !!body
+      });
 
       // Make request
       const response = await fetch(url, {
@@ -456,10 +504,11 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
       }
 
       // Extract token from auth responses
-      if (category === 'auth' && processedRoute.endpoint.includes('/login') && response.ok) {
+      if ((category === 'auth' && (route.endpoint.includes('/login') || route.endpoint.includes('/register'))) && response.ok) {
         const token = extractAuthToken(data);
         if (token) {
-          setAuthToken(token);
+          console.log('🎉 Auth token extracted and saved');
+          updateAuthToken(token);
         }
       }
 
@@ -483,6 +532,8 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
     } catch (error) {
       const duration = Date.now() - startTime;
       
+      console.error(`❌ Error testing ${testKey}:`, error);
+      
       setResults(prev => ({
         ...prev,
         [testKey]: {
@@ -499,7 +550,7 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
 
       return false;
     }
-  }, [baseUrl, authToken, extractAuthToken, processRouteWithIds]);
+  }, [baseUrl, authToken, extractAuthToken, processRouteWithIds, updateAuthToken]);
 
   /**
    * Test multiple routes with full end-to-end support
@@ -523,16 +574,22 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
       let idCache: IdCache = {};
 
       // Step 1: Handle authentication if needed
-      if (!skipAuth) {
+      if (!skipAuth && !authToken) {
         const authRoutes = routes.filter(route => 
-          route.endpoint.includes('/login') || route.endpoint.includes('/auth')
+          route.endpoint.includes('/login') || 
+          route.endpoint.includes('/register') ||
+          route.name.toLowerCase().includes('login') ||
+          route.name.toLowerCase().includes('register')
         );
         
-        if (authRoutes.length > 0 && !authToken) {
+        if (authRoutes.length > 0) {
           setCurrentOperation('Authenticating...');
           for (const authRoute of authRoutes) {
             const success = await testRoute(authRoute, category, idCache);
-            if (success && authToken) break;
+            if (success && authToken) {
+              console.log('✅ Authentication successful');
+              break;
+            }
           }
         }
       }
@@ -585,7 +642,7 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
    */
   const clearResults = useCallback(() => {
     setResults({});
-    setAuthToken(null);
+    // Don't clear auth token when clearing results
     idCacheRef.current = {};
     setCurrentOperation('');
   }, []);
@@ -604,6 +661,13 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
     return { ...idCacheRef.current };
   }, []);
 
+  /**
+   * Clear auth token
+   */
+  const clearAuth = useCallback(() => {
+    updateAuthToken(null);
+  }, [updateAuthToken]);
+
   return {
     results,
     authToken,
@@ -613,7 +677,8 @@ export function useApiTester({ baseUrl }: UseApiTesterOptions) {
     testRoutes,
     clearResults,
     clearIdCache,
+    clearAuth,
     getCachedIds,
-    setAuthToken, // Allow manual token setting
+    setAuthToken: updateAuthToken, // Use the update function that persists to localStorage
   };
 }
