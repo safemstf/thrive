@@ -232,6 +232,25 @@ export interface PortfolioView {
 }
 
 export interface PortfolioAnalytics {
+  views: number;
+  uniqueViews: number;
+  engagementRate: any;
+  engagement: any;
+  averageSessionTime: any;
+  sessionTime: any;
+  globalReach: any;
+  countries: any;
+  weeklyGrowth: any;
+  growth: any;
+  monthlyViews: any;
+  monthly: any;
+  socialShares: any;
+  shares: any;
+  professionalInquiries: any;
+  inquiries: any;
+  returnVisitorRate: any;
+  returnRate: any;
+  topPerformingContent: never[];
   portfolioId: string;
   period: 'day' | 'week' | 'month' | 'year' | 'all';
   

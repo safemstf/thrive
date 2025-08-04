@@ -110,6 +110,22 @@ import {
 import styled from 'styled-components';
 import { theme } from '@/styles/theme';
 
+// View components
+import { GalleryView } from '@/components/dashboard/views/GalleryView';
+import { LearningView } from '@/components/dashboard/views/learningView';
+import { AnalyticsView } from '@/components/dashboard/views/analyticsView';
+
+// Skills data interface
+interface SkillSummary {
+  id: string;
+  name: string;
+  category: string;
+  proficiency: number;
+  marketDemand: number;
+  lastPracticed: string;
+  trending: boolean;
+}
+
 const SkillsHighlightCard = styled.div`
   background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
   border: 1px solid #bfdbfe;
@@ -264,21 +280,7 @@ const IntegrationAction = styled.button`
   }
 `;
 
-// View components
-import { GalleryView } from '@/components/dashboard/views/GalleryView';
-import { LearningView } from '@/components/dashboard/views/learningView';
-import { AnalyticsView } from '@/components/dashboard/views/analyticsView';
 
-// Skills data interface
-interface SkillSummary {
-  id: string;
-  name: string;
-  category: string;
-  proficiency: number;
-  marketDemand: number;
-  lastPracticed: string;
-  trending: boolean;
-}
 
 export default function EnhancedDashboard() {
   const { user } = useAuth();

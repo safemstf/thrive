@@ -8,7 +8,7 @@ import {
   Code, 
   Layers 
 } from 'lucide-react';
-import type { PortfolioKind } from '@/types/portfolio.types';
+import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
 
 // src/components/profile/utils/staticMethodsProfile.tsx - Simple fix
 // Just update your existing PortfolioStats interface to include the missing properties
@@ -44,6 +44,107 @@ export interface UserStats {
   averageRating: number;
   totalRatings: number;
 }
+
+// Add these functions to your existing staticMethodsProfile.tsx file
+
+/**
+ * Check if portfolio has gallery capability
+ */
+export const hasGalleryCapability = (kind: PortfolioKind): boolean => {
+  return ['creative', 'professional', 'hybrid'].includes(kind);
+};
+
+/**
+ * Check if portfolio has learning capability  
+ */
+export const hasLearningCapability = (kind: PortfolioKind): boolean => {
+  return ['educational', 'hybrid'].includes(kind);
+};
+
+/**
+ * Fix for TypeScript error - use userId instead of ownerId
+ */
+export const isPortfolioOwner = (portfolio: Portfolio, userId: string): boolean => {
+  return portfolio.userId === userId;
+};
+
+/**
+ * Get portfolio notifications with proper typing
+ */
+export const getPortfolioNotifications = (portfolio: Portfolio): Array<{
+  type: 'info' | 'warning' | 'error' | 'success';
+  message: string;
+  action?: string;
+}> => {
+  const notifications: Array<{
+    type: 'info' | 'warning' | 'error' | 'success';
+    message: string;
+    action?: string;
+  }> = [];
+
+  // Check completion
+  const completionRate = calculateCompletionPercentage(
+    portfolio.specializations?.length || 0, 
+    5 // Assume 5 is target
+  );
+  
+  if (completionRate < 50) {
+    notifications.push({
+      type: 'warning' as const,
+      message: `Your portfolio is ${completionRate}% complete. Add more details to improve it.`,
+      action: 'Complete Profile'
+    });
+  }
+  
+  if (portfolio.visibility === 'private') {
+    notifications.push({
+      type: 'info' as const,
+      message: 'Your portfolio is private and not visible to others.',
+      action: 'Make Public'
+    });
+  }
+  
+  if (portfolio.kind !== 'hybrid') {
+    notifications.push({
+      type: 'info' as const,
+      message: `Upgrade to hybrid for more features.`,
+      action: 'Upgrade Now'
+    });
+  }
+  
+  return notifications;
+};
+
+/**
+ * Handle API errors gracefully
+ */
+export const handleApiError = (error: any): string => {
+  if (typeof error === 'string') {
+    return error;
+  }
+  
+  if (error?.message) {
+    return error.message;
+  }
+  
+  if (error?.status === 404) {
+    return 'Portfolio not found';
+  }
+  
+  if (error?.status === 403) {
+    return 'You do not have permission to access this portfolio';
+  }
+  
+  if (error?.status === 409) {
+    return 'A portfolio with this name already exists';
+  }
+  
+  if (error?.status >= 500) {
+    return 'Server error - please try again later';
+  }
+  
+  return 'An unexpected error occurred';
+};
 
 /**
  * Get user initials from full name

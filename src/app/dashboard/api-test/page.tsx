@@ -4,6 +4,7 @@
 import React, { Suspense } from 'react';
 import { ApiTestLogic } from '@/components/apiTest/apiTestLogic';
 import { Loader2 } from 'lucide-react';
+import { AuthFlowHelper } from '@/hooks/utils/authFlowHelper';
 
 // Loading component for better UX
 const LoadingFallback = () => (

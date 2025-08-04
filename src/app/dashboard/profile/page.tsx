@@ -1,4 +1,4 @@
-// src/app/dashboard/profile/page.tsx - Clean modular version (FIXED)
+// src/app/dashboard/profile/page.tsx - Fixed version
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -20,12 +20,12 @@ import {
 import { ArtworkUploadModal } from '@/components/gallery/utils/uploadModal';
 import { PortfolioCreation } from '@/components/portfolio/portfolioCreation';
 
-// Import our new modular components
+// Import modular components
 import { PortfolioOverview } from '@/components/profile/utils/overview';
 import { UpgradeTabContent } from '@/components/profile/utils/upgradeTab';
 import ProfessionalSettingsPage from '@/components/profile/utils/settings';
 
-// Import from structureProfile (without AnalyticsTabContent)
+// Import from structure
 import { 
   HeaderSection,
   ErrorDisplay,
@@ -48,15 +48,29 @@ import {
   PortfolioStats
 } from '@/components/profile/utils/staticMethodsProfile';
 
-import { Loader2, Settings as SettingsIcon } from 'lucide-react';
+import { Loader2, Settings as SettingsIcon, AlertCircle } from 'lucide-react';
 
 type TabType = 'overview' | 'gallery' | 'learning' | 'analytics' | 'settings' | 'upgrade';
 
 export default function PortfolioHubPage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const portfolioManagement = usePortfolioManagement();
+  
+  // Portfolio management with proper error handling
+  const {
+    portfolio,
+    loading: portfolioLoading,
+    error: portfolioError,
+    isCreating,
+    isUpdating,
+    isDeleting,
+    createPortfolio,
+    updatePortfolio,
+    deletePortfolio,
+    refreshPortfolio,
+    hasPortfolio
+  } = usePortfolioManagement();
   
   // Local state
   const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -65,53 +79,74 @@ export default function PortfolioHubPage() {
   const [selectedPortfolioType, setSelectedPortfolioType] = useState<PortfolioKind>('creative');
   const [stats, setStats] = useState<UserStats>({ visits: 0, averageRating: 0, totalRatings: 0 });
   const [portfolioStats, setPortfolioStats] = useState<PortfolioStats | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   
-  // Get URL parameters
+  // URL parameters
   const createParam = searchParams.get('create') as PortfolioKind | null;
   const upgradeParam = searchParams.get('upgrade') as PortfolioKind | null;
   
-  // State for handling URL parameters
+  // State for URL parameter handling
   const [showCreationFromUrl, setShowCreationFromUrl] = useState(false);
   const [targetTypeFromUrl, setTargetTypeFromUrl] = useState<PortfolioKind | null>(null);
 
-  // Fetch stats on mount and portfolio change
+  // Generate stats when portfolio changes
   useEffect(() => {
     setStats(generateMockUserStats());
-    if (portfolioManagement.portfolio) {
+    if (portfolio) {
       setPortfolioStats(generateMockPortfolioStats());
+    } else {
+      setPortfolioStats(null);
     }
-  }, [portfolioManagement.portfolio]);
+  }, [portfolio]);
 
-  // Handle URL parameters for portfolio creation/upgrade
+  // Handle URL parameters
   useEffect(() => {
-    if (createParam && !portfolioManagement.portfolio) {
+    if (createParam && !hasPortfolio && !portfolioLoading) {
       setTargetTypeFromUrl(createParam);
       setShowCreationFromUrl(true);
       clearUrlParams(router, ['create']);
-    } else if (upgradeParam && portfolioManagement.portfolio) {
+    } else if (upgradeParam && hasPortfolio && !portfolioLoading) {
       setActiveTab('upgrade');
       clearUrlParams(router, ['upgrade']);
     }
-  }, [createParam, upgradeParam, portfolioManagement.portfolio, router]);
+  }, [createParam, upgradeParam, hasPortfolio, portfolioLoading, router]);
+
+  // Clear local errors when switching tabs
+  useEffect(() => {
+    setLocalError(null);
+  }, [activeTab]);
 
   // Handle successful portfolio creation
-  const handleCreationSuccess = (portfolioId: string) => {
-    setShowCreationFromUrl(false);
-    setTargetTypeFromUrl(null);
-    setShowPortfolioCreation(false);
-    
-    portfolioManagement.refreshPortfolio();
-    showSuccessNotification('Portfolio created successfully!');
-    setActiveTab('overview');
+  const handleCreationSuccess = async (portfolioId: string) => {
+    try {
+      setShowCreationFromUrl(false);
+      setTargetTypeFromUrl(null);
+      setShowPortfolioCreation(false);
+      setLocalError(null);
+      
+      await refreshPortfolio();
+      showSuccessNotification('Portfolio created successfully!');
+      setActiveTab('overview');
+    } catch (error) {
+      console.error('Error refreshing after creation:', error);
+      setLocalError('Portfolio created but failed to refresh. Please reload the page.');
+    }
   };
 
-  // Handle portfolio updates
+  // Handle portfolio updates with better error handling
   const handlePortfolioUpdate = async (updates: Partial<Portfolio>) => {
+    if (!portfolio?.id) {
+      setLocalError('No portfolio available to update');
+      return;
+    }
+
     try {
-      await portfolioManagement.updatePortfolio(updates);
+      setLocalError(null);
+      await updatePortfolio(updates);
       showSuccessNotification('Portfolio updated successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update portfolio:', error);
+      setLocalError(error.message || 'Failed to update portfolio');
       throw error;
     }
   };
@@ -119,114 +154,194 @@ export default function PortfolioHubPage() {
   // Handle portfolio upgrade
   const handleUpgradeTabContent = async (newKind: PortfolioKind) => {
     try {
-      await portfolioManagement.updatePortfolio({ kind: newKind });
+      setLocalError(null);
+      await handlePortfolioUpdate({ kind: newKind });
       showSuccessNotification('Portfolio upgraded successfully!');
       setActiveTab('overview');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to upgrade portfolio:', error);
-      throw error;
+      setLocalError(error.message || 'Failed to upgrade portfolio');
     }
   };
 
-  // Handle portfolio deletion
+  // Handle portfolio deletion with confirmation
   const handlePortfolioDelete = async (deleteGalleryPieces: boolean = false) => {
     try {
-      await portfolioManagement.deletePortfolio(deleteGalleryPieces);
+      setLocalError(null);
+      await deletePortfolio(deleteGalleryPieces);
       showSuccessNotification('Portfolio deleted successfully');
       setActiveTab('overview');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete portfolio:', error);
+      setLocalError(error.message || 'Failed to delete portfolio');
       throw error;
     }
   };
 
-  // Handle portfolio type selection for creation
+  // Handle portfolio type selection
   const handlePortfolioTypeSelect = (type: PortfolioKind) => {
     setSelectedPortfolioType(type);
     setShowPortfolioCreation(true);
+    setLocalError(null);
   };
 
   // Handle upload modal
   const handleUploadClick = () => {
+    if (!portfolio || !hasGalleryCapability(portfolio.kind)) {
+      setLocalError('Gallery feature not available for this portfolio type');
+      return;
+    }
     setShowUploadModal(true);
   };
 
-  // Handle tab changes with proper type casting
+  // Handle tab changes
   const handleTabChange = (tab: string) => {
     setActiveTab(tab as TabType);
   };
 
-  // Render tab content based on active tab
-  const renderTabContent = () => {
-    if (!portfolioManagement.portfolio || !portfolioStats) return null;
-    
-    const portfolio = portfolioManagement.portfolio;
-    
-    switch (activeTab) {
-      case 'overview':
-        return (
-          <PortfolioOverview
-            portfolio={portfolio}
-            stats={portfolioStats}
-            onEditClick={() => setActiveTab('settings')}
-            onUpgradeClick={portfolio.kind !== 'hybrid' ? () => setActiveTab('upgrade') : undefined}
-          />
-        );
+  // Handle portfolio creation with proper data mapping
+  const handleCreatePortfolio = async (data: {
+    title: string;
+    tagline?: string;
+    bio?: string;
+    visibility?: 'public' | 'private' | 'unlisted';
+    specializations?: string[];
+    tags?: string[];
+    kind?: PortfolioKind;
+  }) => {
+    try {
+      setLocalError(null);
+      
+      // Map the data to what your hook expects
+      const portfolioData = {
+        title: data.title,
+        bio: data.bio || '',
+        visibility: data.visibility || 'public' as const,
+        specializations: data.specializations || [],
+        tags: data.tags || [],
+        // Include kind if your API supports it, otherwise handle separately
+        ...(data.kind && { kind: data.kind })
+      };
 
-      case 'gallery':
-        return (
-          <GalleryTabContent
-            portfolioStats={portfolioStats}
-            onUploadClick={handleUploadClick}
-          />
-        );
-
-      case 'learning':
-        return (
-          <LearningTabContent
-            portfolioStats={portfolioStats}
-          />
-        );
-
-      case 'analytics':
-        return (
-          <AnalyticsTabContent
-            portfolioStats={portfolioStats}
-          />
-        );
-
-      case 'settings':
-        return (
-          <ProfessionalSettingsPage
-            portfolio={portfolio}
-            onUpdate={handlePortfolioUpdate}
-            onDelete={handlePortfolioDelete}
-            isUpdating={portfolioManagement.isUpdating}
-          />
-        );
-
-      case 'upgrade':
-        return (
-          <UpgradeTabContent
-            portfolio={portfolio}
-            onUpgrade={handleUpgradeTabContent}
-            isUpgrading={portfolioManagement.isUpdating}
-          />
-        );
-
-      default:
-        return (
-          <ComingSoonTab
-            title="Feature Coming Soon"
-            description="This section is being developed and will be available soon"
-            icon={<SettingsIcon />}
-          />
-        );
+      const result = await createPortfolio(portfolioData);
+      
+      // If kind wasn't handled in creation, update it separately
+      if (data.kind && result && !result.kind) {
+        try {
+          await updatePortfolio({ kind: data.kind });
+        } catch (updateError) {
+          console.warn('Failed to update portfolio kind:', updateError);
+          // Don't fail the entire creation for this
+        }
+      }
+      
+      return result;
+    } catch (error: any) {
+      console.error('Portfolio creation failed:', error);
+      setLocalError(error.message || 'Failed to create portfolio');
+      throw error;
     }
   };
 
-  // Loading state
-  if (loading || portfolioManagement.loading) {
+  // Render tab content with error boundaries
+  const renderTabContent = () => {
+    if (!portfolio) return null;
+    
+    try {
+      switch (activeTab) {
+        case 'overview':
+          return (
+            <PortfolioOverview
+              portfolio={portfolio}
+              stats={portfolioStats || generateMockPortfolioStats()}
+              onEditClick={() => setActiveTab('settings')}
+              onUpgradeClick={portfolio.kind !== 'hybrid' ? () => setActiveTab('upgrade') : undefined}
+            />
+          );
+
+        case 'gallery':
+          if (!hasGalleryCapability(portfolio.kind)) {
+            return (
+              <ComingSoonTab
+                title="Gallery Not Available"
+                description={`Gallery features are not available for ${portfolio.kind} portfolios. Consider upgrading to a creative or hybrid portfolio.`}
+                icon={<AlertCircle />}
+              />
+            );
+          }
+          return (
+            <GalleryTabContent
+              portfolioStats={portfolioStats || generateMockPortfolioStats()}
+              onUploadClick={handleUploadClick}
+            />
+          );
+
+        case 'learning':
+          if (!hasLearningCapability(portfolio.kind)) {
+            return (
+              <ComingSoonTab
+                title="Learning Features Not Available"
+                description={`Learning features are not available for ${portfolio.kind} portfolios. Consider upgrading to an educational or hybrid portfolio.`}
+                icon={<AlertCircle />}
+              />
+            );
+          }
+          return (
+            <LearningTabContent
+              portfolioStats={portfolioStats || generateMockPortfolioStats()}
+            />
+          );
+
+        case 'analytics':
+          return (
+            <AnalyticsTabContent
+              portfolioStats={portfolioStats || generateMockPortfolioStats()}
+              portfolio={portfolio}
+            />
+          );
+
+        case 'settings':
+          return (
+            <ProfessionalSettingsPage
+              portfolio={portfolio}
+              onUpdate={handlePortfolioUpdate}
+              onDelete={handlePortfolioDelete}
+              isUpdating={isUpdating}
+            />
+          );
+
+        case 'upgrade':
+          return (
+            <UpgradeTabContent
+              portfolio={portfolio}
+              onUpgrade={handleUpgradeTabContent}
+              isUpgrading={isUpdating}
+            />
+          );
+
+        default:
+          return (
+            <ComingSoonTab
+              title="Feature Coming Soon"
+              description="This section is being developed and will be available soon"
+              icon={<SettingsIcon />}
+            />
+          );
+      }
+    } catch (error) {
+      console.error('Error rendering tab content:', error);
+      return (
+        <ComingSoonTab
+          title="Error Loading Content"
+          description="There was an error loading this section. Please try refreshing the page."
+          icon={<AlertCircle />}
+        />
+      );
+    }
+  };
+
+  // Show loading spinner
+  if (authLoading || portfolioLoading) {
     return (
       <PageWrapper>
         <LoadingContainer>
@@ -237,7 +352,11 @@ export default function PortfolioHubPage() {
     );
   }
 
-  const { portfolio, error } = portfolioManagement;
+  // Handle authentication required
+  if (!user) {
+    router.push('/auth/login');
+    return null;
+  }
 
   // Show creation modal from URL parameter
   if (showCreationFromUrl && targetTypeFromUrl) {
@@ -276,23 +395,24 @@ export default function PortfolioHubPage() {
     );
   }
 
+  // Main render
   return (
     <PageWrapper>
       <Container>
         {/* Header Section */}
         <HeaderSection user={user} portfolio={portfolio} />
 
-        {/* Error Display */}
-        <ErrorDisplay error={error} />
+        {/* Error Display - Show both portfolio and local errors */}
+        <ErrorDisplay error={portfolioError || localError} />
 
         {/* Stats Grid */}
         <StatsGrid stats={stats} portfolio={portfolio} />
 
         {/* Main Content */}
-        {!portfolio ? (
+        {!hasPortfolio ? (
           <PortfolioCreationGrid
             onPortfolioTypeSelect={handlePortfolioTypeSelect}
-            isCreating={portfolioManagement.isCreating}
+            isCreating={isCreating}
           />
         ) : (
           <PortfolioManagement>
@@ -305,14 +425,14 @@ export default function PortfolioHubPage() {
           </PortfolioManagement>
         )}
 
-        {/* Upload Modal */}
+        {/* Upload Modal - Only show if portfolio supports gallery */}
         {showUploadModal && portfolio && hasGalleryCapability(portfolio.kind) && (
           <ArtworkUploadModal
             portfolioId={portfolio.id}
             onClose={() => setShowUploadModal(false)}
             onSuccess={() => {
               setShowUploadModal(false);
-              portfolioManagement.refreshPortfolio();
+              refreshPortfolio();
               showSuccessNotification('Artwork uploaded successfully!');
             }}
           />
