@@ -805,12 +805,13 @@ export default function EnhancedDashboard() {
               )}
 
               {/* Gallery View - Only shows when gallery tab is active */}
-              {state.activeView === 'gallery' && (
-                <GalleryView 
-                  galleryItems={state.galleryItems}
-                  onUpload={() => {/* Handle upload */}}
-                />
-              )}
+                  {/* Gallery View - Only shows when gallery tab is active */}
+                        {state.activeView === 'gallery' && (
+                          <GalleryView 
+                            galleryItems={state.galleryItems}
+                            portfolioId={state.portfolio?.id}
+                          />
+                        )}
 
               {/* Learning View - Only shows when learning tab is active */}
               {state.activeView === 'learning' && (
