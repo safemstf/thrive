@@ -593,7 +593,7 @@ export default function ModernHomePage() {
   };
 
   const handlePortfolioClick = (username: string) => {
-    router.push(`/u/${username}`);
+    router.push(`/portfolio/${username}`);
   };
 
   const renderPortfolioImage = (portfolio: Portfolio) => {
