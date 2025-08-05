@@ -140,6 +140,7 @@ const Sidebar = styled.div`
   display: flex;
   flex-direction: column;
   gap: ${theme.spacing['2xl']};
+  margin-bottom: 2rem;
 `;
 
 const SectionTitle = styled(Heading2)`

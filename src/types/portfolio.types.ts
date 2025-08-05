@@ -440,3 +440,5 @@ export const hasLearningCapability = (kind: PortfolioKind): boolean => {
 export const canUpgrade = (currentKind: PortfolioKind): boolean => {
   return currentKind !== 'hybrid';
 };
+
+export type { GalleryPiece };

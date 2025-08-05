@@ -1,3 +1,4 @@
+// src\components\dashboard\views\GalleryView.tsx
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { Upload, Settings, ExternalLink, Image as GalleryIcon } from 'lucide-react';

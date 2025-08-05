@@ -614,5 +614,72 @@ export class PortfolioApiClient extends BaseApiClient {
       features: ['Basic Portfolio']
     };
   }
+
+// Replace the problematic methods in portfolio-api-client.ts with these fixed versions:
+
+  /**
+   * Get public gallery pieces for a portfolio
+   */
+  async getPublicGallery(portfolioId: string): Promise<GalleryPiece[]> {
+    // Use requestWithRetry instead of request, no requiresAuth needed
+    return this.requestWithRetry<GalleryPiece[]>(`/gallery/public/${portfolioId}`, {
+      method: 'GET',
+      // Don't include requiresAuth - it's not a valid property
+    });
+  }
+
+  /**
+   * Like a gallery piece
+   */
+  async likePiece(pieceId: string): Promise<void> {
+    return this.requestWithRetry(`/gallery/${pieceId}/like`, {
+      method: 'POST',
+      body: JSON.stringify({}), // Empty body
+    });
+  }
+
+  /**
+   * Unlike a gallery piece
+   */
+  async unlikePiece(pieceId: string): Promise<void> {
+    return this.requestWithRetry(`/gallery/${pieceId}/unlike`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Get liked status for multiple pieces
+   */
+  async getLikedStatus(pieceIds: string[]): Promise<Record<string, boolean>> {
+    return this.requestWithRetry(`/gallery/liked-status`, {
+      method: 'POST',
+      body: JSON.stringify({ pieceIds }), // Properly stringify the body
+    });
+  }
+
+  /**
+   * Upload image with raw FormData (fixing the upload issue)
+   */
+  async uploadImageRaw(formData: FormData): Promise<any> {
+    const response = await fetch(`${this.baseURL}/gallery/upload`, {
+      method: 'POST',
+      headers: {
+        // Don't set Content-Type - let browser set it with boundary for FormData
+        'Authorization': `Bearer ${this.getAuthToken()}`,
+        'ngrok-skip-browser-warning': 'true', // Add this for consistency
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new APIError(
+        error.message || `Upload failed with status ${response.status}`,
+        response.status
+      );
+    }
+    
+    return response.json();
+  }
 }
 

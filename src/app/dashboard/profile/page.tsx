@@ -1,4 +1,4 @@
-// src/app/dashboard/profile/page.tsx - Fixed version
+// src/app/dashboard/profile/page.tsx - portfolio Hub
 'use client';
 
 import React, { useEffect, useState } from 'react';

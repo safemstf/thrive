@@ -189,6 +189,23 @@ export const api = {
     // Utility methods
     hasPortfolio: () => getApiClient().portfolio.hasPortfolio(),
     getPortfolioTypeConfig: (type: string) => getApiClient().portfolio.getPortfolioTypeConfig(type),
+
+
+    // Public Portfolio 
+    getPublicGallery: (portfolioId: string) => 
+      getApiClient().portfolio.getPublicGallery(portfolioId),
+    
+    likePiece: (pieceId: string) => 
+      getApiClient().portfolio.likePiece(pieceId),
+    
+    unlikePiece: (pieceId: string) => 
+      getApiClient().portfolio.unlikePiece(pieceId),
+    
+    getLikedStatus: (pieceIds: string[]) => 
+      getApiClient().portfolio.getLikedStatus(pieceIds),
+    
+    uploadImageRaw: (formData: FormData) => 
+      getApiClient().portfolio.uploadImageRaw(formData),
   },
   
   // Gallery API utilities
