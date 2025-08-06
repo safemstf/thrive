@@ -3,162 +3,190 @@
 
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/authProvider';
-import { api } from '@/lib/api-client'; // Your existing API client
 import {
-  User, Brush, GraduationCap, Code, FolderOpen, 
-  CheckCircle, ArrowRight, Loader2, X, Plus,
-  BookOpen, Camera, Palette, Users, Award,
-  PenTool, Brain, Calculator
+  Brush, GraduationCap, Code, FolderOpen, 
+  CheckCircle, ArrowRight, Loader2, X
 } from 'lucide-react';
-import type { CreatePortfolioDto } from '@/types/portfolio.types';
+import type { PortfolioKind, PortfolioVisibility } from '@/types/portfolio.types';
 
 export interface PortfolioCreationProps {
-  targetType: 'creative' | 'educational' | 'professional' | 'hybrid';
+  targetType: PortfolioKind;
   onSuccess?: (portfolioId: string) => void;
   onCancel?: () => void;
+  onCreatePortfolio?: (formData: {
+    title: string;
+    tagline?: string;
+    bio: string;
+    visibility: PortfolioVisibility;
+    specializations: string[];
+    tags: string[];
+    kind?: PortfolioKind;
+  }) => Promise<any>;
   inline?: boolean;
   showCloseButton?: boolean;
 }
 
-// Fix: Update the visibility type to include 'unlisted'
-type VisibilityType = 'public' | 'private' | 'unlisted';
+// Portfolio configuration
+const PORTFOLIO_CONFIG = {
+  creative: {
+    id: 'creative' as const,
+    title: 'Creative Portfolio',
+    subtitle: 'Art • Photography • Design',
+    description: 'Showcase your artistic work, photography, and design projects',
+    icon: <Brush size={32} />,
+    color: '#8b5cf6',
+    features: [
+      'Image gallery with metadata',
+      'Project showcases',
+      'Artist statement',
+      'Exhibition history',
+      'Commission inquiries'
+    ]
+  },
+  educational: {
+    id: 'educational' as const,
+    title: 'Teaching Portfolio',
+    subtitle: 'Education • Curriculum • Training',
+    description: 'Document your teaching philosophy, curriculum, and educational impact',
+    icon: <GraduationCap size={32} />,
+    color: '#3b82f6',
+    features: [
+      'Teaching philosophy',
+      'Curriculum materials',
+      'Student outcomes',
+      'Professional development',
+      'Research publications'
+    ]
+  },
+  professional: {
+    id: 'professional' as const,
+    title: 'Tech Portfolio',
+    subtitle: 'Software • Development • Engineering',
+    description: 'Highlight your technical skills, projects, and professional experience',
+    icon: <Code size={32} />,
+    color: '#059669',
+    features: [
+      'Code repositories',
+      'Technical projects',
+      'Skills & certifications',
+      'Professional timeline',
+      'Contact & resume'
+    ]
+  },
+  hybrid: {
+    id: 'hybrid' as const,
+    title: 'Multi-Portfolio',
+    subtitle: 'Creative • Teaching • Professional',
+    description: 'Combine multiple portfolio types for diverse professional identity',
+    icon: <FolderOpen size={32} />,
+    color: '#10b981',
+    features: [
+      'All portfolio features',
+      'Customizable sections',
+      'Flexible organization',
+      'Multiple focus areas',
+      'Comprehensive showcase'
+    ]
+  }
+};
 
 export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
   targetType,
   onSuccess,
   onCancel,
+  onCreatePortfolio,
   inline = false,
   showCloseButton = false
 }) => {
   const [isCreating, setIsCreating] = useState(false);
-  const [selectedType, setSelectedType] = useState<string>(targetType);
+  const [selectedType, setSelectedType] = useState<PortfolioKind>(targetType);
   const [formData, setFormData] = useState({
     title: '',
     tagline: '',
     bio: '',
-    visibility: 'public' as VisibilityType, // Fix: Use the updated type
+    visibility: 'public' as PortfolioVisibility,
     specializations: [] as string[],
     tags: [] as string[]
   });
 
   const { user } = useAuth();
-  const router = useRouter();
+  const currentConfig = PORTFOLIO_CONFIG[selectedType];
 
-  const portfolioTypes = {
-    creative: {
-      id: 'creative',
-      title: 'Creative Portfolio',
-      subtitle: 'Art • Photography • Design',
-      description: 'Showcase your artistic work, photography, and design projects',
-      icon: <Brush size={32} />,
-      color: '#8b5cf6',
-      features: [
-        'Image gallery with metadata',
-        'Project showcases',
-        'Artist statement',
-        'Exhibition history',
-        'Commission inquiries'
-      ],
-      defaultName: `${user?.name}'s Creative Portfolio`,
-      defaultTagline: 'Showcasing my creative journey'
-    },
-    educational: {
-      id: 'educational',
-      title: 'Teaching Portfolio',
-      subtitle: 'Education • Curriculum • Training',
-      description: 'Document your teaching philosophy, curriculum, and educational impact',
-      icon: <GraduationCap size={32} />,
-      color: '#3b82f6',
-      features: [
-        'Teaching philosophy',
-        'Curriculum materials',
-        'Student outcomes',
-        'Professional development',
-        'Research publications'
-      ],
-      defaultName: `${user?.name}'s Teaching Portfolio`,
-      defaultTagline: 'Inspiring minds through education'
-    },
-    professional: {
-      id: 'professional',
-      title: 'Tech Portfolio',
-      subtitle: 'Software • Development • Engineering',
-      description: 'Highlight your technical skills, projects, and professional experience',
-      icon: <Code size={32} />,
-      color: '#059669',
-      features: [
-        'Code repositories',
-        'Technical projects',
-        'Skills & certifications',
-        'Professional timeline',
-        'Contact & resume'
-      ],
-      defaultName: `${user?.name}'s Tech Portfolio`,
-      defaultTagline: 'Building innovative solutions'
-    },
-    hybrid: {
-      id: 'hybrid',
-      title: 'Multi-Portfolio',
-      subtitle: 'Creative • Teaching • Professional',
-      description: 'Combine multiple portfolio types for diverse professional identity',
-      icon: <FolderOpen size={32} />,
-      color: '#10b981',
-      features: [
-        'All portfolio features',
-        'Customizable sections',
-        'Flexible organization',
-        'Multiple focus areas',
-        'Comprehensive showcase'
-      ],
-      defaultName: `${user?.name}'s Portfolio`,
-      defaultTagline: 'Diverse skills, unified vision'
+  // Generate default names based on user and type
+  const getDefaultName = (type: PortfolioKind) => {
+    const userName = user?.name || 'My';
+    switch (type) {
+      case 'creative':
+        return `${userName}'s Creative Portfolio`;
+      case 'educational':
+        return `${userName}'s Teaching Portfolio`;
+      case 'professional':
+        return `${userName}'s Tech Portfolio`;
+      case 'hybrid':
+        return `${userName}'s Portfolio`;
+      default:
+        return `${userName}'s Portfolio`;
     }
   };
 
-  const currentType = portfolioTypes[selectedType as keyof typeof portfolioTypes];
+  const getDefaultTagline = (type: PortfolioKind) => {
+    switch (type) {
+      case 'creative':
+        return 'Showcasing my creative journey';
+      case 'educational':
+        return 'Inspiring minds through education';
+      case 'professional':
+        return 'Building innovative solutions';
+      case 'hybrid':
+        return 'Diverse skills, unified vision';
+      default:
+        return 'Welcome to my portfolio';
+    }
+  };
 
   const handleCreate = async () => {
-    if (!currentType || !formData.title.trim()) return;
+    if (!currentConfig || !formData.title.trim()) return;
 
     setIsCreating(true);
     try {
-      // Using your existing API client structure
-      const portfolioData: CreatePortfolioDto = {
+      const portfolioData = {
         title: formData.title.trim(),
         tagline: formData.tagline.trim() || undefined,
         bio: formData.bio.trim(),
         visibility: formData.visibility,
         specializations: formData.specializations,
-        tags: formData.tags
+        tags: formData.tags,
+        kind: selectedType as PortfolioKind
       };
 
-      const response = await api.portfolio.create(portfolioData);
+      // Use the provided creation function from the hook
+      let response;
+      if (onCreatePortfolio) {
+        response = await onCreatePortfolio(portfolioData);
+      } else {
+        // Fallback to direct API call if no hook provided (legacy support)
+        const { api } = await import('@/lib/api-client');
+        const apiData = {
+          title: portfolioData.title,
+          tagline: portfolioData.tagline,
+          bio: portfolioData.bio,
+          visibility: portfolioData.visibility,
+          specializations: portfolioData.specializations,
+          tags: portfolioData.tags
+        };
+        response = await api.portfolio.create(apiData);
+      }
 
       if (onSuccess) {
         onSuccess(response.id);
-      } else {
-        // Redirect to appropriate section
-        const redirectMap = {
-          creative: '/dashboard/gallery',
-          educational: '/dashboard/writing',
-          professional: '/dashboard/projects',
-          hybrid: '/dashboard/profile'
-        };
-        router.push(redirectMap[selectedType as keyof typeof redirectMap]);
       }
     } catch (error) {
       console.error('Failed to create portfolio:', error);
-      // Handle error (show toast, etc.)
+      // Error handling is now in the hook
     } finally {
       setIsCreating(false);
     }
-  };
-
-  // Fix: Update the visibility change handler to use the correct type
-  const handleVisibilityChange = (value: VisibilityType) => {
-    setFormData(prev => ({ ...prev, visibility: value }));
   };
 
   const Container = inline ? InlineContainer : ModalContainer;
@@ -174,12 +202,12 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
         )}
 
         <Header>
-          <HeaderIcon $color={currentType.color}>
-            {currentType.icon}
+          <HeaderIcon $color={currentConfig.color}>
+            {currentConfig.icon}
           </HeaderIcon>
           <HeaderText>
-            <Title>Create {currentType.title}</Title>
-            <Subtitle>{currentType.description}</Subtitle>
+            <Title>Create {currentConfig.title}</Title>
+            <Subtitle>{currentConfig.description}</Subtitle>
           </HeaderText>
         </Header>
 
@@ -188,7 +216,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
           <TypeSelection>
             <SectionTitle>Choose Portfolio Type</SectionTitle>
             <TypeGrid>
-              {Object.values(portfolioTypes).map((type) => (
+              {Object.values(PORTFOLIO_CONFIG).map((type) => (
                 <TypeCard
                   key={type.id}
                   $selected={selectedType === type.id}
@@ -213,7 +241,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
               type="text"
               value={formData.title}
               onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              placeholder={currentType.defaultName}
+              placeholder={getDefaultName(selectedType)}
             />
           </FormGroup>
           <FormGroup>
@@ -222,7 +250,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
               type="text"
               value={formData.tagline}
               onChange={(e) => setFormData(prev => ({ ...prev, tagline: e.target.value }))}
-              placeholder={currentType.defaultTagline}
+              placeholder={getDefaultTagline(selectedType)}
             />
           </FormGroup>
           <FormGroup>
@@ -246,7 +274,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
                 name="visibility"
                 value="public"
                 checked={formData.visibility === 'public'}
-                onChange={() => handleVisibilityChange('public')}
+                onChange={() => setFormData(prev => ({ ...prev, visibility: 'public' }))}
               />
               <RadioLabel>
                 <strong>Public</strong>
@@ -259,7 +287,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
                 name="visibility"
                 value="unlisted"
                 checked={formData.visibility === 'unlisted'}
-                onChange={() => handleVisibilityChange('unlisted')}
+                onChange={() => setFormData(prev => ({ ...prev, visibility: 'unlisted' }))}
               />
               <RadioLabel>
                 <strong>Unlisted</strong>
@@ -272,7 +300,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
                 name="visibility"
                 value="private"
                 checked={formData.visibility === 'private'}
-                onChange={() => handleVisibilityChange('private')}
+                onChange={() => setFormData(prev => ({ ...prev, visibility: 'private' }))}
               />
               <RadioLabel>
                 <strong>Private</strong>
@@ -286,7 +314,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
         <FeaturesSection>
           <SectionTitle>What You'll Get</SectionTitle>
           <FeaturesList>
-            {currentType.features.map((feature, index) => (
+            {currentConfig.features.map((feature, index) => (
               <FeatureItem key={index}>
                 <CheckCircle size={16} />
                 <span>{feature}</span>
@@ -305,7 +333,7 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
           <CreateButton
             onClick={handleCreate}
             disabled={isCreating || !formData.title.trim()}
-            $color={currentType.color}
+            $color={currentConfig.color}
           >
             {isCreating ? (
               <>
@@ -380,7 +408,7 @@ export const QuickCreateButton: React.FC<{
   );
 };
 
-// Styled Components (keeping all the existing styles)
+// Styled Components
 const ModalContainer = styled.div`
   position: fixed;
   top: 0;
@@ -623,29 +651,6 @@ const RadioLabel = styled.label`
     color: #6b7280;
     font-size: 0.875rem;
   }
-`;
-
-const CheckboxGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`;
-
-const CheckboxItem = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-`;
-
-const Checkbox = styled.input`
-  width: 18px;
-  height: 18px;
-  accent-color: #3b82f6;
-`;
-
-const CheckboxLabel = styled.label`
-  color: #374151;
-  cursor: pointer;
 `;
 
 const FeaturesSection = styled.div`

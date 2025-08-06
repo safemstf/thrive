@@ -3,10 +3,9 @@
 
 import { useCallback, useMemo } from 'react';
 import { useAuth } from '@/providers/authProvider';
-import { api, useApiClient } from '@/lib/api-client';
-import type { CreatePortfolioDto, Portfolio } from '@/types/portfolio.types';
+import { useApiClient } from '@/lib/api-client';
+import type { Portfolio } from '@/types/portfolio.types';
 import type { GalleryPiece } from '@/types/gallery.types';
-import { getAuthToken } from '@/lib/utils/auth';
 
 // Enhanced types
 export interface QuickStats {
@@ -24,7 +23,6 @@ export interface RecentActivity {
   title: string;
   description: string;
   timestamp: Date;
-  icon: React.ReactNode;
   metadata?: {
     score?: number;
     category?: string;
@@ -46,25 +44,11 @@ export interface Achievement {
   id: string;
   title: string;
   description: string;
-  icon: React.ReactNode;
   unlockedAt: Date;
   rarity: 'common' | 'rare' | 'epic';
 }
 
-export interface DashboardState {
-  portfolio: Portfolio | null;
-  loading: boolean;
-  activeView: 'overview' | 'gallery' | 'learning' | 'analytics';
-  stats: QuickStats;
-  recentActivity: RecentActivity[];
-  galleryItems: GalleryPiece[];
-  conceptProgress: ConceptProgress[];
-  achievements: Achievement[];
-  error: string | null;
-}
-
 export interface PortfolioTypeConfig {
-  icon: React.ReactNode;
   title: string;
   description: string;
   color: string;
@@ -78,21 +62,24 @@ export const useDashboardLogic = () => {
   // Portfolio type configuration
   const portfolioTypeConfig = useMemo((): Record<string, PortfolioTypeConfig> => ({
     creative: {
-      icon: <span>🎨</span>, // Will be replaced with actual icon in component
       title: 'Creative Portfolio',
       description: 'Showcase artwork, designs, and creative projects',
       color: '#8b5cf6',
       gradient: 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)'
     },
     educational: {
-      icon: <span>🧠</span>,
       title: 'Educational Portfolio',
       description: 'Track learning progress and academic achievements',
       color: '#3b82f6',
       gradient: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)'
     },
+    professional: {
+      title: 'Professional Portfolio',
+      description: 'Highlight technical skills and professional experience',
+      color: '#059669',
+      gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
+    },
     hybrid: {
-      icon: <span>📚</span>,
       title: 'Hybrid Portfolio',
       description: 'Combine creative works with educational progress',
       color: '#10b981',
@@ -125,7 +112,7 @@ export const useDashboardLogic = () => {
 
     try {
       // Gallery content fetching
-      if (portfolio.kind === 'creative' || portfolio.kind === 'hybrid') {
+      if (portfolio.kind === 'creative' || portfolio.kind === 'hybrid' || portfolio.kind === 'professional') {
         try {
           const galleryResponse = await apiClient.gallery.getPieces({ limit: 20 });
           galleryItems = Array.isArray(galleryResponse) ? galleryResponse : galleryResponse.pieces || [];
@@ -144,7 +131,7 @@ export const useDashboardLogic = () => {
             title: concept.title || `Concept ${index + 1}`,
             category: concept.category || 'General',
             difficulty: concept.difficulty || 'intermediate',
-            lastUpdated: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000)
+            lastUpdated: concept.lastUpdated || new Date()
           }));
           
           conceptProgress = enhancedConcepts;
@@ -168,9 +155,9 @@ export const useDashboardLogic = () => {
         stats: {
           portfolioType: portfolio.kind,
           totalItems,
-          recentActivity: Math.floor(Math.random() * 10) + 3,
+          recentActivity: 0, // Will be populated from actual activity data
           completionRate,
-          weeklyGrowth: Math.floor(Math.random() * 25) + 5,
+          weeklyGrowth: 0, // Will be calculated from historical data
           averageScore
         }
       };
@@ -180,121 +167,80 @@ export const useDashboardLogic = () => {
     }
   }, [apiClient]);
 
-  const generateEnhancedActivity = useCallback((portfolioKind: string): RecentActivity[] => {
-    const activities: RecentActivity[] = [];
+  // Fetch recent activity from API
+  const fetchRecentActivity = useCallback(async (portfolioId: string): Promise<RecentActivity[]> => {
+    if (!portfolioId) return [];
     
-    if (portfolioKind === 'creative' || portfolioKind === 'hybrid') {
-      activities.push(
-        {
-          id: '1',
-          type: 'gallery_upload',
-          title: 'New artwork uploaded',
-          description: 'Added "Digital Landscape #47" to gallery',
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-          icon: <span>📷</span>,
-          metadata: { category: 'Digital Art' }
-        },
-        {
-          id: '4',
-          type: 'achievement_unlock',
-          title: 'Achievement unlocked!',
-          description: 'Earned "Creative Streak" for 7 consecutive uploads',
-          timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
-          icon: <span>🏆</span>
-        }
-      );
+    try {
+      // TODO: Implement when activity API is available
+      // const activityData = await apiClient.portfolio.getRecentActivity(portfolioId);
+      // return activityData.map(activity => ({
+      //   ...activity,
+      //   timestamp: new Date(activity.timestamp)
+      // }));
+      
+      return []; // Return empty array until API is ready
+    } catch (error) {
+      console.error('Error fetching recent activity:', error);
+      return [];
     }
-    
-    if (portfolioKind === 'educational' || portfolioKind === 'hybrid') {
-      activities.push(
-        {
-          id: '2',
-          type: 'concept_complete',
-          title: 'Concept mastered',
-          description: 'Completed "Advanced Calculus - Derivatives" with 94% score',
-          timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-          icon: <span>📖</span>,
-          metadata: { score: 94, category: 'Mathematics' }
-        }
-      );
-    }
-    
-    activities.push(
-      {
-        id: '3',
-        type: 'project_create',
-        title: 'New project started',
-        description: 'Began "React Portfolio Website" development',
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        icon: <span>💻</span>,
-        metadata: { category: 'Web Development' }
-      },
-      {
-        id: '5',
-        type: 'portfolio_update',
-        title: 'Portfolio updated',
-        description: 'Refreshed bio and added new specializations',
-        timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        icon: <span>⚙️</span>
-      }
-    );
+  }, [apiClient]);
 
-    return activities.slice(0, 5);
+  // Fetch achievements from API
+  const fetchAchievements = useCallback(async (portfolioId: string): Promise<Achievement[]> => {
+    if (!portfolioId) return [];
+    
+    try {
+      // TODO: Implement when achievements API is available
+      // const achievementsData = await apiClient.portfolio.getAchievements(portfolioId);
+      // return achievementsData.map(achievement => ({
+      //   ...achievement,
+      //   unlockedAt: new Date(achievement.unlockedAt)
+      // }));
+      
+      return []; // Return empty array until API is ready
+    } catch (error) {
+      console.error('Error fetching achievements:', error);
+      return [];
+    }
+  }, [apiClient]);
+
+  // Calculate dashboard statistics from real data
+  const calculateDashboardStats = useCallback((
+    galleryItems: GalleryPiece[], 
+    conceptProgress: ConceptProgress[],
+    recentActivity: RecentActivity[]
+  ): QuickStats => {
+    const totalItems = galleryItems.length + conceptProgress.length;
+    
+    // Calculate completion rate for educational portfolios
+    const completedConcepts = conceptProgress.filter(c => c.status === 'completed').length;
+    const completionRate = conceptProgress.length > 0 
+      ? (completedConcepts / conceptProgress.length) * 100 
+      : 0;
+
+    // Calculate average score from completed concepts
+    const scoredConcepts = conceptProgress.filter(c => c.score);
+    const averageScore = scoredConcepts.length > 0
+      ? scoredConcepts.reduce((sum, c) => sum + (c.score || 0), 0) / scoredConcepts.length
+      : undefined;
+
+    // Recent activity count (last 7 days)
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentActivityCount = recentActivity.filter(
+      activity => activity.timestamp > weekAgo
+    ).length;
+
+    return {
+      totalItems,
+      recentActivity: recentActivityCount,
+      completionRate,
+      weeklyGrowth: 0, // TODO: Calculate from historical data
+      averageScore
+    };
   }, []);
 
-  const generateAchievements = useCallback((): Achievement[] => {
-    return [
-      {
-        id: '1',
-        title: 'First Steps',
-        description: 'Created your first portfolio',
-        icon: <span>✨</span>,
-        unlockedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        rarity: 'common'
-      },
-      {
-        id: '2',
-        title: 'Learning Machine',
-        description: 'Completed 10 learning concepts',
-        icon: <span>🧠</span>,
-        unlockedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-        rarity: 'rare'
-      },
-      {
-        id: '3',
-        title: 'Perfectionist',
-        description: 'Achieved 95%+ on 5 concepts',
-        icon: <span>🎯</span>,
-        unlockedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        rarity: 'epic'
-      }
-    ];
-  }, []);
-
-const createPortfolio = async (type: 'creative' | 'educational' | 'hybrid') => {
-  const token = getAuthToken();
-  if (!token) {
-    throw new Error('Authentication token not found. Please login again.');
-  }
-
-  const data: CreatePortfolioDto = {
-    kind: type,
-    title: '',
-    bio: '',
-    visibility: 'public',
-    specializations: [],
-    tags: []
-  };
-
-  try {
-    const portfolio = await api.portfolio.create(data);
-    return portfolio;
-  } catch (err: any) {
-    const message = err?.message || 'Failed to create portfolio';
-    throw new Error(message);
-  }
-};
-
+  // Utility functions
   const formatTimeAgo = useCallback((date: Date): string => {
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
@@ -307,13 +253,36 @@ const createPortfolio = async (type: 'creative' | 'educational' | 'hybrid') => {
     return `${Math.floor(diffInDays / 7)}w ago`;
   }, []);
 
+  // Get available views based on portfolio type
+  const getAvailableViews = useCallback((portfolioKind: string) => {
+    const views = ['overview', 'analytics'];
+    
+    if (portfolioKind === 'creative' || portfolioKind === 'hybrid' || portfolioKind === 'professional') {
+      views.push('gallery');
+    }
+    
+    if (portfolioKind === 'educational' || portfolioKind === 'hybrid') {
+      views.push('learning');
+    }
+    
+    return views;
+  }, []);
+
   return {
+    // Configuration
     portfolioTypeConfig,
+    
+    // Data fetching
     fetchPortfolioData,
     fetchPortfolioContent,
-    generateEnhancedActivity,
-    generateAchievements,
-    createPortfolio,
-    formatTimeAgo
+    fetchRecentActivity,
+    fetchAchievements,
+    
+    // Data processing
+    calculateDashboardStats,
+    
+    // Utilities
+    formatTimeAgo,
+    getAvailableViews
   };
 };

@@ -1,5 +1,4 @@
-// src/types/portfolio.types.ts - Main index file for all portfolio-related types
-
+// src/types/portfolio.types.ts - Complete types file
 import { GalleryPiece } from './gallery.types';
 
 // ==================== Base Types ====================
@@ -21,7 +20,6 @@ export type SubCategory = 'sat' | 'foundations' | 'ap';
 export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
 export type CategoryIcon = MainCategory | SubCategory;
 export type ScientificDiscipline = 'physics' | 'chemistry' | 'biology';
-
 
 export interface Concept {
   id: string;
@@ -72,8 +70,24 @@ export const defaultSections: SectionConfig[] = [
   { key: 'ap-calc', title: 'AP Calculus', mainCategory: 'math', subCategory: 'ap' }
 ];
 
+
+export interface ConceptFilters {
+  type?: string;
+  discipline?: string;
+  difficulty?: string;
+  bookId?: string;
+  tags?: string[];
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
 // ==================== Main Portfolio Interface ====================
 export interface Portfolio extends BaseEntity {
+  id: string;
+
   // Basic Info
   userId: string;
   username: string;
@@ -232,33 +246,59 @@ export interface PortfolioView {
 }
 
 export interface PortfolioAnalytics {
-  views: number;
-  uniqueViews: number;
-  engagementRate: any;
-  engagement: any;
-  averageSessionTime: any;
-  sessionTime: any;
-  globalReach: any;
-  countries: any;
-  weeklyGrowth: any;
-  growth: any;
-  monthlyViews: any;
-  monthly: any;
-  socialShares: any;
-  shares: any;
-  professionalInquiries: any;
-  inquiries: any;
-  returnVisitorRate: any;
-  returnRate: any;
-  topPerformingContent: never[];
   portfolioId: string;
   period: 'day' | 'week' | 'month' | 'year' | 'all';
   
   // Overview
   totalViews: number;
+  uniqueViews: number;
   uniqueVisitors: number;
   averageSessionDuration: number;
+  averageSessionTime: number;
   bounceRate: number;
+  
+  // Engagement 
+  engagement: number;
+  engagementRate: number;
+  
+  // Growth
+  growth: number;
+  weeklyGrowth: number;
+  
+  // Content Performance
+  topPerformingContent: Array<{
+    pieceId: string;
+    title: string;
+    views: number;
+    engagement: number;
+  }>;
+  
+  // Geographic
+  globalReach: number;
+  countries: Array<{
+    country: string;
+    count: number;
+  }>;
+  
+  // Time-based
+  monthly: Array<{
+    month: string;
+    views: number;
+    visitors: number;
+  }>;
+  monthlyViews: number;
+  
+  // Social & Sharing
+  shares: number;
+  socialShares: Record<string, number>;
+  
+  // Professional
+  inquiries: number;
+  professionalInquiries: number;
+  
+  // Retention
+  returnRate: number;
+  returnVisitorRate: number;
   
   // Traffic Sources
   trafficSources: {
@@ -274,7 +314,7 @@ export interface PortfolioAnalytics {
     count: number;
   }>;
   
-  // Engagement
+  // Piece-specific views
   pieceViews: Array<{
     pieceId: string;
     views: number;
@@ -290,18 +330,36 @@ export interface PortfolioAnalytics {
   contactClicks: number;
   shareClicks: number;
   socialLinkClicks: Record<string, number>;
+  
+  // Time tracking
+  sessionTime: number;
+  views: number;
 }
 
 // ==================== API DTOs ====================
+
+// Input type for usePortfolioManagement hook
+export interface CreatePortfolioInput {
+  title: string;
+  bio?: string;
+  visibility?: PortfolioVisibility;
+  kind?: PortfolioKind;
+  specializations?: string[];
+  tags?: string[];
+  location?: string;
+  tagline?: string;
+}
+
+// DTO for API calls
 export interface CreatePortfolioDto {
   title: string;
   tagline?: string;
   bio: string;
   visibility: PortfolioVisibility;
-  kind?: PortfolioKind;
   specializations: string[];
   tags: string[];
   settings?: Partial<PortfolioSettings>;
+  // Note: kind might not be supported in create API - handle separately
 }
 
 export interface UpdatePortfolioDto extends Partial<CreatePortfolioDto> {
@@ -441,4 +499,8 @@ export const canUpgrade = (currentKind: PortfolioKind): boolean => {
   return currentKind !== 'hybrid';
 };
 
+// Portfolio creation trigger types
+export type CreationTrigger = 'dashboard' | 'gallery' | 'profile' | 'url' | 'manual';
+
+// Re-export from gallery types
 export type { GalleryPiece };

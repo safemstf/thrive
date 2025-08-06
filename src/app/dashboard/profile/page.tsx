@@ -1,4 +1,4 @@
-// src/app/dashboard/profile/page.tsx - portfolio Hub
+// src/app/dashboard/profile/page.tsx - Clean Portfolio Hub (Management Only)
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -7,9 +7,7 @@ import { useAuth } from '@/providers/authProvider';
 import { usePortfolioManagement } from '@/hooks/usePortfolioManagement';
 import { 
   type PortfolioKind,
-  type Portfolio,
-  hasGalleryCapability,
-  hasLearningCapability
+  type Portfolio
 } from '@/types/portfolio.types';
 import { 
   PageWrapper, 
@@ -17,10 +15,9 @@ import {
   LoadingContainer,
   PortfolioManagement
 } from '@/components/profile/profileStyles';
-import { ArtworkUploadModal } from '@/components/gallery/utils/uploadModal';
 import { PortfolioCreation } from '@/components/portfolio/portfolioCreation';
 
-// Import modular components
+// Import modular components - MANAGEMENT FOCUSED ONLY
 import { PortfolioOverview } from '@/components/profile/utils/overview';
 import { UpgradeTabContent } from '@/components/profile/utils/upgradeTab';
 import ProfessionalSettingsPage from '@/components/profile/utils/settings';
@@ -35,9 +32,7 @@ import {
   ComingSoonTab
 } from '@/components/profile/utils/structureProfile';
 
-import { GalleryTabContent } from '@/components/profile/utils/galleryTab';
-import { LearningTabContent } from '@/components/profile/utils/learningTab';
-import { AnalyticsTabContent } from '@/components/profile/utils/analytics';
+// REMOVED: Gallery and Learning tab components (they have dedicated pages now)
 
 import { 
   generateMockUserStats,
@@ -48,9 +43,12 @@ import {
   PortfolioStats
 } from '@/components/profile/utils/staticMethodsProfile';
 
-import { Loader2, Settings as SettingsIcon, AlertCircle } from 'lucide-react';
+import { Loader2, Settings as SettingsIcon, AlertCircle, ExternalLink } from 'lucide-react';
+import styled from 'styled-components';
+import { theme } from '@/styles/theme';
 
-type TabType = 'overview' | 'gallery' | 'learning' | 'analytics' | 'settings' | 'upgrade';
+// FOCUSED TAB TYPES - Only management-related, NO CONTENT CREATION
+type TabType = 'overview' | 'settings' | 'upgrade';
 
 export default function PortfolioHubPage() {
   const { user, loading: authLoading } = useAuth();
@@ -72,9 +70,8 @@ export default function PortfolioHubPage() {
     hasPortfolio
   } = usePortfolioManagement();
   
-  // Local state
+  // Local state - SIMPLIFIED TO MANAGEMENT ONLY
   const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [showPortfolioCreation, setShowPortfolioCreation] = useState(false);
   const [selectedPortfolioType, setSelectedPortfolioType] = useState<PortfolioKind>('creative');
   const [stats, setStats] = useState<UserStats>({ visits: 0, averageRating: 0, totalRatings: 0 });
@@ -116,8 +113,8 @@ export default function PortfolioHubPage() {
     setLocalError(null);
   }, [activeTab]);
 
-  // Handle successful portfolio creation
-  const handleCreationSuccess = async (portfolioId: string) => {
+  // Handle successful portfolio creation - REDIRECT TO APPROPRIATE WORKSPACE
+  const handleCreationSuccess = async (portfolioId: string, portfolioKind: PortfolioKind) => {
     try {
       setShowCreationFromUrl(false);
       setTargetTypeFromUrl(null);
@@ -126,10 +123,35 @@ export default function PortfolioHubPage() {
       
       await refreshPortfolio();
       showSuccessNotification('Portfolio created successfully!');
-      setActiveTab('overview');
+      
+      // REDIRECT to the appropriate specialized workspace
+      const redirectPath = getWorkspaceRedirect(portfolioKind);
+      if (redirectPath) {
+        setTimeout(() => {
+          router.push(redirectPath);
+        }, 1500); // Give user time to see success message
+      } else {
+        setActiveTab('overview');
+      }
     } catch (error) {
       console.error('Error refreshing after creation:', error);
       setLocalError('Portfolio created but failed to refresh. Please reload the page.');
+    }
+  };
+
+  // NEW: Determine where to redirect after portfolio creation
+  const getWorkspaceRedirect = (portfolioKind: PortfolioKind): string | null => {
+    switch (portfolioKind) {
+      case 'creative':
+        return '/dashboard/gallery'; // Creative workspace
+      case 'educational':
+        return '/dashboard/writing'; // Learning workspace
+      case 'professional':
+        return '/dashboard/projects'; // Tech workspace
+      case 'hybrid':
+        return '/dashboard'; // Main dashboard with all views
+      default:
+        return null; // Stay on current page
     }
   };
 
@@ -151,13 +173,22 @@ export default function PortfolioHubPage() {
     }
   };
 
-  // Handle portfolio upgrade
+  // Handle portfolio upgrade - WITH WORKSPACE REDIRECT
   const handleUpgradeTabContent = async (newKind: PortfolioKind) => {
     try {
       setLocalError(null);
       await handlePortfolioUpdate({ kind: newKind });
       showSuccessNotification('Portfolio upgraded successfully!');
-      setActiveTab('overview');
+      
+      // Redirect to the new workspace if different from current
+      const redirectPath = getWorkspaceRedirect(newKind);
+      if (redirectPath && newKind !== portfolio?.kind) {
+        setTimeout(() => {
+          router.push(redirectPath);
+        }, 1500);
+      } else {
+        setActiveTab('overview');
+      }
     } catch (error: any) {
       console.error('Failed to upgrade portfolio:', error);
       setLocalError(error.message || 'Failed to upgrade portfolio');
@@ -185,15 +216,6 @@ export default function PortfolioHubPage() {
     setLocalError(null);
   };
 
-  // Handle upload modal
-  const handleUploadClick = () => {
-    if (!portfolio || !hasGalleryCapability(portfolio.kind)) {
-      setLocalError('Gallery feature not available for this portfolio type');
-      return;
-    }
-    setShowUploadModal(true);
-  };
-
   // Handle tab changes
   const handleTabChange = (tab: string) => {
     setActiveTab(tab as TabType);
@@ -212,26 +234,22 @@ export default function PortfolioHubPage() {
     try {
       setLocalError(null);
       
-      // Map the data to what your hook expects
       const portfolioData = {
         title: data.title,
         bio: data.bio || '',
         visibility: data.visibility || 'public' as const,
         specializations: data.specializations || [],
         tags: data.tags || [],
-        // Include kind if your API supports it, otherwise handle separately
         ...(data.kind && { kind: data.kind })
       };
 
       const result = await createPortfolio(portfolioData);
       
-      // If kind wasn't handled in creation, update it separately
       if (data.kind && result && !result.kind) {
         try {
           await updatePortfolio({ kind: data.kind });
         } catch (updateError) {
           console.warn('Failed to update portfolio kind:', updateError);
-          // Don't fail the entire creation for this
         }
       }
       
@@ -243,61 +261,85 @@ export default function PortfolioHubPage() {
     }
   };
 
-  // Render tab content with error boundaries
+  // NEW: Get workspace info for current portfolio
+  const getWorkspaceInfo = (portfolioKind: string) => {
+    switch (portfolioKind) {
+      case 'creative':
+        return {
+          title: 'Creative Studio',
+          description: 'Manage your artwork, photography, and visual projects',
+          path: '/dashboard/gallery',
+          icon: '🎨',
+          color: '#8b5cf6'
+        };
+      case 'educational':
+        return {
+          title: 'Teaching Portfolio', 
+          description: 'Manage courses, curriculum, and educational content',
+          path: '/dashboard/writing',
+          icon: '📚',
+          color: '#3b82f6'
+        };
+      case 'professional':
+        return {
+          title: 'Tech Portfolio',
+          description: 'Manage projects, code repositories, and technical work',
+          path: '/dashboard/projects', 
+          icon: '💻',
+          color: '#059669'
+        };
+      case 'hybrid':
+        return {
+          title: 'Multi-Portfolio Dashboard',
+          description: 'Access all your creative, educational, and professional tools',
+          path: '/dashboard',
+          icon: '🚀',
+          color: '#10b981'
+        };
+      default:
+        return null;
+    }
+  };
+
+  // Render tab content - MANAGEMENT FOCUSED ONLY
   const renderTabContent = () => {
     if (!portfolio) return null;
+    
+    const workspaceInfo = getWorkspaceInfo(portfolio.kind);
     
     try {
       switch (activeTab) {
         case 'overview':
           return (
-            <PortfolioOverview
-              portfolio={portfolio}
-              stats={portfolioStats || generateMockPortfolioStats()}
-              onEditClick={() => setActiveTab('settings')}
-              onUpgradeClick={portfolio.kind !== 'hybrid' ? () => setActiveTab('upgrade') : undefined}
-            />
-          );
-
-        case 'gallery':
-          if (!hasGalleryCapability(portfolio.kind)) {
-            return (
-              <ComingSoonTab
-                title="Gallery Not Available"
-                description={`Gallery features are not available for ${portfolio.kind} portfolios. Consider upgrading to a creative or hybrid portfolio.`}
-                icon={<AlertCircle />}
+            <>
+              <PortfolioOverview
+                portfolio={portfolio}
+                stats={portfolioStats || generateMockPortfolioStats()}
+                onEditClick={() => setActiveTab('settings')}
+                onUpgradeClick={portfolio.kind !== 'hybrid' ? () => setActiveTab('upgrade') : undefined}
               />
-            );
-          }
-          return (
-            <GalleryTabContent
-              portfolioStats={portfolioStats || generateMockPortfolioStats()}
-              onUploadClick={handleUploadClick}
-            />
-          );
-
-        case 'learning':
-          if (!hasLearningCapability(portfolio.kind)) {
-            return (
-              <ComingSoonTab
-                title="Learning Features Not Available"
-                description={`Learning features are not available for ${portfolio.kind} portfolios. Consider upgrading to an educational or hybrid portfolio.`}
-                icon={<AlertCircle />}
-              />
-            );
-          }
-          return (
-            <LearningTabContent
-              portfolioStats={portfolioStats || generateMockPortfolioStats()}
-            />
-          );
-
-        case 'analytics':
-          return (
-            <AnalyticsTabContent
-              portfolioStats={portfolioStats || generateMockPortfolioStats()}
-              portfolio={portfolio}
-            />
+              
+              {/* NEW: Workspace Navigation Card */}
+              {workspaceInfo && (
+                <WorkspaceNavigationCard>
+                  <WorkspaceIcon $color={workspaceInfo.color}>
+                    {workspaceInfo.icon}
+                  </WorkspaceIcon>
+                  <WorkspaceContent>
+                    <WorkspaceTitle>{workspaceInfo.title}</WorkspaceTitle>
+                    <WorkspaceDescription>
+                      {workspaceInfo.description}
+                    </WorkspaceDescription>
+                    <WorkspaceButton 
+                      onClick={() => router.push(workspaceInfo.path)}
+                    >
+                      Open {workspaceInfo.title}
+                      <ExternalLink size={16} />
+                    </WorkspaceButton>
+                  </WorkspaceContent>
+                </WorkspaceNavigationCard>
+              )}
+            </>
           );
 
         case 'settings':
@@ -365,7 +407,7 @@ export default function PortfolioHubPage() {
         <Container>
           <PortfolioCreation
             targetType={targetTypeFromUrl}
-            onSuccess={handleCreationSuccess}
+            onSuccess={(portfolioId) => handleCreationSuccess(portfolioId, targetTypeFromUrl)}
             onCancel={() => {
               setShowCreationFromUrl(false);
               setTargetTypeFromUrl(null);
@@ -385,7 +427,7 @@ export default function PortfolioHubPage() {
         <Container>
           <PortfolioCreation
             targetType={selectedPortfolioType}
-            onSuccess={handleCreationSuccess}
+            onSuccess={(portfolioId) => handleCreationSuccess(portfolioId, selectedPortfolioType)}
             onCancel={() => setShowPortfolioCreation(false)}
             inline={true}
             showCloseButton={true}
@@ -402,7 +444,7 @@ export default function PortfolioHubPage() {
         {/* Header Section */}
         <HeaderSection user={user} portfolio={portfolio} />
 
-        {/* Error Display - Show both portfolio and local errors */}
+        {/* Error Display */}
         <ErrorDisplay error={portfolioError || localError} />
 
         {/* Stats Grid */}
@@ -424,20 +466,85 @@ export default function PortfolioHubPage() {
             {renderTabContent()}
           </PortfolioManagement>
         )}
-
-        {/* Upload Modal - Only show if portfolio supports gallery */}
-        {showUploadModal && portfolio && hasGalleryCapability(portfolio.kind) && (
-          <ArtworkUploadModal
-            portfolioId={portfolio.id}
-            onClose={() => setShowUploadModal(false)}
-            onSuccess={() => {
-              setShowUploadModal(false);
-              refreshPortfolio();
-              showSuccessNotification('Artwork uploaded successfully!');
-            }}
-          />
-        )}
       </Container>
     </PageWrapper>
   );
 }
+
+// NEW: Styled components for workspace navigation
+const WorkspaceNavigationCard = styled.div`
+  background: ${theme.glass.background};
+  backdrop-filter: blur(${theme.glass.blur});
+  border: 1px solid ${theme.glass.border};
+  border-radius: ${theme.borderRadius.lg};
+  padding: ${theme.spacing.xl};
+  margin-top: ${theme.spacing.lg};
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.lg};
+  box-shadow: ${theme.shadows.sm};
+  transition: all ${theme.transitions.normal};
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${theme.shadows.md};
+  }
+`;
+
+const WorkspaceIcon = styled.div<{ $color: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: ${props => `${props.$color}15`};
+  border: 2px solid ${props => `${props.$color}30`};
+  border-radius: ${theme.borderRadius.lg};
+  font-size: 2.5rem;
+  flex-shrink: 0;
+`;
+
+const WorkspaceContent = styled.div`
+  flex: 1;
+`;
+
+const WorkspaceTitle = styled.h3`
+  font-family: ${theme.typography.fonts.display};
+  font-size: ${theme.typography.sizes.xl};
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
+  margin: 0 0 ${theme.spacing.xs} 0;
+`;
+
+const WorkspaceDescription = styled.p`
+  font-family: ${theme.typography.fonts.body};
+  font-size: ${theme.typography.sizes.base};
+  color: ${theme.colors.text.secondary};
+  margin: 0 0 ${theme.spacing.lg} 0;
+  line-height: 1.5;
+`;
+
+const WorkspaceButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
+  border-radius: ${theme.borderRadius.sm};
+  font-family: ${theme.typography.fonts.body};
+  font-size: ${theme.typography.sizes.base};
+  font-weight: ${theme.typography.weights.medium};
+  cursor: pointer;
+  transition: all ${theme.transitions.fast};
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: ${theme.shadows.sm};
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+`;

@@ -61,6 +61,7 @@ export interface RouteDefinition {
 
 export interface RouteCategory {
   name: string;
+  description?:string;
   routes: RouteDefinition[];
 }
 
