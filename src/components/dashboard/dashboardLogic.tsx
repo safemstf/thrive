@@ -114,19 +114,20 @@ export const useDashboardLogic = () => {
       // Gallery content fetching
       if (portfolio.kind === 'creative' || portfolio.kind === 'hybrid' || portfolio.kind === 'professional') {
         try {
-          const galleryResponse = await apiClient.gallery.getPieces({ limit: 20 });
-          galleryItems = Array.isArray(galleryResponse) ? galleryResponse : galleryResponse.pieces || [];
+          const galleryResponse = await apiClient.portfolio.getMyGalleryPieces();
+          galleryItems = Array.isArray(galleryResponse) ? galleryResponse : galleryResponse || [];
           totalItems += galleryItems.length;
         } catch (error) {
           console.log('No gallery data available');
         }
       }
-
       // Learning content fetching
       if (portfolio.kind === 'educational' || portfolio.kind === 'hybrid') {
         try {
-          const conceptData = await apiClient.portfolio.getMyConcepts();
-          const enhancedConcepts = (conceptData || []).map((concept: ConceptProgress, index: number) => ({
+          const conceptResponse = await apiClient.portfolio.getMyConcepts();
+          const concepts = conceptResponse.concepts || []; // Access the concepts array
+          
+          const enhancedConcepts = concepts.map((concept: ConceptProgress, index: number) => ({
             ...concept,
             title: concept.title || `Concept ${index + 1}`,
             category: concept.category || 'General',
@@ -148,7 +149,6 @@ export const useDashboardLogic = () => {
           console.log('No concept data available');
         }
       }
-
       return {
         galleryItems,
         conceptProgress,
