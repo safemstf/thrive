@@ -5,7 +5,7 @@ import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { UploadIcon, X, Loader2 } from '@/components/ui/icons';
 import { useAuth } from '@/providers/authProvider';
-import type { ArtworkCategory, GalleryPiece, GalleryStatus, GalleryUploadFile } from '@/types/gallery.types';
+import type { ArtworkCategory, GalleryPiece, GalleryStatus, GalleryUploadFile, GalleryVisibility } from '@/types/gallery.types';
 
 interface ArtworkUploadModalProps {
   portfolioId?: string;
@@ -139,7 +139,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
       if (!pid) {
         try {
           // First, check if user already has a portfolio
-          const portfolioResponse = await api.portfolio.getMyPortfolio();
+          const portfolioResponse = await api.portfolio.get();
           console.log('Portfolio check response:', portfolioResponse);
           
           if (!portfolioResponse) {
@@ -154,14 +154,13 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
               tags: [],
               tagline: '',
               settings: {},
-            } as any);
+            });
             
-            // Handle MongoDB _id or regular id
-            pid = (newPortfolio as any)._id || newPortfolio.id;
+            pid = newPortfolio.id;
             console.log('Created new portfolio:', pid);
           } else {
             // Portfolio exists, use it
-            pid = (portfolioResponse as any)._id || portfolioResponse.id;
+            pid = portfolioResponse.id;
             console.log('Using existing portfolio:', pid);
           }
         } catch (portfolioError: any) {
@@ -175,15 +174,15 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
             await new Promise(resolve => setTimeout(resolve, 500));
             
             try {
-              const existingPortfolio = await api.portfolio.getMyPortfolio();
+              const existingPortfolio = await api.portfolio.get();
               if (existingPortfolio) {
-                pid = (existingPortfolio as any)._id || existingPortfolio.id;
+                pid = existingPortfolio.id;
                 console.log('Retrieved existing portfolio:', pid);
               } else {
                 // If still can't get it, try getting by user ID
                 if (user?.id) {
                   const userPortfolio = await api.portfolio.getByUserId(user.id);
-                  pid = (userPortfolio as any)._id || userPortfolio.id;
+                  pid = userPortfolio.id;
                   console.log('Retrieved portfolio by user ID:', pid);
                 } else {
                   throw new Error('Unable to retrieve existing portfolio');
@@ -209,29 +208,31 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
         .map(tag => tag.trim())
         .filter(tag => tag.length > 0);
 
-      // Upload image and create gallery piece
-      const uploadResponse = await api.gallery.uploadImage(selectedFile, {
+      // Step 1: Upload the image file
+      const imageFormData = new FormData();
+      imageFormData.append('file', selectedFile);
+      const imageUploadResponse = await api.portfolio.images.uploadRaw(imageFormData);
+
+      if (!imageUploadResponse?.url) {
+        throw new Error('Image upload failed - no URL returned');
+      }
+
+      // Step 2: Create the gallery piece with metadata
+      const galleryPieceData = {
         title: formData.title,
         description: formData.description,
+        imageUrl: imageUploadResponse.url,
         category: formData.category,
         medium: formData.medium,
-        tags: tagsArray.join(','),
-        price: formData.price || '',
-        artist: formData.artist || user?.name || '',
-        year: formData.year.toString(),
-        portfolioId: pid,
-        visibility: 'public',
-        generateThumbnail: 'true',
-        optimizeImages: 'true',
-        preserveMetadata: 'false',
-        quality: '0.9',
-        maxWidth: '2000',
-        maxHeight: '2000',
-      });
+        tags: tagsArray,
+        visibility: 'public' as GalleryVisibility,
+        year: formData.year,
+        displayOrder: 0, // Set appropriate display order
+        // Add other required fields
+      };
 
-      if (!uploadResponse?.url) {
-        throw new Error('Upload failed - no URL returned');
-      }
+      const galleryResponse = await api.portfolio.gallery.add(galleryPieceData);
+      console.log('Gallery piece created:', galleryResponse);
 
       console.log('Upload and gallery piece creation successful!');
       onSuccess();
