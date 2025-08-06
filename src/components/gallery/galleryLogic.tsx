@@ -77,26 +77,12 @@ export const useGalleryData = () => {
 
           if (portfolioData && (portfolioData.kind === 'creative' || portfolioData.kind === 'hybrid')) {
             // Fetch portfolio artwork
-            const piecesResponse = await apiClient.gallery.getPieces({ limit: 50 });
+            const piecesResponse = await apiClient.portfolio.getMyGalleryPieces();
             const pieces = Array.isArray(piecesResponse) ? piecesResponse : [];
             const myPieces = pieces.filter(p => p.ownerId === user?.id || p.portfolioId === portfolioData.id);
             setGalleryPieces(myPieces);
 
-            // Fetch collections
-            const collectionsData = await apiClient.gallery.getCollections();
-            const transformedCollections: Collection[] = collectionsData.map(gc => ({
-              id: gc.id,
-              name: gc.name,
-              description: gc.description,
-              type: 'artwork' as const,
-              visibility: 'public' as const,
-              itemCount: 0,
-              coverImage: gc.coverImage,
-              createdAt: gc.createdAt || new Date(),
-              portfolioId: portfolioData.id
-            }));
-            setCollections(transformedCollections);
-          } else if (portfolioData && portfolioData.kind === 'educational') {
+            } else if (portfolioData && portfolioData.kind === 'educational') {
             setGalleryPieces([]);
             setError('Educational portfolios focus on learning progress. Switch to Creative or Hybrid to manage artwork.');
           } else {
@@ -112,10 +98,7 @@ export const useGalleryData = () => {
         }
       } else {
         // Fetch public gallery
-        const publicPiecesResponse = await apiClient.gallery.getPieces({
-          visibility: 'public',
-          limit: 50
-        });
+        const publicPiecesResponse = await apiClient.portfolio.getMyGalleryPieces();
         const publicPieces = Array.isArray(publicPiecesResponse) ? publicPiecesResponse : [];
         setGalleryPieces(publicPieces);
         setPortfolio(null);
