@@ -251,15 +251,36 @@ export const createGalleryPiece = async (
   metadata: Record<string, any>
 ) => {
   try {
-    // For now, still using gallery.uploadImage but this should move to portfolio
-    // TODO: Implement /portfolios/me/gallery/upload endpoint
-    const result = await api.gallery.uploadImage(file, metadata);
+    // First upload the image
+    const uploadResponse = await api.portfolio.images.uploadRaw(createFormData(file));
+    
+    // Then create the gallery piece using the uploaded URL
+    const pieceData = {
+      title: metadata.title,
+      description: metadata.description,
+      imageUrl: uploadResponse.url,
+      category: metadata.category,
+      medium: metadata.medium,
+      tags: metadata.tags,
+      visibility: metadata.visibility,
+      year: metadata.year,
+      displayOrder: metadata.displayOrder
+    };
+    
+    const result = await api.portfolio.gallery.add(pieceData);
     console.log('[Portfolio/Gallery] Created new piece:', result);
     return result;
   } catch (error) {
     console.error('[Portfolio/Gallery] Failed to create piece:', error);
     throw error;
   }
+};
+
+// Helper to create FormData for file upload
+const createFormData = (file: File): FormData => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return formData;
 };
 
 /**
@@ -271,8 +292,7 @@ export const updateGalleryPiece = async (
   updates: Partial<GalleryPiece>
 ) => {
   try {
-    // For now, still using gallery API
-    const result = await api.gallery.update(pieceId, updates);
+    const result = await api.portfolio.gallery.update(pieceId, updates);
     console.log('[Portfolio/Gallery] Updated piece:', pieceId);
     return result;
   } catch (error) {
@@ -287,8 +307,8 @@ export const updateGalleryPiece = async (
  */
 export const deleteGalleryPiece = async (pieceId: string) => {
   try {
-    const result = await api.portfolio.deleteGalleryPiece(pieceId);
-    console.log(`[Portfolio/Gallery] Deleted piece ${pieceId}, remaining: ${result.remainingCount}`);
+    const result = await api.portfolio.gallery.delete(pieceId);
+    console.log(`[Portfolio/Gallery] Deleted piece ${pieceId}`);
     return result;
   } catch (error) {
     console.error('[Portfolio/Gallery] Failed to delete piece:', error);
@@ -302,20 +322,14 @@ export const deleteGalleryPiece = async (pieceId: string) => {
  */
 export const batchDeletePieces = async (pieceIds: string[]) => {
   try {
-    const result = await api.portfolio.batchDeleteGalleryPieces(pieceIds);
-    console.log(`[Portfolio/Gallery] Batch deleted ${result.deletedCount} pieces, remaining: ${result.remainingCount}`);
-    
-    if (result.unauthorizedCount > 0) {
-      console.warn(`[Portfolio/Gallery] ${result.unauthorizedCount} pieces were not authorized for deletion`);
-    }
-    
+    const result = await api.portfolio.gallery.batchDelete(pieceIds);
+    console.log(`[Portfolio/Gallery] Batch deleted ${pieceIds.length} pieces`);
     return result;
   } catch (error) {
     console.error('[Portfolio/Gallery] Failed to batch delete pieces:', error);
     throw error;
   }
 };
-
 /**
  * Update visibility for a single gallery piece through portfolio
  */
@@ -324,7 +338,7 @@ export const updatePieceVisibility = async (
   visibility: GalleryVisibility
 ) => {
   try {
-    const result = await api.portfolio.updateGalleryPieceVisibility(pieceId, visibility);
+    const result = await api.portfolio.gallery.update(pieceId, { visibility });
     console.log(`[Portfolio/Gallery] Updated piece ${pieceId} visibility to: ${visibility}`);
     return result;
   } catch (error) {
@@ -341,8 +355,8 @@ export const batchUpdateVisibility = async (
   visibility: GalleryVisibility
 ) => {
   try {
-    const result = await api.portfolio.batchUpdateGalleryVisibility(pieceIds, visibility);
-    console.log(`[Portfolio/Gallery] Updated ${result.updatedCount} pieces visibility to: ${visibility}`);
+    const result = await api.portfolio.gallery.batchUpdateVisibility(pieceIds, visibility);
+    console.log(`[Portfolio/Gallery] Updated ${pieceIds.length} pieces visibility to: ${visibility}`);
     return result;
   } catch (error) {
     console.error('[Portfolio/Gallery] Failed to batch update visibility:', error);
@@ -401,64 +415,19 @@ export const checkDeletablePieces = (
 };
 
 /**
- * PUBLIC GALLERY API
- * These operations are for public viewing and don't require portfolio context
- */
-
-/**
- * Get gallery pieces with filters (public viewing)
- * This remains in gallery API as it's for discovery/browsing
- */
-export const getGalleryPieces = async (params?: GalleryQueryParams) => {
-  try {
-    const result = await api.gallery.getPieces(params);
-    console.log('[Gallery] Fetched pieces:', result.pieces.length);
-    return result;
-  } catch (error) {
-    console.error('[Gallery] Failed to fetch pieces:', error);
-    throw error;
-  }
-};
-
-/**
- * Get a single gallery piece by ID (public viewing)
- * This remains in gallery API as it's for public access
- */
-export const getGalleryPieceById = async (pieceId: string) => {
-  try {
-    const result = await api.gallery.getPieceById(pieceId);
-    console.log('[Gallery] Fetched piece:', pieceId);
-    return result;
-  } catch (error) {
-    console.error('[Gallery] Failed to fetch piece:', error);
-    throw error;
-  }
-};
-
-/**
  * Get user's own gallery pieces through portfolio
  * TODO: Implement /portfolios/me/gallery endpoint with GET method
  */
 export const getMyGalleryPieces = async (params?: GalleryQueryParams) => {
   try {
-    // For now, use gallery API without owner filter since GalleryQueryParams doesn't support it
-    // This is a temporary solution until we have the proper portfolio endpoint
-    const result = await api.gallery.getPieces(params);
-    
-    // Get current user to filter client-side
-    const user = await api.auth.getCurrentUser();
-    if (!user) {
-      return { pieces: [], total: 0, page: 1, limit: 20 };
-    }
-    
-    // Filter pieces client-side for now
-    const userPieces = result.pieces.filter(piece => piece.ownerId === user.id);
-    
-    console.log('[Portfolio/Gallery] Fetched user pieces:', userPieces.length);
+    // Use the new portfolio gallery endpoint
+    const result = await api.portfolio.gallery.get();
+    console.log('[Portfolio/Gallery] Fetched user pieces:', result.length);
     return {
-      ...result,
-      pieces: userPieces,
-      total: userPieces.length
+      pieces: result,
+      total: result.length,
+      page: 1,
+      limit: result.length
     };
   } catch (error) {
     console.error('[Portfolio/Gallery] Failed to fetch user pieces:', error);
