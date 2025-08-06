@@ -1,6 +1,7 @@
+// src/components/portfolio/edit.tsx - Fixed for current API
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { 
@@ -11,7 +12,7 @@ import { useAuth } from '@/providers/authProvider';
 import { useMyPortfolio, useUpdatePortfolio, useUploadPortfolioImage } from '@/hooks/usePortfolioQueries';
 import { VisibilityToggle } from '@/components/gallery/rendering';
 import { UpdatePortfolioDto, PortfolioVisibility } from '@/types/portfolio.types';
-import { Gallery } from '@/components/gallery'; // Import the Gallery component
+import { Gallery } from '@/components/gallery';
 
 export default function PortfolioEditPage() {
   const router = useRouter();
@@ -20,23 +21,23 @@ export default function PortfolioEditPage() {
   const coverImageRef = useRef<HTMLInputElement>(null);
 
   // Fetch portfolio data
-  const { data: portfolio, isLoading } = useMyPortfolio();
+  const { data: portfolio, isLoading, error } = useMyPortfolio();
   const updateMutation = useUpdatePortfolio();
   const uploadImageMutation = useUploadPortfolioImage();
 
-  // Form state
+  // Form state - Initialize with empty values first
   const [formData, setFormData] = useState<UpdatePortfolioDto>({
-    title: portfolio?.title || '',
-    tagline: portfolio?.tagline || '',
-    bio: portfolio?.bio || '',
-    visibility: portfolio?.visibility || 'public',
-    location: portfolio?.location || '',
-    specializations: portfolio?.specializations || [],
-    tags: portfolio?.tags || [],
-    socialLinks: portfolio?.socialLinks || {},
-    contactEmail: portfolio?.contactEmail || '',
-    showContactInfo: portfolio?.showContactInfo || false,
-    settings: portfolio?.settings || {
+    title: '',
+    tagline: '',
+    bio: '',
+    visibility: 'public',
+    location: '',
+    specializations: [],
+    tags: [],
+    socialLinks: {},
+    contactEmail: '',
+    showContactInfo: false,
+    settings: {
       allowReviews: true,
       requireReviewApproval: false,
       allowAnonymousReviews: false,
@@ -50,6 +51,38 @@ export default function PortfolioEditPage() {
     }
   });
 
+  // Update form data when portfolio loads
+  useEffect(() => {
+    if (portfolio) {
+      setFormData({
+        title: portfolio.title || '',
+        tagline: portfolio.tagline || '',
+        bio: portfolio.bio || '',
+        visibility: portfolio.visibility || 'public',
+        location: portfolio.location || '',
+        specializations: portfolio.specializations || [],
+        tags: portfolio.tags || [],
+        socialLinks: portfolio.socialLinks || {},
+        contactEmail: portfolio.contactEmail || '',
+        showContactInfo: portfolio.showContactInfo || false,
+        profileImage: portfolio.profileImage,
+        coverImage: portfolio.coverImage,
+        settings: {
+          allowReviews: portfolio.settings?.allowReviews ?? true,
+          requireReviewApproval: portfolio.settings?.requireReviewApproval ?? false,
+          allowAnonymousReviews: portfolio.settings?.allowAnonymousReviews ?? false,
+          showStats: portfolio.settings?.showStats ?? true,
+          showPrices: portfolio.settings?.showPrices ?? true,
+          defaultGalleryView: portfolio.settings?.defaultGalleryView || 'masonry',
+          piecesPerPage: portfolio.settings?.piecesPerPage || 20,
+          notifyOnReview: portfolio.settings?.notifyOnReview ?? true,
+          notifyOnView: portfolio.settings?.notifyOnView ?? false,
+          weeklyAnalyticsEmail: portfolio.settings?.weeklyAnalyticsEmail ?? false,
+        }
+      });
+    }
+  }, [portfolio]);
+
   const [newSpecialization, setNewSpecialization] = useState('');
   const [newTag, setNewTag] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -57,6 +90,13 @@ export default function PortfolioEditPage() {
   // ==================== Event Handlers ====================
   const handleInputChange = (field: keyof UpdatePortfolioDto, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSocialLinkChange = (platform: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      socialLinks: { ...prev.socialLinks, [platform]: value }
+    }));
   };
 
   const handleSettingChange = (setting: string, value: any) => {
@@ -72,18 +112,21 @@ export default function PortfolioEditPage() {
       handleInputChange(type === 'profile' ? 'profileImage' : 'coverImage', result.url);
     } catch (error) {
       console.error('Image upload failed:', error);
+      alert('Failed to upload image. Please try again.');
     }
   };
 
   const handleSave = async () => {
-    if (!portfolio?.id) return;
+    if (!portfolio) return;
     
     setIsSaving(true);
     try {
-      await updateMutation.mutateAsync({ id: portfolio.id, data: formData });
-      router.push(`/portfolio/${user?.username || user?.id}`);
+      await updateMutation.mutateAsync(formData);
+      alert('Portfolio updated successfully!');
+      router.push(`/portfolio/${user?.username || portfolio.username}`);
     } catch (error) {
       console.error('Save failed:', error);
+      alert('Failed to save portfolio. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -121,18 +164,44 @@ export default function PortfolioEditPage() {
     );
   }
 
+  // ==================== Error State ====================
+  if (error) {
+    return (
+      <ErrorContainer>
+        <h2>Error loading portfolio</h2>
+        <p>Please try refreshing the page or contact support if the problem persists.</p>
+        <button onClick={() => window.location.reload()}>Refresh Page</button>
+      </ErrorContainer>
+    );
+  }
+
+  // ==================== No Portfolio State ====================
+  if (!portfolio) {
+    return (
+      <ErrorContainer>
+        <h2>No portfolio found</h2>
+        <p>You don't have a portfolio yet. Create one to get started!</p>
+        <button onClick={() => router.push('/dashboard/portfolio/create')}>Create Portfolio</button>
+      </ErrorContainer>
+    );
+  }
+
   // ==================== Main Render ====================
   return (
     <Container>
       <Header>
         <h1>Edit Portfolio</h1>
         <HeaderActions>
-          <PreviewButton onClick={() => router.push(`/portfolio/${user?.username || user?.id}`)}>
+          <PreviewButton onClick={() => router.push(`/portfolio/${user?.username || portfolio.username}`)}>
             <Eye size={18} />
             Preview
           </PreviewButton>
-          <SaveButton onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+          <SaveButton onClick={handleSave} disabled={isSaving || updateMutation.isPending}>
+            {isSaving || updateMutation.isPending ? (
+              <Loader2 className="animate-spin" size={18} />
+            ) : (
+              <Save size={18} />
+            )}
             Save Changes
           </SaveButton>
         </HeaderActions>
@@ -144,12 +213,13 @@ export default function PortfolioEditPage() {
           <SectionTitle>Basic Information</SectionTitle>
           
           <FormGroup>
-            <Label>Portfolio Title</Label>
+            <Label>Portfolio Title *</Label>
             <Input
               type="text"
               value={formData.title}
               onChange={(e) => handleInputChange('title', e.target.value)}
               placeholder="Your Portfolio Name"
+              required
             />
           </FormGroup>
 
@@ -180,6 +250,16 @@ export default function PortfolioEditPage() {
               value={formData.location}
               onChange={(e) => handleInputChange('location', e.target.value)}
               placeholder="City, Country"
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Label>Contact Email</Label>
+            <Input
+              type="email"
+              value={formData.contactEmail}
+              onChange={(e) => handleInputChange('contactEmail', e.target.value)}
+              placeholder="your@email.com"
             />
           </FormGroup>
         </Section>
@@ -239,23 +319,83 @@ export default function PortfolioEditPage() {
           </ImagesGrid>
         </Section>
 
+        {/* Social Links Section */}
+        <Section>
+          <SectionTitle>Social Links</SectionTitle>
+          
+          <SocialLinksGrid>
+            <FormGroup>
+              <Label>Website</Label>
+              <Input
+                type="url"
+                value={formData.socialLinks?.website || ''}
+                onChange={(e) => handleSocialLinkChange('website', e.target.value)}
+                placeholder="https://yourwebsite.com"
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>Instagram</Label>
+              <Input
+                type="text"
+                value={formData.socialLinks?.instagram || ''}
+                onChange={(e) => handleSocialLinkChange('instagram', e.target.value)}
+                placeholder="username or full URL"
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>Twitter</Label>
+              <Input
+                type="text"
+                value={formData.socialLinks?.twitter || ''}
+                onChange={(e) => handleSocialLinkChange('twitter', e.target.value)}
+                placeholder="username or full URL"
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>LinkedIn</Label>
+              <Input
+                type="url"
+                value={formData.socialLinks?.linkedin || ''}
+                onChange={(e) => handleSocialLinkChange('linkedin', e.target.value)}
+                placeholder="https://linkedin.com/in/username"
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>GitHub</Label>
+              <Input
+                type="url"
+                value={formData.socialLinks?.github || ''}
+                onChange={(e) => handleSocialLinkChange('github', e.target.value)}
+                placeholder="https://github.com/username"
+              />
+            </FormGroup>
+          </SocialLinksGrid>
+        </Section>
+
         {/* Gallery Management Section */}
         <Section>
           <SectionTitle>Gallery Management</SectionTitle>
-          <Gallery 
-            mode="manage"
-            viewConfig={{
-              layout: 'grid',
-              itemsPerPage: 12,
-              enableSelection: true,
-              enableQuickEdit: true
-            }}
-          />
+          <GalleryWrapper>
+            <Gallery 
+              mode="manage"
+              viewConfig={{
+                layout: 'grid',
+                itemsPerPage: 12,
+                showPrivateIndicator: true,
+                enableSelection: true,
+                enableQuickEdit: true
+              }}
+            />
+          </GalleryWrapper>
         </Section>
 
         {/* Visibility Section */}
         <Section>
-          <SectionTitle>Visibility Settings</SectionTitle>
+          <SectionTitle>Privacy & Visibility</SectionTitle>
           
           <FormGroup>
             <Label>Portfolio Visibility</Label>
@@ -263,6 +403,11 @@ export default function PortfolioEditPage() {
               value={formData.visibility as PortfolioVisibility}
               onChange={(v) => handleInputChange('visibility', v)}
             />
+            <HelpText>
+              <strong>Public:</strong> Anyone can find and view your portfolio<br/>
+              <strong>Unlisted:</strong> Only people with the link can view<br/>
+              <strong>Private:</strong> Only you can view your portfolio
+            </HelpText>
           </FormGroup>
 
           <SettingsGrid>
@@ -342,7 +487,7 @@ export default function PortfolioEditPage() {
             <TagList>
               {formData.tags?.map((tag, idx) => (
                 <Tag key={idx}>
-                  {tag}
+                  #{tag}
                   <button onClick={() => removeTag(tag)}>
                     <X size={14} />
                   </button>
@@ -354,7 +499,7 @@ export default function PortfolioEditPage() {
 
         {/* Review Settings Section */}
         <Section>
-          <SectionTitle>Review Settings</SectionTitle>
+          <SectionTitle>Review & Notification Settings</SectionTitle>
           
           <SettingsGrid>
             <Toggle>
@@ -385,6 +530,24 @@ export default function PortfolioEditPage() {
               />
               <span>Allow Anonymous Reviews</span>
             </Toggle>
+
+            <Toggle>
+              <input
+                type="checkbox"
+                checked={formData.settings?.notifyOnReview}
+                onChange={(e) => handleSettingChange('notifyOnReview', e.target.checked)}
+              />
+              <span>Email Notifications for Reviews</span>
+            </Toggle>
+
+            <Toggle>
+              <input
+                type="checkbox"
+                checked={formData.settings?.weeklyAnalyticsEmail}
+                onChange={(e) => handleSettingChange('weeklyAnalyticsEmail', e.target.checked)}
+              />
+              <span>Weekly Analytics Email</span>
+            </Toggle>
           </SettingsGrid>
         </Section>
       </Form>
@@ -409,6 +572,41 @@ const LoadingContainer = styled.div`
   color: #666;
 `;
 
+const ErrorContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 1rem;
+  text-align: center;
+  padding: 2rem;
+
+  h2 {
+    color: #111827;
+    margin: 0;
+  }
+
+  p {
+    color: #6b7280;
+    margin: 0;
+  }
+
+  button {
+    padding: 0.75rem 1.5rem;
+    background: #2c2c2c;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover {
+      background: #1a1a1a;
+    }
+  }
+`;
+
 const Header = styled.header`
   display: flex;
   justify-content: space-between;
@@ -420,6 +618,12 @@ const Header = styled.header`
     font-weight: 700;
     color: #111827;
     margin: 0;
+  }
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
   }
 `;
 
@@ -519,6 +723,7 @@ const Input = styled.input`
     outline: none;
     border-color: #3b82f6;
     background: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
   &::placeholder {
@@ -540,6 +745,7 @@ const Textarea = styled.textarea`
     outline: none;
     border-color: #3b82f6;
     background: white;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
   &::placeholder {
@@ -592,6 +798,19 @@ const ImagePreview = styled.div<{ $hasImage: boolean }>`
   }
 `;
 
+const SocialLinksGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+`;
+
+const GalleryWrapper = styled.div`
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #f9fafb;
+`;
+
 const SettingsGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -616,6 +835,13 @@ const Toggle = styled.label`
   }
 `;
 
+const HelpText = styled.div`
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.4;
+`;
+
 const TagInput = styled.div`
   display: flex;
   gap: 0.5rem;
@@ -629,6 +855,7 @@ const AddButton = styled.button`
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s;
+  flex-shrink: 0;
 
   &:hover {
     background: #2563eb;

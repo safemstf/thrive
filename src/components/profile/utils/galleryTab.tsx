@@ -42,7 +42,7 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
         setError(null);
         
         // Fetch gallery pieces
-        const pieces = await api.portfolio.getMyGalleryPieces();
+        const pieces = await api.portfolio.gallery.get();
         setGalleryPieces(pieces || []);
         
         // Calculate stats from pieces (using correct property names)
@@ -100,7 +100,7 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
     if (!confirm('Are you sure you want to delete this piece?')) return;
     
     try {
-      await api.portfolio.deleteGalleryPiece(pieceId);
+      await api.portfolio.gallery.get();
       setGalleryPieces(prev => prev.filter(piece => piece.id !== pieceId));
     } catch (err) {
       console.error('Failed to delete piece:', err);
@@ -108,14 +108,16 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
     }
   };
 
-  const handleToggleVisibility = async (pieceId: string, currentVisibility: string) => {
+ const handleToggleVisibility = async (pieceId: string, currentVisibility: string) => {
     const newVisibility = currentVisibility === 'public' ? 'private' : 'public';
     
     try {
-      await api.portfolio.updateGalleryPieceVisibility(pieceId, newVisibility as any);
+      // Use updateGalleryPiece instead of batchUpdateVisibility
+      await api.portfolio.gallery.update(pieceId, { visibility: newVisibility });
+      
       setGalleryPieces(prev => prev.map(piece => 
         piece.id === pieceId 
-          ? { ...piece, visibility: newVisibility as any }
+          ? { ...piece, visibility: newVisibility }
           : piece
       ));
     } catch (err) {

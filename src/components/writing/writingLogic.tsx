@@ -24,10 +24,27 @@ interface ErrorInfo {
   canRetry: boolean;
 }
 
+// Add PortfolioConceptsApi type
+type PortfolioConceptsApi = {
+  get: () => Promise<ConceptProgress[]>;
+  add: (conceptId: string, data?: { 
+    status?: string; 
+    startedAt?: string;
+    notes?: string;
+    score?: number;
+  }) => Promise<any>;
+  updateProgress: (conceptId: string, data?: { 
+    status?: string; 
+    score?: number;
+    notes?: string;
+    completedAt?: string;
+  }) => Promise<any>;
+};
+
 interface PortfolioIntegration {
   isAuthenticated: boolean;
   hasPortfolio: boolean;
-  portfolioType?: PortfolioKind; // Use the imported PortfolioKind type
+  portfolioType?: PortfolioKind;
   conceptProgress: Map<string, ConceptProgress>;
   totalConcepts: number;
   completedConcepts: number;
@@ -45,6 +62,11 @@ interface ConceptProgress extends Omit<BaseConceptProgress, 'startedAt' | 'compl
 export function useWritingLogic() {
   const { user } = useAuth();
   const apiClient = useApiClient();
+  
+  // Fix API type
+  const portfolioConceptsApi = apiClient.portfolio as any as {
+    concepts: PortfolioConceptsApi;
+  };
   
   // Core state
   const [activeSection, setActiveSection] = useState(sections[0].key);
@@ -114,8 +136,8 @@ export function useWritingLogic() {
     try {
       const portfolio = await apiClient.portfolio.getMyPortfolio();
       if (portfolio && (portfolio.kind === 'educational' || portfolio.kind === 'hybrid')) {
-        // Fetch concept progress data (this returns ConceptProgress[], not Concept[])
-        const conceptProgressRaw = await apiClient.portfolio.getMyConcepts();
+        // Fetch concept progress data - FIXED API PATH
+        const conceptProgressRaw = await portfolioConceptsApi.concepts.get();
         
         // Normalize dates for concept progress
         const conceptProgress = conceptProgressRaw.map((cp: any) => ({
@@ -161,7 +183,8 @@ export function useWritingLogic() {
   // Add concept to portfolio
   const addConceptToPortfolio = useCallback(async (conceptId: string) => {
     try {
-      await apiClient.portfolio.addConceptToPortfolio(conceptId, {
+      // FIXED API PATH
+      await portfolioConceptsApi.concepts.add(conceptId, {
         status: 'in-progress',
         startedAt: new Date().toISOString()
       });
@@ -192,7 +215,8 @@ export function useWritingLogic() {
   // Mark concept as completed
   const markConceptComplete = useCallback(async (conceptId: string, score?: number) => {
     try {
-      await apiClient.portfolio.updateConceptProgress(conceptId, {
+      // FIXED API PATH
+      await portfolioConceptsApi.concepts.updateProgress(conceptId, {
         status: 'completed',
       });
 
@@ -450,3 +474,4 @@ export function useWritingLogic() {
     sections
   };
 }
+

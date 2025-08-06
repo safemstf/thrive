@@ -1,12 +1,12 @@
-// ==================== Portfolio Discovery Page ====================
-// src/pages/portfolio/discover.tsx
+// src/pages/portfolio/discover.tsx - Fixed to work with current API
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, TrendingUp, Star } from 'lucide-react';
-import { usePaginatedDiscoverPortfolios, useFeaturedPortfolios } from '@/hooks/usePortfolioQueries';
-import { PortfolioFilters, PortfolioListResponse } from '@/types/portfolio.types';
+import { Search, Filter, TrendingUp, Star, Loader2, AlertCircle } from 'lucide-react';
+import { useDiscoverPortfolios } from '@/hooks/usePortfolioQueries';
+import { PortfolioFilters } from '@/types/portfolio.types';
 
 export function PortfolioDiscoverPage() {
   const router = useRouter();
@@ -15,142 +15,255 @@ export function PortfolioDiscoverPage() {
     sortBy: 'recent'
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
 
-  // Use paginated discovery hook
+  // Use discovery hook with pagination
   const {
     data: portfolioData,
-    nextPage,
-    isFetching,
-    reset
-  } = usePaginatedDiscoverPortfolios(filters);
+    isLoading,
+    error,
+    refetch
+  } = useDiscoverPortfolios(filters, page, 20);
 
-  const { data: featuredPortfolios } = useFeaturedPortfolios(6);
+  // Extract portfolios from response
+  const portfolios = portfolioData?.portfolios || portfolioData?.data || [];
+  const hasMore = portfolioData?.hasMore || false;
 
-  // Use portfolioData directly
-  const portfolios = portfolioData?.portfolios ?? [];
-  const hasMore = portfolioData?.hasMore ?? false;
-
-  // Reset pagination when filters change
+  // Reset to page 1 when filters change
   useEffect(() => {
-    reset();
-  }, [filters, reset]);
+    setPage(1);
+  }, [filters, searchQuery]);
+
+  const handleLoadMore = () => {
+    if (hasMore) {
+      setPage(prev => prev + 1);
+    }
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFilters({ ...filters, search: searchQuery });
+  };
+
+  if (isLoading && page === 1) {
+    return (
+      <LoadingContainer>
+        <Loader2 className="animate-spin" size={48} />
+        <LoadingText>Loading portfolios...</LoadingText>
+      </LoadingContainer>
+    );
+  }
+
+  if (error && !portfolios.length) {
+    return (
+      <ErrorContainer>
+        <AlertCircle size={48} color="#ef4444" />
+        <ErrorTitle>Failed to load portfolios</ErrorTitle>
+        <ErrorText>There was an error loading the portfolio discovery page.</ErrorText>
+        <RetryButton onClick={() => refetch()}>
+          Try Again
+        </RetryButton>
+      </ErrorContainer>
+    );
+  }
 
   return (
     <DiscoverContainer>
       <DiscoverHeader>
         <HeaderContent>
           <Title>Discover Portfolios</Title>
-          <Subtitle>Explore amazing work from talented artists</Subtitle>
+          <Subtitle>Explore amazing work from talented creators</Subtitle>
         </HeaderContent>
         
-        <SearchBar>
-          <Search size={20} />
-          <input
-            type="text"
-            placeholder="Search portfolios..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </SearchBar>
+        <SearchForm onSubmit={handleSearch}>
+          <SearchBar>
+            <Search size={20} />
+            <input
+              type="text"
+              placeholder="Search portfolios..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <SearchButton type="submit">Search</SearchButton>
+          </SearchBar>
+        </SearchForm>
       </DiscoverHeader>
-
-      {featuredPortfolios && featuredPortfolios.length > 0 && (
-        <FeaturedSection>
-          <SectionTitle>
-            <Star size={20} />
-            Featured Portfolios
-          </SectionTitle>
-          <FeaturedGrid>
-            {featuredPortfolios.map(portfolio => (
-              <PortfolioCard
-                key={portfolio.id}
-                onClick={() => router.push(`/portfolio/${portfolio.userId}`)}
-              >
-                <CardCover src={portfolio.coverImage || '/default-cover.jpg'} alt="" />
-                <CardInfo>
-                  <CardAvatar src={portfolio.profileImage || '/default-avatar.png'} alt="" />
-                  <CardDetails>
-                    <CardTitle>{portfolio.title}</CardTitle>
-                    <CardMeta>
-                      {portfolio.stats.totalPieces} artworks • 
-                      {portfolio.stats.averageRating && (
-                        <> <Star size={14} fill="currentColor" /> {portfolio.stats.averageRating.toFixed(1)}</>
-                      )}
-                    </CardMeta>
-                  </CardDetails>
-                </CardInfo>
-              </PortfolioCard>
-            ))}
-          </FeaturedGrid>
-        </FeaturedSection>
-      )}
 
       <MainSection>
         <FilterBar>
-          <FilterButton>
-            <Filter size={18} />
-            Filters
-          </FilterButton>
-          <SortSelect
-            value={filters.sortBy}
-            onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as any })}
-          >
-            <option value="recent">Most Recent</option>
-            <option value="rating">Highest Rated</option>
-            <option value="views">Most Viewed</option>
-            <option value="reviews">Most Reviewed</option>
-          </SortSelect>
+          <FilterSection>
+            <FilterButton>
+              <Filter size={18} />
+              Filters
+            </FilterButton>
+            
+            <FilterGroup>
+              <SortSelect
+                value={filters.sortBy || 'recent'}
+                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as any })}
+              >
+                <option value="recent">Most Recent</option>
+                <option value="views">Most Viewed</option>
+              </SortSelect>
+            </FilterGroup>
+          </FilterSection>
+          
+          <ResultsCount>
+            {portfolios.length > 0 && (
+              <span>{portfolios.length} portfolio{portfolios.length !== 1 ? 's' : ''} found</span>
+            )}
+          </ResultsCount>
         </FilterBar>
 
-        <PortfolioGrid>
-          {portfolios.map(portfolio => (
-            <PortfolioTile
-              key={portfolio.id}
-              onClick={() => router.push(`/portfolio/${portfolio.userId}`)}
-            >
-              <TileCover>
-                <img src={portfolio.coverImage || '/default-cover.jpg'} alt="" />
-                <TileOverlay>
-                  <ViewButton>View Portfolio</ViewButton>
-                </TileOverlay>
-              </TileCover>
-              <TileInfo>
-                <TileHeader>
-                  <TileAvatar src={portfolio.profileImage || '/default-avatar.png'} alt="" />
-                  <div>
-                    <TileTitle>{portfolio.title}</TileTitle>
-                    {portfolio.location && <TileLocation>{portfolio.location}</TileLocation>}
-                  </div>
-                </TileHeader>
-                <TileStats>
-                  <StatItem>{portfolio.stats.totalPieces} works</StatItem>
-                  <StatItem>{portfolio.stats.totalViews} views</StatItem>
-                  {portfolio.stats.averageRating && (
-                    <StatItem>
-                      <Star size={12} fill="currentColor" />
-                      {portfolio.stats.averageRating.toFixed(1)}
-                    </StatItem>
-                  )}
-                </TileStats>
-              </TileInfo>
-            </PortfolioTile>
-          ))}
-        </PortfolioGrid>
+        {portfolios.length === 0 ? (
+          <EmptyState>
+            <EmptyIcon>🎨</EmptyIcon>
+            <EmptyTitle>No portfolios found</EmptyTitle>
+            <EmptyText>
+              {searchQuery ? 
+                `No portfolios match "${searchQuery}". Try adjusting your search terms.` :
+                'No public portfolios are available right now.'
+              }
+            </EmptyText>
+          </EmptyState>
+        ) : (
+          <>
+            <PortfolioGrid>
+              {portfolios.map((portfolio: any) => (
+                <PortfolioTile
+                  key={portfolio.id}
+                  onClick={() => router.push(`/portfolio/${portfolio.username || portfolio.userId}`)}
+                >
+                  <TileCover>
+                    <img 
+                      src={portfolio.coverImage || '/default-cover.jpg'} 
+                      alt={portfolio.title || 'Portfolio cover'}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/default-cover.jpg';
+                      }}
+                    />
+                    <TileOverlay>
+                      <ViewButton>View Portfolio</ViewButton>
+                    </TileOverlay>
+                  </TileCover>
+                  
+                  <TileInfo>
+                    <TileHeader>
+                      <TileAvatar 
+                        src={portfolio.profileImage || '/default-avatar.png'} 
+                        alt={portfolio.title || 'Profile'}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/default-avatar.png';
+                        }}
+                      />
+                      <TileDetails>
+                        <TileTitle>{portfolio.title || 'Untitled Portfolio'}</TileTitle>
+                        {portfolio.location && <TileLocation>{portfolio.location}</TileLocation>}
+                        {portfolio.tagline && <TileTagline>{portfolio.tagline}</TileTagline>}
+                      </TileDetails>
+                    </TileHeader>
+                    
+                    <TileStats>
+                      {portfolio.stats?.totalPieces !== undefined && (
+                        <StatItem>{portfolio.stats.totalPieces} work{portfolio.stats.totalPieces !== 1 ? 's' : ''}</StatItem>
+                      )}
+                      {portfolio.stats?.totalViews !== undefined && (
+                        <StatItem>{portfolio.stats.totalViews} view{portfolio.stats.totalViews !== 1 ? 's' : ''}</StatItem>
+                      )}
+                      {portfolio.stats?.averageRating && (
+                        <StatItem>
+                          <Star size={12} fill="currentColor" />
+                          {portfolio.stats.averageRating.toFixed(1)}
+                        </StatItem>
+                      )}
+                    </TileStats>
+                    
+                    {portfolio.specializations && portfolio.specializations.length > 0 && (
+                      <SpecializationTags>
+                        {portfolio.specializations.slice(0, 3).map((spec: string, idx: number) => (
+                          <SpecTag key={idx}>{spec}</SpecTag>
+                        ))}
+                        {portfolio.specializations.length > 3 && (
+                          <MoreTag>+{portfolio.specializations.length - 3}</MoreTag>
+                        )}
+                      </SpecializationTags>
+                    )}
+                  </TileInfo>
+                </PortfolioTile>
+              ))}
+            </PortfolioGrid>
 
-        {hasMore && (
-          <LoadMoreButton
-            onClick={nextPage}
-            disabled={isFetching}
-          >
-            {isFetching ? 'Loading...' : 'Load More'}
-          </LoadMoreButton>
+            {hasMore && (
+              <LoadMoreButton
+                onClick={handleLoadMore}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Loading...
+                  </>
+                ) : (
+                  'Load More'
+                )}
+              </LoadMoreButton>
+            )}
+          </>
         )}
       </MainSection>
     </DiscoverContainer>
   );
 }
 
-// ==================== Styled Components for Discovery Page ====================
+// ==================== Styled Components ====================
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 1rem;
+`;
+
+const LoadingText = styled.p`
+  font-size: 1.125rem;
+  color: #666;
+`;
+
+const ErrorContainer = styled(LoadingContainer)`
+  text-align: center;
+  padding: 2rem;
+`;
+
+const ErrorTitle = styled.h2`
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+`;
+
+const ErrorText = styled.p`
+  font-size: 1rem;
+  color: #6b7280;
+  max-width: 500px;
+  margin: 0;
+`;
+
+const RetryButton = styled.button`
+  padding: 0.75rem 1.5rem;
+  background: #2c2c2c;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #1a1a1a;
+  }
+`;
+
 const DiscoverContainer = styled.div`
   min-height: 100vh;
   background: #f8f8f8;
@@ -180,9 +293,12 @@ const Subtitle = styled.p`
   margin: 0;
 `;
 
-const SearchBar = styled.div`
+const SearchForm = styled.form`
   max-width: 600px;
   margin: 0 auto;
+`;
+
+const SearchBar = styled.div`
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -206,84 +322,23 @@ const SearchBar = styled.div`
   }
 `;
 
-const FeaturedSection = styled.section`
-  max-width: 1200px;
-  margin: -2rem auto 3rem;
-  padding: 0 2rem;
-`;
-
-const SectionTitle = styled.h2`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 1.5rem;
-`;
-
-const FeaturedGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 1.5rem;
-`;
-
-const PortfolioCard = styled.div`
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
+const SearchButton = styled.button`
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.3s;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s;
 
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.3);
   }
-`;
-
-const CardCover = styled.img`
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-`;
-
-const CardInfo = styled.div`
-  display: flex;
-  gap: 1rem;
-  padding: 1.5rem;
-`;
-
-const CardAvatar = styled.img`
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  object-fit: cover;
-`;
-
-const CardDetails = styled.div`
-  flex: 1;
-`;
-
-const CardTitle = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 0.25rem;
-`;
-
-const CardMeta = styled.p`
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 `;
 
 const MainSection = styled.section`
   max-width: 1200px;
-  margin: 0 auto;
+  margin: -2rem auto 0;
   padding: 0 2rem 4rem;
 `;
 
@@ -292,6 +347,16 @@ const FilterBar = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+`;
+
+const FilterSection = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 `;
 
 const FilterButton = styled.button`
@@ -299,7 +364,7 @@ const FilterButton = styled.button`
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background: white;
+  background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   font-weight: 500;
@@ -308,8 +373,13 @@ const FilterButton = styled.button`
 
   &:hover {
     border-color: #d1d5db;
-    background: #f9fafb;
+    background: #f3f4f6;
   }
+`;
+
+const FilterGroup = styled.div`
+  display: flex;
+  gap: 1rem;
 `;
 
 const SortSelect = styled.select`
@@ -321,9 +391,41 @@ const SortSelect = styled.select`
   cursor: pointer;
 `;
 
+const ResultsCount = styled.div`
+  font-size: 0.875rem;
+  color: #6b7280;
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 4rem 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+`;
+
+const EmptyIcon = styled.div`
+  font-size: 4rem;
+  margin-bottom: 1rem;
+`;
+
+const EmptyTitle = styled.h3`
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.5rem;
+`;
+
+const EmptyText = styled.p`
+  font-size: 1rem;
+  color: #6b7280;
+  max-width: 500px;
+  margin: 0 auto;
+`;
+
 const PortfolioGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 2rem;
   margin-bottom: 3rem;
 `;
@@ -337,8 +439,8 @@ const PortfolioTile = styled.div`
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
   }
 `;
 
@@ -393,23 +495,41 @@ const TileHeader = styled.div`
 `;
 
 const TileAvatar = styled.img`
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   object-fit: cover;
+  flex-shrink: 0;
+`;
+
+const TileDetails = styled.div`
+  flex: 1;
+  min-width: 0;
 `;
 
 const TileTitle = styled.h3`
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 600;
   color: #111827;
-  margin: 0;
+  margin: 0 0 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const TileLocation = styled.p`
   font-size: 0.875rem;
   color: #6b7280;
-  margin: 0.125rem 0 0;
+  margin: 0;
+`;
+
+const TileTagline = styled.p`
+  font-size: 0.875rem;
+  color: #4b5563;
+  margin: 0.25rem 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const TileStats = styled.div`
@@ -417,6 +537,7 @@ const TileStats = styled.div`
   gap: 1rem;
   font-size: 0.875rem;
   color: #6b7280;
+  margin-bottom: 1rem;
 `;
 
 const StatItem = styled.span`
@@ -425,10 +546,33 @@ const StatItem = styled.span`
   gap: 0.25rem;
 `;
 
+const SpecializationTags = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const SpecTag = styled.span`
+  padding: 0.25rem 0.5rem;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+`;
+
+const MoreTag = styled(SpecTag)`
+  background: #f3f4f6;
+  color: #6b7280;
+`;
+
 const LoadMoreButton = styled.button`
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   margin: 0 auto;
-  padding: 0.75rem 2rem;
+  padding: 1rem 2rem;
   background: #2c2c2c;
   color: white;
   border: none;
@@ -446,3 +590,5 @@ const LoadMoreButton = styled.button`
     cursor: not-allowed;
   }
 `;
+
+export default PortfolioDiscoverPage;

@@ -1,4 +1,4 @@
-// src/components/portfolio/PortfolioView.tsx
+// src/components/portfolio/PortfolioView.tsx - Fixed for current API
 'use client';
 
 import React, { useState } from 'react';
@@ -10,67 +10,30 @@ import {
   Loader2, AlertCircle 
 } from 'lucide-react';
 import { Gallery } from '@/components/gallery';
-import { usePortfolio, usePortfolioReviews } from '@/hooks/usePortfolioQueries';
+import { usePortfolioByUsername } from '@/hooks/usePortfolioQueries';
 import { useAuth } from '@/providers/authProvider';
-import { Portfolio, PortfolioReview } from '@/types/portfolio.types';
-import { VISIBILITY_CONFIG } from '@/components/gallery/utils';
+import { Portfolio } from '@/types/portfolio.types';
 
 // ==================== Component Props ====================
 interface PortfolioViewProps {
-  portfolioId?: string;
-  userId?: string;
-  username?: string;
-  shareToken?: string;
+  username: string;
 }
 
 // ==================== Main Component ====================
-export const PortfolioView: React.FC<PortfolioViewProps> = ({
-  portfolioId,
-  userId,
-  username,
-  shareToken
-}) => {
+export const PortfolioView: React.FC<PortfolioViewProps> = ({ username }) => {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const [showReviews, setShowReviews] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
-  // Fetch portfolio data based on available identifiers
+  // Fetch portfolio data by username
   const { 
     data: portfolio, 
     isLoading, 
     error 
-  } = usePortfolio(
-    portfolioId || userId || username || shareToken || '',
-    {
-      // Determine fetch method based on available props
-      queryKey: portfolioId 
-        ? ['portfolio', portfolioId]
-        : userId 
-        ? ['portfolio', 'user', userId]
-        : username
-        ? ['portfolio', 'username', username]
-        : shareToken
-        ? ['portfolio', 'share', shareToken]
-        : [],
-    }
-  );
-
-  const { 
-    data: reviewsData,
-    isLoading: reviewsLoading 
-  } = usePortfolioReviews(
-    portfolio?.id || '', 
-    1, // page
-    10, // limit
-    {
-        enabled: !!portfolio?.id && showReviews && portfolio.settings.allowReviews,
-        queryKey: []
-    }
-  );
+  } = usePortfolioByUsername(username);
 
   // Check if user owns this portfolio
-  const isOwner = isAuthenticated && user?.id === portfolio?.userId;
+  const isOwner = isAuthenticated && user?.username === username;
 
   // ==================== Event Handlers ====================
   const handleShare = async () => {
@@ -82,16 +45,23 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
           url: window.location.href
         });
       } catch (err) {
-        setShareModalOpen(true);
+        // Fallback: copy to clipboard
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          alert('Portfolio link copied to clipboard!');
+        } catch (clipErr) {
+          console.error('Failed to copy to clipboard:', clipErr);
+        }
       }
     } else {
-      setShareModalOpen(true);
+      // Fallback for browsers without Web Share API
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Portfolio link copied to clipboard!');
+      } catch (err) {
+        console.error('Failed to copy to clipboard:', err);
+      }
     }
-  };
-
-  const handleReviewSubmit = async (review: Partial<PortfolioReview>) => {
-    // Implementation would use the addReview API
-    console.log('Submit review:', review);
   };
 
   // ==================== Loading & Error States ====================
@@ -110,10 +80,26 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
         <AlertCircle size={48} color="#ef4444" />
         <ErrorTitle>Portfolio not found</ErrorTitle>
         <ErrorText>
-          The portfolio you're looking for doesn't exist or you don't have permission to view it.
+          The portfolio you're looking for doesn't exist or may have been made private.
         </ErrorText>
         <BackButton onClick={() => router.push('/portfolio/discover')}>
           Browse Portfolios
+        </BackButton>
+      </ErrorContainer>
+    );
+  }
+
+  // Check if portfolio is private
+  if (portfolio.visibility === 'private' && !isOwner) {
+    return (
+      <ErrorContainer>
+        <Lock size={48} color="#6b7280" />
+        <ErrorTitle>Private Portfolio</ErrorTitle>
+        <ErrorText>
+          This portfolio is private and can only be viewed by the owner.
+        </ErrorText>
+        <BackButton onClick={() => router.push('/portfolio/discover')}>
+          Browse Public Portfolios
         </BackButton>
       </ErrorContainer>
     );
@@ -126,7 +112,13 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
       <CoverSection $bgImage={portfolio.coverImage}>
         <CoverOverlay />
         <ProfileSection>
-          <ProfileImage src={portfolio.profileImage || '/default-avatar.png'} alt={portfolio.title} />
+          <ProfileImage 
+            src={portfolio.profileImage || '/default-avatar.png'} 
+            alt={portfolio.title}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/default-avatar.png';
+            }}
+          />
           <ProfileInfo>
             <ProfileName>{portfolio.title}</ProfileName>
             {portfolio.tagline && <ProfileTagline>{portfolio.tagline}</ProfileTagline>}
@@ -176,25 +168,38 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
         <BioSection>
           <SectionTitle>About</SectionTitle>
           <BioText>{portfolio.bio}</BioText>
-          {portfolio.specializations.length > 0 && (
+          {portfolio.specializations && portfolio.specializations.length > 0 && (
             <Specializations>
-              {portfolio.specializations.map((spec, idx) => (
-                <Tag key={idx}>{spec}</Tag>
-              ))}
+              <SubTitle>Specializations</SubTitle>
+              <TagGrid>
+                {portfolio.specializations.map((spec, idx) => (
+                  <Tag key={idx}>{spec}</Tag>
+                ))}
+              </TagGrid>
             </Specializations>
+          )}
+          {portfolio.tags && portfolio.tags.length > 0 && (
+            <Tags>
+              <SubTitle>Tags</SubTitle>
+              <TagGrid>
+                {portfolio.tags.map((tag, idx) => (
+                  <TagSecondary key={idx}>#{tag}</TagSecondary>
+                ))}
+              </TagGrid>
+            </Tags>
           )}
         </BioSection>
       )}
 
       {/* Stats Bar */}
-      {portfolio.settings.showStats && (
+      {portfolio.settings?.showStats && portfolio.stats && (
         <StatsBar>
           <StatItem>
-            <StatValue>{portfolio.stats.totalPieces}</StatValue>
+            <StatValue>{portfolio.stats.totalPieces || 0}</StatValue>
             <StatLabel>Artworks</StatLabel>
           </StatItem>
           <StatItem>
-            <StatValue>{portfolio.stats.totalViews}</StatValue>
+            <StatValue>{portfolio.stats.totalViews || 0}</StatValue>
             <StatLabel>Views</StatLabel>
           </StatItem>
           {portfolio.stats.averageRating && (
@@ -216,37 +221,69 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
       )}
 
       {/* Social Links */}
-      {portfolio.socialLinks && Object.keys(portfolio.socialLinks).length > 0 && (
+      {portfolio.socialLinks && Object.values(portfolio.socialLinks).some(link => link) && (
         <SocialSection>
-          {portfolio.socialLinks.website && (
-            <SocialLink href={portfolio.socialLinks.website} target="_blank" rel="noopener noreferrer">
-              <ExternalLink size={20} />
-              Website
-            </SocialLink>
-          )}
-          {portfolio.socialLinks.instagram && (
-            <SocialLink href={`https://instagram.com/${portfolio.socialLinks.instagram}`} target="_blank" rel="noopener noreferrer">
-              <Instagram size={20} />
-              Instagram
-            </SocialLink>
-          )}
-          {portfolio.socialLinks.twitter && (
-            <SocialLink href={`https://twitter.com/${portfolio.socialLinks.twitter}`} target="_blank" rel="noopener noreferrer">
-              <Twitter size={20} />
-              Twitter
-            </SocialLink>
-          )}
+          <SectionTitle>Connect</SectionTitle>
+          <SocialLinksGrid>
+            {portfolio.socialLinks.website && (
+              <SocialLink href={portfolio.socialLinks.website} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={20} />
+                Website
+              </SocialLink>
+            )}
+            {portfolio.socialLinks.instagram && (
+              <SocialLink 
+                href={portfolio.socialLinks.instagram.startsWith('http') 
+                  ? portfolio.socialLinks.instagram 
+                  : `https://instagram.com/${portfolio.socialLinks.instagram}`
+                } 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                <Instagram size={20} />
+                Instagram
+              </SocialLink>
+            )}
+            {portfolio.socialLinks.twitter && (
+              <SocialLink 
+                href={portfolio.socialLinks.twitter.startsWith('http') 
+                  ? portfolio.socialLinks.twitter 
+                  : `https://twitter.com/${portfolio.socialLinks.twitter}`
+                } 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                <Twitter size={20} />
+                Twitter
+              </SocialLink>
+            )}
+            {portfolio.socialLinks.linkedin && (
+              <SocialLink href={portfolio.socialLinks.linkedin} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={20} />
+                LinkedIn
+              </SocialLink>
+            )}
+            {portfolio.socialLinks.github && (
+              <SocialLink href={portfolio.socialLinks.github} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={20} />
+                GitHub
+              </SocialLink>
+            )}
+          </SocialLinksGrid>
         </SocialSection>
       )}
 
       {/* Gallery Section */}
       <GallerySection>
         <SectionHeader>
-          <SectionTitle>Gallery</SectionTitle>
-          {portfolio.visibility !== 'public' && (
+          <SectionTitle>
+            {portfolio.kind === 'creative' ? 'Gallery' : 
+             portfolio.kind === 'professional' ? 'Projects' : 'Work'}
+          </SectionTitle>
+          {portfolio.visibility !== 'public' && isOwner && (
             <VisibilityBadge $visibility={portfolio.visibility}>
               {portfolio.visibility === 'private' ? <Lock size={16} /> : <LinkIcon size={16} />}
-              {VISIBILITY_CONFIG[portfolio.visibility].label} Portfolio
+              {portfolio.visibility === 'private' ? 'Private' : 'Unlisted'} Portfolio
             </VisibilityBadge>
           )}
         </SectionHeader>
@@ -254,70 +291,19 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
         <Gallery
           mode="portfolio"
           portfolioUserId={portfolio.userId}
+          portfolioUsername={username}
           initialFilters={{
             visibility: 'public' // Only show public pieces in portfolio view
           }}
           viewConfig={{
-            layout: portfolio.settings.defaultGalleryView || 'masonry',
-            itemsPerPage: portfolio.settings.piecesPerPage || 20,
+            layout: portfolio.settings?.defaultGalleryView || 'masonry',
+            itemsPerPage: portfolio.settings?.piecesPerPage || 20,
             showPrivateIndicator: false,
             enableSelection: false,
             enableQuickEdit: false
           }}
         />
       </GallerySection>
-
-      {/* Reviews Section */}
-      {portfolio.settings.allowReviews && (
-        <ReviewsSection>
-          <SectionHeader>
-            <SectionTitle>
-              Reviews ({portfolio.stats.totalReviews})
-            </SectionTitle>
-            {!isOwner && (
-              <ReviewButton onClick={() => setShowReviews(true)}>
-                <MessageSquare size={18} />
-                Write Review
-              </ReviewButton>
-            )}
-          </SectionHeader>
-          
-          {showReviews && reviewsData && (
-            <ReviewsList>
-              {reviewsData.reviews.map(review => (
-                <ReviewCard key={review.id}>
-                  <ReviewHeader>
-                    <ReviewerInfo>
-                      <ReviewerName>{review.reviewerName}</ReviewerName>
-                      <ReviewRating>
-                        {[...Array(5)].map((_, i) => (
-                          <Star 
-                            key={i} 
-                            size={16} 
-                            fill={i < review.rating ? '#fbbf24' : 'none'}
-                            color={i < review.rating ? '#fbbf24' : '#d1d5db'}
-                          />
-                        ))}
-                      </ReviewRating>
-                    </ReviewerInfo>
-                    <ReviewDate>
-                      {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}
-                    </ReviewDate>
-                  </ReviewHeader>
-                  {review.title && <ReviewTitle>{review.title}</ReviewTitle>}
-                  <ReviewComment>{review.comment}</ReviewComment>
-                  {review.artistResponse && (
-                    <ArtistResponse>
-                      <ResponseLabel>Artist Response:</ResponseLabel>
-                      <ResponseText>{review.artistResponse.comment}</ResponseText>
-                    </ArtistResponse>
-                  )}
-                </ReviewCard>
-              ))}
-            </ReviewsList>
-          )}
-        </ReviewsSection>
-      )}
     </Container>
   );
 };
@@ -379,7 +365,7 @@ const BackButton = styled.button`
 const CoverSection = styled.section<{ $bgImage?: string }>`
   position: relative;
   height: 400px;
-  background: ${props => props.$bgImage ? `url(${props.$bgImage})` : '#e5e7eb'};
+  background: ${props => props.$bgImage ? `url(${props.$bgImage})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
   background-size: cover;
   background-position: center;
 `;
@@ -399,6 +385,13 @@ const ProfileSection = styled.div`
   margin: 0 auto;
   padding: 2rem;
   height: 100%;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+  }
 `;
 
 const ProfileImage = styled.img`
@@ -408,6 +401,11 @@ const ProfileImage = styled.img`
   border: 4px solid white;
   background: white;
   object-fit: cover;
+
+  @media (max-width: 768px) {
+    width: 120px;
+    height: 120px;
+  }
 `;
 
 const ProfileInfo = styled.div`
@@ -419,18 +417,30 @@ const ProfileName = styled.h1`
   font-size: 2.5rem;
   font-weight: 700;
   margin: 0 0 0.5rem;
+
+  @media (max-width: 768px) {
+    font-size: 2rem;
+  }
 `;
 
 const ProfileTagline = styled.p`
   font-size: 1.25rem;
   margin: 0 0 1rem;
   opacity: 0.9;
+
+  @media (max-width: 768px) {
+    font-size: 1rem;
+  }
 `;
 
 const ProfileMeta = styled.div`
   display: flex;
   gap: 1.5rem;
   flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    justify-content: center;
+  }
 `;
 
 const MetaItem = styled.div`
@@ -445,6 +455,11 @@ const ProfileActions = styled.div`
   display: flex;
   gap: 1rem;
   align-self: flex-start;
+
+  @media (max-width: 768px) {
+    justify-content: center;
+    align-self: center;
+  }
 `;
 
 const EditButton = styled.button`
@@ -513,29 +528,55 @@ const SectionTitle = styled.h2`
   font-size: 1.5rem;
   font-weight: 600;
   color: #111827;
-  margin: 0 0 1rem;
+  margin: 0 0 1.5rem;
+`;
+
+const SubTitle = styled.h3`
+  font-size: 1rem;
+  font-weight: 500;
+  color: #374151;
+  margin: 0 0 0.75rem;
 `;
 
 const BioText = styled.p`
   font-size: 1rem;
   line-height: 1.6;
   color: #4b5563;
-  margin: 0 0 1.5rem;
+  margin: 0 0 2rem;
   white-space: pre-wrap;
 `;
 
 const Specializations = styled.div`
+  margin-bottom: 2rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const Tags = styled.div``;
+
+const TagGrid = styled.div`
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 `;
 
 const Tag = styled.span`
-  padding: 0.25rem 0.75rem;
+  padding: 0.375rem 0.75rem;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+`;
+
+const TagSecondary = styled.span`
+  padding: 0.25rem 0.5rem;
   background: #f3f4f6;
   color: #4b5563;
-  border-radius: 999px;
-  font-size: 0.875rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
 `;
 
 const StatsBar = styled.div`
@@ -571,10 +612,16 @@ const StatLabel = styled.div`
   margin-top: 0.25rem;
 `;
 
-const SocialSection = styled.div`
+const SocialSection = styled.section`
   max-width: 1200px;
   margin: 0 auto 2rem;
-  padding: 0 2rem;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+`;
+
+const SocialLinksGrid = styled.div`
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
@@ -584,13 +631,14 @@ const SocialLink = styled.a`
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: white;
+  padding: 0.75rem 1rem;
+  background: #f9fafb;
   color: #4b5563;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   text-decoration: none;
   font-size: 0.875rem;
+  font-weight: 500;
   transition: all 0.2s;
 
   &:hover {
@@ -603,7 +651,7 @@ const SocialLink = styled.a`
 const GallerySection = styled.section`
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 2rem;
+  padding: 0 2rem 4rem;
 `;
 
 const SectionHeader = styled.div`
@@ -611,6 +659,12 @@ const SectionHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
 `;
 
 const VisibilityBadge = styled.div<{ $visibility: string }>`
@@ -622,105 +676,6 @@ const VisibilityBadge = styled.div<{ $visibility: string }>`
   color: ${props => props.$visibility === 'private' ? '#6b7280' : '#3b82f6'};
   border-radius: 999px;
   font-size: 0.875rem;
-`;
-
-const ReviewsSection = styled.section`
-  max-width: 1200px;
-  margin: 3rem auto;
-  padding: 0 2rem;
-`;
-
-const ReviewButton = styled.button`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: #2c2c2c;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-
-  &:hover {
-    background: #1a1a1a;
-  }
-`;
-
-const ReviewsList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin-top: 1.5rem;
-`;
-
-const ReviewCard = styled.div`
-  background: white;
-  padding: 1.5rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-`;
-
-const ReviewHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-`;
-
-const ReviewerInfo = styled.div``;
-
-const ReviewerName = styled.h4`
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 0.25rem;
-`;
-
-const ReviewRating = styled.div`
-  display: flex;
-  gap: 0.125rem;
-`;
-
-const ReviewDate = styled.span`
-  font-size: 0.875rem;
-  color: #6b7280;
-`;
-
-const ReviewTitle = styled.h5`
-  font-size: 1rem;
-  font-weight: 500;
-  color: #111827;
-  margin: 0 0 0.5rem;
-`;
-
-const ReviewComment = styled.p`
-  font-size: 0.875rem;
-  line-height: 1.6;
-  color: #4b5563;
-  margin: 0;
-`;
-
-const ArtistResponse = styled.div`
-  margin-top: 1rem;
-  padding: 1rem;
-  background: #f9fafb;
-  border-radius: 8px;
-  border-left: 3px solid #3b82f6;
-`;
-
-const ResponseLabel = styled.div`
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #6b7280;
-  margin-bottom: 0.25rem;
-`;
-
-const ResponseText = styled.p`
-  font-size: 0.875rem;
-  color: #4b5563;
-  margin: 0;
 `;
 
 export default PortfolioView;

@@ -8,18 +8,20 @@ import {
   AlertCircle, RefreshCw, Plus, Download, Share2 
 } from 'lucide-react';
 import { useAuth } from '@/providers/authProvider';
-import { useInfiniteGalleryPieces,  useDeleteGalleryPiece } from '@/hooks/useGalleryApi';
-
+import { useMyGalleryPieces, useGalleryPiecesByUsername, useDeleteGalleryPiece } from '@/hooks/useGalleryApi';
 
 import {
    GalleryViewConfig,
-   GalleryPiece,
    GalleryFilters,
-   GalleryVisibility,
    GalleryLayout,
    GalleryUploadFile,
    GalleryUploadOptions,
  } from '@/types/gallery.types';
+
+import { 
+  GalleryPiece,
+  GalleryVisibility,
+} from '@/types/portfolio.types'; // Use portfolio types as primary
 
 import { 
   filterGalleryPieces, 
@@ -29,10 +31,10 @@ import {
   generatePreview,
   compressImage,
   GALLERY_CONSTANTS,
-    batchUpdateVisibility,    // Now uses portfolio API
-  batchDeletePieces,        // Now uses portfolio API
-  deleteGalleryPiece,       // New import
-  updatePieceVisibility,    // New import
+  batchUpdateVisibility,
+  batchDeletePieces,
+  deleteGalleryPiece,
+  updatePieceVisibility,
   deleteGalleryPieceWithConfirmation 
 } from './utils';
 import { GalleryItem, GalleryModal, VisibilityToggle } from './rendering';
@@ -43,7 +45,8 @@ interface GalleryProps {
   mode: 'public' | 'private' | 'manage' | 'portfolio';
   initialFilters?: Partial<GalleryFilters>;
   viewConfig?: Partial<GalleryViewConfig>;
-  portfolioUserId?: string; // For viewing specific user's portfolio
+  portfolioUserId?: string;
+  portfolioUsername?: string; // Add username for API calls
 }
 
 type UploadStatus = 'pending' | 'error' | 'uploading' | 'complete' | 'processing';
@@ -65,7 +68,8 @@ export const Gallery: React.FC<GalleryProps> = ({
   mode = 'public',
   initialFilters = {},
   viewConfig: initialViewConfig = {},
-  portfolioUserId
+  portfolioUserId,
+  portfolioUsername
 }) => {
   const router = useRouter();
   const deleteMutation = useDeleteGalleryPiece();
@@ -105,40 +109,55 @@ export const Gallery: React.FC<GalleryProps> = ({
     viewConfig 
   } = state;
 
-  
-  // API data fetching
-  const galleryData = useInfiniteGalleryPieces(
-    {
-      ...filters,
-      limit: viewConfig.itemsPerPage,
-      artist: mode === 'private' ? user?.id : portfolioUserId || undefined
-    },
-    { enabled: mode === 'public' || isAuthenticated || mode === 'portfolio' }
-  );
+  // API data fetching - Updated to use correct hooks with proper conditional logic
+  const myGalleryQuery = useMyGalleryPieces();
+  const shouldUseMyGallery = (mode === 'private' || mode === 'manage') && isAuthenticated;
 
+  const portfolioGalleryQuery = useGalleryPiecesByUsername(
+    portfolioUsername || '',
+    1,
+    50
+  );
+  const shouldUsePortfolioGallery = mode === 'portfolio' && !!portfolioUsername;
+
+  // Select the appropriate query based on mode and conditions
+  const galleryQuery = shouldUsePortfolioGallery ? portfolioGalleryQuery : myGalleryQuery;
+  const shouldFetchData = shouldUseMyGallery || shouldUsePortfolioGallery;
+  
   const { 
     data, 
     error, 
-    fetchNextPage, 
-    hasNextPage, 
-    isFetchingNextPage, 
     isLoading, 
     refetch 
-  } = galleryData;
+  } = galleryQuery;
 
-  const pieces = data?.pages.flatMap(page => page.pieces) ?? [];
+  // Handle different data formats only when we should be fetching data
+  const pieces: GalleryPiece[] = React.useMemo(() => {
+    if (!shouldFetchData || !data) return [];
+    
+    // Handle array response (my gallery)
+    if (Array.isArray(data)) {
+      return data;
+    }
+    
+    // Handle object response (portfolio gallery)
+    if (typeof data === 'object' && 'pieces' in data) {
+      return (data as any).pieces || [];
+    }
+    
+    return [];
+  }, [data, shouldFetchData]);
+
   const filteredPieces = filterGalleryPieces(pieces, filters);
   const sortedPieces = sortGalleryPieces(filteredPieces);
 
   // Helper function to safely get piece ID
   const getPieceId = (piece: any): string => {
-    // Try different possible ID fields
     return piece.id || piece._id || piece.pieceId || '';
   };
 
   const handleQuickAction = useCallback(
     async (action: 'edit' | 'delete', pieceId: string): Promise<void> => {
-      // Add debugging to check if pieceId is valid
       console.log('handleQuickAction called with:', { action, pieceId });
       
       if (!pieceId || pieceId === 'undefined') {
@@ -150,8 +169,7 @@ export const Gallery: React.FC<GalleryProps> = ({
       if (action === 'edit') {
         router.push(`/dashboard/gallery/edit/${pieceId}`);
       } else if (action === 'delete') {
-        // Find the piece to show its title in confirmation
-        const piece = pieces.find(p => getPieceId(p) === pieceId);
+        const piece = pieces.find((p: GalleryPiece) => getPieceId(p) === pieceId);
         console.log('Found piece for deletion:', piece);
         
         if (!piece) {
@@ -220,8 +238,8 @@ export const Gallery: React.FC<GalleryProps> = ({
         
         if (!confirmed) return;
         
-        const itemsToDelete = pieces.filter(p => selectedItems.has(p.id));
-        console.log('Deleting items:', itemsToDelete.map(p => p.title));
+        const itemsToDelete = pieces.filter((p: GalleryPiece) => selectedItems.has(p.id));
+        console.log('Deleting items:', itemsToDelete.map((p: GalleryPiece) => p.title));
         
         await batchDeletePieces(Array.from(selectedItems));
         console.log(`Successfully deleted ${count} artwork${count > 1 ? 's' : ''}`);
@@ -290,7 +308,6 @@ export const Gallery: React.FC<GalleryProps> = ({
     const validFiles = uploadFiles.filter(f => f.status === 'pending');
     if (validFiles.length === 0) return;
 
-    // Update file statuses
     updateState({
       uploadFiles: uploadFiles.map(f => 
         validFiles.some(vf => vf.id === f.id) 
@@ -335,7 +352,6 @@ export const Gallery: React.FC<GalleryProps> = ({
         }
       }
 
-      // Clear completed files after delay
       setTimeout(() => {
         updateState({ 
           uploadFiles: uploadFiles.filter(f => f.status !== 'complete'),
@@ -402,131 +418,131 @@ export const Gallery: React.FC<GalleryProps> = ({
   );
 
   const renderGalleryControls = () => (
-  <ControlsBar>
-    <ControlsLeft>
-      <SearchBox>
-        <Search size={18} />
-        <input
-          type="text"
-          placeholder="Search gallery..."
-          value={filters.searchQuery || ''}
-          onChange={(e) => updateState({ 
-            filters: { ...filters, searchQuery: e.target.value } 
-          })}
-        />
-        {filters.searchQuery && (
-          <button onClick={() => updateState({ 
-            filters: { ...filters, searchQuery: '' } 
-          })}>
-            <X size={16} />
-          </button>
+    <ControlsBar>
+      <ControlsLeft>
+        <SearchBox>
+          <Search size={18} />
+          <input
+            type="text"
+            placeholder="Search gallery..."
+            value={filters.searchQuery || ''}
+            onChange={(e) => updateState({ 
+              filters: { ...filters, searchQuery: e.target.value } 
+            })}
+          />
+          {filters.searchQuery && (
+            <button onClick={() => updateState({ 
+              filters: { ...filters, searchQuery: '' } 
+            })}>
+              <X size={16} />
+            </button>
+          )}
+        </SearchBox>
+
+        {(mode === 'manage' || mode === 'private' || mode === 'portfolio') && (
+          <FilterButton>
+            <Filter size={18} />
+            Filters
+          </FilterButton>
         )}
-      </SearchBox>
+      </ControlsLeft>
 
-      {(mode === 'manage' || mode === 'private' || mode === 'portfolio') && (
-        <FilterButton>
-          <Filter size={18} />
-          Filters
-        </FilterButton>
-      )}
-    </ControlsLeft>
+      <ControlsRight>
+        <ViewToggle>
+          <ViewButton
+            $active={viewConfig.layout === 'grid'}
+            onClick={() => updateState({ 
+              viewConfig: { ...viewConfig, layout: 'grid' } 
+            })}
+          >
+            <Grid size={18} />
+          </ViewButton>
+          <ViewButton
+            $active={viewConfig.layout === 'masonry'}
+            onClick={() => updateState({ 
+              viewConfig: { ...viewConfig, layout: 'masonry' } 
+            })}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="2" y="2" width="8" height="10" />
+              <rect x="12" y="2" width="10" height="6" />
+              <rect x="12" y="10" width="10" height="12" />
+              <rect x="2" y="14" width="8" height="8" />
+            </svg>
+          </ViewButton>
+          <ViewButton
+            $active={viewConfig.layout === 'list'}
+            onClick={() => updateState({ 
+              viewConfig: { ...viewConfig, layout: 'list' } 
+            })}
+          >
+            <List size={18} />
+          </ViewButton>
+        </ViewToggle>
 
-    <ControlsRight>
-      <ViewToggle>
-        <ViewButton
-          $active={viewConfig.layout === 'grid'}
-          onClick={() => updateState({ 
-            viewConfig: { ...viewConfig, layout: 'grid' } 
-          })}
-        >
-          <Grid size={18} />
-        </ViewButton>
-        <ViewButton
-          $active={viewConfig.layout === 'masonry'}
-          onClick={() => updateState({ 
-            viewConfig: { ...viewConfig, layout: 'masonry' } 
-          })}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="2" y="2" width="8" height="10" />
-            <rect x="12" y="2" width="10" height="6" />
-            <rect x="12" y="10" width="10" height="12" />
-            <rect x="2" y="14" width="8" height="8" />
-          </svg>
-        </ViewButton>
-        <ViewButton
-          $active={viewConfig.layout === 'list'}
-          onClick={() => updateState({ 
-            viewConfig: { ...viewConfig, layout: 'list' } 
-          })}
-        >
-          <List size={18} />
-        </ViewButton>
-      </ViewToggle>
+        {(mode === 'manage' || mode === 'private') && renderManagementControls()}
+        
+        {mode === 'portfolio' && user?.id === portfolioUserId && (
+          <ActionButton 
+            onClick={() => router.push('/dashboard/portfolio/edit')}
+            $variant="primary"
+          >
+            Edit Portfolio
+          </ActionButton>
+        )}
+      </ControlsRight>
+    </ControlsBar>
+  );
 
-      {/* Show upload controls for both manage and private modes */}
-      {(mode === 'manage' || mode === 'private') && renderManagementControls()}
-      
-      {mode === 'portfolio' && user?.id === portfolioUserId && (
+  const renderManagementControls = () => {
+    if (isSelectionMode) {
+      return (
+        <SelectionActions>
+          <SelectionInfo>
+            {selectedItems.size} selected
+          </SelectionInfo>
+          <VisibilityToggle
+            value="public"
+            onChange={(v) => handleBulkAction('visibility', v)}
+            compact
+          />
+          <ActionButton 
+            onClick={() => handleBulkAction('delete')} 
+            $variant="danger"
+          >
+            Delete
+          </ActionButton>
+          <ActionButton onClick={() => updateState({ 
+            isSelectionMode: false, 
+            selectedItems: new Set() 
+          })}>
+            Cancel
+          </ActionButton>
+        </SelectionActions>
+      );
+    }
+    
+    return (
+      <>
+        <ActionButton onClick={() => updateState({ isSelectionMode: true })}>
+          Select
+        </ActionButton>
         <ActionButton 
-          onClick={() => router.push('/dashboard/portfolio/edit')}
+          onClick={() => fileInputRef.current?.click()}
           $variant="primary"
         >
-          Edit Portfolio
+          <Plus size={18} />
+          Upload
         </ActionButton>
-      )}
-    </ControlsRight>
-  </ControlsBar>
- );
-
-   const renderManagementControls = () => {
-  if (isSelectionMode) {
-    return (
-      <SelectionActions>
-        <SelectionInfo>
-          {selectedItems.size} selected
-        </SelectionInfo>
-        <VisibilityToggle
-          value="public"
-          onChange={(v) => handleBulkAction('visibility', v)}
-          compact
-        />
-        <ActionButton 
-          onClick={() => handleBulkAction('delete')} 
-          $variant="danger"
-        >
-          Delete
-        </ActionButton>
-        <ActionButton onClick={() => updateState({ 
-          isSelectionMode: false, 
-          selectedItems: new Set() 
-        })}>
-          Cancel
-        </ActionButton>
-      </SelectionActions>
+      </>
     );
-  }
-  
-  return (
-    <>
-      <ActionButton onClick={() => updateState({ isSelectionMode: true })}>
-        Select
-      </ActionButton>
-      <ActionButton 
-        onClick={() => fileInputRef.current?.click()}
-        $variant="primary"
-      >
-        <Plus size={18} />
-        Upload
-      </ActionButton>
-    </>
-  );
   };
   
   const renderUploaderModal = () => (
     <UploaderModal>
       <UploaderContent>
         <UploaderHeader>
+          <h2>Upload Artwork</h2>
           <button onClick={() => updateState({ showUploader: false })}>
             <X size={24} />
           </button>
@@ -569,22 +585,6 @@ export const Gallery: React.FC<GalleryProps> = ({
     </UploaderModal>
   );
 
-  // ==================== Effects ====================
-  useEffect(() => {
-    const handleScroll = () => {
-      if (
-        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 100 &&
-        hasNextPage &&
-        !isFetchingNextPage
-      ) {
-        fetchNextPage();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-
   // ==================== Main Render ====================
   if (isLoading) return renderLoadingState();
   if (error && pieces.length === 0) return renderErrorState();
@@ -592,7 +592,6 @@ export const Gallery: React.FC<GalleryProps> = ({
 
   return (
     <Container>
-      {/* Portfolio Header for Portfolio Mode */}
       {mode === 'portfolio' && portfolioUserId && (
         <PortfolioHeader>
           <PortfolioInfo>
@@ -606,15 +605,12 @@ export const Gallery: React.FC<GalleryProps> = ({
         </PortfolioHeader>
       )}
 
-      {/* Gallery Controls */}
       {((mode !== 'public' && isAuthenticated) || filters.searchQuery) && renderGalleryControls()}
       
-      {/* Gallery Grid */}
       <GalleryGrid $layout={viewConfig.layout}>
-        {sortedPieces.map((piece, index) => {
+        {sortedPieces.map((piece: GalleryPiece, index: number) => {
           const pieceId = getPieceId(piece);
           
-          // Debug logging to check piece structure
           if (index === 0) {
             console.log('Sample piece structure:', piece);
             console.log('Piece ID:', pieceId);
@@ -624,7 +620,7 @@ export const Gallery: React.FC<GalleryProps> = ({
           return (
             <div key={pieceId || `piece-${index}`} onClick={() => handlePieceClick(piece)}>
               <GalleryItem
-                piece={{...piece, id: pieceId}} // Ensure piece has id property
+                piece={{...piece, id: pieceId}}
                 layout={viewConfig.layout}
                 isSelected={selectedItems.has(pieceId)}
                 showPrivateIndicator={viewConfig.showPrivateIndicator && mode !== 'portfolio'}
@@ -636,20 +632,6 @@ export const Gallery: React.FC<GalleryProps> = ({
         })}
       </GalleryGrid>
 
-      {/* Load More Button */}
-      {hasNextPage && (
-        <LoadMoreSection>
-          {isFetchingNextPage ? (
-            <Loader2 className="animate-spin" size={24} />
-          ) : (
-            <LoadMoreButton onClick={() => fetchNextPage()}>
-              Load More
-            </LoadMoreButton>
-          )}
-        </LoadMoreSection>
-      )}
-
-      {/* Artwork Detail Modal */}
       {selectedPiece && (
         <GalleryModal
           piece={selectedPiece}
@@ -672,10 +654,8 @@ export const Gallery: React.FC<GalleryProps> = ({
         />
       )}
 
-      {/* Upload Modal */}
       {showUploader && renderUploaderModal()}
 
-      {/* Hidden File Input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -923,7 +903,6 @@ const GalleryGrid = styled.div<{ $layout: string }>`
   }}
 `;
 
-// State Components
 const CenteredState = styled.div`
   display: flex;
   flex-direction: column;
@@ -1007,27 +986,6 @@ const EmptyAction = styled.button`
   }
 `;
 
-const LoadMoreSection = styled.div`
-  display: flex;
-  justify-content: center;
-  margin: 2rem 0;
-`;
-
-const LoadMoreButton = styled.button`
-  padding: 0.75rem 1.5rem;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  transition: background 0.2s;
-
-  &:hover {
-    background: #f9fafb;
-  }
-`;
-
-// Uploader Components
 const UploaderModal = styled.div`
   position: fixed;
   top: 0;

@@ -1,5 +1,5 @@
-// src/services/portfolioService.ts
-import { useApiClient } from '@/lib/api-client';
+// src/services/portfolioService.ts - Fixed to work with current API
+import { api } from '@/lib/api-client';
 import { useState, useEffect, useCallback } from 'react';
 import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
 import type { GalleryPiece } from '@/types/gallery.types';
@@ -28,6 +28,7 @@ class PortfolioService {
   // Get portfolio metadata from localStorage
   static getMetadata(): PortfolioMetadata | null {
     try {
+      if (typeof window === 'undefined') return null; // SSR safety
       const data = localStorage.getItem(this.METADATA_KEY);
       return data ? JSON.parse(data) : null;
     } catch {
@@ -37,12 +38,22 @@ class PortfolioService {
   
   // Save portfolio metadata
   static saveMetadata(metadata: PortfolioMetadata): void {
-    localStorage.setItem(this.METADATA_KEY, JSON.stringify(metadata));
+    if (typeof window === 'undefined') return; // SSR safety
+    try {
+      localStorage.setItem(this.METADATA_KEY, JSON.stringify(metadata));
+    } catch (error) {
+      console.warn('Failed to save portfolio metadata:', error);
+    }
   }
   
   // Clear portfolio metadata
   static clearMetadata(): void {
-    localStorage.removeItem(this.METADATA_KEY);
+    if (typeof window === 'undefined') return; // SSR safety
+    try {
+      localStorage.removeItem(this.METADATA_KEY);
+    } catch (error) {
+      console.warn('Failed to clear portfolio metadata:', error);
+    }
   }
   
   // Enhance portfolio with capabilities based on kind
@@ -58,7 +69,7 @@ class PortfolioService {
     };
   }
   
-  // Get capabilities based on portfolio kind (updated to handle all 4 types)
+  // Get capabilities based on portfolio kind
   static getCapabilities(kind: PortfolioKind) {
     return {
       gallery: kind === 'creative' || kind === 'hybrid' || kind === 'professional',
@@ -68,9 +79,8 @@ class PortfolioService {
     };
   }
   
-  // Create portfolio with type
+  // Create portfolio with type - Fixed to use current API
   static async createPortfolioWithType(
-    apiClient: any,
     data: any,
     kind: PortfolioKind
   ): Promise<EnhancedPortfolio> {
@@ -80,7 +90,7 @@ class PortfolioService {
       kind // Include kind in the creation data
     };
     
-    const portfolio = await apiClient.portfolio.create(portfolioData);
+    const portfolio = await api.portfolio.create(portfolioData);
     
     // Save metadata for backup/sync
     const metadata: PortfolioMetadata = {
@@ -95,14 +105,13 @@ class PortfolioService {
     return this.enhancePortfolio(portfolio)!;
   }
   
-  // Update portfolio type
+  // Update portfolio type - Fixed to use current API
   static async updatePortfolioType(
-    apiClient: any,
     portfolioId: string, 
     kind: PortfolioKind
   ): Promise<void> {
-    // Update in backend
-    await apiClient.portfolio.update(portfolioId, { kind });
+    // Update in backend - Fixed: API only takes data parameter
+    await api.portfolio.update({ kind });
     
     // Update local metadata
     const metadata = this.getMetadata();
@@ -116,22 +125,21 @@ class PortfolioService {
   }
 }
 
-// Custom hook for portfolio management
+// Custom hook for portfolio management - Fixed to use current API
 export function usePortfolioManager() {
   const [portfolio, setPortfolio] = useState<EnhancedPortfolio | null>(null);
   const [galleryPieces, setGalleryPieces] = useState<GalleryPiece[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const apiClient = useApiClient();
   
-  // Fetch portfolio and enhance it
+  // Fetch portfolio and enhance it - Fixed API calls
   const fetchPortfolio = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Get base portfolio
-      const basePortfolio = await apiClient.portfolio.getMyPortfolio();
+      // Get base portfolio - Fixed: use api.portfolio.get()
+      const basePortfolio = await api.portfolio.get();
       
       if (basePortfolio) {
         // Enhance with capabilities
@@ -159,20 +167,20 @@ export function usePortfolioManager() {
     } finally {
       setLoading(false);
     }
-  }, [apiClient]);
+  }, []);
   
-  // Fetch gallery pieces with proper error handling
+  // Fetch gallery pieces with proper error handling - Fixed API calls
   const fetchGalleryPieces = useCallback(async (currentPortfolio: EnhancedPortfolio) => {
     if (!currentPortfolio?.capabilities.gallery) {
       setGalleryPieces([]);
       return;
     }
-
+    
     try {
       console.log('Fetching gallery pieces for portfolio:', currentPortfolio.id);
       
-      // Try the portfolio-specific endpoint first
-      const pieces = await apiClient.portfolio.getMyGalleryPieces();
+      // Fixed: use api.portfolio.gallery.get()
+      const pieces = await api.portfolio.gallery.get();
       
       if (Array.isArray(pieces)) {
         console.log(`Successfully fetched ${pieces.length} gallery pieces`);
@@ -184,37 +192,16 @@ export function usePortfolioManager() {
       
     } catch (err: any) {
       console.error('Failed to fetch gallery pieces:', err);
+      setGalleryPieces([]);
       
-      // If the portfolio endpoint fails, try the general gallery endpoint
-      // with user-specific filtering
-      try {
-        console.log('Trying fallback gallery endpoint...');
-        const fallbackPieces = await apiClient.gallery.getPieces({ 
-          artist: currentPortfolio.userId,
-          limit: 100
-        });
-        
-        if (Array.isArray(fallbackPieces)) {
-          console.log(`Fallback fetch successful: ${fallbackPieces.length} pieces`);
-          setGalleryPieces(fallbackPieces);
-        } else {
-          console.warn('Fallback response is not an array:', fallbackPieces);
-          setGalleryPieces([]);
-        }
-        
-      } catch (fallbackErr: any) {
-        console.error('Fallback gallery fetch also failed:', fallbackErr);
-        setGalleryPieces([]);
-        
-        // Only set error if it's not a "no data" situation
-        if (fallbackErr?.status !== 404) {
-          setError('Failed to load gallery pieces');
-        }
+      // Only set error if it's not a "no data" situation
+      if (err?.status !== 404) {
+        setError('Failed to load gallery pieces');
       }
     }
-  }, [apiClient]);
+  }, []);
   
-  // Create portfolio with type
+  // Create portfolio with type - Fixed to use current API
   const createPortfolio = useCallback(async (
     data: any,
     kind: PortfolioKind
@@ -225,11 +212,7 @@ export function usePortfolioManager() {
       
       console.log('Creating portfolio:', { kind, title: data.title });
       
-      const enhanced = await PortfolioService.createPortfolioWithType(
-        apiClient,
-        data,
-        kind
-      );
+      const enhanced = await PortfolioService.createPortfolioWithType(data, kind);
       
       setPortfolio(enhanced);
       
@@ -248,9 +231,9 @@ export function usePortfolioManager() {
     } finally {
       setLoading(false);
     }
-  }, [apiClient]);
+  }, []);
   
-  // Update portfolio type
+  // Update portfolio type - Fixed to use current API
   const updatePortfolioType = useCallback(async (kind: PortfolioKind) => {
     if (!portfolio) {
       throw new Error('No portfolio to update');
@@ -259,7 +242,7 @@ export function usePortfolioManager() {
     try {
       console.log('Updating portfolio type:', { from: portfolio.kind, to: kind });
       
-      await PortfolioService.updatePortfolioType(apiClient, portfolio.id, kind);
+      await PortfolioService.updatePortfolioType(portfolio.id, kind);
       
       // Update local state
       const updatedPortfolio = {
@@ -284,15 +267,16 @@ export function usePortfolioManager() {
       setError(errorMessage);
       throw err;
     }
-  }, [portfolio, apiClient, fetchGalleryPieces]);
+  }, [portfolio, fetchGalleryPieces]);
   
-  // Delete portfolio and clear metadata
+  // Delete portfolio and clear metadata - Fixed to use current API
   const deletePortfolio = useCallback(async (deleteGalleryPieces = false) => {
     try {
       setLoading(true);
       console.log('Deleting portfolio:', { deleteGalleryPieces });
       
-      await apiClient.portfolio.deleteMyPortfolio(deleteGalleryPieces);
+      // Fixed: use api.portfolio.delete()
+      await api.portfolio.delete(deleteGalleryPieces);
       PortfolioService.clearMetadata();
       setPortfolio(null);
       setGalleryPieces([]);
@@ -306,7 +290,7 @@ export function usePortfolioManager() {
     } finally {
       setLoading(false);
     }
-  }, [apiClient]);
+  }, []);
   
   // Refresh data
   const refresh = useCallback(async () => {
@@ -333,23 +317,25 @@ export function usePortfolioManager() {
   };
 }
 
-// Gallery-specific operations hook
+// Gallery-specific operations hook - Fixed to use current API
 export function useGalleryOperations(portfolio: EnhancedPortfolio | null) {
-  const apiClient = useApiClient();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Upload image to gallery
+  // Upload image to gallery - Fixed to use current API
   const uploadImage = useCallback(async (
     file: File,
     metadata?: {
       title?: string;
       description?: string;
       category?: string;
+      medium?: string;
       tags?: string[];
       visibility?: 'public' | 'private' | 'unlisted';
+      year?: number;
+      displayOrder?: number;
     }
-  ) => {
+  ): Promise<GalleryPiece> => {
     if (!portfolio?.capabilities.gallery) {
       throw new Error('Portfolio does not support gallery features');
     }
@@ -360,28 +346,29 @@ export function useGalleryOperations(portfolio: EnhancedPortfolio | null) {
       
       console.log('Uploading image:', { fileName: file.name, portfolioId: portfolio.id });
       
-      // Create form data for the upload
-      const formData = new FormData();
-      formData.append('media', file);
-      formData.append('title', metadata?.title || file.name);
+      // First upload the image file to get URL
+      const uploadResult = await api.portfolio.images.uploadRaw((() => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return formData;
+      })());
       
-      if (metadata?.description) {
-        formData.append('description', metadata.description);
-      }
-      if (metadata?.category) {
-        formData.append('category', metadata.category);
-      }
-      if (metadata?.tags) {
-        formData.append('tags', JSON.stringify(metadata.tags));
-      }
-      if (metadata?.visibility) {
-        formData.append('visibility', metadata.visibility);
-      }
+      // Then add the gallery piece with the uploaded image URL
+      const pieceData = {
+        title: metadata?.title || file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
+        description: metadata?.description,
+        imageUrl: uploadResult.url,
+        category: metadata?.category,
+        medium: metadata?.medium,
+        tags: metadata?.tags || [],
+        visibility: metadata?.visibility || 'private',
+        year: metadata?.year,
+        displayOrder: metadata?.displayOrder || 0
+      };
       
-      // Upload using the correct API method
-      const piece = await apiClient.gallery.uploadImage(file);
+      const piece = await api.portfolio.gallery.add(pieceData);
       
-      console.log('Image uploaded successfully:', piece.url); 
+      console.log('Image uploaded successfully:', piece.id); 
       return piece;
       
     } catch (err: any) {
@@ -392,17 +379,19 @@ export function useGalleryOperations(portfolio: EnhancedPortfolio | null) {
     } finally {
       setUploading(false);
     }
-  }, [portfolio, apiClient]);
+  }, [portfolio]);
   
-  // Batch upload images
+  // Batch upload images - Fixed to use current API
   const batchUpload = useCallback(async (
     uploads: Array<{
       file: File;
       title: string;
       description?: string;
       category?: string;
+      medium?: string;
       tags?: string[];
       visibility?: 'public' | 'private' | 'unlisted';
+      year?: number;
     }>,
     onProgress?: (completed: number, total: number) => void
   ) => {
@@ -444,10 +433,195 @@ export function useGalleryOperations(portfolio: EnhancedPortfolio | null) {
     }
   }, [portfolio, uploadImage]);
   
+  // Update gallery piece - New method using current API
+  const updateGalleryPiece = useCallback(async (
+    pieceId: string,
+    updates: Partial<GalleryPiece>
+  ): Promise<GalleryPiece> => {
+    if (!portfolio?.capabilities.gallery) {
+      throw new Error('Portfolio does not support gallery features');
+    }
+    
+    try {
+      setError(null);
+      
+      console.log('Updating gallery piece:', { pieceId, updates });
+      
+      const updatedPiece = await api.portfolio.gallery.update(pieceId, updates);
+      
+      console.log('Gallery piece updated successfully');
+      return updatedPiece;
+      
+    } catch (err: any) {
+      const message = err?.message || 'Failed to update gallery piece';
+      console.error('Gallery piece update failed:', err);
+      setError(message);
+      throw new Error(message);
+    }
+  }, [portfolio]);
+  
+  // Delete gallery piece - New method using current API
+  const deleteGalleryPiece = useCallback(async (pieceId: string): Promise<void> => {
+    if (!portfolio?.capabilities.gallery) {
+      throw new Error('Portfolio does not support gallery features');
+    }
+    
+    try {
+      setError(null);
+      
+      console.log('Deleting gallery piece:', pieceId);
+      
+      await api.portfolio.gallery.delete(pieceId);
+      
+      console.log('Gallery piece deleted successfully');
+      
+    } catch (err: any) {
+      const message = err?.message || 'Failed to delete gallery piece';
+      console.error('Gallery piece deletion failed:', err);
+      setError(message);
+      throw new Error(message);
+    }
+  }, [portfolio]);
+  
+  // Batch delete gallery pieces - New method using current API
+  const batchDeleteGalleryPieces = useCallback(async (pieceIds: string[]): Promise<void> => {
+    if (!portfolio?.capabilities.gallery) {
+      throw new Error('Portfolio does not support gallery features');
+    }
+    
+    try {
+      setError(null);
+      
+      console.log('Batch deleting gallery pieces:', pieceIds);
+      
+      await api.portfolio.gallery.batchDelete(pieceIds);
+      
+      console.log('Gallery pieces deleted successfully');
+      
+    } catch (err: any) {
+      const message = err?.message || 'Failed to delete gallery pieces';
+      console.error('Batch gallery deletion failed:', err);
+      setError(message);
+      throw new Error(message);
+    }
+  }, [portfolio]);
+  
+  // Update visibility for multiple pieces - New method using current API
+  const batchUpdateVisibility = useCallback(async (
+    pieceIds: string[], 
+    visibility: 'public' | 'private' | 'unlisted'
+  ): Promise<void> => {
+    if (!portfolio?.capabilities.gallery) {
+      throw new Error('Portfolio does not support gallery features');
+    }
+    
+    try {
+      setError(null);
+      
+      console.log('Batch updating visibility:', { pieceIds, visibility });
+      
+      await api.portfolio.gallery.batchUpdateVisibility(pieceIds, visibility);
+      
+      console.log('Gallery pieces visibility updated successfully');
+      
+    } catch (err: any) {
+      const message = err?.message || 'Failed to update gallery pieces visibility';
+      console.error('Batch visibility update failed:', err);
+      setError(message);
+      throw new Error(message);
+    }
+  }, [portfolio]);
+  
   return {
+    // Upload operations
     uploadImage,
     batchUpload,
+    
+    // CRUD operations
+    updateGalleryPiece,
+    deleteGalleryPiece,
+    batchDeleteGalleryPieces,
+    batchUpdateVisibility,
+    
+    // State
     uploading,
+    error
+  };
+}
+
+// Concept operations hook - New hook for educational portfolios
+export function useConceptOperations(portfolio: EnhancedPortfolio | null) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Add concept to portfolio
+  const addConcept = useCallback(async (
+    conceptId: string,
+    data?: {
+      status?: string;
+      startedAt?: string;
+      notes?: string;
+      score?: number;
+    }
+  ) => {
+    if (!portfolio?.capabilities.learning) {
+      throw new Error('Portfolio does not support learning features');
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      await api.portfolio.concepts.add(conceptId, data);
+      
+      console.log('Concept added to portfolio successfully');
+      
+    } catch (err: any) {
+      const message = err?.message || 'Failed to add concept';
+      console.error('Add concept failed:', err);
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [portfolio]);
+  
+  // Update concept progress
+  const updateConceptProgress = useCallback(async (
+    conceptId: string,
+    data?: {
+      status?: string;
+      score?: number;
+      notes?: string;
+      completedAt?: string;
+    }
+  ) => {
+    if (!portfolio?.capabilities.learning) {
+      throw new Error('Portfolio does not support learning features');
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      await api.portfolio.concepts.updateProgress(conceptId, data);
+      
+      console.log('Concept progress updated successfully');
+      
+    } catch (err: any) {
+      const message = err?.message || 'Failed to update concept progress';
+      console.error('Update concept progress failed:', err);
+      setError(message);
+      throw new Error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [portfolio]);
+  
+  return {
+    addConcept,
+    updateConceptProgress,
+    loading,
     error
   };
 }

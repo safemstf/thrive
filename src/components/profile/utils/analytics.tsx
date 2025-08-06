@@ -246,7 +246,7 @@ export const AnalyticsTabContent: React.FC<AnalyticsTabContentProps> = ({
       // Try the new API structure first
       let apiResponse;
       try {
-        apiResponse = await api.portfolio.getAnalytics(portfolioId, timeRange);
+        apiResponse = await api.portfolio.analytics.get(portfolioId);
       } catch (apiError) {
         console.warn('API client analytics failed, trying direct fetch:', apiError);
         

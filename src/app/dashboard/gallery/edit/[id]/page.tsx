@@ -1,18 +1,17 @@
 // src/app/dashboard/gallery/edit/[id]/page.tsx
 'use client';
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import styled from 'styled-components';
 import { 
   ArrowLeft, Save, Trash2, Image as ImageIcon, 
-  Lock, Globe, Link, Loader2, AlertCircle 
+  Lock, Loader2, AlertCircle 
 } from 'lucide-react';
-import { useGalleryPiece, useUpdateGalleryPiece, useDeleteGalleryPiece } from '@/hooks/useGalleryApi';
+import { useMyGalleryPieces, useUpdateGalleryPiece, useDeleteGalleryPiece } from '@/hooks/useGalleryApi';
 import { useAuth } from '@/providers/authProvider';
 import { Button } from '@/components/ui/button';
 import { VisibilityToggle } from '@/components/gallery/rendering';
-import type { GalleryPiece, GalleryVisibility, ArtworkCategory } from '@/types/gallery.types';
+import type { GalleryPiece, GalleryVisibility } from '@/types/gallery.types';
 
 export default function GalleryEditPage() {
   const router = useRouter();
@@ -20,23 +19,26 @@ export default function GalleryEditPage() {
   const pieceId = params.id as string;
   const { user } = useAuth();
   
-  // API hooks
-  const { data: piece, isLoading, error } = useGalleryPiece(pieceId);
+  // API hooks - Get all pieces and find the one we need
+  const { data: allPieces, isLoading, error } = useMyGalleryPieces();
   const updateMutation = useUpdateGalleryPiece();
   const deleteMutation = useDeleteGalleryPiece();
   
-  // Form state
+  // Find the specific piece from all pieces
+  const piece = useMemo(() => {
+    return allPieces?.find(p => p.id === pieceId);
+  }, [allPieces, pieceId]);
+  
+  // Form state - Updated to match actual GalleryPiece type
   const [formData, setFormData] = useState<Partial<GalleryPiece>>({
     title: '',
     description: '',
-    artist: '',
-    category: 'painting' as ArtworkCategory,
+    category: undefined, // Fixed: use undefined instead of empty string
     medium: '',
     year: new Date().getFullYear(),
-    price: undefined,
     visibility: 'private',
-    status: 'exhibition',
-    tags: []
+    tags: [],
+    displayOrder: 0,
   });
   
   const [tagInput, setTagInput] = useState('');
@@ -47,16 +49,15 @@ export default function GalleryEditPage() {
   useEffect(() => {
     if (piece) {
       setFormData({
-        title: piece.title,
-        description: piece.description,
-        artist: piece.artist,
-        category: piece.category,
-        medium: piece.medium,
-        year: piece.year,
-        price: piece.price,
-        visibility: piece.visibility,
-        status: piece.status,
-        tags: piece.tags || []
+        title: piece.title || '',
+        description: piece.description || '',
+        category: piece.category || undefined, // Fixed: use undefined instead of empty string
+        medium: piece.medium || '',
+        year: piece.year || new Date().getFullYear(),
+        visibility: piece.visibility || 'private',
+        tags: piece.tags || [],
+        displayOrder: piece.displayOrder || 0,
+        // Add any other fields that are supported by your API
       });
     }
   }, [piece]);
@@ -76,10 +77,19 @@ export default function GalleryEditPage() {
   // Handlers
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? (value ? parseFloat(value) : undefined) : value
-    }));
+    
+    // Handle category field specially to ensure type safety
+    if (name === 'category') {
+      setFormData(prev => ({
+        ...prev,
+        category: value === '' ? undefined : value as any // Allow empty string to become undefined
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'number' ? (value ? parseFloat(value) : undefined) : value
+      }));
+    }
   };
   
   const handleVisibilityChange = (visibility: GalleryVisibility) => {
@@ -109,7 +119,7 @@ export default function GalleryEditPage() {
     setIsSaving(true);
     try {
       await updateMutation.mutateAsync({
-        id: piece.id,
+        pieceId: piece.id, // Updated to use pieceId
         updates: formData
       });
       router.push('/dashboard/gallery');
@@ -133,12 +143,8 @@ export default function GalleryEditPage() {
     }
   };
   
-  // Check permissions
-  const canEdit = piece && user && (
-    piece.ownerId === user.id || 
-    piece.uploadedBy === user.id || 
-    user.role === 'admin'
-  );
+  // Check permissions - simplified since these are your own pieces
+  const canEdit = piece && user;
   
   if (isLoading) {
     return (
@@ -154,7 +160,7 @@ export default function GalleryEditPage() {
       <ErrorContainer>
         <AlertCircle size={48} />
         <h2>Artwork not found</h2>
-        <p>This artwork may have been deleted or you don't have permission to view it.</p>
+        <p>This artwork may have been deleted or doesn't exist.</p>
         <Button onClick={() => router.push('/dashboard/gallery')}>
           Back to Gallery
         </Button>
@@ -216,11 +222,31 @@ export default function GalleryEditPage() {
           
           <ImageInfo>
             <InfoItem>
-              <strong>Uploaded:</strong> {new Date(piece.createdAt).toLocaleDateString()}
+              <strong>Uploaded:</strong> {piece.createdAt ? new Date(piece.createdAt).toLocaleDateString() : 'Unknown'}
             </InfoItem>
             <InfoItem>
-              <strong>Last Updated:</strong> {new Date(piece.updatedAt).toLocaleDateString()}
+              <strong>Last Updated:</strong> {piece.updatedAt ? new Date(piece.updatedAt).toLocaleDateString() : 'Unknown'}
             </InfoItem>
+            {piece.displayOrder !== undefined && (
+              <InfoItem>
+                <strong>Display Order:</strong> {piece.displayOrder}
+              </InfoItem>
+            )}
+            {piece.views !== undefined && (
+              <InfoItem>
+                <strong>Views:</strong> {piece.views}
+              </InfoItem>
+            )}
+            {piece.likes !== undefined && (
+              <InfoItem>
+                <strong>Likes:</strong> {piece.likes}
+              </InfoItem>
+            )}
+            {piece.fileSize && (
+              <InfoItem>
+                <strong>File Size:</strong> {(piece.fileSize / 1024 / 1024).toFixed(2)} MB
+              </InfoItem>
+            )}
             {piece.dimensions && (
               <InfoItem>
                 <strong>Dimensions:</strong> {piece.dimensions.width} × {piece.dimensions.height}
@@ -245,16 +271,6 @@ export default function GalleryEditPage() {
           </FormGroup>
           
           <FormGroup>
-            <Label>Artist</Label>
-            <Input
-              name="artist"
-              value={formData.artist}
-              onChange={handleInputChange}
-              placeholder="Artist name"
-            />
-          </FormGroup>
-          
-          <FormGroup>
             <Label>Description</Label>
             <TextArea
               name="description"
@@ -268,18 +284,12 @@ export default function GalleryEditPage() {
           <FormRow>
             <FormGroup>
               <Label>Category</Label>
-              <Select
+              <Input
                 name="category"
-                value={formData.category}
+                value={formData.category || ''} // Convert undefined to empty string for input
                 onChange={handleInputChange}
-              >
-                <option value="painting">Painting</option>
-                <option value="drawing">Drawing</option>
-                <option value="digital">Digital Art</option>
-                <option value="photography">Photography</option>
-                <option value="sculpture">Sculpture</option>
-                <option value="mixed_media">Mixed Media</option>
-              </Select>
+                placeholder="e.g., Painting, Digital Art"
+              />
             </FormGroup>
             
             <FormGroup>
@@ -307,14 +317,14 @@ export default function GalleryEditPage() {
             </FormGroup>
             
             <FormGroup>
-              <Label>Price (optional)</Label>
+              <Label>Display Order</Label>
               <Input
-                name="price"
+                name="displayOrder"
                 type="number"
-                step="0.01"
-                value={formData.price || ''}
+                value={formData.displayOrder}
                 onChange={handleInputChange}
-                placeholder="0.00"
+                min="0"
+                placeholder="Lower numbers appear first"
               />
             </FormGroup>
           </FormRow>
@@ -342,7 +352,7 @@ export default function GalleryEditPage() {
             </TagList>
           </FormGroup>
           
-          <SectionTitle>Visibility & Status</SectionTitle>
+          <SectionTitle>Visibility & Settings</SectionTitle>
           
           <FormGroup>
             <Label>Visibility</Label>
@@ -350,21 +360,41 @@ export default function GalleryEditPage() {
               value={formData.visibility || 'private'}
               onChange={handleVisibilityChange}
             />
+            <VisibilityHelp>
+              <strong>Public:</strong> Visible to everyone<br/>
+              <strong>Private:</strong> Only visible to you<br/>
+              <strong>Unlisted:</strong> Not shown in public galleries but accessible via direct link
+            </VisibilityHelp>
           </FormGroup>
           
-          <FormGroup>
-            <Label>Status</Label>
-            <Select
-              name="status"
-              value={formData.status}
-              onChange={handleInputChange}
-            >
-              <option value="available">Available</option>
-              <option value="sold">Sold</option>
-              <option value="exhibition">Exhibition Only</option>
-              <option value="not_for_sale">Not for Sale</option>
-            </Select>
-          </FormGroup>
+          {/* Additional metadata display */}
+          <SectionTitle>Metadata</SectionTitle>
+          
+          <MetadataGrid>
+            <MetadataItem>
+              <MetadataLabel>File Type</MetadataLabel>
+              <MetadataValue>{piece.mimeType || 'Unknown'}</MetadataValue>
+            </MetadataItem>
+            
+            <MetadataItem>
+              <MetadataLabel>Original Filename</MetadataLabel>
+              <MetadataValue>{piece.originalFileName || 'N/A'}</MetadataValue>
+            </MetadataItem>
+            
+            {piece.alt && (
+              <MetadataItem>
+                <MetadataLabel>Alt Text</MetadataLabel>
+                <MetadataValue>{piece.alt}</MetadataValue>
+              </MetadataItem>
+            )}
+            
+            {piece.shareToken && (
+              <MetadataItem>
+                <MetadataLabel>Share Token</MetadataLabel>
+                <MetadataValue>{piece.shareToken}</MetadataValue>
+              </MetadataItem>
+            )}
+          </MetadataGrid>
         </FormSection>
       </Content>
     </Container>
@@ -538,21 +568,6 @@ const TextArea = styled.textarea`
   }
 `;
 
-const Select = styled.select`
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  font-size: 1rem;
-  background: white;
-  
-  &:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-  }
-`;
-
 const TagInput = styled.div`
   display: flex;
   gap: 0.5rem;
@@ -588,6 +603,40 @@ const Tag = styled.span`
       color: #374151;
     }
   }
+`;
+
+const VisibilityHelp = styled.div`
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.5rem;
+  line-height: 1.4;
+`;
+
+const MetadataGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+`;
+
+const MetadataItem = styled.div`
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+`;
+
+const MetadataLabel = styled.div`
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+`;
+
+const MetadataValue = styled.div`
+  font-size: 0.875rem;
+  color: #374151;
+  word-break: break-all;
 `;
 
 const LoadingContainer = styled.div`

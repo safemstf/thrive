@@ -3,9 +3,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useBooks, useCreateBook, useDeleteBook, useApiError } from '@/hooks/useEducationalApi';
+import { useBooks, useApiError } from '@/hooks/useEducationalApi'; // Removed unused mutations
 import { BookQueryParams } from '@/types/api.types';
-import { MainCategory, SubCategory } from '@/types/educational.types';
+import { MainCategory } from '@/types/portfolio.types'; // Updated import
 import { ConnectionStatusIndicator } from './apiConnectionManager';
 
 export function BooksList() {
@@ -17,50 +17,12 @@ export function BooksList() {
   // Fetch books with filters
   const { data: books, isLoading, error, refetch } = useBooks(filters);
   
-  // Mutations
-  const createBookMutation = useCreateBook();
-  const deleteBookMutation = useDeleteBook();
-  
   // Error handling
   const { getErrorMessage, isNotFound } = useApiError();
 
   // Handle category filter change
   const handleCategoryChange = (category: MainCategory) => {
     setFilters(prev => ({ ...prev, mainCategory: category }));
-  };
-
-  // Handle book creation
-  const handleCreateBook = async () => {
-    try {
-      await createBookMutation.mutateAsync({
-        title: 'New Math Book',
-        year: '2025',
-        mainCategory: 'math',
-        subCategory: 'sat',
-        colors: {
-          primary: '#3B82F6',
-          secondary: '#1E40AF',
-        },
-        excerpt: 'A comprehensive guide to SAT Math',
-        description: 'Master SAT Math with practice problems and strategies',
-        learningContent: {
-          mathConcepts: [],
-        },
-      });
-    } catch (error) {
-      console.error('Failed to create book:', getErrorMessage(error));
-    }
-  };
-
-  // Handle book deletion
-  const handleDeleteBook = async (bookId: string) => {
-    if (confirm('Are you sure you want to delete this book?')) {
-      try {
-        await deleteBookMutation.mutateAsync(bookId);
-      } catch (error) {
-        console.error('Failed to delete book:', getErrorMessage(error));
-      }
-    }
   };
 
   // Loading state
@@ -109,13 +71,7 @@ export function BooksList() {
           <option value="science">Science</option>
         </select>
 
-        <button
-          onClick={handleCreateBook}
-          disabled={createBookMutation.isPending}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-        >
-          {createBookMutation.isPending ? 'Creating...' : 'Create Book'}
-        </button>
+        {/* Removed Create Book button */}
       </div>
 
       {/* Books Grid */}
@@ -138,15 +94,9 @@ export function BooksList() {
             
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-500">
-                {book.subCategory.toUpperCase()}
+                {book.subCategory?.toUpperCase()}
               </span>
-              <button
-                onClick={() => handleDeleteBook(book.id)}
-                disabled={deleteBookMutation.isPending}
-                className="text-red-600 hover:text-red-800 text-sm"
-              >
-                Delete
-              </button>
+              {/* Removed Delete button */}
             </div>
           </div>
         ))}

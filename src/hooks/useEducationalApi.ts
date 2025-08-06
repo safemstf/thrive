@@ -1,24 +1,8 @@
 // src/hooks/useEducationalApi.ts
-
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
-import { api, useApiClient } from '@/lib/api-client';
+import { useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
+import { api } from '@/lib/api-client';
 import { APIError } from '@/lib/api-client';
-
-import { 
-  Book, 
-  MainCategory, 
-  SubCategory, 
-  MathConcept,
-  ScienceConcept,
-  GrammarRule
-} from '@/types/educational.types';
-import { ScientificDiscipline } from '@/types/portfolio.types'
-import {
-  BookQueryParams,
-  SearchFilters,
-  SearchResult,
-  UserProgress
-} from '@/types/api.types';
+import { MainCategory, SubCategory } from '@/types/portfolio.types';
 
 // Query keys factory
 export const queryKeys = {
@@ -26,7 +10,7 @@ export const queryKeys = {
   books: {
     all: ['educational', 'books'] as const,
     lists: () => [...queryKeys.books.all, 'list'] as const,
-    list: (params?: BookQueryParams) => [...queryKeys.books.lists(), params] as const,
+    list: (params?: any) => [...queryKeys.books.lists(), params] as const,
     details: () => [...queryKeys.books.all, 'detail'] as const,
     detail: (id: string) => [...queryKeys.books.details(), id] as const,
     byCategory: (category: MainCategory, subCategory?: SubCategory) => 
@@ -35,43 +19,36 @@ export const queryKeys = {
   content: {
     all: ['educational', 'content'] as const,
     math: (bookId: string) => [...queryKeys.content.all, 'math', bookId] as const,
-    science: (bookId: string, discipline?: ScientificDiscipline) => 
+    science: (bookId: string, discipline?: string) => 
       [...queryKeys.content.all, 'science', bookId, discipline] as const,
     grammar: (bookId: string) => [...queryKeys.content.all, 'grammar', bookId] as const,
   },
   search: {
     all: ['educational', 'search'] as const,
-    query: (query: string, filters?: SearchFilters) => 
+    query: (query: string, filters?: any) => 
       [...queryKeys.search.all, query, filters] as const,
-  },
-  analytics: {
-    popular: (limit?: number) => ['educational', 'analytics', 'popular', limit] as const,
-  },
-  user: {
-    progress: (userId: string, bookId: string) => 
-      ['educational', 'user', userId, 'progress', bookId] as const,
-  },
+  }
 };
 
 // Books hooks
 export function useBooks(
-  params?: BookQueryParams,
-  options?: UseQueryOptions<Book[], APIError>
+  params?: any,
+  options?: UseQueryOptions<any[], APIError>
 ) {
   return useQuery({
     queryKey: queryKeys.books.list(params),
-    queryFn: () => api.books.getAll(params),
+    queryFn: () => api.education.books.getAll(params),
     ...options,
   });
 }
 
 export function useBook(
   id: string,
-  options?: UseQueryOptions<Book, APIError>
+  options?: UseQueryOptions<any, APIError>
 ) {
   return useQuery({
     queryKey: queryKeys.books.detail(id),
-    queryFn: () => api.books.getById(id),
+    queryFn: () => api.education.books.getById(id),
     enabled: !!id,
     ...options,
   });
@@ -80,11 +57,11 @@ export function useBook(
 export function useBooksByCategory(
   category: MainCategory,
   subCategory?: SubCategory,
-  options?: UseQueryOptions<Book[], APIError>
+  options?: UseQueryOptions<any[], APIError>
 ) {
   return useQuery({
     queryKey: queryKeys.books.byCategory(category, subCategory),
-    queryFn: () => api.books.getByCategory(category, subCategory),
+    queryFn: () => api.education.books.getByCategory(category, subCategory),
     ...options,
   });
 }
@@ -92,11 +69,14 @@ export function useBooksByCategory(
 // Content hooks
 export function useMathConcepts(
   bookId: string,
-  options?: UseQueryOptions<MathConcept[], APIError>
+  options?: UseQueryOptions<any[], APIError>
 ) {
   return useQuery({
     queryKey: queryKeys.content.math(bookId),
-    queryFn: () => api.content.getMathConcepts(bookId),
+    queryFn: async () => {
+      const response = await api.education.concepts.getByBook(bookId);
+      return response.concepts;
+    },
     enabled: !!bookId,
     ...options,
   });
@@ -104,12 +84,15 @@ export function useMathConcepts(
 
 export function useScienceConcepts(
   bookId: string,
-  discipline?: ScientificDiscipline,
-  options?: UseQueryOptions<ScienceConcept[], APIError>
+  discipline?: string,
+  options?: UseQueryOptions<any[], APIError>
 ) {
   return useQuery({
     queryKey: queryKeys.content.science(bookId, discipline),
-    queryFn: () => api.content.getScienceConcepts(bookId, discipline),
+    queryFn: async () => {
+      const response = await api.education.concepts.getByBook(bookId);
+      return response.concepts;
+    },
     enabled: !!bookId,
     ...options,
   });
@@ -117,11 +100,14 @@ export function useScienceConcepts(
 
 export function useGrammarRules(
   bookId: string,
-  options?: UseQueryOptions<GrammarRule[], APIError>
+  options?: UseQueryOptions<any[], APIError>
 ) {
   return useQuery({
     queryKey: queryKeys.content.grammar(bookId),
-    queryFn: () => api.content.getGrammarRules(bookId),
+    queryFn: async () => {
+      const response = await api.education.concepts.getByBook(bookId);
+      return response.concepts;
+    },
     enabled: !!bookId,
     ...options,
   });
@@ -130,93 +116,17 @@ export function useGrammarRules(
 // Search hooks
 export function useContentSearch(
   query: string,
-  filters?: SearchFilters,
-  options?: UseQueryOptions<SearchResult[], APIError>
+  filters?: any,
+  options?: UseQueryOptions<any[], APIError>
 ) {
   return useQuery({
     queryKey: queryKeys.search.query(query, filters),
-    queryFn: () => api.content.search(query, filters),
-    enabled: !!query && query.length > 2, // Only search with 3+ characters
-    ...options,
-  });
-}
-
-// Analytics hooks
-export function usePopularBooks(
-  limit?: number,
-  options?: UseQueryOptions<Book[], APIError>
-) {
-  const apiClient = useApiClient();
-  
-  return useQuery({
-    queryKey: queryKeys.analytics.popular(limit),
-    queryFn: () => apiClient.educational.getPopularBooks(limit),
-    ...options,
-  });
-}
-
-// Mutation hooks
-export function useCreateBook(
-  options?: UseMutationOptions<Book, APIError, Omit<Book, 'id' | 'createdAt' | 'updatedAt'>>
-) {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: api.books.create,
-    onSuccess: (data) => {
-      // Invalidate and refetch books list
-      queryClient.invalidateQueries({ queryKey: queryKeys.books.lists() });
-      // Add the new book to the cache
-      queryClient.setQueryData(queryKeys.books.detail(data.id), data);
+    queryFn: async () => {
+      const response = await api.education.concepts.search(query, filters);
+      return response.results;
     },
+    enabled: !!query && query.length > 2,
     ...options,
-  });
-}
-
-export function useUpdateBook(
-  options?: UseMutationOptions<Book, APIError, { id: string; updates: Partial<Book> }>
-) {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ id, updates }) => api.books.update(id, updates),
-    onSuccess: (data, { id }) => {
-      // Update the book in cache
-      queryClient.setQueryData(queryKeys.books.detail(id), data);
-      // Invalidate lists to ensure consistency
-      queryClient.invalidateQueries({ queryKey: queryKeys.books.lists() });
-    },
-    ...options,
-  });
-}
-
-export function useDeleteBook(
-  options?: UseMutationOptions<void, APIError, string>
-) {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: api.books.delete,
-    onSuccess: (_, id) => {
-      // Remove from cache
-      queryClient.removeQueries({ queryKey: queryKeys.books.detail(id) });
-      // Invalidate lists
-      queryClient.invalidateQueries({ queryKey: queryKeys.books.lists() });
-    },
-    ...options,
-  });
-}
-
-// Track content view mutation
-export function useTrackContentView() {
-  const apiClient = useApiClient();
-  
-  return useMutation({
-    mutationFn: ({ userId, contentId, contentType }: {
-      userId: string;
-      contentId: string;
-      contentType: string;
-    }) => apiClient.educational.trackContentView(userId, contentId, contentType),
   });
 }
 
@@ -224,14 +134,14 @@ export function useTrackContentView() {
 export const prefetchBook = async (queryClient: any, id: string) => {
   await queryClient.prefetchQuery({
     queryKey: queryKeys.books.detail(id),
-    queryFn: () => api.books.getById(id),
+    queryFn: () => api.education.books.getById(id),
   });
 };
 
-export const prefetchBooks = async (queryClient: any, params?: BookQueryParams) => {
+export const prefetchBooks = async (queryClient: any, params?: any) => {
   await queryClient.prefetchQuery({
     queryKey: queryKeys.books.list(params),
-    queryFn: () => api.books.getAll(params),
+    queryFn: () => api.education.books.getAll(params),
   });
 };
 

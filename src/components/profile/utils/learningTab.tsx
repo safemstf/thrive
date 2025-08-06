@@ -36,11 +36,12 @@ export const LearningTabContent: React.FC<LearningTabContentProps> = ({ portfoli
         setError(null);
         
         // Fetch user's concept progress from portfolio
-        const userConceptProgresses = await api.portfolio.getMyConcepts();
-        setConceptProgresses(userConceptProgresses || []);
+        const response = await api.portfolio.concepts.get();
+        const userConceptProgresses = response.concepts || [];
+        setConceptProgresses(userConceptProgresses);
         
         // Calculate stats from concept progress
-        if (userConceptProgresses && userConceptProgresses.length > 0) {
+        if (userConceptProgresses.length > 0) {
           const completedCount = userConceptProgresses.filter(cp => 
             cp.status === 'completed'
           ).length;
@@ -112,7 +113,7 @@ export const LearningTabContent: React.FC<LearningTabContentProps> = ({ portfoli
 
   const handleUpdateProgress = async (conceptId: string, newStatus: string) => {
     try {
-      await api.portfolio.updateConceptProgress(conceptId, { status: newStatus });
+      await api.portfolio.concepts.updateProgress(conceptId, { status: newStatus });
       setConceptProgresses(prev => prev.map(cp => 
         cp.conceptId === conceptId 
           ? { ...cp, status: newStatus as any }

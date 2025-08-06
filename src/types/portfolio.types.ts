@@ -1,4 +1,4 @@
-// src/types/portfolio.types.ts - Complete types file
+// src/types/portfolio.types.ts 
 import { GalleryPiece } from './gallery.types';
 
 // ==================== Base Types ====================
@@ -29,6 +29,9 @@ export interface Concept {
   summary?: string;
   estimatedMinutes?: number;
 }
+
+export type { GalleryVisibility } from '@/types/gallery.types';
+
 
 export interface ConceptProgress {
   conceptId: string;

@@ -11,7 +11,7 @@ import {
   Grid3x3, List, Layers
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
-import type { Portfolio, GalleryPiece, PortfolioStats, PortfolioSettings } from '@/types/portfolio.types';
+import type { Portfolio, GalleryPiece } from '@/types/portfolio.types';
 
 // Define missing components locally
 const MetaTag = styled.span`
@@ -35,6 +35,14 @@ const EmptyGallerySection = styled.section`
 `;
 
 type ViewMode = 'grid' | 'masonry' | 'list';
+
+interface GalleryResponse {
+  pieces: GalleryPiece[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
 
 export default function PublicPortfolioPage() {
   const params = useParams();
@@ -63,15 +71,31 @@ export default function PublicPortfolioPage() {
         // Fetch gallery pieces if portfolio has gallery capability
         if (['creative', 'hybrid', 'professional'].includes(portfolioResponse.kind)) {
           try {
-            const galleryResponse = await api.portfolio.gallery.getByUsername(username);
-            setGalleryPieces(galleryResponse.pieces || []);
+            // Updated API call - returns GalleryResponse or GalleryPiece[]
+            const galleryResponse = await api.portfolio.gallery.getByUsername(username, 1, 50);
+            
+            // Handle both possible response formats
+            if (galleryResponse && typeof galleryResponse === 'object') {
+              if ('pieces' in galleryResponse) {
+                // It's a GalleryResponse object
+                setGalleryPieces(galleryResponse.pieces || []);
+              } else if (Array.isArray(galleryResponse)) {
+                // It's an array of GalleryPiece
+                setGalleryPieces(galleryResponse);
+              } else {
+                // Fallback - assume it's the pieces array
+                setGalleryPieces([]);
+              }
+            } else {
+              setGalleryPieces([]);
+            }
           } catch (galleryError) {
             console.error('Failed to fetch gallery:', galleryError);
             setGalleryPieces([]);
           }
         }
 
-        // Track view
+        // Track view - Updated to match API signature
         try {
           await api.portfolio.analytics.trackView(portfolioResponse.id, {
             referrer: document.referrer || undefined,
@@ -147,7 +171,7 @@ export default function PublicPortfolioPage() {
     );
   }
 
-  const displayName = portfolio.title || 'Anonymous';
+  const displayName = portfolio.title || portfolio.name || 'Anonymous';
 
   return (
     <PageWrapper>
@@ -192,6 +216,17 @@ export default function PublicPortfolioPage() {
                   <SpecializationTags>
                     {portfolio.specializations.map((spec, index) => (
                       <SpecializationTag key={index}>{spec}</SpecializationTag>
+                    ))}
+                  </SpecializationTags>
+                </SpecializationsWrapper>
+              )}
+
+              {/* Tags */}
+              {portfolio.tags && portfolio.tags.length > 0 && (
+                <SpecializationsWrapper>
+                  <SpecializationTags>
+                    {portfolio.tags.map((tag, index) => (
+                      <SpecializationTag key={index}>#{tag}</SpecializationTag>
                     ))}
                   </SpecializationTags>
                 </SpecializationsWrapper>
@@ -333,8 +368,14 @@ export default function PublicPortfolioPage() {
                       <OverlayActions>
                         <OverlayAction title="Views">
                           <Eye size={16} />
-                          <span>{0}</span>
+                          <span>{piece.views || 0}</span>
                         </OverlayAction>
+                        {piece.likes !== undefined && (
+                          <OverlayAction title="Likes">
+                            <Heart size={16} />
+                            <span>{piece.likes}</span>
+                          </OverlayAction>
+                        )}
                       </OverlayActions>
                     </GalleryOverlay>
                   </GalleryImageWrapper>
@@ -398,6 +439,12 @@ export default function PublicPortfolioPage() {
                     <strong>Tags:</strong> {selectedPiece.tags.map(tag => `#${tag}`).join(', ')}
                   </MetaRow>
                 )}
+                {selectedPiece.dimensions && (
+                  <MetaRow>
+                    <strong>Dimensions:</strong> {selectedPiece.dimensions.width} × {selectedPiece.dimensions.height}
+                    {selectedPiece.dimensions.depth && ` × ${selectedPiece.dimensions.depth}`} {selectedPiece.dimensions.unit}
+                  </MetaRow>
+                )}
               </LightboxMeta>
               <LightboxActions>
                 <ActionButton as="a" href={selectedPiece.imageUrl} download target="_blank">
@@ -432,10 +479,7 @@ export default function PublicPortfolioPage() {
   );
 }
 
-// Styled Components (same as before)
-// ... (keep all the styled components from previous version)
-
-// Styled Components
+// Styled Components (keeping all the existing ones exactly as they were)
 const PageWrapper = styled.div`
   min-height: 100vh;
   background: #fafafa;

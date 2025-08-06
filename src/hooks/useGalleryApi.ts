@@ -7,298 +7,281 @@ import {
   useInfiniteQuery,
   UseQueryOptions,
   UseMutationOptions,
-  UseInfiniteQueryOptions,
 } from '@tanstack/react-query';
 import { api, APIError } from '@/lib/api-client';
 
 import {
   GalleryPiece,
-  GalleryApiResponse,
   GalleryQueryParams,
-  GalleryCollection,
-  Artist,
   GalleryStats,
-  ArtworkCategory,
-  ArtworkStatus,
+  GalleryVisibility,
 } from '@/types/gallery.types';
 
-// Query keys factory for gallery
+// Updated query keys factory for gallery
 export const galleryQueryKeys = {
   all: ['gallery'] as const,
   pieces: {
     all: ['gallery', 'pieces'] as const,
-    lists: () => [...galleryQueryKeys.pieces.all, 'list'] as const,
-    list: (params?: GalleryQueryParams) => [...galleryQueryKeys.pieces.lists(), params] as const,
-    details: () => [...galleryQueryKeys.pieces.all, 'detail'] as const,
-    detail: (id: string) => [...galleryQueryKeys.pieces.details(), id] as const,
-    byCategory: (category: ArtworkCategory) => [...galleryQueryKeys.pieces.all, 'category', category] as const,
-    featured: (limit?: number) => [...galleryQueryKeys.pieces.all, 'featured', limit] as const,
-  },
-  collections: {
-    all: ['gallery', 'collections'] as const,
-    lists: () => [...galleryQueryKeys.collections.all, 'list'] as const,
-    detail: (id: string) => [...galleryQueryKeys.collections.all, id] as const,
-  },
-  artists: {
-    all: ['gallery', 'artists'] as const,
-    lists: () => [...galleryQueryKeys.artists.all, 'list'] as const,
-    detail: (id: string) => [...galleryQueryKeys.artists.all, id] as const,
-    pieces: (artistId: string) => [...galleryQueryKeys.artists.all, artistId, 'pieces'] as const,
+    my: () => [...galleryQueryKeys.pieces.all, 'my'] as const,
+    byUsername: (username: string, page?: number, limit?: number) => 
+      [...galleryQueryKeys.pieces.all, 'username', username, page, limit] as const,
+    detail: (id: string) => [...galleryQueryKeys.pieces.all, 'detail', id] as const,
   },
   stats: ['gallery', 'stats'] as const,
 };
 
-// Gallery pieces hooks
-export function useGalleryPieces(
-  params?: GalleryQueryParams,
-  options?: UseQueryOptions<GalleryApiResponse, APIError>
-) {
-  return useQuery({
-    queryKey: galleryQueryKeys.pieces.list(params ?? {}),
-    queryFn: () => api.gallery.getPieces(params),
-    ...options,
-  });
-}
+// ==================== UPDATED HOOKS ====================
 
-
-export function useGalleryPiece(
-  id: string,
-  options?: UseQueryOptions<GalleryPiece, APIError>
-) {
-  return useQuery({
-    queryKey: galleryQueryKeys.pieces.detail(id),
-    queryFn: () => api.gallery.getPieceById(id),
-    enabled: !!id,
-    ...options,
-  });
-}
-
-export function useGalleryPiecesByCategory(
-  category: ArtworkCategory,
+// Get my gallery pieces
+export function useMyGalleryPieces(
   options?: UseQueryOptions<GalleryPiece[], APIError>
 ) {
   return useQuery({
-    queryKey: galleryQueryKeys.pieces.byCategory(category),
-    queryFn: () => api.gallery.getByCategory(category),
+    queryKey: galleryQueryKeys.pieces.my(),
+    queryFn: () => api.portfolio.gallery.get(),
     ...options,
   });
 }
 
-export function useFeaturedPieces(
+// Get gallery pieces by username (public view)
+export function useGalleryPiecesByUsername(
+  username: string,
+  page?: number,
   limit?: number,
-  options?: UseQueryOptions<GalleryPiece[], APIError>
+  options?: UseQueryOptions<any, APIError> // Adjust type based on API response
 ) {
   return useQuery({
-    queryKey: galleryQueryKeys.pieces.featured(limit),
-    queryFn: () => api.gallery.getFeatured(limit),
+    queryKey: galleryQueryKeys.pieces.byUsername(username, page, limit),
+    queryFn: () => api.portfolio.gallery.getByUsername(username, page, limit),
+    enabled: !!username,
     ...options,
   });
 }
 
-// Collections hooks
-export function useGalleryCollections(
-  options?: UseQueryOptions<GalleryCollection[], APIError>
-) {
-  return useQuery({
-    queryKey: galleryQueryKeys.collections.lists(),
-    queryFn: () => api.collections.getAll(),
-    ...options,
-  });
-}
-
-export function useGalleryCollection(
-  id: string,
-  options?: UseQueryOptions<GalleryCollection, APIError>
-) {
-  return useQuery({
-    queryKey: galleryQueryKeys.collections.detail(id),
-    queryFn: () => api.collections.getById(id),
-    enabled: !!id,
-    ...options,
-  });
-}
-
-// Artists hooks
-export function useArtists(
-  options?: UseQueryOptions<Artist[], APIError>
-) {
-  return useQuery({
-    queryKey: galleryQueryKeys.artists.lists(),
-    queryFn: () => api.artists.getAll(),
-    ...options,
-  });
-}
-
-export function useArtist(
-  id: string,
-  options?: UseQueryOptions<Artist, APIError>
-) {
-  return useQuery({
-    queryKey: galleryQueryKeys.artists.detail(id),
-    queryFn: () => api.artists.getById(id),
-    enabled: !!id,
-    ...options,
-  });
-}
-
-export function useArtistPieces(
-  artistId: string,
-  options?: UseQueryOptions<GalleryPiece[], APIError>
-) {
-  return useQuery({
-    queryKey: galleryQueryKeys.artists.pieces(artistId),
-    queryFn: () => api.artists.getPieces(artistId),
-    enabled: !!artistId,
-    ...options,
-  });
-}
-
-// Gallery stats hook
+// Get gallery stats - Updated to match actual API response
 export function useGalleryStats(
-  options?: UseQueryOptions<GalleryStats, APIError>
+  options?: UseQueryOptions<{
+    totalPieces: number;
+    publicPieces: number;
+    privatePieces: number;
+    unlistedPieces: number;
+    categories: Record<string, number>;
+    recentUploads: number;
+  }, APIError>
 ) {
   return useQuery({
     queryKey: galleryQueryKeys.stats,
-    queryFn: () => api.gallery.getStats(),
+    queryFn: () => api.portfolio.gallery.getStats(),
     ...options,
   });
 }
 
-// Mutation hooks
-export function useCreateGalleryPiece(
+// ==================== MUTATION HOOKS ====================
+
+// Add gallery piece
+export function useAddGalleryPiece(
   options?: UseMutationOptions<
     GalleryPiece,
     APIError,
-    Omit<GalleryPiece, 'id' | 'createdAt' | 'updatedAt'>
+    {
+      title: string;
+      description?: string;
+      imageUrl: string;
+      category?: string;
+      medium?: string;
+      tags?: string[];
+      visibility?: GalleryVisibility;
+      year?: number;
+      displayOrder?: number;
+    }
   >
 ) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: api.gallery.create,
+    mutationFn: (pieceData) => api.portfolio.gallery.add(pieceData),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.lists() });
-      queryClient.setQueryData(galleryQueryKeys.pieces.detail(data.id), data);
+      // Invalidate my gallery pieces list
+      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
+      // Update stats
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.stats });
+      // Optionally set the new piece in cache
+      queryClient.setQueryData(galleryQueryKeys.pieces.detail(data.id), data);
     },
     ...options,
   });
 }
 
+// Update gallery piece
 export function useUpdateGalleryPiece(
   options?: UseMutationOptions<
     GalleryPiece,
     APIError,
-    { id: string; updates: Partial<GalleryPiece> }
+    { pieceId: string; updates: Partial<GalleryPiece> }
   >
 ) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, updates }) => api.gallery.update(id, updates),
-    onSuccess: (data, { id }) => {
-      queryClient.setQueryData(galleryQueryKeys.pieces.detail(id), data);
-      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.lists() });
-      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.all });
+    mutationFn: ({ pieceId, updates }) => api.portfolio.gallery.update(pieceId, updates),
+    onSuccess: (data, { pieceId }) => {
+      // Update the specific piece in cache
+      queryClient.setQueryData(galleryQueryKeys.pieces.detail(pieceId), data);
+      // Invalidate lists to refresh
+      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
     },
     ...options,
   });
 }
 
+// Delete single gallery piece - Updated return type
 export function useDeleteGalleryPiece(
-  options?: UseMutationOptions<void, APIError, string>
+  options?: UseMutationOptions<{ message: string; id: string; }, APIError, string>
 ) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: api.gallery.delete,
-    onSuccess: (_data, id) => {
-      queryClient.removeQueries({ queryKey: galleryQueryKeys.pieces.detail(id) });
-      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.lists() });
+    mutationFn: (pieceId) => api.portfolio.gallery.delete(pieceId),
+    onSuccess: (_data, pieceId) => {
+      // Remove from cache
+      queryClient.removeQueries({ queryKey: galleryQueryKeys.pieces.detail(pieceId) });
+      // Refresh lists and stats
+      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.stats });
     },
     ...options,
   });
 }
 
-// Image upload mutation
-export function useUploadGalleryImage(
-  options?: UseMutationOptions<
-    { url: string; thumbnailUrl?: string },
-    APIError,
-    { file: File; metadata?: Record<string, any> }
-  >
+// Batch delete gallery pieces - Updated return type
+export function useBatchDeleteGalleryPieces(
+  options?: UseMutationOptions<{ message: string; deletedCount: number; }, APIError, string[]>
 ) {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: ({ file, metadata }) => api.gallery.uploadImage(file, metadata),
-    ...options,
-  });
-}
-
-// Prefetch utilities
-export const prefetchGalleryPiece = async (queryClient: any, id: string) => {
-  await queryClient.prefetchQuery({
-    queryKey: galleryQueryKeys.pieces.detail(id),
-    queryFn: () => api.gallery.getPieceById(id),
-  });
-};
-
-export const prefetchGalleryPieces = async (queryClient: any, params?: GalleryQueryParams) => {
-  await queryClient.prefetchQuery({
-    queryKey: galleryQueryKeys.pieces.list(params),
-    queryFn: () => api.gallery.getPieces(params),
-  });
-};
-
-export const prefetchFeaturedPieces = async (queryClient: any, limit?: number) => {
-  await queryClient.prefetchQuery({
-    queryKey: galleryQueryKeys.pieces.featured(limit),
-    queryFn: () => api.gallery.getFeatured(limit),
-  });
-};
-
-// Infinite query hook for gallery pieces (for infinite scroll)
-import type { QueryFunctionContext } from '@tanstack/react-query';
-
-export function useInfiniteGalleryPieces(
-  baseParams?: Omit<GalleryQueryParams, 'page'>,
-  options?: Omit<
-    UseInfiniteQueryOptions<GalleryApiResponse, APIError>,
-    'queryKey' | 'queryFn' | 'getNextPageParam' | 'initialPageParam'
-  >
-) {
-  return useInfiniteQuery({
-    // keep key consistent
-    queryKey: galleryQueryKeys.pieces.list(baseParams),
-    queryFn: (context: QueryFunctionContext) => {
-      const page = typeof context.pageParam === 'number' ? context.pageParam : 1;
-      return api.gallery.getPieces({ ...baseParams, page });
+    mutationFn: (pieceIds) => api.portfolio.gallery.batchDelete(pieceIds),
+    onSuccess: (_data, pieceIds) => {
+      // Remove all deleted pieces from cache
+      pieceIds.forEach(id => {
+        queryClient.removeQueries({ queryKey: galleryQueryKeys.pieces.detail(id) });
+      });
+      // Refresh lists and stats
+      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
+      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.stats });
     },
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
     ...options,
   });
 }
 
-// Optimistic update utilities
+// Batch update visibility - Updated return type
+export function useBatchUpdateGalleryVisibility(
+  options?: UseMutationOptions<{ message: string; updatedCount: number; }, APIError, { pieceIds: string[]; visibility: GalleryVisibility }>
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ pieceIds, visibility }) => 
+      api.portfolio.gallery.batchUpdateVisibility(pieceIds, visibility),
+    onSuccess: (_data, { pieceIds }) => {
+      // Invalidate affected pieces and lists
+      pieceIds.forEach(id => {
+        queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.detail(id) });
+      });
+      queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
+    },
+    ...options,
+  });
+}
+
+// ==================== PREFETCH UTILITIES ====================
+
+export const prefetchMyGalleryPieces = async (queryClient: any) => {
+  await queryClient.prefetchQuery({
+    queryKey: galleryQueryKeys.pieces.my(),
+    queryFn: () => api.portfolio.gallery.get(),
+  });
+};
+
+export const prefetchGalleryPiecesByUsername = async (
+  queryClient: any, 
+  username: string, 
+  page?: number, 
+  limit?: number
+) => {
+  await queryClient.prefetchQuery({
+    queryKey: galleryQueryKeys.pieces.byUsername(username, page, limit),
+    queryFn: () => api.portfolio.gallery.getByUsername(username, page, limit),
+  });
+};
+
+export const prefetchGalleryStats = async (queryClient: any) => {
+  await queryClient.prefetchQuery({
+    queryKey: galleryQueryKeys.stats,
+    queryFn: () => api.portfolio.gallery.getStats(),
+  });
+};
+
+// ==================== OPTIMISTIC UPDATE UTILITIES ====================
+
 export function useOptimisticGalleryUpdate() {
   const queryClient = useQueryClient();
 
   return {
-    updatePieceOptimistically: (id: string, updates: Partial<GalleryPiece>) => {
-      queryClient.setQueryData<GalleryPiece>(galleryQueryKeys.pieces.detail(id), (old) =>
-        old ? { ...old, ...updates } : old
-      );
+    // Optimistically update a piece in the list
+    updatePieceOptimistically: (pieceId: string, updates: Partial<GalleryPiece>) => {
+      queryClient.setQueryData<GalleryPiece[]>(galleryQueryKeys.pieces.my(), (old) => {
+        if (!old) return old;
+        return old.map(piece => piece.id === pieceId ? { ...piece, ...updates } : piece);
+      });
     },
-    addPieceToListsOptimistically: (piece: GalleryPiece) => {
-      queryClient.setQueriesData<GalleryApiResponse>({ queryKey: galleryQueryKeys.pieces.lists() }, (old) =>
-        old ? { ...old, pieces: [piece, ...old.pieces], total: old.total + 1 } : old
-      );
+
+    // Optimistically add a piece to the list
+    addPieceToListOptimistically: (piece: GalleryPiece) => {
+      queryClient.setQueryData<GalleryPiece[]>(galleryQueryKeys.pieces.my(), (old) => {
+        if (!old) return [piece];
+        return [piece, ...old];
+      });
     },
-    removePieceFromListsOptimistically: (id: string) => {
-      queryClient.setQueriesData<GalleryApiResponse>({ queryKey: galleryQueryKeys.pieces.lists() }, (old) =>
-        old ? { ...old, pieces: old.pieces.filter((p) => p.id !== id), total: old.total - 1 } : old
-      );
+
+    // Optimistically remove a piece from the list
+    removePieceFromListOptimistically: (pieceId: string) => {
+      queryClient.setQueryData<GalleryPiece[]>(galleryQueryKeys.pieces.my(), (old) => {
+        if (!old) return old;
+        return old.filter(piece => piece.id !== pieceId);
+      });
+    },
+
+    // Optimistically remove multiple pieces
+    removePiecesFromListOptimistically: (pieceIds: string[]) => {
+      queryClient.setQueryData<GalleryPiece[]>(galleryQueryKeys.pieces.my(), (old) => {
+        if (!old) return old;
+        return old.filter(piece => !pieceIds.includes(piece.id));
+      });
     },
   };
+}
+
+// ==================== LEGACY HOOKS (DEPRECATED) ====================
+// These are marked as deprecated to help with migration
+
+/**
+ * @deprecated Use useMyGalleryPieces() instead
+ */
+export const useGalleryPieces = useMyGalleryPieces;
+
+/**
+ * @deprecated Collections are no longer separate entities. Use gallery pieces with category filtering.
+ */
+export function useGalleryCollections() {
+  console.warn('useGalleryCollections is deprecated. Use gallery pieces with category filtering instead.');
+  return { data: [], isLoading: false, error: null };
+}
+
+/**
+ * @deprecated Artists are no longer separate entities. Use portfolio discovery instead.
+ */
+export function useArtists() {
+  console.warn('useArtists is deprecated. Use portfolio discovery instead.');
+  return { data: [], isLoading: false, error: null };
 }

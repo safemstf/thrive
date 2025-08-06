@@ -29,7 +29,7 @@ export function usePortfolioManagement() {
       setLoading(true);
       setError(null);
       
-      const portfolioData = await api.portfolio.getMyPortfolio();
+      const portfolioData = await api.portfolio.get();
       setPortfolio(portfolioData);
     } catch (err: any) {
       console.error('Failed to fetch portfolio:', err);
@@ -93,9 +93,9 @@ export function usePortfolioManagement() {
     }
   }, []);
 
-  // Update portfolio
+  // Update portfolio - Fixed to match API signature (only takes data, no ID)
   const updatePortfolio = useCallback(async (updates: Partial<Portfolio>) => {
-    if (!portfolio?.id) {
+    if (!portfolio) {
       const errorMsg = 'No portfolio to update - please create a portfolio first';
       setError(errorMsg);
       throw new Error(errorMsg);
@@ -111,10 +111,21 @@ export function usePortfolioManagement() {
         visibility: updates.visibility ?? portfolio.visibility,
         specializations: updates.specializations ?? (portfolio.specializations || []),
         tags: updates.tags ?? (portfolio.tags || []),
-        location: updates.location ?? portfolio.location ?? ''
+        location: updates.location ?? portfolio.location,
+        // Add other fields that might be in UpdatePortfolioDto
+        tagline: updates.tagline ?? portfolio.tagline,
+        profileImage: updates.profileImage ?? portfolio.profileImage,
+        coverImage: updates.coverImage ?? portfolio.coverImage,
+        socialLinks: updates.socialLinks ?? portfolio.socialLinks,
+        contactEmail: updates.contactEmail ?? portfolio.contactEmail,
+        showContactInfo: updates.showContactInfo ?? portfolio.showContactInfo,
+        customUrl: updates.customUrl ?? portfolio.customUrl,
+        featuredPieces: updates.featuredPieces ?? portfolio.featuredPieces,
+        kind: updates.kind ?? portfolio.kind
       };
 
-      const updatedPortfolio = await api.portfolio.update(portfolio.id, updateData);
+      // Fixed: API only takes data parameter, not ID
+      const updatedPortfolio = await api.portfolio.update(updateData);
       setPortfolio(updatedPortfolio);
       return updatedPortfolio;
     } catch (err: any) {
@@ -127,7 +138,7 @@ export function usePortfolioManagement() {
     }
   }, [portfolio]);
 
-  // Delete portfolio
+  // Delete portfolio - Fixed to use correct API method
   const deletePortfolio = useCallback(async (deleteGalleryPieces: boolean = false) => {
     if (!portfolio) {
       throw new Error('No portfolio to delete');
@@ -137,7 +148,8 @@ export function usePortfolioManagement() {
     setError(null);
 
     try {
-      await api.portfolio.deleteMyPortfolio(deleteGalleryPieces);
+      // Fixed: Use the correct API method name
+      await api.portfolio.delete(deleteGalleryPieces);
       setPortfolio(null);
     } catch (err: any) {
       console.error('Failed to delete portfolio:', err);
@@ -163,7 +175,8 @@ export function usePortfolioManagement() {
     
     try {
       setGalleryLoading(true);
-      const pieces = await api.portfolio.getMyGalleryPieces();
+      // Fixed: Use the correct API method name
+      const pieces = await api.portfolio.gallery.get();
       setGalleryPieces(pieces);
     } catch (err) {
       console.error('Failed to fetch gallery pieces:', err);

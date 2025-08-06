@@ -1,11 +1,11 @@
 // src/components/LearningModal.tsx
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { X } from 'lucide-react';
-import type { Book, LearningContent } from '@/types/educational.types';
+import type { Book } from '@/types/educational.types';
+import type { ConceptProgress } from '@/types/portfolio.types';
 import { api } from '@/lib/api-client';
 
 export interface LearningModalProps {
@@ -14,25 +14,29 @@ export interface LearningModalProps {
 }
 
 export default function LearningModal({ book, onClose }: LearningModalProps) {
-  const [content, setContent] = useState<LearningContent | null>(null);
+  const [concepts, setConcepts] = useState<ConceptProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('Overview');
 
   useEffect(() => {
-    async function fetchContent() {
+    async function fetchConcepts() {
       try {
-        const mathConcepts = await api.content.getMathConcepts(book.id);
-        const scienceConcepts = await api.content.getScienceConcepts(book.id);
-        const grammarRules = await api.content.getGrammarRules(book.id);
-        setContent({ mathConcepts, scienceConcepts, grammarRules });
+        setLoading(true);
+        setError(null);
+        
+        // Fetch concepts using portfolio API
+        const response = await api.portfolio.concepts.get();
+        setConcepts(response.concepts || []);
       } catch (err) {
-        setError((err as Error).message);
+        console.error('Failed to fetch concepts:', err);
+        setError('Failed to load learning content');
       } finally {
         setLoading(false);
       }
     }
-    fetchContent();
+    
+    fetchConcepts();
   }, [book.id]);
 
   const handleOverlayClick = (e: React.MouseEvent) => {
@@ -42,17 +46,23 @@ export default function LearningModal({ book, onClose }: LearningModalProps) {
   if (loading) {
     return (
       <ModalOverlay>
-        <Spinner>Loading...</Spinner>
+        <Spinner>Loading learning content...</Spinner>
       </ModalOverlay>
     );
   }
-  if (error || !content) {
+  
+  if (error) {
     return (
       <ModalOverlay>
-        <ModalError>{error || 'Failed to load content'}</ModalError>
+        <ModalError>{error}</ModalError>
       </ModalOverlay>
     );
   }
+
+  // Group concepts by subject using conceptId prefix
+  const mathConcepts = concepts.filter(c => c.conceptId.startsWith('math-'));
+  const scienceConcepts = concepts.filter(c => c.conceptId.startsWith('science-'));
+  const grammarConcepts = concepts.filter(c => c.conceptId.startsWith('grammar-'));
 
   const tabs = [
     { key: 'Overview', label: 'Overview' },
@@ -79,19 +89,61 @@ export default function LearningModal({ book, onClose }: LearningModalProps) {
 
         <LearningContent>
           {activeTab === 'Overview' && <Description>{book.description}</Description>}
-          {activeTab === 'Math' && content.mathConcepts && (
+          
+          {activeTab === 'Math' && (
             <ContentList>
-              {content.mathConcepts.map(mc => <li key={mc.id}>{mc.topic}</li>)}
+              {mathConcepts.map(concept => (
+                <ConceptItem key={concept.conceptId}>
+                  <ConceptTitle>{concept.conceptId.replace('math-', 'Math: ')}</ConceptTitle>
+                  <ConceptStatus $status={concept.status}>
+                    Status: {concept.status}
+                  </ConceptStatus>
+                  {concept.score && <ConceptScore>Score: {concept.score}/100</ConceptScore>}
+                  {concept.notes && <ConceptNotes>{concept.notes}</ConceptNotes>}
+                </ConceptItem>
+              ))}
+              
+              {mathConcepts.length === 0 && (
+                <EmptyMessage>No math concepts found</EmptyMessage>
+              )}
             </ContentList>
           )}
-          {activeTab === 'Science' && content.scienceConcepts && (
+          
+          {activeTab === 'Science' && (
             <ContentList>
-              {content.scienceConcepts.map(sc => <li key={sc.id}>{sc.topic}</li>)}
+              {scienceConcepts.map(concept => (
+                <ConceptItem key={concept.conceptId}>
+                  <ConceptTitle>{concept.conceptId.replace('science-', 'Science: ')}</ConceptTitle>
+                  <ConceptStatus $status={concept.status}>
+                    Status: {concept.status}
+                  </ConceptStatus>
+                  {concept.score && <ConceptScore>Score: {concept.score}/100</ConceptScore>}
+                  {concept.notes && <ConceptNotes>{concept.notes}</ConceptNotes>}
+                </ConceptItem>
+              ))}
+              
+              {scienceConcepts.length === 0 && (
+                <EmptyMessage>No science concepts found</EmptyMessage>
+              )}
             </ContentList>
           )}
-          {activeTab === 'Grammar' && content.grammarRules && (
+          
+          {activeTab === 'Grammar' && (
             <ContentList>
-              {content.grammarRules.map(gr => <li key={gr.id}>{gr.topic}</li>)}
+              {grammarConcepts.map(concept => (
+                <ConceptItem key={concept.conceptId}>
+                  <ConceptTitle>{concept.conceptId.replace('grammar-', 'Grammar: ')}</ConceptTitle>
+                  <ConceptStatus $status={concept.status}>
+                    Status: {concept.status}
+                  </ConceptStatus>
+                  {concept.score && <ConceptScore>Score: {concept.score}/100</ConceptScore>}
+                  {concept.notes && <ConceptNotes>{concept.notes}</ConceptNotes>}
+                </ConceptItem>
+              ))}
+              
+              {grammarConcepts.length === 0 && (
+                <EmptyMessage>No grammar rules found</EmptyMessage>
+              )}
             </ContentList>
           )}
         </LearningContent>
@@ -100,7 +152,8 @@ export default function LearningModal({ book, onClose }: LearningModalProps) {
   );
 }
 
-// Styled Components
+// Styled Components remain the same
+// Styled Components (same as before)
 const ModalOverlay = styled.div`
   position: fixed;
   inset: 0;
@@ -184,9 +237,61 @@ const Description = styled.div`
   color: var(--secondary-color);
 `;
 
-const ContentList = styled.ul`
-  list-style: disc;
-  padding-left: 1.5rem;
+const ContentList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+`;
+
+const ConceptItem = styled.div`
+  padding: 1.5rem;
+  border-radius: 8px;
+  background: #f9fafb;
+  border-left: 4px solid #4f46e5;
+`;
+
+const ConceptTitle = styled.h3`
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem 0;
+  color: #1e293b;
+`;
+
+const ConceptStatus = styled.div<{ $status?: string }>`
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: ${({ $status }) => 
+    $status === 'completed' ? '#dcfce7' : 
+    $status === 'in-progress' ? '#fffbeb' : 
+    '#f3f4f6'};
+  color: ${({ $status }) => 
+    $status === 'completed' ? '#166534' : 
+    $status === 'in-progress' ? '#854d0e' : 
+    '#4b5563'};
+`;
+
+const ConceptScore = styled.div`
+  margin-top: 0.5rem;
+  font-weight: 500;
+  color: #4338ca;
+`;
+
+const ConceptNotes = styled.div`
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  color: #4b5563;
+`;
+
+const EmptyMessage = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+  font-style: italic;
 `;
 
 const Spinner = styled.div`
@@ -198,4 +303,3 @@ const ModalError = styled.div`
   color: white;
   font-size: 1.25rem;
 `;
-

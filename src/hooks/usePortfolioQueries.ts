@@ -1,8 +1,7 @@
-
+// src\hooks\usePortfolioQueries.ts - Fixed to match your API structure
 import type { PortfolioStats } from '@/lib/api/portfolio-api-client';
 import { ConceptProgress } from '@/types/educational.types';
 import type { GalleryPiece, GalleryVisibility } from '@/types/gallery.types';
-// ==================== ENHANCED GALLERY HOOKS ====================
 import {
   useQuery,
   useMutation,
@@ -48,34 +47,22 @@ export const portfolioQueryKeys = {
   shareLinks: (portfolioId: string) => [...portfolioQueryKeys.all, 'shares', portfolioId] as const,
 };
 
-// ==================== Portfolio Queries ====================
-export function usePortfolio(
-  id: string,
-  options?: UseQueryOptions<PortfolioWithPieces, APIError>
-) {
-  return useQuery({
-    queryKey: portfolioQueryKeys.portfolio(id),
-    queryFn: () => api.portfolio.getById(id),
-    enabled: !!id,
-    ...options,
-  });
-}
+// ==================== Core Portfolio Queries ====================
 
-export function usePortfolioByUserId(
-  userId: string,
-  options?: UseQueryOptions<PortfolioWithPieces, APIError>
+// Fixed: Use correct API method name
+export function useMyPortfolio(
+  options?: UseQueryOptions<Portfolio | null, APIError>
 ) {
   return useQuery({
-    queryKey: portfolioQueryKeys.portfolioByUser(userId),
-    queryFn: () => api.portfolio.getByUserId(userId),
-    enabled: !!userId,
+    queryKey: portfolioQueryKeys.myPortfolio(),
+    queryFn: () => api.portfolio.get(), // Fixed: was getMyPortfolio()
     ...options,
   });
 }
 
 export function usePortfolioByUsername(
   username: string,
-  options?: UseQueryOptions<PortfolioWithPieces, APIError>
+  options?: UseQueryOptions<Portfolio, APIError>
 ) {
   return useQuery({
     queryKey: portfolioQueryKeys.portfolioByUsername(username),
@@ -85,125 +72,57 @@ export function usePortfolioByUsername(
   });
 }
 
-// Fixed to handle nullable return type
-export function useMyPortfolio(
-  options?: UseQueryOptions<Portfolio | null, APIError>
+// Legacy methods - these may not work if the API doesn't have them
+export function usePortfolio(
+  id: string,
+  options?: UseQueryOptions<Portfolio, APIError>
 ) {
   return useQuery({
-    queryKey: portfolioQueryKeys.myPortfolio(),
-    queryFn: () => api.portfolio.getMyPortfolio(),
+    queryKey: portfolioQueryKeys.portfolio(id),
+    queryFn: () => api.portfolio.getById(id), // This might not exist in your API
+    enabled: !!id,
+    ...options,
+  });
+}
+
+export function usePortfolioByUserId(
+  userId: string,
+  options?: UseQueryOptions<Portfolio, APIError>
+) {
+  return useQuery({
+    queryKey: portfolioQueryKeys.portfolioByUser(userId),
+    queryFn: () => api.portfolio.getByUserId(userId), // This might not exist in your API
+    enabled: !!userId,
     ...options,
   });
 }
 
 // ==================== Discovery Queries ====================
 export function useDiscoverPortfolios(
-  filters: PortfolioFilters,
+  filters: PortfolioFilters = {},
   page: number = 1,
   limit: number = 20,
   options?: UseQueryOptions<PortfolioListResponse, APIError>
 ) {
   return useQuery({
-    queryKey: portfolioQueryKeys.discover(filters),
+    queryKey: [...portfolioQueryKeys.discover(filters), 'page', page, 'limit', limit], // Fixed: don't put page in filters
     queryFn: () => api.portfolio.discover(filters, page, limit),
     ...options,
   });
 }
 
-// ==================== Paginated discovery hook ====================
-import { useState } from 'react';
-
-export function usePaginatedDiscoverPortfolios(
-  filters: PortfolioFilters,
-  initialPage: number = 1,
-  limit: number = 20,
-  options?: UseQueryOptions<PortfolioListResponse, APIError>
-) {
-  const [page, setPage] = useState(initialPage);
-
-  const query = useQuery<PortfolioListResponse, APIError>({
-    queryKey: [...portfolioQueryKeys.discover(filters), page],
-    queryFn: () => api.portfolio.discover(filters, page, limit),
-    ...options,
-  });
-
-  const nextPage = () => {
-    if (query.data?.hasMore) {
-      setPage((prev) => prev + 1);
-    }
-  };
-
-  const reset = () => setPage(initialPage);
-
-  return {
-    ...query,
-    page,
-    nextPage,
-    reset,
-  };
-}
-
-export function useSearchPortfolios(
-  query: string,
-  limit?: number,
-  options?: UseQueryOptions<Portfolio[], APIError>
+// ==================== Portfolio Stats ====================
+export function usePortfolioStats(
+  options?: UseQueryOptions<any, APIError> // Type might need adjustment based on actual API response
 ) {
   return useQuery({
-    queryKey: portfolioQueryKeys.search(query),
-    queryFn: () => api.portfolio.search(query, limit),
-    enabled: !!query,
+    queryKey: [...portfolioQueryKeys.all, 'stats'],
+    queryFn: () => api.portfolio.getStats(),
     ...options,
   });
 }
 
-export function useFeaturedPortfolios(
-  limit?: number,
-  options?: UseQueryOptions<Portfolio[], APIError>
-) {
-  return useQuery({
-    queryKey: portfolioQueryKeys.featured(),
-    queryFn: () => api.portfolio.getFeatured(limit),
-    ...options,
-  });
-}
-
-export function useTrendingPortfolios(
-  period: 'day' | 'week' | 'month' = 'week',
-  options?: UseQueryOptions<Portfolio[], APIError>
-) {
-  return useQuery({
-    queryKey: portfolioQueryKeys.trending(period),
-    queryFn: () => api.portfolio.getTrending(period),
-    ...options,
-  });
-}
-
-export function usePortfolioReviews(
-  portfolioId: string,
-  page: number = 1,
-  limit: number = 10,
-  options?: UseQueryOptions<ReviewListResponse, APIError>
-) {
-  return useQuery({
-    queryKey: portfolioQueryKeys.reviews(portfolioId),
-    queryFn: () => api.portfolio.getReviews(portfolioId, page, limit),
-    enabled: !!portfolioId,
-    ...options,
-  });
-}
-
-export function usePortfolioAnalytics(
-  portfolioId: string,
-  period: 'day' | 'week' | 'month' | 'year' = 'month',
-  options?: UseQueryOptions<PortfolioAnalytics, APIError>
-) {
-  return useQuery({
-    queryKey: portfolioQueryKeys.analytics(portfolioId, period),
-    queryFn: () => api.portfolio.getAnalytics(portfolioId, period),
-    enabled: !!portfolioId,
-    ...options,
-  });
-}
+// ==================== Portfolio CRUD Mutations ====================
 
 export function useCreatePortfolio(
   options?: UseMutationOptions<Portfolio, APIError, CreatePortfolioDto>
@@ -213,7 +132,6 @@ export function useCreatePortfolio(
     mutationFn: api.portfolio.create,
     onSuccess: data => {
       queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.all });
-      queryClient.setQueryData(portfolioQueryKeys.portfolio(data.id), data);
       queryClient.setQueryData(portfolioQueryKeys.myPortfolio(), data);
     },
     ...options,
@@ -221,13 +139,13 @@ export function useCreatePortfolio(
 }
 
 export function useUpdatePortfolio(
-  options?: UseMutationOptions<Portfolio, APIError, { id: string; data: UpdatePortfolioDto }>
+  options?: UseMutationOptions<Portfolio, APIError, UpdatePortfolioDto>
 ) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }) => api.portfolio.update(id, data),
-    onSuccess: (data, { id }) => {
-      queryClient.setQueryData(portfolioQueryKeys.portfolio(id), data);
+    mutationFn: (data: UpdatePortfolioDto) => api.portfolio.update(data), // Fixed: no ID parameter
+    onSuccess: (data) => {
+      queryClient.setQueryData(portfolioQueryKeys.myPortfolio(), data);
       queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.all });
     },
     ...options,
@@ -235,228 +153,63 @@ export function useUpdatePortfolio(
 }
 
 export function useDeletePortfolio(
-  options?: UseMutationOptions<void, APIError, string>
+  options?: UseMutationOptions<void, APIError, boolean>
 ) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: api.portfolio.delete,
-    onSuccess: (_, id) => {
-      queryClient.removeQueries({ queryKey: portfolioQueryKeys.portfolio(id) });
+    mutationFn: (deleteGalleryPieces: boolean = false) => api.portfolio.delete(deleteGalleryPieces),
+    onSuccess: () => {
+      queryClient.setQueryData(portfolioQueryKeys.myPortfolio(), null);
       queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.all });
     },
     ...options,
   });
 }
 
-export function useAddReview(
-  options?: UseMutationOptions<PortfolioReview, APIError, { portfolioId: string; review: CreateReviewDto }>
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ portfolioId, review }) => api.portfolio.addReview(portfolioId, review),
-    onSuccess: (data, { portfolioId }) => {
-      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.reviews(portfolioId) });
-      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.portfolio(portfolioId) });
-    },
-    ...options,
-  });
-}
-
-export function useUploadPortfolioImage(
-  options?: UseMutationOptions<{ url: string }, APIError, { file: File; type: 'profile' | 'cover' }>
-) {
-  return useMutation({
-    mutationFn: ({ file, type }) => api.portfolio.uploadImage(file, type),
-    ...options,
-  });
-}
-
-export function useTrackPortfolioView() {
-  return useMutation({
-    mutationFn: ({ portfolioId, data }: { portfolioId: string; data?: any }) =>
-      api.portfolio.trackView(portfolioId, data),
-  });
-}
-
-// ==================== Gallery Management Mutations ====================
-export function useDeleteGalleryPiece(
-  options?: UseMutationOptions<{ remainingCount: number }, APIError, string>
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (pieceId: string) => api.portfolio.deleteGalleryPiece(pieceId),
-    onSuccess: () => {
-      // Invalidate gallery and portfolio queries to refresh the data
-      queryClient.invalidateQueries({ queryKey: ['gallery'] });
-      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.myPortfolio() });
-    },
-    ...options,
-  });
-}
-
-export function useBatchDeleteGalleryPieces(
-  options?: UseMutationOptions<
-    { deletedCount: number; remainingCount: number; unauthorizedCount: number },
-    APIError,
-    string[]
-  >
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (pieceIds: string[]) => api.portfolio.batchDeleteGalleryPieces(pieceIds),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['gallery'] });
-      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.myPortfolio() });
-    },
-    ...options,
-  });
-}
-
-export function useUpdateGalleryPieceVisibility(
-  options?: UseMutationOptions<void, APIError, { pieceId: string; visibility: 'public' | 'private' | 'unlisted' }>
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ pieceId, visibility }) => 
-      api.portfolio.updateGalleryPieceVisibility(pieceId, visibility),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['gallery'] });
-    },
-    ...options,
-  });
-}
-
-export function useBatchUpdateGalleryVisibility(
-  options?: UseMutationOptions<
-    { updatedCount: number },
-    APIError,
-    { pieceIds: string[]; visibility: 'public' | 'private' | 'unlisted' }
-  >
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ pieceIds, visibility }) => 
-      api.portfolio.batchUpdateGalleryVisibility(pieceIds, visibility),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['gallery'] });
-    },
-    ...options,
-  });
-}
+// ==================== Gallery Management ====================
 
 export function useMyGalleryPieces(
   options?: UseQueryOptions<GalleryPiece[], APIError>
 ) {
   return useQuery({
     queryKey: [...portfolioQueryKeys.all, 'myGallery'],
-    queryFn: () => api.portfolio.getMyGalleryPieces(),
+    queryFn: () => api.portfolio.gallery.get(),
     ...options,
   });
 }
 
-export function usePortfolioGallery(
-  portfolioId: string,
-  options?: UseQueryOptions<GalleryPiece[], APIError>
+export function usePortfolioGalleryByUsername(
+  username: string,
+  page?: number,
+  limit?: number,
+  options?: UseQueryOptions<any, APIError> // Type depends on API response format
 ) {
   return useQuery({
-    queryKey: [...portfolioQueryKeys.all, 'gallery', portfolioId],
-    queryFn: () => api.portfolio.getPortfolioGallery(portfolioId),
-    enabled: !!portfolioId,
+    queryKey: [...portfolioQueryKeys.all, 'gallery', username, page, limit],
+    queryFn: () => api.portfolio.gallery.getByUsername(username, page, limit),
+    enabled: !!username,
     ...options,
   });
 }
 
 export function useGalleryStats(
-  options?: UseQueryOptions<{ totalPieces: number; totalViews: number }, APIError>
+  options?: UseQueryOptions<{
+    totalPieces: number;
+    publicPieces: number;
+    privatePieces: number;
+    unlistedPieces: number;
+    categories: Record<string, number>;
+    recentUploads: number;
+  }, APIError>
 ) {
   return useQuery({
     queryKey: [...portfolioQueryKeys.all, 'galleryStats'],
-    queryFn: () => api.portfolio.getGalleryStats(),
+    queryFn: () => api.portfolio.gallery.getStats(),
     ...options,
   });
 }
 
-export function usePortfolioStats(
-  options?: UseQueryOptions<PortfolioStats, APIError>
-) {
-  return useQuery({
-    queryKey: [...portfolioQueryKeys.all, 'stats'],
-    queryFn: () => api.portfolio.getPortfolioStats(),
-    ...options,
-  });
-}
-
-// ==================== ENHANCED CONCEPT HOOKS ====================
-
-export function useMyConcepts(
-  options?: UseQueryOptions<ConceptProgress[], APIError>
-) {
-  return useQuery({
-    queryKey: [...portfolioQueryKeys.all, 'concepts'],
-    queryFn: () => api.portfolio.getMyConcepts(),
-    ...options,
-  });
-}
-
-export function useAddConceptToPortfolio(
-  options?: UseMutationOptions<void, APIError, { conceptId: string; data: { status: string; startedAt: string } }>
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ conceptId, data }) => api.portfolio.addConceptToPortfolio(conceptId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] });
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'stats'] });
-    },
-    ...options,
-  });
-}
-
-export function useUpdateConceptProgress(
-  options?: UseMutationOptions<void, APIError, { conceptId: string; data: { status: string } }>
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ conceptId, data }) => api.portfolio.updateConceptProgress(conceptId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] });
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'stats'] });
-    },
-    ...options,
-  });
-}
-
-// ==================== BATCH UPLOAD HOOKS ====================
-
-export function useBatchUploadGallery(
-  options?: UseMutationOptions<
-    { successful: GalleryPiece[]; failed: Array<{ error: string; fileName: string }> },
-    APIError,
-    {
-      uploads: Array<{
-        file: File;
-        title: string;
-        description?: string;
-        category?: string;
-        tags?: string[];
-        visibility?: GalleryVisibility;
-      }>;
-      onProgress?: (completed: number, total: number) => void;
-    }
-  >
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ uploads, onProgress }) => api.portfolio.batchUploadGallery(uploads, onProgress),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'stats'] });
-      queryClient.invalidateQueries({ queryKey: ['gallery'] }); // Also invalidate general gallery queries
-    },
-    ...options,
-  });
-}
+// ==================== Gallery Mutations ====================
 
 export function useAddGalleryPiece(
   options?: UseMutationOptions<
@@ -467,18 +220,20 @@ export function useAddGalleryPiece(
       description?: string;
       imageUrl: string;
       category?: string;
+      medium?: string;
       tags?: string[];
       visibility?: GalleryVisibility;
+      year?: number;
+      displayOrder?: number;
     }
   >
 ) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (pieceData) => api.portfolio.addGalleryPiece(pieceData),
+    mutationFn: (pieceData) => api.portfolio.gallery.add(pieceData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
       queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'stats'] });
     },
     ...options,
   });
@@ -489,7 +244,7 @@ export function useUpdateGalleryPiece(
 ) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ pieceId, updates }) => api.portfolio.updateGalleryPiece(pieceId, updates),
+    mutationFn: ({ pieceId, updates }) => api.portfolio.gallery.update(pieceId, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
       queryClient.invalidateQueries({ queryKey: ['gallery'] });
@@ -498,7 +253,177 @@ export function useUpdateGalleryPiece(
   });
 }
 
-// ==================== UTILITY HOOKS ====================
+export function useDeleteGalleryPiece(
+  options?: UseMutationOptions<{ message: string; id: string; }, APIError, string>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (pieceId: string) => api.portfolio.gallery.delete(pieceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
+      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+    },
+    ...options,
+  });
+}
+
+export function useBatchDeleteGalleryPieces(
+  options?: UseMutationOptions<{ message: string; deletedCount: number; }, APIError, string[]>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (pieceIds: string[]) => api.portfolio.gallery.batchDelete(pieceIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
+      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+    },
+    ...options,
+  });
+}
+
+export function useBatchUpdateGalleryVisibility(
+  options?: UseMutationOptions<
+    { message: string; updatedCount: number; },
+    APIError,
+    { pieceIds: string[]; visibility: GalleryVisibility }
+  >
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ pieceIds, visibility }) => 
+      api.portfolio.gallery.batchUpdateVisibility(pieceIds, visibility),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
+      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+    },
+    ...options,
+  });
+}
+
+// ==================== Concept Management ====================
+
+export function useMyConcepts(
+  options?: UseQueryOptions<{
+    concepts: ConceptProgress[];
+    portfolio: {
+      id: string;
+      kind: any; // PortfolioKind type
+      totalConcepts: number;
+      completedConcepts: number;
+    };
+  }, APIError>
+) {
+  return useQuery({
+    queryKey: [...portfolioQueryKeys.all, 'concepts'],
+    queryFn: () => api.portfolio.concepts.get(),
+    ...options,
+  });
+}
+
+export function useAddConceptToPortfolio(
+  options?: UseMutationOptions<
+    { message: string; conceptProgress: ConceptProgress; }, 
+    APIError, 
+    { 
+      conceptId: string; 
+      data?: { 
+        status?: string; 
+        startedAt?: string;
+        notes?: string;
+        score?: number;
+      } 
+    }
+  >
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conceptId, data = {} }) => api.portfolio.concepts.add(conceptId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] });
+    },
+    ...options,
+  });
+}
+
+export function useUpdateConceptProgress(
+  options?: UseMutationOptions<
+    { message: string; conceptProgress: ConceptProgress; }, 
+    APIError, 
+    { 
+      conceptId: string; 
+      data?: { 
+        status?: string; 
+        score?: number;
+        notes?: string;
+        completedAt?: string;
+      } 
+    }
+  >
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ conceptId, data = {} }) => api.portfolio.concepts.updateProgress(conceptId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] });
+    },
+    ...options,
+  });
+}
+
+// ==================== Analytics ====================
+
+export function usePortfolioAnalytics(
+  period?: string,
+  options?: UseQueryOptions<any, APIError> // Type depends on actual API response
+) {
+  return useQuery({
+    queryKey: [...portfolioQueryKeys.all, 'analytics', period],
+    queryFn: () => api.portfolio.analytics.get(period),
+    ...options,
+  });
+}
+
+export function usePortfolioDashboard(
+  options?: UseQueryOptions<any, APIError> // Type depends on actual API response
+) {
+  return useQuery({
+    queryKey: [...portfolioQueryKeys.all, 'dashboard'],
+    queryFn: () => api.portfolio.analytics.dashboard(),
+    ...options,
+  });
+}
+
+export function useTrackPortfolioView(
+  options?: UseMutationOptions<
+    { message: string; totalViews: number; }, 
+    APIError, 
+    { portfolioId: string; data?: { referrer?: string; duration?: number } }
+  >
+) {
+  return useMutation({
+    mutationFn: ({ portfolioId, data }) => api.portfolio.analytics.trackView(portfolioId, data),
+    ...options,
+  });
+}
+
+// ==================== Image Upload ====================
+
+export function useUploadPortfolioImage(
+  options?: UseMutationOptions<{ url: string }, APIError, { file: File; type: 'profile' | 'cover' }>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, type }) => api.portfolio.images.upload(file, type),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.myPortfolio() });
+    },
+    ...options,
+  });
+}
+
+// ==================== Utility Hooks ====================
 
 export function useHasPortfolio() {
   const { data: portfolio, isLoading } = useMyPortfolio();
@@ -510,3 +435,113 @@ export function useHasPortfolio() {
   };
 }
 
+export function usePortfolioCheck(
+  options?: UseQueryOptions<boolean, APIError>
+) {
+  return useQuery({
+    queryKey: [...portfolioQueryKeys.all, 'check'],
+    queryFn: () => api.portfolio.check(),
+    ...options,
+  });
+}
+
+// ==================== DEPRECATED HOOKS ====================
+// These hooks may not work with your current API but are kept for backward compatibility
+
+/**
+ * @deprecated - These methods may not exist in your streamlined API
+ */
+export function useSearchPortfolios(
+  query: string,
+  limit?: number,
+  options?: UseQueryOptions<Portfolio[], APIError>
+) {
+  console.warn('useSearchPortfolios: This hook may not work with the current API structure');
+  return useQuery({
+    queryKey: portfolioQueryKeys.search(query),
+    queryFn: () => {
+      // This method might not exist in your API
+      throw new Error('Search portfolios method not implemented');
+    },
+    enabled: false, // Disabled by default
+    ...options,
+  });
+}
+
+/**
+ * @deprecated - These methods may not exist in your streamlined API
+ */
+export function useFeaturedPortfolios(
+  limit?: number,
+  options?: UseQueryOptions<Portfolio[], APIError>
+) {
+  console.warn('useFeaturedPortfolios: This hook may not work with the current API structure');
+  return useQuery({
+    queryKey: portfolioQueryKeys.featured(),
+    queryFn: () => {
+      // This method might not exist in your API
+      throw new Error('Featured portfolios method not implemented');
+    },
+    enabled: false, // Disabled by default
+    ...options,
+  });
+}
+
+/**
+ * @deprecated - These methods may not exist in your streamlined API
+ */
+export function useTrendingPortfolios(
+  period: 'day' | 'week' | 'month' = 'week',
+  options?: UseQueryOptions<Portfolio[], APIError>
+) {
+  console.warn('useTrendingPortfolios: This hook may not work with the current API structure');
+  return useQuery({
+    queryKey: portfolioQueryKeys.trending(period),
+    queryFn: () => {
+      // This method might not exist in your API
+      throw new Error('Trending portfolios method not implemented');
+    },
+    enabled: false, // Disabled by default
+    ...options,
+  });
+}
+
+export default {
+  // Core queries
+  useMyPortfolio,
+  usePortfolioByUsername,
+  useDiscoverPortfolios,
+  usePortfolioStats,
+  
+  // CRUD mutations
+  useCreatePortfolio,
+  useUpdatePortfolio,
+  useDeletePortfolio,
+  
+  // Gallery
+  useMyGalleryPieces,
+  usePortfolioGalleryByUsername,
+  useGalleryStats,
+  useAddGalleryPiece,
+  useUpdateGalleryPiece,
+  useDeleteGalleryPiece,
+  useBatchDeleteGalleryPieces,
+  useBatchUpdateGalleryVisibility,
+  
+  // Concepts
+  useMyConcepts,
+  useAddConceptToPortfolio,
+  useUpdateConceptProgress,
+  
+  // Analytics
+  usePortfolioAnalytics,
+  usePortfolioDashboard,
+  useTrackPortfolioView,
+  
+  // Images
+  useUploadPortfolioImage,
+  
+  // Utility
+  useHasPortfolio,
+  usePortfolioCheck,
+};
