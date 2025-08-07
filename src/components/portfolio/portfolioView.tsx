@@ -1,17 +1,17 @@
-// src/components/portfolio/PortfolioView.tsx - Fixed for current API
+// src/components/portfolio/PortfolioView.tsx - Fixed without Gallery import
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { 
   Globe, Lock, Link as LinkIcon, Share2, Star, MessageSquare, 
   MapPin, Calendar, Award, ExternalLink, Instagram, Twitter, 
-  Loader2, AlertCircle 
+  Loader2, AlertCircle, Eye, Image as ImageIcon 
 } from 'lucide-react';
-import { Gallery } from '@/components/gallery';
 import { usePortfolioByUsername } from '@/hooks/usePortfolioQueries';
 import { useAuth } from '@/providers/authProvider';
+import { usePortfolioManager } from '@/services/portfolioService';
 import { Portfolio } from '@/types/portfolio.types';
 
 // ==================== Component Props ====================
@@ -32,8 +32,19 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ username }) => {
     error 
   } = usePortfolioByUsername(username);
 
+  // Get gallery pieces for this portfolio
+  const {
+    galleryPieces,
+    loading: galleryLoading
+  } = usePortfolioManager();
+
   // Check if user owns this portfolio
   const isOwner = isAuthenticated && user?.username === username;
+
+  // Filter gallery pieces to show only public ones (unless owner)
+  const visiblePieces = galleryPieces?.filter(piece => 
+    isOwner || piece.visibility === 'public'
+  ) || [];
 
   // ==================== Event Handlers ====================
   const handleShare = async () => {
@@ -273,7 +284,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ username }) => {
         </SocialSection>
       )}
 
-      {/* Gallery Section */}
+      {/* Gallery Section - REPLACED with Simple Gallery */}
       <GallerySection>
         <SectionHeader>
           <SectionTitle>
@@ -288,21 +299,60 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ username }) => {
           )}
         </SectionHeader>
         
-        <Gallery
-          mode="portfolio"
-          portfolioUserId={portfolio.userId}
-          portfolioUsername={username}
-          initialFilters={{
-            visibility: 'public' // Only show public pieces in portfolio view
-          }}
-          viewConfig={{
-            layout: portfolio.settings?.defaultGalleryView || 'masonry',
-            itemsPerPage: portfolio.settings?.piecesPerPage || 20,
-            showPrivateIndicator: false,
-            enableSelection: false,
-            enableQuickEdit: false
-          }}
-        />
+        {/* Simple Gallery Implementation */}
+        {galleryLoading ? (
+          <GalleryLoading>
+            <Loader2 className="animate-spin" size={32} />
+            <p>Loading gallery...</p>
+          </GalleryLoading>
+        ) : visiblePieces.length === 0 ? (
+          <EmptyGallery>
+            <EmptyIcon>
+              <ImageIcon size={48} />
+            </EmptyIcon>
+            <EmptyTitle>No artworks to display</EmptyTitle>
+            <EmptyDescription>
+              {isOwner 
+                ? "You haven't uploaded any public artworks yet." 
+                : "This portfolio doesn't have any public artworks to display."}
+            </EmptyDescription>
+            {isOwner && (
+              <ManageButton onClick={() => router.push('/dashboard/gallery')}>
+                <Eye size={16} />
+                Manage Gallery
+              </ManageButton>
+            )}
+          </EmptyGallery>
+        ) : (
+          <SimpleGalleryGrid>
+            {visiblePieces.map((piece) => (
+              <GalleryItem key={piece.id}>
+                <GalleryItemImage>
+                  <img 
+                    src={piece.thumbnailUrl || piece.imageUrl} 
+                    alt={piece.title} 
+                    loading="lazy"
+                  />
+                </GalleryItemImage>
+                <GalleryItemInfo>
+                  <GalleryItemTitle>{piece.title}</GalleryItemTitle>
+                  {piece.year && <GalleryItemYear>{piece.year}</GalleryItemYear>}
+                  {piece.medium && <GalleryItemMedium>{piece.medium}</GalleryItemMedium>}
+                </GalleryItemInfo>
+              </GalleryItem>
+            ))}
+          </SimpleGalleryGrid>
+        )}
+
+        {/* Show manage link for owners */}
+        {isOwner && visiblePieces.length > 0 && (
+          <GalleryManageLink>
+            <ManageButton onClick={() => router.push('/dashboard/gallery')}>
+              <Eye size={16} />
+              Manage Gallery ({visiblePieces.length} artworks)
+            </ManageButton>
+          </GalleryManageLink>
+        )}
       </GallerySection>
     </Container>
   );
@@ -676,6 +726,130 @@ const VisibilityBadge = styled.div<{ $visibility: string }>`
   color: ${props => props.$visibility === 'private' ? '#6b7280' : '#3b82f6'};
   border-radius: 999px;
   font-size: 0.875rem;
+`;
+
+// Simple Gallery Styles
+const GalleryLoading = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 1rem;
+  color: #6b7280;
+`;
+
+const EmptyGallery = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+`;
+
+const EmptyIcon = styled.div`
+  color: #d1d5db;
+  margin-bottom: 1rem;
+`;
+
+const EmptyTitle = styled.h3`
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.5rem 0;
+`;
+
+const EmptyDescription = styled.p`
+  color: #6b7280;
+  margin: 0 0 1.5rem 0;
+  max-width: 400px;
+  line-height: 1.5;
+`;
+
+const ManageButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+  }
+`;
+
+const SimpleGalleryGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+`;
+
+const GalleryItem = styled.div`
+  background: #f9fafb;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s;
+  
+  &:hover {
+    transform: translateY(-2px);
+  }
+`;
+
+const GalleryItemImage = styled.div`
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #f3f4f6;
+  
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+`;
+
+const GalleryItemInfo = styled.div`
+  padding: 1rem;
+`;
+
+const GalleryItemTitle = styled.h4`
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  color: #111827;
+`;
+
+const GalleryItemYear = styled.p`
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+`;
+
+const GalleryItemMedium = styled.p`
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin: 0.25rem 0 0 0;
+`;
+
+const GalleryManageLink = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
 `;
 
 export default PortfolioView;

@@ -1,4 +1,4 @@
-// src/components/portfolio/edit.tsx - Fixed for current API
+// src/components/portfolio/edit.tsx - Fixed without Gallery import
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -6,13 +6,12 @@ import styled from 'styled-components';
 import { useRouter } from 'next/navigation';
 import { 
   Save, Upload, X, Globe, Lock, Link as LinkIcon, 
-  Plus, Trash2, Eye, EyeOff, Loader2 
+  Plus, Trash2, Eye, EyeOff, Loader2, ExternalLink 
 } from 'lucide-react';
 import { useAuth } from '@/providers/authProvider';
 import { useMyPortfolio, useUpdatePortfolio, useUploadPortfolioImage } from '@/hooks/usePortfolioQueries';
 import { VisibilityToggle } from '@/components/gallery/rendering';
 import { UpdatePortfolioDto, PortfolioVisibility } from '@/types/portfolio.types';
-import { Gallery } from '@/components/gallery';
 
 export default function PortfolioEditPage() {
   const router = useRouter();
@@ -376,21 +375,24 @@ export default function PortfolioEditPage() {
           </SocialLinksGrid>
         </Section>
 
-        {/* Gallery Management Section */}
+        {/* Gallery Management Section - REPLACED */}
         <Section>
           <SectionTitle>Gallery Management</SectionTitle>
-          <GalleryWrapper>
-            <Gallery 
-              mode="manage"
-              viewConfig={{
-                layout: 'grid',
-                itemsPerPage: 12,
-                showPrivateIndicator: true,
-                enableSelection: true,
-                enableQuickEdit: true
-              }}
-            />
-          </GalleryWrapper>
+          <GalleryLinkContainer>
+            <GalleryLinkContent>
+              <GalleryLinkIcon>🎨</GalleryLinkIcon>
+              <GalleryLinkText>
+                <GalleryLinkTitle>Manage Your Artworks</GalleryLinkTitle>
+                <GalleryLinkDescription>
+                  Upload, organize, and edit your artwork collection in the dedicated gallery interface.
+                </GalleryLinkDescription>
+              </GalleryLinkText>
+            </GalleryLinkContent>
+            <GalleryLinkButton onClick={() => router.push('/dashboard/gallery')}>
+              <ExternalLink size={16} />
+              Open Gallery Manager
+            </GalleryLinkButton>
+          </GalleryLinkContainer>
         </Section>
 
         {/* Visibility Section */}
@@ -804,11 +806,66 @@ const SocialLinksGrid = styled.div`
   gap: 1rem;
 `;
 
-const GalleryWrapper = styled.div`
-  border: 1px solid #e5e7eb;
+// NEW: Gallery Link Styles
+const GalleryLinkContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 1rem;
-  background: #f9fafb;
+  
+  @media (max-width: 640px) {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+`;
+
+const GalleryLinkContent = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const GalleryLinkIcon = styled.div`
+  font-size: 2rem;
+`;
+
+const GalleryLinkText = styled.div``;
+
+const GalleryLinkTitle = styled.h3`
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.25rem 0;
+`;
+
+const GalleryLinkDescription = styled.p`
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+`;
+
+const GalleryLinkButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+  }
 `;
 
 const SettingsGrid = styled.div`

@@ -356,7 +356,6 @@ export interface CreatePortfolioInput {
 }
 
 // DTO for API calls
-// DTO for API calls
 export interface CreatePortfolioDto {
   title: string;
   tagline?: string;

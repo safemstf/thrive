@@ -173,7 +173,8 @@ export const PortfolioCreation: React.FC<PortfolioCreationProps> = ({
           bio: portfolioData.bio,
           visibility: portfolioData.visibility,
           specializations: portfolioData.specializations,
-          tags: portfolioData.tags
+          tags: portfolioData.tags,
+          kind: portfolioData.kind,
         };
         response = await api.portfolio.create(apiData);
       }

@@ -74,8 +74,8 @@ export function usePortfolioManagement() {
         bio: data.bio || '',
         visibility: data.visibility || 'public',
         specializations: data.specializations || [],
-        tags: data.tags || []
-        // Note: 'kind' might not be in CreatePortfolioDto - check your types
+        tags: data.tags || [],
+        kind: data.kind || 'professional'  // Default to 'professional'
       };
 
       console.log('Creating portfolio with data:', portfolioData);

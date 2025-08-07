@@ -1,15 +1,11 @@
-// src/components/gallery/galleryLogic.tsx
+// src/components/gallery/galleryLogic.tsx - Fixed version
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApiClient } from '@/lib/api-client';
 import { useAuth } from '@/providers/authProvider';
-import type { Portfolio } from '@/types/portfolio.types';
+import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
 import type {
   GalleryPiece,
-  ArtworkCategory,
-  GalleryLayout,
-  BatchUploadResult,
-  GalleryUploadFile
 } from '@/types/gallery.types';
 
 // Local types for component logic
@@ -82,9 +78,12 @@ export const useGalleryData = () => {
             const myPieces = pieces.filter(p => p.ownerId === user?.id || p.portfolioId === portfolioData.id);
             setGalleryPieces(myPieces);
 
-            } else if (portfolioData && portfolioData.kind === 'educational') {
+          } else if (portfolioData && portfolioData.kind === 'educational') {
             setGalleryPieces([]);
             setError('Educational portfolios focus on learning progress. Switch to Creative or Hybrid to manage artwork.');
+          } else if (portfolioData && portfolioData.kind === 'professional') {
+            setGalleryPieces([]);
+            setError('Professional portfolios focus on career achievements. Switch to Creative or Hybrid to manage artwork.');
           } else {
             setGalleryPieces([]);
           }
@@ -111,14 +110,36 @@ export const useGalleryData = () => {
     }
   }, [isAuthenticated, user?.id, apiClient]);
 
-  const createPortfolio = useCallback(async (type: 'creative' | 'hybrid') => {
+  // FIXED: Now uses the type parameter properly
+  const createPortfolio = useCallback(async (kind: PortfolioKind) => {
     try {
+      // Generate appropriate bio based on portfolio kind
+      const bios = {
+        creative: 'Welcome to my creative portfolio. I\'m excited to share my artistic journey and showcase my creative works.',
+        hybrid: 'Welcome to my portfolio. Here you\'ll find both my professional achievements and creative projects.',
+        professional: 'Welcome to my professional portfolio. Explore my career achievements, skills, and experience.',
+        educational: 'Welcome to my learning portfolio. Follow my educational journey and academic progress.'
+      };
+
+      const taglines = {
+        creative: 'Sharing my creative journey',
+        hybrid: 'Balancing creativity and professionalism',
+        professional: 'Building excellence through experience',
+        educational: 'Learning and growing every day'
+      };
+
       const newPortfolio = await apiClient.portfolio.create({
         title: `${user?.name || 'My'} Portfolio`,
-        bio: '',
+        bio: bios[kind],
+        kind: kind, // FIXED: Now uses the actual kind parameter
         visibility: 'public',
         specializations: [],
-        tags: []
+        tags: [],
+        tagline: taglines[kind],
+        settings: {
+          allowComments: true,
+          showStats: true,
+        }
       });
       
       setPortfolio(newPortfolio);

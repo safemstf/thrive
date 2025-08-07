@@ -139,9 +139,9 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     try {
       const newPortfolio = await api.portfolio.create({
         title: `${user?.name || 'My'} Portfolio`,
-        bio: 'Welcome to my creative portfolio.',
+        bio: 'Welcome to my creative portfolio. I\'m excited to share my artistic journey with you.',
+        kind: 'creative',
         visibility: 'public',
-        kind: 'creative', // Add the required kind field
         specializations: [],
         tags: [],
         tagline: 'Sharing my creative journey',
