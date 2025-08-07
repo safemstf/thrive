@@ -371,8 +371,8 @@ export class PortfolioApiClient extends BaseApiClient {
     }
   }
 
-  async uploadImageRaw(formData: FormData): Promise<any> {
-    const response = await fetch(`${this.baseURL}/portfolios/upload-image`, {
+  async uploadRaw(formData: FormData): Promise<any> {
+    const response = await fetch(`${this.baseURL}/api/portfolios/upload-image`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.getAuthToken()}`,
@@ -391,7 +391,6 @@ export class PortfolioApiClient extends BaseApiClient {
     
     return response.json();
   }
-
   // ==================== BATCH OPERATIONS ====================
 
   async batchUploadGallery(
