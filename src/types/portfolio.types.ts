@@ -144,6 +144,8 @@ export interface Portfolio extends BaseEntity {
 export interface PortfolioSettings {
   // Review Settings
   allowReviews: boolean;
+  allowComments: boolean;
+
   requireReviewApproval: boolean;
   allowAnonymousReviews: boolean;
   
@@ -354,15 +356,16 @@ export interface CreatePortfolioInput {
 }
 
 // DTO for API calls
+// DTO for API calls
 export interface CreatePortfolioDto {
   title: string;
   tagline?: string;
   bio: string;
   visibility: PortfolioVisibility;
+  kind: PortfolioKind; // Add this required field
   specializations: string[];
   tags: string[];
   settings?: Partial<PortfolioSettings>;
-  // Note: kind might not be supported in create API - handle separately
 }
 
 export interface UpdatePortfolioDto extends Partial<CreatePortfolioDto> {

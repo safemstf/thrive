@@ -110,6 +110,72 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     }));
   };
 
+  // Simplified portfolio resolution
+  const resolvePortfolioId = async (): Promise<string> => {
+    console.log('Resolving portfolio ID...');
+    
+    // If portfolioId is provided, use it
+    if (portfolioId) {
+      console.log('Using provided portfolio ID:', portfolioId);
+      return portfolioId;
+    }
+
+    try {
+      // Try to get user's existing portfolio
+      console.log('Fetching user portfolio...');
+      const existingPortfolio = await api.portfolio.get();
+      
+      if (existingPortfolio && existingPortfolio.id) {
+        console.log('Found existing portfolio:', existingPortfolio.id);
+        return existingPortfolio.id;
+      }
+    } catch (error: any) {
+      console.log('No existing portfolio found or error fetching:', error.message);
+      // Continue to create new portfolio
+    }
+
+    // Create a new portfolio
+    console.log('Creating new portfolio...');
+    try {
+      const newPortfolio = await api.portfolio.create({
+        title: `${user?.name || 'My'} Portfolio`,
+        bio: 'Welcome to my creative portfolio.',
+        visibility: 'public',
+        kind: 'creative', // Add the required kind field
+        specializations: [],
+        tags: [],
+        tagline: 'Sharing my creative journey',
+        settings: {
+          allowComments: true,
+          showStats: true,
+        },
+      });
+      
+      console.log('Created new portfolio:', newPortfolio.id);
+      return newPortfolio.id;
+    } catch (createError: any) {
+      console.error('Failed to create portfolio:', createError);
+      
+      // If creation failed due to existing portfolio, try to fetch again
+      if (createError.status === 409 || createError.message?.includes('already exists')) {
+        console.log('Portfolio exists, retrying fetch...');
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        
+        try {
+          const retryPortfolio = await api.portfolio.get();
+          if (retryPortfolio && retryPortfolio.id) {
+            console.log('Retrieved portfolio on retry:', retryPortfolio.id);
+            return retryPortfolio.id;
+          }
+        } catch (retryError) {
+          console.error('Retry failed:', retryError);
+        }
+      }
+      
+      throw new Error(`Failed to resolve portfolio: ${createError.message || 'Unknown error'}`);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -134,118 +200,77 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     try {
       console.log('Starting upload process...');
 
-      // Check if portfolio exists
-      let pid = portfolioId;
-      if (!pid) {
-        try {
-          // First, check if user already has a portfolio
-          const portfolioResponse = await api.portfolio.get();
-          console.log('Portfolio check response:', portfolioResponse);
-          
-          if (!portfolioResponse) {
-            // User doesn't have a portfolio, create one
-            console.log('No portfolio exists, creating new one...');
-            
-            const newPortfolio = await api.portfolio.create({
-              title: `${user?.name || 'My'} Portfolio`,
-              bio: '',
-              visibility: 'public',
-              specializations: [],
-              tags: [],
-              tagline: '',
-              settings: {},
-            });
-            
-            pid = newPortfolio.id;
-            console.log('Created new portfolio:', pid);
-          } else {
-            // Portfolio exists, use it
-            pid = portfolioResponse.id;
-            console.log('Using existing portfolio:', pid);
-          }
-        } catch (portfolioError: any) {
-          console.error('Portfolio error:', portfolioError);
-          
-          // Special handling for 409 conflict (portfolio already exists)
-          if (portfolioError.status === 409 || portfolioError.message?.includes('already exists')) {
-            console.log('Portfolio already exists, fetching it...');
-            
-            // Wait a moment for the backend to be consistent
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            try {
-              const existingPortfolio = await api.portfolio.get();
-              if (existingPortfolio) {
-                pid = existingPortfolio.id;
-                console.log('Retrieved existing portfolio:', pid);
-              } else {
-                // If still can't get it, try getting by user ID
-                if (user?.id) {
-                  const userPortfolio = await api.portfolio.getByUserId(user.id);
-                  pid = userPortfolio.id;
-                  console.log('Retrieved portfolio by user ID:', pid);
-                } else {
-                  throw new Error('Unable to retrieve existing portfolio');
-                }
-              }
-            } catch (retryError) {
-              console.error('Failed to retrieve existing portfolio:', retryError);
-              throw new Error('Portfolio exists but cannot be retrieved. Please refresh the page and try again.');
-            }
-          } else {
-            throw portfolioError;
-          }
-        }
-      }
+      // Step 1: Resolve portfolio ID
+      const resolvedPortfolioId = await resolvePortfolioId();
+      console.log('Portfolio ID resolved:', resolvedPortfolioId);
 
-      if (!pid) {
-        throw new Error('Failed to determine portfolio ID');
-      }
-
-      // Parse tags
-      const tagsArray = formData.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0);
-
-      // Step 1: Upload the image file
+      // Step 2: Upload the image file
+      console.log('Uploading image file...');
       const imageFormData = new FormData();
       imageFormData.append('file', selectedFile);
+      
       const imageUploadResponse = await api.portfolio.images.uploadRaw(imageFormData);
-
+      
       if (!imageUploadResponse?.url) {
         throw new Error('Image upload failed - no URL returned');
       }
+      
+      console.log('Image uploaded successfully:', imageUploadResponse.url);
 
-      // Step 2: Create the gallery piece with metadata
+      // Step 3: Parse tags
+      const tagsArray = formData.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0 && tag.length <= 50) // Validate tag length
+        .slice(0, 10); // Limit to 10 tags
+
+      // Step 4: Create the gallery piece with metadata
+      console.log('Creating gallery piece...');
       const galleryPieceData = {
-        title: formData.title,
-        description: formData.description,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         imageUrl: imageUploadResponse.url,
         category: formData.category,
-        medium: formData.medium,
+        medium: formData.medium.trim(),
         tags: tagsArray,
         visibility: 'public' as GalleryVisibility,
         year: formData.year,
-        displayOrder: 0, // Set appropriate display order
-        // Add other required fields
+        displayOrder: 0,
+        // Add price if provided
+        ...(formData.price && !isNaN(parseFloat(formData.price)) && {
+          price: parseFloat(formData.price)
+        }),
+        // Add artist if different from user name
+        ...(formData.artist.trim() && formData.artist.trim() !== user?.name && {
+          artist: formData.artist.trim()
+        }),
       };
 
       const galleryResponse = await api.portfolio.gallery.add(galleryPieceData);
-      console.log('Gallery piece created:', galleryResponse);
+      console.log('Gallery piece created successfully:', galleryResponse.id);
 
-      console.log('Upload and gallery piece creation successful!');
+      // Success!
       onSuccess();
     } catch (error: any) {
       console.error('Upload error:', error);
-      let errorMessage = 'Failed to upload artwork';
+      
+      let errorMessage = 'Failed to upload artwork. Please try again.';
 
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-
-      if (error.status === 401 || errorMessage.includes('401') || errorMessage.includes('NO_AUTH_TOKEN')) {
-        errorMessage = 'Authentication failed. Please try logging out and back in.';
+      // Handle specific error cases
+      if (error.message) {
+        if (error.message.includes('401') || error.message.includes('authentication')) {
+          errorMessage = 'Authentication failed. Please refresh the page and try again.';
+        } else if (error.message.includes('403')) {
+          errorMessage = 'You do not have permission to upload to this portfolio.';
+        } else if (error.message.includes('413') || error.message.includes('file too large')) {
+          errorMessage = 'File is too large. Please choose an image under 10MB.';
+        } else if (error.message.includes('415') || error.message.includes('unsupported')) {
+          errorMessage = 'Unsupported file type. Please choose a JPG, PNG, or GIF image.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else {
+          errorMessage = error.message;
+        }
       }
 
       setError(errorMessage);
@@ -364,6 +389,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                     onChange={handleInputChange}
                     placeholder="Enter artwork title"
                     required
+                    maxLength={100}
                   />
                 </FormGroup>
                 
@@ -374,6 +400,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                     value={formData.artist}
                     onChange={handleInputChange}
                     placeholder="Your name or artist pseudonym"
+                    maxLength={50}
                   />
                 </FormGroup>
                 
@@ -385,7 +412,9 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                     onChange={handleInputChange}
                     placeholder="Tell the story behind your artwork..."
                     rows={3}
+                    maxLength={1000}
                   />
+                  <FieldHint>{formData.description.length}/1000 characters</FieldHint>
                 </FormGroup>
                 
                 <FormRow>
@@ -411,6 +440,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                       value={formData.medium}
                       onChange={handleInputChange}
                       placeholder="e.g., Oil on canvas, Digital, Acrylic"
+                      maxLength={50}
                     />
                   </FormGroup>
                 </FormRow>
@@ -436,6 +466,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                         name="price"
                         type="number"
                         step="0.01"
+                        min="0"
                         value={formData.price}
                         onChange={handleInputChange}
                         placeholder="0.00"
@@ -453,8 +484,9 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                     value={formData.tags}
                     onChange={handleInputChange}
                     placeholder="abstract, landscape, portrait (comma separated)"
+                    maxLength={200}
                   />
-                  <FieldHint>Add tags to help people discover your work</FieldHint>
+                  <FieldHint>Add up to 10 tags to help people discover your work</FieldHint>
                 </FormGroup>
               </FormSection>
               
@@ -471,7 +503,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
                 <Button type="button" variant="secondary" onClick={onClose} disabled={isUploading}>
                   Cancel
                 </Button>
-                <SubmitButton type="submit" disabled={isUploading || !selectedFile}>
+                <SubmitButton type="submit" disabled={isUploading || !selectedFile || !formData.title.trim()}>
                   {isUploading ? (
                     <>
                       <Loader2 className="animate-spin" size={16} />
@@ -493,7 +525,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   );
 };
 
-// Styled Components (keeping existing ones and adding new ones)
+// Styled Components (keeping all existing styles - same as before)
 const ModalOverlay = styled.div`
   position: fixed;
   inset: 0;
@@ -673,7 +705,6 @@ const ChangeButton = styled.button`
   }
 `;
 
-// NEW: Image info display
 const ImageInfo = styled.div`
   position: absolute;
   bottom: 0;
