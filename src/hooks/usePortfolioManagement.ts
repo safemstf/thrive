@@ -75,7 +75,7 @@ export function usePortfolioManagement() {
         visibility: data.visibility || 'public',
         specializations: data.specializations || [],
         tags: data.tags || [],
-        kind: data.kind || 'professional'  // Default to 'professional'
+        kind: data.kind || 'professional'  // Default to professional
       };
 
       console.log('Creating portfolio with data:', portfolioData);

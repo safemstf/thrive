@@ -307,7 +307,7 @@ export const testingUtils = {
       visibility: 'public',
       specializations: ['Digital Art', 'Photography'],
       tags: ['test', 'portfolio', 'automated'],
-      kind: 'creative',  // Best match for art/photography
+      kind: 'creative',  // Keep as creative for this test
     }),
 
     generateGalleryPieceData: () => ({

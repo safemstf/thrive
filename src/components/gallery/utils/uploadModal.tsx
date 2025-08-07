@@ -156,10 +156,18 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     } catch (createError: any) {
       console.error('Failed to create portfolio:', createError);
       
-      // If creation failed due to existing portfolio, try to fetch again
-      if (createError.status === 409 || createError.message?.includes('already exists')) {
-        console.log('Portfolio exists, retrying fetch...');
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      // Handle 409 conflict - portfolio already exists
+      if (createError.status === 409) {
+        console.log('Portfolio already exists (409), attempting to fetch existing portfolio...');
+        
+        // Check if the error response contains the existing portfolio
+        if (createError.response?.portfolio) {
+          console.log('Found portfolio in 409 response:', createError.response.portfolio._id);
+          return createError.response.portfolio._id;
+        }
+        
+        // Wait a moment for consistency and try to fetch again
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         try {
           const retryPortfolio = await api.portfolio.get();
@@ -168,7 +176,13 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
             return retryPortfolio.id;
           }
         } catch (retryError) {
-          console.error('Retry failed:', retryError);
+          console.error('Retry fetch failed:', retryError);
+        }
+        
+        // Last resort: extract from error message or response data
+        if (createError.data?.portfolio) {
+          console.log('Found portfolio in error data:', createError.data.portfolio._id);
+          return createError.data.portfolio._id;
         }
       }
       
