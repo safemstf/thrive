@@ -391,6 +391,27 @@ export class PortfolioApiClient extends BaseApiClient {
     
     return response.json();
   }
+  
+  async uploadImageRaw(formData: FormData): Promise<any> {
+  const response = await fetch(`${this.baseURL}/api/portfolios/upload-image`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${this.getAuthToken()}`,
+      'ngrok-skip-browser-warning': 'true',
+    },
+    body: formData,
+  });
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+    throw new APIError(
+      error.message || `Upload failed with status ${response.status}`,
+      response.status
+    );
+  }
+  
+  return response.json();
+}
   // ==================== BATCH OPERATIONS ====================
 
   async batchUploadGallery(
