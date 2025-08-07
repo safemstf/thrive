@@ -2,6 +2,7 @@
 import { api } from '@/lib/api-client';
 import { useState, useEffect, useCallback } from 'react';
 import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
+import { getPortfolioId, getGalleryPieceId } from '@/types/portfolio.types';
 import type { GalleryPiece } from '@/types/gallery.types';
 
 // Enhanced Portfolio type with client-side kind tracking
@@ -79,7 +80,7 @@ class PortfolioService {
     };
   }
   
-  // Create portfolio with type - Fixed to use current API
+  // Create portfolio with type - Fixed to use current API and utility functions
   static async createPortfolioWithType(
     data: any,
     kind: PortfolioKind
@@ -92,9 +93,16 @@ class PortfolioService {
     
     const portfolio = await api.portfolio.create(portfolioData);
     
+    // Use utility function to safely get portfolio ID
+    const portfolioId = getPortfolioId(portfolio);
+    
+    if (!portfolioId) {
+      throw new Error('Portfolio created but no ID returned');
+    }
+    
     // Save metadata for backup/sync
     const metadata: PortfolioMetadata = {
-      portfolioId: portfolio.id,
+      portfolioId,
       kind,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -105,17 +113,20 @@ class PortfolioService {
     return this.enhancePortfolio(portfolio)!;
   }
   
-  // Update portfolio type - Fixed to use current API
+  // Update portfolio type - Fixed to use current API and utility functions
   static async updatePortfolioType(
-    portfolioId: string, 
+    portfolio: Portfolio, 
     kind: PortfolioKind
   ): Promise<void> {
     // Update in backend - Fixed: API only takes data parameter
     await api.portfolio.update({ kind });
     
+    // Get portfolio ID safely
+    const portfolioId = getPortfolioId(portfolio);
+    
     // Update local metadata
     const metadata = this.getMetadata();
-    if (metadata && metadata.portfolioId === portfolioId) {
+    if (metadata && portfolioId && metadata.portfolioId === portfolioId) {
       this.saveMetadata({
         ...metadata,
         kind,
@@ -177,7 +188,8 @@ export function usePortfolioManager() {
     }
     
     try {
-      console.log('Fetching gallery pieces for portfolio:', currentPortfolio.id);
+      const portfolioId = getPortfolioId(currentPortfolio);
+      console.log('Fetching gallery pieces for portfolio:', portfolioId);
       
       // Fixed: use api.portfolio.gallery.get()
       const pieces = await api.portfolio.gallery.get();
@@ -221,7 +233,7 @@ export function usePortfolioManager() {
         setGalleryPieces([]);
       }
       
-      console.log('Portfolio created successfully:', enhanced.id);
+      console.log('Portfolio created successfully:', getPortfolioId(enhanced));
       return enhanced;
     } catch (err: any) {
       const errorMessage = err?.message || 'Failed to create portfolio';
@@ -233,7 +245,7 @@ export function usePortfolioManager() {
     }
   }, []);
   
-  // Update portfolio type - Fixed to use current API
+  // Update portfolio type - Fixed to use current API and utility functions
   const updatePortfolioType = useCallback(async (kind: PortfolioKind) => {
     if (!portfolio) {
       throw new Error('No portfolio to update');
@@ -242,7 +254,7 @@ export function usePortfolioManager() {
     try {
       console.log('Updating portfolio type:', { from: portfolio.kind, to: kind });
       
-      await PortfolioService.updatePortfolioType(portfolio.id, kind);
+      await PortfolioService.updatePortfolioType(portfolio, kind);
       
       // Update local state
       const updatedPortfolio = {
@@ -344,7 +356,8 @@ export function useGalleryOperations(portfolio: EnhancedPortfolio | null) {
       setUploading(true);
       setError(null);
       
-      console.log('Uploading image:', { fileName: file.name, portfolioId: portfolio.id });
+      const portfolioId = getPortfolioId(portfolio);
+      console.log('Uploading image:', { fileName: file.name, portfolioId });
       
       // First upload the image file to get URL
       const uploadResult = await api.portfolio.images.uploadRaw((() => {
@@ -368,7 +381,7 @@ export function useGalleryOperations(portfolio: EnhancedPortfolio | null) {
       
       const piece = await api.portfolio.gallery.add(pieceData);
       
-      console.log('Image uploaded successfully:', piece.id); 
+      console.log('Image uploaded successfully:', getGalleryPieceId(piece)); 
       return piece;
       
     } catch (err: any) {

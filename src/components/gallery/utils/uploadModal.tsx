@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { UploadIcon, X, Loader2 } from '@/components/ui/icons';
 import { useAuth } from '@/providers/authProvider';
 import type { ArtworkCategory, GalleryPiece, GalleryStatus, GalleryUploadFile, GalleryVisibility } from '@/types/gallery.types';
+import { getPortfolioId, extractPortfolioIdFromError, getGalleryPieceId } from '@/types/portfolio.types';
 
 interface ArtworkUploadModalProps {
   portfolioId?: string;
@@ -110,7 +111,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     }));
   };
 
-  // Simplified portfolio resolution
+  // Improved portfolio resolution using utility functions
   const resolvePortfolioId = async (): Promise<string> => {
     console.log('Resolving portfolio ID...');
     
@@ -125,12 +126,22 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
       console.log('Fetching user portfolio...');
       const existingPortfolio = await api.portfolio.get();
       
-      if (existingPortfolio && existingPortfolio.id) {
-        console.log('Found existing portfolio:', existingPortfolio.id);
-        return existingPortfolio.id;
+      console.log('Portfolio fetch result:', existingPortfolio);
+      
+      if (existingPortfolio) {
+        // Use utility function to safely extract ID
+        const portfolioId = getPortfolioId(existingPortfolio);
+        if (portfolioId) {
+          console.log('Found existing portfolio with ID:', portfolioId);
+          return portfolioId;
+        } else {
+          console.log('Portfolio exists but no ID found:', Object.keys(existingPortfolio));
+        }
+      } else {
+        console.log('No portfolio returned from API');
       }
     } catch (error: any) {
-      console.log('No existing portfolio found or error fetching:', error.message);
+      console.log('Error fetching portfolio:', error.message);
       // Continue to create new portfolio
     }
 
@@ -148,41 +159,58 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
         settings: {
           allowComments: true,
           showStats: true,
+          allowReviews: true,
+          requireReviewApproval: false,
+          allowAnonymousReviews: true,
+          showPrices: true,
+          defaultGalleryView: 'grid',
+          piecesPerPage: 12,
+          notifyOnReview: true,
+          notifyOnView: false,
+          weeklyAnalyticsEmail: false,
         },
       });
       
-      console.log('Created new portfolio:', newPortfolio.id);
-      return newPortfolio.id;
+      console.log('Created new portfolio:', newPortfolio);
+      const newPortfolioId = getPortfolioId(newPortfolio);
+      if (newPortfolioId) {
+        console.log('New portfolio ID:', newPortfolioId);
+        return newPortfolioId;
+      } else {
+        console.log('New portfolio created but no ID found:', Object.keys(newPortfolio));
+        throw new Error('Portfolio created but no ID returned');
+      }
     } catch (createError: any) {
       console.error('Failed to create portfolio:', createError);
       
       // Handle 409 conflict - portfolio already exists
       if (createError.status === 409) {
-        console.log('Portfolio already exists (409), attempting to fetch existing portfolio...');
+        console.log('Portfolio already exists (409), attempting to extract from response...');
         
-        // Check if the error response contains the existing portfolio
-        if (createError.response?.portfolio) {
-          console.log('Found portfolio in 409 response:', createError.response.portfolio._id);
-          return createError.response.portfolio._id;
+        // Use utility function to extract portfolio ID from error response
+        const existingId = extractPortfolioIdFromError(createError);
+        if (existingId) {
+          console.log('Extracted portfolio ID from 409 response:', existingId);
+          return existingId;
         }
         
-        // Wait a moment for consistency and try to fetch again
+        // If we can't extract from response, wait and try to fetch again
+        console.log('Could not extract portfolio from 409 response, retrying fetch...');
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         try {
           const retryPortfolio = await api.portfolio.get();
-          if (retryPortfolio && retryPortfolio.id) {
-            console.log('Retrieved portfolio on retry:', retryPortfolio.id);
-            return retryPortfolio.id;
+          console.log('Retry portfolio fetch result:', retryPortfolio);
+          
+          if (retryPortfolio) {
+            const retryId = getPortfolioId(retryPortfolio);
+            if (retryId) {
+              console.log('Retrieved portfolio ID on retry:', retryId);
+              return retryId;
+            }
           }
         } catch (retryError) {
           console.error('Retry fetch failed:', retryError);
-        }
-        
-        // Last resort: extract from error message or response data
-        if (createError.data?.portfolio) {
-          console.log('Found portfolio in error data:', createError.data.portfolio._id);
-          return createError.data.portfolio._id;
         }
       }
       
@@ -261,7 +289,7 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
       };
 
       const galleryResponse = await api.portfolio.gallery.add(galleryPieceData);
-      console.log('Gallery piece created successfully:', galleryResponse.id);
+      console.log('Gallery piece created successfully:', getGalleryPieceId(galleryResponse) || 'unknown ID');
 
       // Success!
       onSuccess();

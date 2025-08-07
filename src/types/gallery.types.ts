@@ -32,6 +32,7 @@ export interface Publication {
 
 // === Main Gallery Piece ===
 export interface GalleryPiece extends BaseEntity {
+  _id: string;
   title: string;
   artist: string;
   description?: string;

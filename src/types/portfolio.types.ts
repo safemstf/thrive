@@ -3,7 +3,8 @@ import { GalleryPiece } from './gallery.types';
 
 // ==================== Base Types ====================
 export interface BaseEntity {
-  id: string;
+  id?: string;      // Frontend normalized ID
+  _id?: string;     // MongoDB ObjectId
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -31,7 +32,6 @@ export interface Concept {
 }
 
 export type { GalleryVisibility } from '@/types/gallery.types';
-
 
 export interface ConceptProgress {
   conceptId: string;
@@ -73,7 +73,6 @@ export const defaultSections: SectionConfig[] = [
   { key: 'ap-calc', title: 'AP Calculus', mainCategory: 'math', subCategory: 'ap' }
 ];
 
-
 export interface ConceptFilters {
   type?: string;
   discipline?: string;
@@ -89,8 +88,6 @@ export interface ConceptFilters {
 
 // ==================== Main Portfolio Interface ====================
 export interface Portfolio extends BaseEntity {
-  id: string;
-
   // Basic Info
   userId: string;
   username: string;
@@ -140,12 +137,70 @@ export interface Portfolio extends BaseEntity {
   featuredPieces?: string[]; // IDs of featured gallery pieces
 }
 
+// ==================== Utility Functions for ID Handling ====================
+
+/**
+ * Safely extract portfolio ID from either format
+ * Handles both frontend (id) and backend (_id) formats
+ */
+export function getPortfolioId(portfolio: Portfolio | null | undefined): string | null {
+  if (!portfolio) return null;
+  return portfolio.id || portfolio._id || null;
+}
+
+/**
+ * Safely extract gallery piece ID from either format
+ * Handles both frontend (id) and backend (_id) formats
+ */
+export function getGalleryPieceId(piece: GalleryPiece | null | undefined): string | null {
+  if (!piece) return null;
+  return piece.id || piece._id || null;
+}
+
+/**
+ * Normalize portfolio object to have consistent ID field
+ * Converts MongoDB _id to frontend-friendly id
+ */
+export function normalizePortfolio(portfolio: Portfolio): Portfolio {
+  if (!portfolio) return portfolio;
+  
+  const normalized = { ...portfolio };
+  
+  // Ensure we have an id field
+  if (!normalized.id && normalized._id) {
+    normalized.id = normalized._id;
+  }
+  
+  return normalized;
+}
+
+/**
+ * Extract ID from error response during portfolio creation conflicts
+ */
+export function extractPortfolioIdFromError(error: any): string | null {
+  // Try to extract portfolio from different possible response locations
+  const possiblePaths = [
+    error.response?.data?.portfolio,
+    error.response?.portfolio,
+    error.data?.portfolio,
+    error.portfolio
+  ];
+  
+  for (const portfolio of possiblePaths) {
+    if (portfolio) {
+      const id = getPortfolioId(portfolio);
+      if (id) return id;
+    }
+  }
+  
+  return null;
+}
+
 // ==================== Portfolio Settings ====================
 export interface PortfolioSettings {
   // Review Settings
   allowReviews: boolean;
   allowComments?: boolean;
-
   requireReviewApproval: boolean;
   allowAnonymousReviews: boolean;
   

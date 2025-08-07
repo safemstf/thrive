@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import type { Portfolio, GalleryPiece } from '@/types/portfolio.types';
+import { getPortfolioId, getGalleryPieceId } from '@/types/portfolio.types'; // Import both utility functions
 
 // Define missing components locally
 const MetaTag = styled.span`
@@ -95,11 +96,16 @@ export default function PublicPortfolioPage() {
           }
         }
 
-        // Track view - Updated to match API signature
+        // Track view - Fixed to use getPortfolioId utility function
         try {
-          await api.portfolio.analytics.trackView(portfolioResponse.id, {
-            referrer: document.referrer || undefined,
-          });
+          const portfolioId = getPortfolioId(portfolioResponse);
+          if (portfolioId) {
+            await api.portfolio.analytics.trackView(portfolioId, {
+              referrer: document.referrer || undefined,
+            });
+          } else {
+            console.warn('Portfolio ID not found, cannot track view');
+          }
         } catch (trackError) {
           console.log('Could not track view:', trackError);
         }
@@ -350,7 +356,7 @@ export default function PublicPortfolioPage() {
             <GalleryGrid>
               {galleryPieces.map((piece) => (
                 <GalleryItem 
-                  key={piece.id}
+                  key={getGalleryPieceId(piece) || 'unknown'}
                   onClick={() => setSelectedPiece(piece)}
                 >
                   <GalleryImageWrapper>
@@ -479,7 +485,7 @@ export default function PublicPortfolioPage() {
   );
 }
 
-// Styled Components (keeping all the existing ones exactly as they were)
+// All the styled components remain exactly the same as before...
 const PageWrapper = styled.div`
   min-height: 100vh;
   background: #fafafa;
