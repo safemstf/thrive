@@ -144,7 +144,7 @@ export interface Portfolio extends BaseEntity {
 export interface PortfolioSettings {
   // Review Settings
   allowReviews: boolean;
-  allowComments: boolean;
+  allowComments?: boolean;
 
   requireReviewApproval: boolean;
   allowAnonymousReviews: boolean;
