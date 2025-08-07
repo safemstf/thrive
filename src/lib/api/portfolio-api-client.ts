@@ -158,11 +158,30 @@ export class PortfolioApiClient extends BaseApiClient {
   }
 
   // ==================== GALLERY MANAGEMENT (Portfolio-Owned) ====================
-
+  
   async getMyGalleryPieces(): Promise<GalleryPiece[]> {
     try {
-      // Backend returns array directly, not wrapped
-      return await this.requestWithRetry<GalleryPiece[]>('/portfolios/me/gallery');
+      const response = await this.requestWithRetry<any>('/portfolios/me/gallery');
+      console.log('Raw gallery response:', response);
+      
+      // Your backend is returning an object with numeric keys instead of an array
+      // Convert it back to a proper array
+      if (response && typeof response === 'object' && !Array.isArray(response)) {
+        const keys = Object.keys(response);
+        if (keys.every(key => /^\d+$/.test(key))) {
+          // It's an object with numeric keys like {"0": {...}, "1": {...}}
+          const pieces = keys
+            .sort((a, b) => parseInt(a) - parseInt(b))
+            .map(key => response[key]);
+          
+          console.log('Converted object to array:', pieces);
+          return pieces;
+        }
+      }
+      
+      // If it's already an array or empty, return as is
+      return Array.isArray(response) ? response : [];
+      
     } catch (error) {
       console.error('Failed to get gallery pieces:', error);
       return [];
