@@ -83,7 +83,7 @@ export const api = {
     // Core Operations
     get: () => getApiClient().portfolio.getMyPortfolio(),
     create: (data: CreatePortfolioDto) => getApiClient().portfolio.create(data),
-    update: (data: UpdatePortfolioDto) => getApiClient().portfolio.update(data), // Fixed: only needs data parameter
+    update: (data: UpdatePortfolioDto) => getApiClient().portfolio.update(data),
     delete: (deleteGalleryPieces?: boolean) => getApiClient().portfolio.deleteMyPortfolio(deleteGalleryPieces),
     upgrade: (kind: PortfolioKind, preserveContent?: boolean) => getApiClient().portfolio.upgrade(kind, preserveContent),
     check: () => getApiClient().portfolio.hasPortfolio(),
@@ -121,7 +121,7 @@ export const api = {
       getStats: () => getApiClient().portfolio.getGalleryStats(),
     },
 
-    // Concept Tracking (Educational/Hybrid) - Fixed type issues
+    // Concept Tracking (Educational/Hybrid)
     concepts: {
       get: () => getApiClient().portfolio.getMyConcepts(),
       add: (conceptId: string, data: { 
@@ -129,13 +129,13 @@ export const api = {
         startedAt?: string;
         notes?: string;
         score?: number;
-      } = {}) => getApiClient().portfolio.addConceptToPortfolio(conceptId, data), // Fixed: made data optional with default
+      } = {}) => getApiClient().portfolio.addConceptToPortfolio(conceptId, data),
       updateProgress: (conceptId: string, data: { 
         status?: string; 
         score?: number;
         notes?: string;
         completedAt?: string;
-      } = {}) => getApiClient().portfolio.updateConceptProgress(conceptId, data), // Fixed: made data optional with default
+      } = {}) => getApiClient().portfolio.updateConceptProgress(conceptId, data),
     },
 
     // Analytics & Dashboard
@@ -152,6 +152,12 @@ export const api = {
         getApiClient().portfolio.uploadImage(file, type),
       uploadRaw: (formData: FormData) => 
         getApiClient().portfolio.uploadImageRaw(formData),
+    },
+
+    // Debug & Testing
+    debug: {
+      uploadConfig: () => getApiClient().portfolio.getUploadConfig(),
+      validateFile: (filename: string) => getApiClient().portfolio.validateFile(filename),
     },
 
     // Legacy methods (for backward compatibility during migration)
@@ -212,7 +218,8 @@ export const testingUtils = {
       gallery: ['gallery.get', 'gallery.getByUsername', 'gallery.add', 'gallery.update', 'gallery.delete', 'gallery.batchDelete', 'gallery.batchUpdateVisibility', 'gallery.getStats'],
       concepts: ['concepts.get', 'concepts.add', 'concepts.updateProgress'],
       analytics: ['analytics.get', 'analytics.dashboard', 'analytics.trackView'],
-      images: ['images.upload', 'images.uploadRaw']
+      images: ['images.upload', 'images.uploadRaw'],
+      debug: ['debug.uploadConfig', 'debug.validateFile']
     },
     education: {
       books: ['books.getAll', 'books.getById', 'books.getByCategory'],
@@ -228,7 +235,8 @@ export const testingUtils = {
       'get', 'check', 'discover', 'getByUsername', 
       'getStats', 'getTypeConfig', 'gallery.get', 
       'gallery.getStats', 'concepts.get', 
-      'analytics.get', 'analytics.dashboard'
+      'analytics.get', 'analytics.dashboard',
+      'debug.uploadConfig', 'debug.validateFile'
     ],
     education: [
       'books.getAll', 'books.getById', 'books.getByCategory',
@@ -250,7 +258,8 @@ export const testingUtils = {
       'get', 'create', 'update', 'delete', 'upgrade', 'check',
       'gallery.get', 'gallery.add', 'gallery.update', 'gallery.delete',
       'concepts.get', 'concepts.add', 'concepts.updateProgress',
-      'analytics.get', 'analytics.dashboard', 'images.upload'
+      'analytics.get', 'analytics.dashboard', 'images.upload',
+      'debug.uploadConfig', 'debug.validateFile'
     ],
     education: ['concepts.markComplete'],
     auth: ['getCurrentUser', 'updateProfile', 'logout']
@@ -269,12 +278,11 @@ export const testingUtils = {
   }),
 
   getDestructiveMethods: (): Record<ApiCategory, string[]> => ({
-  portfolio: ['delete', 'gallery.delete', 'gallery.batchDelete'],
-  education: [],
-  auth: ['logout'],
-  health: []
+    portfolio: ['delete', 'gallery.delete', 'gallery.batchDelete'],
+    education: [],
+    auth: ['logout'],
+    health: []
   }),
-
 
   // Helper to categorize API calls for your test page
   categorizeMethod: (category: string, method: string) => {
@@ -307,7 +315,7 @@ export const testingUtils = {
       visibility: 'public',
       specializations: ['Digital Art', 'Photography'],
       tags: ['test', 'portfolio', 'automated'],
-      kind: 'creative',  // Keep as creative for this test
+      kind: 'creative',
     }),
 
     generateGalleryPieceData: () => ({
@@ -369,6 +377,98 @@ export const testingUtils = {
         console.error('Gallery test failed:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
       }
-    }
-  }
-};
+    },
+
+    // Enhanced debug and upload testing
+    runUploadDiagnostics: async () => {
+      try {
+        console.log('🔍 Running upload diagnostics...');
+        
+        // 1. Check upload configuration
+        const config = await api.portfolio.debug.uploadConfig();
+        console.log('📁 Upload Config:', {
+          directoryExists: config.filesystem.checks.uploadsExists,
+          canWrite: config.filesystem.checks.canWrite,
+          portfolioDir: config.filesystem.checks.portfolioExists,
+          fileCount: config.filesystem.checks.portfolioCount || 0
+        });
+        
+        // 2. Test a file if any exist
+        if (config.filesystem.checks.portfolioContents && config.filesystem.checks.portfolioContents.length > 0) {
+          const testFile = config.filesystem.checks.portfolioContents[0];
+          const validation = await api.portfolio.debug.validateFile(testFile);
+          console.log('📄 File Validation:', {
+            filename: validation.filename,
+            exists: validation.validation.checks.exists,
+            readable: validation.validation.checks.readable,
+            size: validation.validation.checks.sizeHuman,
+            format: validation.validation.checks.imageInfo?.format
+          });
+        }
+        
+        return { 
+          success: true, 
+          config: {
+            directoryExists: config.filesystem.checks.uploadsExists,
+            canWrite: config.filesystem.checks.canWrite,
+            portfolioDir: config.filesystem.checks.portfolioExists,
+            fileCount: config.filesystem.checks.portfolioCount || 0
+          }
+        };
+      } catch (error) {
+        console.error('❌ Upload diagnostics failed:', error);
+        return { 
+          success: false, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        };
+      }
+    },
+
+    testImageUpload: async (file?: File) => {
+      try {
+        console.log('📤 Testing image upload...');
+        
+        // If no file provided, create a test blob
+        const testFile = file || new File(
+          [new Blob(['test'], { type: 'image/jpeg' })], 
+          'test-upload.jpg', 
+          { type: 'image/jpeg' }
+        );
+        
+        console.log('📁 Uploading file:', {
+          name: testFile.name,
+          size: `${(testFile.size / 1024).toFixed(2)} KB`,
+          type: testFile.type
+        });
+        
+        // Test the upload
+        const result = await api.portfolio.images.upload(testFile, 'profile');
+        
+        console.log('✅ Upload successful:', {
+          url: result.url,
+          filename: result.filename,
+          type: result.type,
+          message: result.message
+        });
+        
+        // Validate the uploaded file
+        if (result.filename) {
+          const validation = await api.portfolio.debug.validateFile(result.filename);
+          console.log('🔍 File validation:', {
+            exists: validation.validation.checks.exists,
+            readable: validation.validation.checks.readable,
+            format: validation.validation.checks.imageInfo?.format
+          });
+        }
+        
+        return { success: true, result };
+      } catch (error) {
+        console.error('❌ Upload test failed:', error);
+        return { 
+          success: false, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        };
+      }
+    },
+
+}};

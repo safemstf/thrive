@@ -1,4 +1,4 @@
-// lib/api/portfolio-api-client.ts - Fixed to align with backend structure
+// lib/api/portfolio-api-client.ts - ALIGNED with backend structure
 import { BaseApiClient, APIError } from './base-api-client';
 import {
   Portfolio,
@@ -54,37 +54,9 @@ export class PortfolioApiClient extends BaseApiClient {
   }
 
   async update(data: UpdatePortfolioDto): Promise<Portfolio> {
-    // Updated to match backend: /portfolios/me for current user updates
     return this.requestWithRetry<Portfolio>('/portfolios/me', {
       method: 'PUT',
       body: JSON.stringify(data),
-    });
-  }
-
-  async getById(id: string): Promise<PortfolioWithPieces> {
-    // Note: This is deprecated in favor of getByUsername
-    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/by-id/${id}`);
-  }
-
-  async getByUserId(userId: string): Promise<PortfolioWithPieces> {
-    // Note: This is deprecated, use getByUsername instead
-    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/user/${userId}`);
-  }
-
-  async getByUsername(username: string): Promise<Portfolio> {
-    return this.requestWithRetry<Portfolio>(`/portfolios/by-username/${username}`);
-  }
-
-  async delete(id: string): Promise<void> {
-    return this.requestWithRetry<void>(`/portfolios/by-id/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async deleteMyPortfolio(deleteGalleryPieces: boolean = false): Promise<void> {
-    return this.requestWithRetry<void>('/portfolios/me', {
-      method: 'DELETE',
-      body: JSON.stringify({ deleteGalleryPieces }),
     });
   }
 
@@ -101,51 +73,18 @@ export class PortfolioApiClient extends BaseApiClient {
     }
   }
 
-  // ==================== DISCOVERY & SEARCH ====================
-
-  async discover(
-    filters?: PortfolioFilters,
-    page: number = 1,
-    limit: number = 20
-  ): Promise<PortfolioListResponse> {
-    return this.requestWithRetry<PortfolioListResponse>('/portfolios/discover', {
-      params: { ...filters, page, limit },
+  async deleteMyPortfolio(deleteGalleryPieces: boolean = false): Promise<void> {
+    return this.requestWithRetry<void>('/portfolios/me', {
+      method: 'DELETE',
+      body: JSON.stringify({ deleteGalleryPieces }),
     });
   }
-
-  async search(query: string, limit: number = 10): Promise<Portfolio[]> {
-    return this.requestWithRetry<Portfolio[]>('/portfolios/search', {
-      params: { q: query, limit },
-    });
-  }
-
-  async getFeatured(limit: number = 6): Promise<Portfolio[]> {
-    return this.requestWithRetry<Portfolio[]>('/portfolios/featured', {
-      params: { limit },
-    });
-  }
-
-  async getTrending(period: 'day' | 'week' | 'month' = 'week'): Promise<Portfolio[]> {
-    return this.requestWithRetry<Portfolio[]>('/portfolios/trending', {
-      params: { period },
-    });
-  }
-
-  // ==================== PORTFOLIO UTILITY METHODS ====================
 
   async upgrade(kind: PortfolioKind, preserveContent: boolean = true): Promise<Portfolio> {
     return this.requestWithRetry<Portfolio>('/portfolios/me/upgrade', {
       method: 'PUT',
       body: JSON.stringify({ kind, preserveContent }),
     });
-  }
-
-  async getStats(): Promise<any> {
-    return this.requestWithRetry('/portfolios/stats');
-  }
-
-  async getTypeConfig(type: string): Promise<any> {
-    return this.requestWithRetry(`/portfolios/type-config/${type}`);
   }
 
   async hasPortfolio(): Promise<boolean> {
@@ -157,31 +96,73 @@ export class PortfolioApiClient extends BaseApiClient {
     }
   }
 
-  // ==================== GALLERY MANAGEMENT (Portfolio-Owned) ====================
+  // ==================== PUBLIC PORTFOLIO ACCESS ====================
+
+  async getByUsername(username: string): Promise<Portfolio> {
+    return this.requestWithRetry<Portfolio>(`/portfolios/by-username/${username}`);
+  }
+
+  async discover(
+    filters?: PortfolioFilters,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<PortfolioListResponse> {
+    return this.requestWithRetry<PortfolioListResponse>('/portfolios/discover', {
+      params: { ...filters, page, limit },
+    });
+  }
+
+  async getStats(): Promise<any> {
+    return this.requestWithRetry('/portfolios/stats');
+  }
+
+  async getTypeConfig(type: string): Promise<any> {
+    return this.requestWithRetry(`/portfolios/type-config/${type}`);
+  }
+
+  async trackView(
+    portfolioId: string,
+    data?: { referrer?: string; duration?: number }
+  ): Promise<{ message: string; totalViews: number }> {
+    return this.requestWithRetry(`/portfolios/by-id/${portfolioId}/views`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    });
+  }
+
+  // ==================== PORTFOLIO GALLERY MANAGEMENT ====================
   
   async getMyGalleryPieces(): Promise<GalleryPiece[]> {
     try {
       const response = await this.requestWithRetry<any>('/portfolios/me/gallery');
       console.log('Raw gallery response:', response);
       
-      // Your backend is returning an object with numeric keys instead of an array
-      // Convert it back to a proper array
-      if (response && typeof response === 'object' && !Array.isArray(response)) {
-        const keys = Object.keys(response);
-        if (keys.every(key => /^\d+$/.test(key))) {
-          // It's an object with numeric keys like {"0": {...}, "1": {...}}
-          const pieces = keys
-            .sort((a, b) => parseInt(a) - parseInt(b))
-            .map(key => response[key]);
-          
-          console.log('Converted object to array:', pieces);
-          return pieces;
+      // Handle backend response format - could be array or object with pieces property
+      if (response && typeof response === 'object') {
+        // If it has a pieces property, use that
+        if (response.pieces && Array.isArray(response.pieces)) {
+          return response.pieces;
+        }
+        
+        // If it's an object with numeric keys, convert to array
+        if (!Array.isArray(response)) {
+          const keys = Object.keys(response);
+          if (keys.every(key => /^\d+$/.test(key))) {
+            const pieces = keys
+              .sort((a, b) => parseInt(a) - parseInt(b))
+              .map(key => response[key]);
+            console.log('Converted object to array:', pieces);
+            return pieces;
+          }
+        }
+        
+        // If it's already an array, return as is
+        if (Array.isArray(response)) {
+          return response;
         }
       }
       
-      // If it's already an array or empty, return as is
-      return Array.isArray(response) ? response : [];
-      
+      return [];
     } catch (error) {
       console.error('Failed to get gallery pieces:', error);
       return [];
@@ -209,7 +190,6 @@ export class PortfolioApiClient extends BaseApiClient {
     year?: number;
     displayOrder?: number;
   }): Promise<GalleryPiece> {
-    // Backend returns the gallery piece directly
     return this.requestWithRetry<GalleryPiece>('/portfolios/me/gallery', {
       method: 'POST',
       body: JSON.stringify(pieceData),
@@ -217,7 +197,6 @@ export class PortfolioApiClient extends BaseApiClient {
   }
 
   async updateGalleryPiece(pieceId: string, updates: Partial<GalleryPiece>): Promise<GalleryPiece> {
-    // Backend returns the updated piece directly
     return this.requestWithRetry<GalleryPiece>(`/portfolios/me/gallery/${pieceId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
@@ -327,22 +306,27 @@ export class PortfolioApiClient extends BaseApiClient {
     return this.requestWithRetry('/portfolios/me/dashboard');
   }
 
-  async trackView(
-    portfolioId: string,
-    data?: { referrer?: string; duration?: number }
-  ): Promise<{ message: string; totalViews: number }> {
-    return this.requestWithRetry(`/portfolios/by-id/${portfolioId}/views`, {
-      method: 'POST',
-      body: JSON.stringify(data || {}),
-    });
-  }
-
-  // ==================== IMAGE UPLOADS ====================
+  // ==================== IMAGE UPLOADS - FIXED ====================
 
   async uploadImage(
     file: File,
     type: 'profile' | 'cover'
-  ): Promise<{ url: string; type: string; message: string }> {
+  ): Promise<{ 
+    success: boolean;
+    url: string; 
+    filename: string;
+    type: string; 
+    size: number;
+    sizeHuman: string;
+    originalName: string;
+    message: string;
+    urls: {
+      direct: string;
+      relative: string;
+      api: string | null;
+    };
+    meta: any;
+  }> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', type);
@@ -360,6 +344,7 @@ export class PortfolioApiClient extends BaseApiClient {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
+      // Fixed: Remove duplicate /api in URL
       const response = await fetch(`${this.baseURL}/portfolios/upload-image`, {
         method: 'POST',
         headers,
@@ -374,7 +359,8 @@ export class PortfolioApiClient extends BaseApiClient {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
         throw new APIError(
           errorData.message || `Upload failed: ${response.statusText}`,
-          response.status
+          response.status,
+          errorData.code
         );
       }
 
@@ -390,8 +376,9 @@ export class PortfolioApiClient extends BaseApiClient {
     }
   }
 
-  async uploadRaw(formData: FormData): Promise<any> {
-    const response = await fetch(`${this.baseURL}/api/portfolios/upload-image`, {
+  // Simplified raw upload method
+  async uploadImageRaw(formData: FormData): Promise<any> {
+    const response = await fetch(`${this.baseURL}/portfolios/upload-image`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.getAuthToken()}`,
@@ -404,33 +391,162 @@ export class PortfolioApiClient extends BaseApiClient {
       const error = await response.json().catch(() => ({ message: 'Upload failed' }));
       throw new APIError(
         error.message || `Upload failed with status ${response.status}`,
-        response.status
+        response.status,
+        error.code
       );
     }
     
     return response.json();
   }
-  
-  async uploadImageRaw(formData: FormData): Promise<any> {
-  const response = await fetch(`${this.baseURL}/api/portfolios/upload-image`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${this.getAuthToken()}`,
-      'ngrok-skip-browser-warning': 'true',
-    },
-    body: formData,
-  });
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-    throw new APIError(
-      error.message || `Upload failed with status ${response.status}`,
-      response.status
-    );
+
+  // ==================== DEBUG & TESTING ENDPOINTS ====================
+
+  async getUploadConfig(): Promise<{
+    server: {
+      nodeVersion: string;
+      platform: string;
+      uptime: number;
+      memory: any;
+      cwd: string;
+    };
+    paths: {
+      backendRoot: string;
+      uploadsDir: string;
+      __dirname: string;
+      resolved: string;
+    };
+    filesystem: {
+      timestamp: string;
+      uploadsDir: string;
+      checks: {
+        uploadsExists: boolean;
+        uploadsIsDirectory?: boolean;
+        canWrite: boolean;
+        contents?: string[];
+        galleryExists?: boolean;
+        galleryContents?: string[];
+        galleryCount?: number;
+        portfolioExists?: boolean;
+        portfolioContents?: string[];
+        portfolioCount?: number;
+      };
+    };
+    request: {
+      method: string;
+      url: string;
+      headers: any;
+      query: any;
+    };
+  }> {
+    return this.requestWithRetry('/portfolios/debug/upload-config');
   }
-  
-  return response.json();
-}
+
+  async validateFile(filename: string): Promise<{
+    filename: string;
+    filePath: string;
+    validation: {
+      timestamp: string;
+      filePath: string;
+      checks: {
+        exists: boolean;
+        isFile?: boolean;
+        size?: number;
+        sizeHuman?: string;
+        created?: string;
+        modified?: string;
+        readable: boolean;
+        imageInfo?: {
+          format: string;
+          valid: boolean;
+          size: number;
+          sizeHuman: string;
+          signature?: string;
+        };
+      };
+    };
+    timestamp: string;
+  }> {
+    return this.requestWithRetry(`/portfolios/debug/file-check/${filename}`);
+  }
+
+  // ==================== COMPREHENSIVE PORTFOLIO STATS ====================
+
+  async getPortfolioStats(): Promise<PortfolioStats> {
+    try {
+      const [portfolio, galleryStats, concepts] = await Promise.allSettled([
+        this.getMyPortfolio(),
+        this.getGalleryStats(),
+        this.getMyConcepts()
+      ]);
+
+      const portfolioData = portfolio.status === 'fulfilled' ? portfolio.value : null;
+      const gallery = galleryStats.status === 'fulfilled' ? galleryStats.value : { totalPieces: 0 };
+      const conceptData = concepts.status === 'fulfilled' ? concepts.value : null;
+
+      return {
+        views: (portfolioData as any)?.stats?.totalViews || 0,
+        rating: (portfolioData as any)?.stats?.averageRating || 0,
+        totalRatings: (portfolioData as any)?.stats?.totalReviews || 0,
+        galleryCount: gallery.totalPieces || 0,
+        projectCount: (portfolioData as any)?.stats?.projectCount || 0,
+        conceptCount: conceptData?.concepts?.length || 0,
+        completedConcepts: conceptData?.concepts?.filter((c: any) => c.status === 'completed').length || 0
+      };
+    } catch (error) {
+      console.error('Failed to get portfolio stats:', error);
+      throw error;
+    }
+  }
+
+  // ==================== LEGACY/DEPRECATED METHODS ====================
+  // Keep for backward compatibility but mark as deprecated
+
+  /** @deprecated Use getByUsername instead */
+  async getById(id: string): Promise<PortfolioWithPieces> {
+    console.warn('getById is deprecated, use getByUsername instead');
+    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/by-id/${id}`);
+  }
+
+  /** @deprecated Use getByUsername instead */
+  async getByUserId(userId: string): Promise<PortfolioWithPieces> {
+    console.warn('getByUserId is deprecated, use getByUsername instead');
+    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/user/${userId}`);
+  }
+
+  /** @deprecated Use deleteMyPortfolio instead */
+  async delete(id: string): Promise<void> {
+    console.warn('delete(id) is deprecated, use deleteMyPortfolio() instead');
+    return this.requestWithRetry<void>(`/portfolios/by-id/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /** @deprecated Use uploadImage instead */
+  async uploadRaw(formData: FormData): Promise<any> {
+    console.warn('uploadRaw is deprecated, use uploadImageRaw instead');
+    return this.uploadImageRaw(formData);
+  }
+
+  // ==================== SEARCH & DISCOVERY (if implemented) ====================
+
+  async search(query: string, limit: number = 10): Promise<Portfolio[]> {
+    return this.requestWithRetry<Portfolio[]>('/portfolios/search', {
+      params: { q: query, limit },
+    });
+  }
+
+  async getFeatured(limit: number = 6): Promise<Portfolio[]> {
+    return this.requestWithRetry<Portfolio[]>('/portfolios/featured', {
+      params: { limit },
+    });
+  }
+
+  async getTrending(period: 'day' | 'week' | 'month' = 'week'): Promise<Portfolio[]> {
+    return this.requestWithRetry<Portfolio[]>('/portfolios/trending', {
+      params: { period },
+    });
+  }
+
   // ==================== BATCH OPERATIONS ====================
 
   async batchUploadGallery(
@@ -450,30 +566,17 @@ export class PortfolioApiClient extends BaseApiClient {
     for (let i = 0; i < uploads.length; i++) {
       const upload = uploads[i];
       try {
-        // First upload the image file (you'll need a separate upload endpoint)
+        // First upload the image file using portfolio upload
         const formData = new FormData();
-        formData.append('image', upload.file);
+        formData.append('file', upload.file);
         
-        const uploadResponse = await fetch(`${this.baseURL}/gallery/upload`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.getAuthToken()}`,
-            'ngrok-skip-browser-warning': 'true',
-          },
-          body: formData,
-        });
-
-        if (!uploadResponse.ok) {
-          throw new Error(`Upload failed: ${uploadResponse.statusText}`);
-        }
-
-        const uploadData = await uploadResponse.json();
+        const uploadResponse = await this.uploadImageRaw(formData);
         
-        // Then add the piece to portfolio
+        // Then add the piece to portfolio gallery
         const galleryPiece = await this.addGalleryPiece({
           title: upload.title,
           description: upload.description || '',
-          imageUrl: uploadData.url,
+          imageUrl: uploadResponse.url,
           category: upload.category,
           tags: upload.tags || [],
           visibility: upload.visibility || 'public'
@@ -493,127 +596,41 @@ export class PortfolioApiClient extends BaseApiClient {
     return { successful, failed };
   }
 
-  // ==================== COMPREHENSIVE PORTFOLIO STATS ====================
+  // ==================== PLACEHOLDER METHODS (for future implementation) ====================
 
-  async getPortfolioStats(): Promise<PortfolioStats> {
-    try {
-      const [portfolio, galleryStats, concepts] = await Promise.allSettled([
-        this.getMyPortfolio(),
-        this.getGalleryStats(),
-        this.getMyConcepts()
-      ]);
-
-      const portfolioData = portfolio.status === 'fulfilled' ? portfolio.value : null;
-      const gallery = galleryStats.status === 'fulfilled' ? galleryStats.value : { totalPieces: 0, totalViews: 0 };
-      const conceptData = concepts.status === 'fulfilled' ? concepts.value : null;
-
-      return {
-        views: (portfolioData as any)?.stats?.totalViews || 0,
-        rating: (portfolioData as any)?.stats?.averageRating || 0,
-        totalRatings: (portfolioData as any)?.stats?.totalReviews || 0,
-        galleryCount: gallery.totalPieces || 0,
-        projectCount: (portfolioData as any)?.stats?.projectCount || 0,
-        conceptCount: conceptData?.concepts?.length || 0,
-        completedConcepts: conceptData?.concepts?.filter((c: any) => c.status === 'completed').length || 0
-      };
-    } catch (error) {
-      console.error('Failed to get portfolio stats:', error);
-      throw error;
-    }
-  }
-
-  // ==================== REVIEWS (if implemented) ====================
-
+  // Reviews - if you plan to implement them
   async addReview(portfolioId: string, review: CreateReviewDto): Promise<PortfolioReview> {
-    const response = await this.requestWithRetry<{
-      review: PortfolioReview;
-      message: string;
-    }>(`/portfolios/by-id/${portfolioId}/reviews`, {
-      method: 'POST',
-      body: JSON.stringify(review),
-    });
-    
-    return response.review;
+    throw new APIError('Reviews not yet implemented', 501, 'NOT_IMPLEMENTED');
   }
 
-  async getReviews(
-    portfolioId: string,
-    page: number = 1,
-    limit: number = 10
-  ): Promise<ReviewListResponse> {
-    return this.requestWithRetry<ReviewListResponse>(`/portfolios/by-id/${portfolioId}/reviews`, {
-      params: { page, limit },
-    });
+  async getReviews(portfolioId: string, page: number = 1, limit: number = 10): Promise<ReviewListResponse> {
+    throw new APIError('Reviews not yet implemented', 501, 'NOT_IMPLEMENTED');
   }
 
-  async updateReviewStatus(
-    reviewId: string,
-    status: 'approved' | 'rejected'
-  ): Promise<PortfolioReview> {
-    return this.requestWithRetry<PortfolioReview>(`/reviews/${reviewId}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-  }
-
-  async respondToReview(reviewId: string, comment: string): Promise<PortfolioReview> {
-    return this.requestWithRetry<PortfolioReview>(`/reviews/${reviewId}/respond`, {
-      method: 'POST',
-      body: JSON.stringify({ comment }),
-    });
-  }
-
-  async deleteReview(reviewId: string): Promise<void> {
-    return this.requestWithRetry<void>(`/reviews/${reviewId}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // ==================== SHARING (if implemented) ====================
-
-  async generateShareLink(
-    portfolioId: string,
-    options?: { expiresIn?: number; maxViews?: number }
-  ): Promise<PortfolioShareLink> {
-    const response = await this.requestWithRetry<{
-      shareLink: PortfolioShareLink;
-    }>(`/portfolios/by-id/${portfolioId}/share`, {
-      method: 'POST',
-      body: JSON.stringify(options || {}),
-    });
-    
-    return response.shareLink;
+  // Sharing - if you plan to implement it
+  async generateShareLink(portfolioId: string, options?: any): Promise<PortfolioShareLink> {
+    throw new APIError('Share links not yet implemented', 501, 'NOT_IMPLEMENTED');
   }
 
   async getByShareToken(token: string): Promise<PortfolioWithPieces> {
-    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/shared/${token}`);
+    throw new APIError('Share links not yet implemented', 501, 'NOT_IMPLEMENTED');
   }
 
-  // ==================== LEGACY GALLERY METHODS (for backward compatibility) ====================
-  // These should be migrated to portfolio-centric approach
-
+  // Legacy gallery methods - if you have a separate gallery system
   async getPublicGallery(portfolioId: string): Promise<GalleryPiece[]> {
     console.warn('getPublicGallery is deprecated, use getPortfolioGalleryByUsername instead');
-    return this.requestWithRetry<GalleryPiece[]>(`/gallery/public/${portfolioId}`);
+    throw new APIError('Legacy gallery methods not supported', 501, 'DEPRECATED');
   }
 
   async likePiece(pieceId: string): Promise<void> {
-    return this.requestWithRetry(`/gallery/${pieceId}/like`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
+    throw new APIError('Gallery likes not yet implemented', 501, 'NOT_IMPLEMENTED');
   }
 
   async unlikePiece(pieceId: string): Promise<void> {
-    return this.requestWithRetry(`/gallery/${pieceId}/unlike`, {
-      method: 'DELETE',
-    });
+    throw new APIError('Gallery likes not yet implemented', 501, 'NOT_IMPLEMENTED');
   }
 
   async getLikedStatus(pieceIds: string[]): Promise<Record<string, boolean>> {
-    return this.requestWithRetry(`/gallery/liked-status`, {
-      method: 'POST',
-      body: JSON.stringify({ pieceIds }),
-    });
+    throw new APIError('Gallery likes not yet implemented', 501, 'NOT_IMPLEMENTED');
   }
 }

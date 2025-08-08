@@ -2,9 +2,8 @@
 'use client'
 
 import React, { Suspense } from 'react';
-import { ApiTestLogic } from '@/components/apiTest/apiTestLogic';
+import ApiClientTestLogic from '@/components/apiTest/apiTestLogic';
 import { Loader2 } from 'lucide-react';
-import { AuthFlowHelper } from '@/hooks/utils/authFlowHelper';
 
 // Loading component for better UX
 const LoadingFallback = () => (
@@ -113,7 +112,7 @@ export default function ApiTestPage() {
   return (
     <ApiTestErrorBoundary>
       <Suspense fallback={<LoadingFallback />}>
-        <ApiTestLogic />
+        <ApiClientTestLogic />
       </Suspense>
     </ApiTestErrorBoundary>
   );

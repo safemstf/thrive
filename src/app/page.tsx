@@ -1,7 +1,7 @@
-// src/app/page.tsx 
+// src/app/page.tsx - Fixed Type Issues
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -18,25 +18,8 @@ import {
 import styled from 'styled-components';
 import { theme } from '@/styles/theme';
 
-// Types with enhanced structure
-interface Portfolio {
-  id: string;
-  username: string;
-  title?: string;
-  bio?: string;
-  profileImage?: string;
-  coverImage?: string;
-  kind: 'creative' | 'educational' | 'professional' | 'hybrid';
-  stats: {
-    totalViews: number;
-    totalPieces: number;
-    totalReviews: number;
-    averageRating?: number;
-  };
-  specializations: string[];
-  isOnline?: boolean;
-  lastActiveAt?: Date;
-}
+// Import types from your types file
+import { Portfolio, getPortfolioId, normalizePortfolio } from '@/types/portfolio.types';
 
 interface Stats {
   users: number;
@@ -45,155 +28,7 @@ interface Stats {
   active: number;
 }
 
-interface SearchFormData {
-  query: string;
-}
-
-// Enhanced styled components with better performance
-const HeroSection = styled(Section)`
-  background: linear-gradient(135deg, ${theme.colors.background.primary} 0%, ${theme.colors.primary[100]} 100%);
-  text-align: center;
-  border-bottom: 1px solid ${theme.colors.border.light};
-  position: relative;
-  overflow: hidden;
-  min-height: 60vh;
-  display: flex;
-  align-items: center;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(44, 44, 44, 0.03) 1px, transparent 1px);
-    background-size: 30px 30px;
-    animation: float 20s ease-in-out infinite;
-    will-change: transform;
-  }
-  
-  @keyframes float {
-    0%, 100% { transform: translate(0, 0) rotate(0deg); }
-    50% { transform: translate(10px, -10px) rotate(1deg); }
-  }
-  
-  @media (prefers-reduced-motion: reduce) {
-    &::before {
-      animation: none;
-    }
-  }
-`;
-
-const HeroContent = styled.div`
-  position: relative;
-  z-index: 1;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: ${theme.spacing['2xl']} 0;
-`;
-
-const SearchContainer = styled.div`
-  position: relative;
-  max-width: 600px;
-  margin: 0 auto ${theme.spacing['2xl']};
-`;
-
-const SearchForm = styled.form`
-  position: relative;
-  width: 100%;
-`;
-
-const SearchInput = styled.input`
-  width: 100%;
-  padding: ${theme.spacing.md} ${theme.spacing.md} ${theme.spacing.md} 3rem;
-  border: 1px solid ${theme.colors.border.medium};
-  border-radius: ${theme.borderRadius.full};
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.base};
-  background: ${theme.colors.background.secondary};
-  transition: ${theme.transitions.normal};
-  box-shadow: ${theme.shadows.sm};
-
-  &:focus {
-    outline: none;
-    border-color: ${theme.colors.primary[500]};
-    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1), ${theme.shadows.md};
-  }
-
-  &::placeholder {
-    color: ${theme.colors.text.muted};
-  }
-  
-  &:invalid {
-    border-color: ${theme.colors.border.medium};
-    box-shadow: none;
-  }
-`;
-
-const SearchIcon = styled(Search)`
-  position: absolute;
-  left: ${theme.spacing.md};
-  top: 50%;
-  transform: translateY(-50%);
-  color: ${theme.colors.text.secondary};
-  width: 20px;
-  height: 20px;
-  pointer-events: none;
-`;
-
-// Optimized portfolio image component
-const PortfolioImage = React.memo<{
-  portfolio: Portfolio;
-  onClick: () => void;
-}>(({ portfolio, onClick }) => {
-  const [imageError, setImageError] = useState(false);
-  
-  const handleImageError = useCallback(() => {
-    setImageError(true);
-  }, []);
-
-  return (
-    <CoverImage 
-      $coverImage={portfolio.coverImage && !imageError ? portfolio.coverImage : undefined} 
-      $kind={portfolio.kind}
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      aria-label={`View ${portfolio.title || portfolio.username}'s portfolio`}
-    >
-      <KindBadge $kind={portfolio.kind}>{portfolio.kind}</KindBadge>
-      {portfolio.isOnline && <OnlineIndicator aria-label="Currently online" />}
-      
-      {portfolio.coverImage && !imageError ? (
-        <OptimizedImage
-          src={portfolio.coverImage}
-          alt={`${portfolio.title || portfolio.username}'s portfolio cover`}
-          fill
-          style={{ objectFit: 'cover' }}
-          onError={handleImageError}
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          priority={false}
-        />
-      ) : (
-        <PlaceholderContent>
-          <User aria-hidden="true" />
-          <span>{portfolio.title || portfolio.username}</span>
-        </PlaceholderContent>
-      )}
-    </CoverImage>
-  );
-});
-
-PortfolioImage.displayName = 'PortfolioImage';
-
-// Utility functions with memoization
+// Simple utility functions
 const getInitials = (name: string | undefined | null): string => {
   if (!name || typeof name !== 'string' || !name.trim()) {
     return '??';
@@ -207,121 +42,285 @@ const getInitials = (name: string | undefined | null): string => {
   return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
-const generateMockPortfolios = (): Portfolio[] => [
+const normalizeImageUrl = (url: string | undefined): string | null => {
+  if (!url || url.trim() === '') return null;
+  
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  
+  if (url.startsWith('/')) {
+    return `${backendUrl}${url}`;
+  }
+  
+  return `${backendUrl}/${url}`;
+};
+
+// Simple image component
+const PortfolioImage: React.FC<{
+  portfolio: Portfolio;
+  onClick: () => void;
+}> = ({ portfolio, onClick }) => {
+  const [imageError, setImageError] = useState(false);
+  
+  const getImageUrl = () => {
+    const candidates = [
+      portfolio.coverImage,
+      portfolio.profileImage
+    ].filter(Boolean);
+    
+    for (const url of candidates) {
+      const normalized = normalizeImageUrl(url);
+      if (normalized) return normalized;
+    }
+    
+    return null;
+  };
+
+  const imageUrl = getImageUrl();
+  const displayName = portfolio.title || portfolio.name || portfolio.username;
+
+  return (
+    <CoverImage 
+      $coverImage={imageUrl && !imageError ? imageUrl : undefined} 
+      $kind={portfolio.kind}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      aria-label={`View ${displayName}'s portfolio`}
+    >
+      <KindBadge $kind={portfolio.kind}>{portfolio.kind}</KindBadge>
+      
+      {imageUrl && !imageError ? (
+        <OptimizedImage
+          src={imageUrl}
+          alt={`${displayName}'s portfolio cover`}
+          fill
+          style={{ objectFit: 'cover' }}
+          onError={() => setImageError(true)}
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          priority={false}
+        />
+      ) : (
+        <PlaceholderContent>
+          <User aria-hidden="true" />
+          <span>{displayName}</span>
+        </PlaceholderContent>
+      )}
+    </CoverImage>
+  );
+};
+
+// Simple avatar component
+const PortfolioAvatar: React.FC<{
+  portfolio: Portfolio;
+}> = ({ portfolio }) => {
+  const [imageError, setImageError] = useState(false);
+  
+  const profileImageUrl = portfolio.profileImage;
+  const normalizedUrl = normalizeImageUrl(profileImageUrl);
+  const displayName = portfolio.title || portfolio.name || portfolio.username;
+
+  if (normalizedUrl && !imageError) {
+    return (
+      <Avatar>
+        <OptimizedImage
+          src={normalizedUrl}
+          alt={`${displayName}'s profile`}
+          width={48}
+          height={48}
+          style={{ objectFit: 'cover', borderRadius: '50%' }}
+          onError={() => setImageError(true)}
+        />
+      </Avatar>
+    );
+  }
+
+  return (
+    <Avatar>
+      {getInitials(displayName)}
+    </Avatar>
+  );
+};
+
+// Mock data with proper structure matching your types
+const MOCK_PORTFOLIOS: Portfolio[] = [
   {
     id: '1',
+    userId: 'user1',
     username: 'alice_creates',
-    title: 'Alice Johnson',
-    bio: 'Digital artist and UI designer creating beautiful, functional experiences that inspire and engage users worldwide.',
+    title: 'Alice Johnson Creative',
+    bio: 'Digital artist and UI designer creating beautiful, functional experiences.',
     kind: 'creative',
-    stats: { totalViews: 2840, totalPieces: 24, totalReviews: 18, averageRating: 4.8 },
+    visibility: 'public',
+    status: 'active',
     specializations: ['Digital Art', 'UI Design', 'Branding'],
-    isOnline: true
+    tags: ['digital', 'design', 'branding'],
+    showContactInfo: true,
+    settings: {
+      allowReviews: true,
+      requireReviewApproval: false,
+      allowAnonymousReviews: true,
+      showStats: true,
+      showPrices: false,
+      defaultGalleryView: 'grid',
+      piecesPerPage: 12,
+      notifyOnReview: true,
+      notifyOnView: false,
+      weeklyAnalyticsEmail: true
+    },
+    stats: { 
+      totalViews: 2840, 
+      uniqueVisitors: 1200,
+      totalPieces: 24, 
+      totalReviews: 18, 
+      averageRating: 4.8,
+      viewsThisWeek: 150,
+      viewsThisMonth: 650,
+      shareCount: 45,
+      savedCount: 12
+    },
+    coverImage: 'https://picsum.photos/800/400?random=1',
+    profileImage: 'https://picsum.photos/200/200?random=1',
+    createdAt: new Date('2024-01-15')
   },
   {
     id: '2',
+    userId: 'user2',
     username: 'math_master_bob',
-    title: 'Bob Chen',
-    bio: 'Mathematics educator passionate about making complex concepts accessible to students of all backgrounds.',
+    title: 'Bob Chen Mathematics',
+    bio: 'Mathematics educator passionate about making complex concepts accessible.',
     kind: 'educational',
-    stats: { totalViews: 1956, totalPieces: 45, totalReviews: 32, averageRating: 4.9 },
+    visibility: 'public',
+    status: 'active',
     specializations: ['Calculus', 'Statistics', 'SAT Prep'],
-    isOnline: false
+    tags: ['math', 'education', 'tutoring'],
+    showContactInfo: true,
+    settings: {
+      allowReviews: true,
+      requireReviewApproval: true,
+      allowAnonymousReviews: false,
+      showStats: true,
+      showPrices: false,
+      defaultGalleryView: 'list',
+      piecesPerPage: 10,
+      notifyOnReview: true,
+      notifyOnView: false,
+      weeklyAnalyticsEmail: true
+    },
+    stats: { 
+      totalViews: 1956, 
+      uniqueVisitors: 890,
+      totalPieces: 45, 
+      totalReviews: 32, 
+      averageRating: 4.9,
+      viewsThisWeek: 89,
+      viewsThisMonth: 420,
+      shareCount: 23,
+      savedCount: 8
+    },
+    coverImage: 'https://picsum.photos/800/400?random=2',
+    profileImage: 'https://picsum.photos/200/200?random=2',
+    createdAt: new Date('2024-01-10')
   },
   {
     id: '3',
+    userId: 'user3',
     username: 'carol_codes',
-    title: 'Carol Martinez',
-    bio: 'Full-stack developer and creative technologist bridging the gap between design and engineering.',
+    title: 'Carol Martinez Tech',
+    bio: 'Full-stack developer and creative technologist.',
     kind: 'hybrid',
-    stats: { totalViews: 3210, totalPieces: 38, totalReviews: 27, averageRating: 4.7 },
+    visibility: 'public',
+    status: 'active',
     specializations: ['React', 'Node.js', 'Creative Coding'],
-    isOnline: true
-  },
-  {
-    id: '4',
-    username: 'david_pro',
-    title: 'David Kim',
-    bio: 'Senior product manager with 8 years of experience driving innovation in tech startups and Fortune 500 companies.',
-    kind: 'professional',
-    stats: { totalViews: 1687, totalPieces: 15, totalReviews: 22, averageRating: 4.6 },
-    specializations: ['Product Strategy', 'UX Research', 'Data Analysis'],
-    isOnline: true
-  },
-  {
-    id: '5',
-    username: 'eva_writer',
-    title: 'Eva Thompson',
-    bio: 'Content creator and storyteller helping brands find their authentic voice in the digital landscape.',
-    kind: 'creative',
-    stats: { totalViews: 1423, totalPieces: 31, totalReviews: 19, averageRating: 4.5 },
-    specializations: ['Content Strategy', 'Copywriting', 'Brand Voice'],
-    isOnline: false
-  },
-  {
-    id: '6',
-    username: 'frank_music',
-    title: 'Frank Rodriguez',
-    bio: 'Music producer and audio engineer crafting immersive sonic experiences for film, games, and artists.',
-    kind: 'creative',
-    stats: { totalViews: 2156, totalPieces: 28, totalReviews: 15, averageRating: 4.8 },
-    specializations: ['Music Production', 'Audio Engineering', 'Sound Design'],
-    isOnline: true
+    tags: ['development', 'creative', 'fullstack'],
+    showContactInfo: true,
+    settings: {
+      allowReviews: true,
+      requireReviewApproval: false,
+      allowAnonymousReviews: true,
+      showStats: true,
+      showPrices: false,
+      defaultGalleryView: 'masonry',
+      piecesPerPage: 15,
+      notifyOnReview: true,
+      notifyOnView: false,
+      weeklyAnalyticsEmail: true
+    },
+    stats: { 
+      totalViews: 3210, 
+      uniqueVisitors: 1450,
+      totalPieces: 38, 
+      totalReviews: 27, 
+      averageRating: 4.7,
+      viewsThisWeek: 210,
+      viewsThisMonth: 890,
+      shareCount: 67,
+      savedCount: 19
+    },
+    coverImage: 'https://picsum.photos/800/400?random=3',
+    profileImage: 'https://picsum.photos/200/200?random=3',
+    createdAt: new Date('2024-01-05')
   }
 ];
 
-// Main component with optimizations
-export default function OptimizedHomePage() {
+// Stats data - simple static object
+const STATS_DATA = {
+  users: 1247,
+  portfolios: 120,
+  pieces: 900,
+  active: 45
+};
+
+// Main component - simplified
+export default function HomePage() {
   const router = useRouter();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>(MOCK_PORTFOLIOS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Memoized stats calculation
-  const stats = useMemo<Stats>(() => ({
-    users: 1247,
-    portfolios: Math.max(portfolios.length * 20, 120),
-    pieces: Math.max(portfolios.length * 150, 900),
-    active: Math.max(portfolios.filter(p => p.isOnline).length * 30, 45)
-  }), [portfolios]);
 
-  // Optimized fetch function with error handling
-  const fetchPortfolios = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const apiClient = getApiClient();
-      let portfolioData: any;
-      
+  // Fetch portfolios
+  useEffect(() => {
+    const fetchPortfolios = async () => {
       try {
-        portfolioData = await apiClient.portfolio?.discover?.({}, 1, 6);
-      } catch (apiError) {
-        console.warn('API fetch failed, using mock data:', apiError);
-        portfolioData = generateMockPortfolios();
+        setLoading(true);
+        setError(null);
+        
+        const apiClient = getApiClient();
+        const portfolioData = await apiClient.portfolio?.discover?.({}, 1, 6);
+        
+        if (Array.isArray(portfolioData)) {
+          // Normalize portfolio data to ensure consistent ID handling
+          const normalizedPortfolios = portfolioData.map(normalizePortfolio);
+          setPortfolios(normalizedPortfolios);
+        } else if (portfolioData?.portfolios && Array.isArray(portfolioData.portfolios)) {
+          const normalizedPortfolios = portfolioData.portfolios.map(normalizePortfolio);
+          setPortfolios(normalizedPortfolios);
+        } else {
+          setPortfolios(MOCK_PORTFOLIOS);
+        }
+      } catch (error) {
+        console.error('Failed to fetch portfolios:', error);
+        setError('Failed to load portfolios');
+        setPortfolios(MOCK_PORTFOLIOS);
+      } finally {
+        setLoading(false);
       }
-      
-      const portfolioArray = Array.isArray(portfolioData) 
-        ? portfolioData 
-        : portfolioData?.portfolios || portfolioData?.data || generateMockPortfolios();
-      
-      setPortfolios(portfolioArray);
-    } catch (error) {
-      console.error('Failed to fetch portfolios:', error);
-      setError('Failed to load portfolios');
-      setPortfolios(generateMockPortfolios());
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    fetchPortfolios();
   }, []);
 
-  useEffect(() => {
-    fetchPortfolios();
-  }, [fetchPortfolios]);
-
-  // Optimized search handler
   const handleSearch = useCallback((e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const trimmedQuery = searchQuery.trim();
@@ -331,30 +330,25 @@ export default function OptimizedHomePage() {
     }
   }, [searchQuery, router]);
 
-  // Memoized portfolio click handler
   const handlePortfolioClick = useCallback((username: string) => {
     router.push(`/portfolio/${username}`);
   }, [router]);
 
-  // Retry handler for error state
   const handleRetry = useCallback(() => {
-    fetchPortfolios();
-  }, [fetchPortfolios]);
+    window.location.reload();
+  }, []);
 
-  // Loading state
   if (loading) {
     return (
       <PageContainer>
         <LoadingContainer>
           <Loader2 className="animate-spin" size={48} aria-hidden="true" />
-          <span className="sr-only">Loading portfolios...</span>
           <BodyText>Loading portfolios...</BodyText>
         </LoadingContainer>
       </PageContainer>
     );
   }
 
-  // Error state
   if (error) {
     return (
       <PageContainer>
@@ -425,19 +419,30 @@ export default function OptimizedHomePage() {
         <Section>
           {/* Stats Grid */}
           <StatsGrid>
-            {[
-              { value: stats.users, label: 'Active Creators' },
-              { value: stats.portfolios, label: 'Portfolios' },
-              { value: stats.pieces, label: 'Creative Works' },
-              { value: stats.active, label: 'Online Now' }
-            ].map((stat, index) => (
-              <StatCard key={stat.label}>
-                <CardContent>
-                  <StatNumber>{stat.value.toLocaleString()}</StatNumber>
-                  <StatLabel>{stat.label}</StatLabel>
-                </CardContent>
-              </StatCard>
-            ))}
+            <StatCard>
+              <CardContent>
+                <StatNumber>{STATS_DATA.users.toLocaleString()}</StatNumber>
+                <StatLabel>Active Creators</StatLabel>
+              </CardContent>
+            </StatCard>
+            <StatCard>
+              <CardContent>
+                <StatNumber>{STATS_DATA.portfolios.toLocaleString()}</StatNumber>
+                <StatLabel>Portfolios</StatLabel>
+              </CardContent>
+            </StatCard>
+            <StatCard>
+              <CardContent>
+                <StatNumber>{STATS_DATA.pieces.toLocaleString()}</StatNumber>
+                <StatLabel>Creative Works</StatLabel>
+              </CardContent>
+            </StatCard>
+            <StatCard>
+              <CardContent>
+                <StatNumber>{STATS_DATA.active.toLocaleString()}</StatNumber>
+                <StatLabel>Online Now</StatLabel>
+              </CardContent>
+            </StatCard>
           </StatsGrid>
 
           {/* Featured Creators Section */}
@@ -453,61 +458,55 @@ export default function OptimizedHomePage() {
 
           {portfolios.length > 0 ? (
             <Grid $minWidth="320px">
-              {portfolios.map((portfolio) => (
-                <PortfolioCard 
-                  key={portfolio.id}
-                  $kind={portfolio.kind}
-                >
-                  <PortfolioImage 
-                    portfolio={portfolio}
-                    onClick={() => handlePortfolioClick(portfolio.username)}
-                  />
-                  
-                  <CardContent>
-                    <UserInfo>
-                      <Avatar>
-                        {portfolio.profileImage ? (
-                          <OptimizedImage
-                            src={portfolio.profileImage}
-                            alt={`${portfolio.title || portfolio.username}'s profile`}
-                            width={48}
-                            height={48}
-                            style={{ objectFit: 'cover', borderRadius: '50%' }}
-                          />
-                        ) : (
-                          getInitials(portfolio.title || portfolio.username)
-                        )}
-                      </Avatar>
-                      <UserDetails>
-                        <Username>@{portfolio.username}</Username>
-                        <UserTitle>{portfolio.title || 'Creative Professional'}</UserTitle>
-                      </UserDetails>
-                    </UserInfo>
+              {portfolios.map((portfolio) => {
+                // Use safe ID extraction
+                const portfolioId = getPortfolioId(portfolio);
+                if (!portfolioId) return null;
+                
+                return (
+                  <PortfolioCard 
+                    key={`portfolio-${portfolioId}-${portfolio.username}`}
+                    $kind={portfolio.kind}
+                  >
+                    <PortfolioImage 
+                      portfolio={portfolio}
+                      onClick={() => handlePortfolioClick(portfolio.username)}
+                    />
                     
-                    {portfolio.bio && portfolio.bio.trim() && (
-                      <Bio>{portfolio.bio}</Bio>
-                    )}
-                    
-                    <PortfolioStats>
-                      <StatItem>
-                        <Eye size={14} aria-hidden="true" />
-                        <StatValue>{(portfolio.stats?.totalViews || 0).toLocaleString()}</StatValue>
-                        <span className="sr-only">views</span>
-                      </StatItem>
-                      <StatItem>
-                        <ImageIcon size={14} aria-hidden="true" />
-                        <StatValue>{portfolio.stats?.totalPieces || 0}</StatValue>
-                        <span className="sr-only">pieces</span>
-                      </StatItem>
-                      <StatItem>
-                        <Star size={14} aria-hidden="true" />
-                        <StatValue>{portfolio.stats?.averageRating?.toFixed(1) || 'N/A'}</StatValue>
-                        <span className="sr-only">rating</span>
-                      </StatItem>
-                    </PortfolioStats>
-                  </CardContent>
-                </PortfolioCard>
-              ))}
+                    <CardContent>
+                      <UserInfo>
+                        <PortfolioAvatar portfolio={portfolio} />
+                        <UserDetails>
+                          <Username>@{portfolio.username}</Username>
+                          <UserTitle>{portfolio.title || portfolio.name || 'Creative Professional'}</UserTitle>
+                        </UserDetails>
+                      </UserInfo>
+                      
+                      {portfolio.bio && portfolio.bio.trim() && (
+                        <Bio>{portfolio.bio}</Bio>
+                      )}
+                      
+                      <PortfolioStats>
+                        <StatItem>
+                          <Eye size={14} aria-hidden="true" />
+                          <StatValue>{(portfolio.stats?.totalViews || 0).toLocaleString()}</StatValue>
+                          <span className="sr-only">views</span>
+                        </StatItem>
+                        <StatItem>
+                          <ImageIcon size={14} aria-hidden="true" />
+                          <StatValue>{portfolio.stats?.totalPieces || 0}</StatValue>
+                          <span className="sr-only">pieces</span>
+                        </StatItem>
+                        <StatItem>
+                          <Star size={14} aria-hidden="true" />
+                          <StatValue>{portfolio.stats?.averageRating?.toFixed(1) || 'N/A'}</StatValue>
+                          <span className="sr-only">rating</span>
+                        </StatItem>
+                      </PortfolioStats>
+                    </CardContent>
+                  </PortfolioCard>
+                );
+              })}
             </Grid>
           ) : (
             <EmptyState role="status">
@@ -521,40 +520,37 @@ export default function OptimizedHomePage() {
           <ContentWrapper>
             <SectionTitle>Quick Actions</SectionTitle>
             <ActionGrid>
-              {[
-                {
-                  href: '/thrive',
-                  icon: <Target size={24} />,
-                  title: 'Skills Arena',
-                  description: 'Challenge yourself with interactive professional development games'
-                },
-                {
-                  href: '/writing',
-                  icon: <BookOpen size={24} />,
-                  title: 'Learning Center',
-                  description: 'Explore educational content and track your learning progress'
-                },
-                {
-                  href: '/explore',
-                  icon: <Grid3X3 size={24} />,
-                  title: 'Browse Gallery',
-                  description: 'Discover creative works from our talented community'
-                },
-                {
-                  href: '/dashboard/profile',
-                  icon: <Trophy size={24} />,
-                  title: 'Build Portfolio',
-                  description: 'Create and showcase your professional work and achievements'
-                }
-              ].map((action) => (
-                <ActionCard key={action.href} href={action.href}>
-                  <ActionIcon aria-hidden="true">
-                    {action.icon}
-                  </ActionIcon>
-                  <ActionTitle>{action.title}</ActionTitle>
-                  <ActionDescription>{action.description}</ActionDescription>
-                </ActionCard>
-              ))}
+              <ActionCard href="/thrive">
+                <ActionIcon aria-hidden="true">
+                  <Target size={24} />
+                </ActionIcon>
+                <ActionTitle>Skills Arena</ActionTitle>
+                <ActionDescription>Challenge yourself with interactive professional development games</ActionDescription>
+              </ActionCard>
+              
+              <ActionCard href="/writing">
+                <ActionIcon aria-hidden="true">
+                  <BookOpen size={24} />
+                </ActionIcon>
+                <ActionTitle>Learning Center</ActionTitle>
+                <ActionDescription>Explore educational content and track your learning progress</ActionDescription>
+              </ActionCard>
+              
+              <ActionCard href="/explore">
+                <ActionIcon aria-hidden="true">
+                  <Grid3X3 size={24} />
+                </ActionIcon>
+                <ActionTitle>Browse Gallery</ActionTitle>
+                <ActionDescription>Discover creative works from our talented community</ActionDescription>
+              </ActionCard>
+              
+              <ActionCard href="/dashboard/profile">
+                <ActionIcon aria-hidden="true">
+                  <Trophy size={24} />
+                </ActionIcon>
+                <ActionTitle>Build Portfolio</ActionTitle>
+                <ActionDescription>Create and showcase your professional work and achievements</ActionDescription>
+              </ActionCard>
             </ActionGrid>
           </ContentWrapper>
         </QuickActions>
@@ -563,7 +559,7 @@ export default function OptimizedHomePage() {
   );
 }
 
-// Additional styled components with RTL support
+// Styled components remain the same as before
 const OptimizedImage = styled(Image)`
   transition: ${theme.transitions.normal};
 `;
@@ -591,17 +587,75 @@ const ErrorContainer = styled.div`
   min-height: 50vh;
 `;
 
+const HeroSection = styled(Section)`
+  background: linear-gradient(135deg, ${theme.colors.background.primary} 0%, ${theme.colors.primary[100]} 100%);
+  text-align: center;
+  border-bottom: 1px solid ${theme.colors.border.light};
+  position: relative;
+  overflow: hidden;
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+`;
+
+const HeroContent = styled.div`
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: ${theme.spacing['2xl']} 0;
+`;
+
+const SearchContainer = styled.div`
+  position: relative;
+  max-width: 600px;
+  margin: 0 auto ${theme.spacing['2xl']};
+`;
+
+const SearchForm = styled.form`
+  position: relative;
+  width: 100%;
+`;
+
+const SearchInput = styled.input`
+  width: 100%;
+  padding: ${theme.spacing.md} ${theme.spacing.md} ${theme.spacing.md} 3rem;
+  border: 1px solid ${theme.colors.border.medium};
+  border-radius: ${theme.borderRadius.full};
+  font-family: ${theme.typography.fonts.body};
+  font-size: ${theme.typography.sizes.base};
+  background: ${theme.colors.background.secondary};
+  transition: ${theme.transitions.normal};
+  box-shadow: ${theme.shadows.sm};
+
+  &:focus {
+    outline: none;
+    border-color: ${theme.colors.primary[500]};
+    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1), ${theme.shadows.md};
+  }
+
+  &::placeholder {
+    color: ${theme.colors.text.muted};
+  }
+`;
+
+const SearchIcon = styled(Search)`
+  position: absolute;
+  left: ${theme.spacing.md};
+  top: 50%;
+  transform: translateY(-50%);
+  color: ${theme.colors.text.secondary};
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+`;
+
 const CTAButtons = styled.div`
   display: flex;
   gap: ${theme.spacing.md};
   justify-content: center;
   flex-wrap: wrap;
   margin-bottom: ${theme.spacing['2xl']};
-  
-  /* RTL support */
-  [dir="rtl"] & {
-    flex-direction: row-reverse;
-  }
 `;
 
 const StatsGrid = styled.div`
@@ -627,12 +681,6 @@ const StatCard = styled(Card)`
   &:hover {
     transform: translateY(-4px);
     background: rgba(255, 255, 255, 0.95);
-  }
-  
-  @media (prefers-reduced-motion: reduce) {
-    &:hover {
-      transform: none;
-    }
   }
 `;
 
@@ -673,16 +721,6 @@ const SectionHeader = styled.div`
     align-items: flex-start;
     gap: ${theme.spacing.sm};
   }
-  
-  /* RTL support */
-  [dir="rtl"] & {
-    flex-direction: row-reverse;
-    
-    @media (max-width: 640px) {
-      flex-direction: column-reverse;
-      align-items: flex-end;
-    }
-  }
 `;
 
 const SectionTitle = styled(Heading2)`
@@ -690,11 +728,6 @@ const SectionTitle = styled(Heading2)`
   align-items: center;
   gap: ${theme.spacing.sm};
   margin-bottom: 0;
-  
-  /* RTL support */
-  [dir="rtl"] & {
-    flex-direction: row-reverse;
-  }
 `;
 
 const ViewAllLink = styled(Link)`
@@ -719,21 +752,6 @@ const ViewAllLink = styled(Link)`
     outline-offset: 2px;
     border-radius: 4px;
   }
-  
-  /* RTL support */
-  [dir="rtl"] & {
-    flex-direction: row-reverse;
-    
-    &:hover {
-      transform: translateX(-2px);
-    }
-  }
-  
-  @media (prefers-reduced-motion: reduce) {
-    &:hover {
-      transform: none;
-    }
-  }
 `;
 
 const PortfolioCard = styled(Card)<{ $kind: string }>`
@@ -748,12 +766,6 @@ const PortfolioCard = styled(Card)<{ $kind: string }>`
   &:focus-within {
     outline: 2px solid ${theme.colors.primary[500]};
     outline-offset: 2px;
-  }
-  
-  @media (prefers-reduced-motion: reduce) {
-    &:hover {
-      transform: translateY(-2px);
-    }
   }
 `;
 
@@ -778,6 +790,7 @@ const CoverImage = styled.div<{ $coverImage?: string; $kind: string }>`
   color: white;
   cursor: pointer;
   border-radius: ${theme.borderRadius.md} ${theme.borderRadius.md} 0 0;
+  overflow: hidden;
   
   &::before {
     content: '';
@@ -788,11 +801,7 @@ const CoverImage = styled.div<{ $coverImage?: string; $kind: string }>`
     bottom: 0;
     background: rgba(0, 0, 0, 0.2);
     border-radius: inherit;
-  }
-  
-  &:focus {
-    outline: 2px solid ${theme.colors.primary[500]};
-    outline-offset: 2px;
+    z-index: 1;
   }
 `;
 
@@ -810,31 +819,6 @@ const KindBadge = styled.div<{ $kind: string }>`
   color: ${theme.colors.text.primary};
   z-index: 2;
   box-shadow: ${theme.shadows.sm};
-  
-  /* RTL support */
-  [dir="rtl"] & {
-    right: auto;
-    left: ${theme.spacing.md};
-  }
-`;
-
-const OnlineIndicator = styled.div`
-  position: absolute;
-  top: ${theme.spacing.md};
-  left: ${theme.spacing.md};
-  width: 12px;
-  height: 12px;
-  background: ${theme.colors.text.secondary};
-  border-radius: 50%;
-  border: 2px solid white;
-  z-index: 2;
-  box-shadow: ${theme.shadows.sm};
-  
-  /* RTL support */
-  [dir="rtl"] & {
-    left: auto;
-    right: ${theme.spacing.md};
-  }
 `;
 
 const UserInfo = styled.div`
@@ -842,12 +826,6 @@ const UserInfo = styled.div`
   align-items: center;
   gap: ${theme.spacing.md};
   margin-bottom: ${theme.spacing.md};
-  
-  /* RTL support */
-  [dir="rtl"] & {
-    flex-direction: row-reverse;
-    text-align: right;
-  }
 `;
 
 const Avatar = styled.div`
@@ -907,10 +885,6 @@ const PortfolioStats = styled.div`
   padding-top: ${theme.spacing.md};
   border-top: 1px solid ${theme.colors.border.light};
   gap: ${theme.spacing.sm};
-  
-  @media (max-width: 480px) {
-    justify-content: space-around;
-  }
 `;
 
 const StatItem = styled.div`
@@ -926,11 +900,6 @@ const StatItem = styled.div`
     width: 14px;
     height: 14px;
     flex-shrink: 0;
-  }
-  
-  /* RTL support */
-  [dir="rtl"] & {
-    flex-direction: row-reverse;
   }
 `;
 
@@ -984,12 +953,6 @@ const ActionCard = styled(Link)`
     outline-offset: 2px;
   }
   
-  @media (prefers-reduced-motion: reduce) {
-    &:hover {
-      transform: translateY(-1px);
-    }
-  }
-  
   @media (max-width: 768px) {
     padding: ${theme.spacing.xl};
   }
@@ -1009,12 +972,6 @@ const ActionIcon = styled.div`
   
   ${ActionCard}:hover & {
     transform: scale(1.1);
-  }
-  
-  @media (prefers-reduced-motion: reduce) {
-    ${ActionCard}:hover & {
-      transform: scale(1.02);
-    }
   }
   
   @media (max-width: 768px) {
