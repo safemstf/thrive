@@ -8,6 +8,101 @@ import {
   Heart, Zap, TrendingUp, Award, Eye, Clock
 } from 'lucide-react';
 
+// Import styled components from the existing styles file
+import {
+  PageWrapper,
+  Container,
+  PageHeader,
+  HeaderLeft,
+  HeaderRight,
+  PageTitle,
+  PageSubtitle,
+  ConnectionBadge,
+  AuthTokenBadge,
+  StatsOverview,
+  StatCard,
+  StatIcon,
+  StatContent,
+  StatValue,
+  StatLabel,
+  ProgressCard,
+  ProgressBar,
+  ProgressFill,
+  ProgressLabel,
+  MainCard,
+  TabRow,
+  TabButton,
+  TabContent,
+  ControlPanel,
+  CategoryGrid,
+  CategoryCard,
+  CategoryIcon,
+  CategoryName,
+  CategoryStats,
+  CategoryProgress,
+  CategoryProgressFill,
+  ActionPanel,
+  ActionBar,
+  ActionGroup,
+  PrimaryButton,
+  SecondaryButton,
+  RouteSection,
+  SectionHeader,
+  SectionTitle,
+  RouteBadge,
+  RouteList,
+  RouteCard,
+  RouteHeader,
+  RouteLeft,
+  StatusIcon,
+  RouteInfo,
+  RouteName,
+  RouteDescription,
+  MethodBadge,
+  RouteTags,
+  RouteTag,
+  RouteActions,
+  ResponseTime,
+  TestButton,
+  ResponseSection,
+  ResponseHeader,
+  ResponseStatus,
+  ResponseMeta,
+  ResponseBody,
+  CodeBlock,
+  ErrorSection,
+  ErrorTitle,
+  ErrorMessage,
+  ConfigSection,
+  ConfigCard,
+  ConfigHeader,
+  ConfigTitle,
+  ConfigStatus,
+  ConfigContent,
+  ConfigRow,
+  ConfigLabel,
+  ConfigValue,
+  TokenDisplay,
+  ConfigActions,
+  QuickLinks,
+  QuickLink,
+  IntegrationSection,
+  IntegrationCard,
+  CardHeader,
+  CardIcon,
+  CardContent,
+  CardTitle,
+  CodeExample,
+  DiagnosticsSection,
+  DiagnosticCard,
+  DiagnosticHeader,
+  DiagnosticList,
+  DiagnosticItem,
+  DebugCommands,
+  DebugCommand,
+  CommandTitle
+} from './apiTestStyles';
+
 // Define test result interface
 interface TestResult {
   status: 'pending' | 'running' | 'success' | 'error';
@@ -262,9 +357,9 @@ interface ApiClientTestLogicProps {
   baseUrl?: string;
 }
 
-export default function ApiClientTestLogic({
+export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
   baseUrl = process.env.NEXT_PUBLIC_NGROK_URL || 'http://localhost:5000'
-}: ApiClientTestLogicProps) {
+}) => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('health');
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
@@ -642,162 +737,110 @@ export default function ApiClientTestLogic({
   const getStatusIcon = useCallback((status: string) => {
     switch (status) {
       case 'success':
-        return <CheckCircle className="text-green-500" size={20} />;
+        return <CheckCircle style={{ color: '#10b981' }} size={20} />;
       case 'error':
-        return <XCircle className="text-red-500" size={20} />;
+        return <XCircle style={{ color: '#ef4444' }} size={20} />;
       case 'running':
-        return <Loader2 className="text-blue-500 animate-spin" size={20} />;
+        return <Loader2 style={{ color: '#3b82f6' }} className="animate-spin" size={20} />;
       default:
-        return <AlertCircle className="text-gray-400" size={20} />;
+        return <AlertCircle style={{ color: '#9ca3af' }} size={20} />;
     }
   }, []);
 
-  const getMethodBadgeColor = (method: string) => {
-    switch (method) {
-      case 'GET':
-        return 'bg-green-100 text-green-800';
-      case 'POST':
-        return 'bg-blue-100 text-blue-800';
-      case 'PUT':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'DELETE':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">API Client Test Suite</h1>
-            <p className="text-gray-600 mt-2">Test the real API client implementation</p>
-          </div>
+    <PageWrapper>
+      <Container>
+        <PageHeader>
+          <HeaderLeft>
+            <PageTitle>API Client Test Suite</PageTitle>
+            <PageSubtitle>Test the real API client implementation</PageSubtitle>
+          </HeaderLeft>
           
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-              connectionStatus === 'connected' 
-                ? 'bg-green-100 text-green-800' 
-                : connectionStatus === 'connecting'
-                ? 'bg-yellow-100 text-yellow-800'
-                : 'bg-red-100 text-red-800'
-            }`}>
+          <HeaderRight>
+            <ConnectionBadge $status={connectionStatus}>
               {connectionStatus === 'connected' ? <Activity size={16} /> : <WifiOff size={16} />}
-              <span className="capitalize">{connectionStatus}</span>
-            </div>
+              {connectionStatus}
+            </ConnectionBadge>
             
             {authToken && (
-              <button
-                onClick={copyToken}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-lg hover:bg-blue-200 transition-colors"
-                title="Click to copy token"
-              >
+              <AuthTokenBadge onClick={copyToken} title="Click to copy token">
                 <Key size={16} />
                 <span>Authenticated</span>
                 <Copy size={14} />
-              </button>
+              </AuthTokenBadge>
             )}
-          </div>
-        </div>
+          </HeaderRight>
+        </PageHeader>
 
-        {/* Stats Overview */}
         {stats.total > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <div className="flex items-center gap-4">
-                <TrendingUp className="text-gray-600" size={24} />
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
-                  <div className="text-sm text-gray-600">Total Tests</div>
-                </div>
-              </div>
-            </div>
+          <StatsOverview>
+            <StatCard>
+              <StatIcon><TrendingUp size={24} /></StatIcon>
+              <StatContent>
+                <StatValue>{stats.total}</StatValue>
+                <StatLabel>Total Tests</StatLabel>
+              </StatContent>
+            </StatCard>
             
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <div className="flex items-center gap-4">
-                <CheckCircle className="text-green-500" size={24} />
-                <div>
-                  <div className="text-2xl font-bold text-green-600">{stats.passed}</div>
-                  <div className="text-sm text-gray-600">Passed</div>
-                </div>
-              </div>
-            </div>
+            <StatCard $color="#10b981">
+              <StatIcon><CheckCircle size={24} /></StatIcon>
+              <StatContent>
+                <StatValue>{stats.passed}</StatValue>
+                <StatLabel>Passed</StatLabel>
+              </StatContent>
+            </StatCard>
             
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <div className="flex items-center gap-4">
-                <XCircle className="text-red-500" size={24} />
-                <div>
-                  <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-                  <div className="text-sm text-gray-600">Failed</div>
-                </div>
-              </div>
-            </div>
+            <StatCard $color="#ef4444">
+              <StatIcon><XCircle size={24} /></StatIcon>
+              <StatContent>
+                <StatValue>{stats.failed}</StatValue>
+                <StatLabel>Failed</StatLabel>
+              </StatContent>
+            </StatCard>
             
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <div className="flex items-center gap-4">
-                <Loader2 className="text-blue-500" size={24} />
-                <div>
-                  <div className="text-2xl font-bold text-blue-600">{stats.running}</div>
-                  <div className="text-sm text-gray-600">Running</div>
-                </div>
-              </div>
-            </div>
+            <StatCard $color="#3b82f6">
+              <StatIcon><Loader2 size={24} /></StatIcon>
+              <StatContent>
+                <StatValue>{stats.running}</StatValue>
+                <StatLabel>Running</StatLabel>
+              </StatContent>
+            </StatCard>
             
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <div className="mb-2">
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${stats.total > 0 ? (stats.passed / stats.total) * 100 : 0}%` }}
-                  />
-                </div>
-              </div>
-              <div className="text-sm text-gray-600">
+            <ProgressCard>
+              <ProgressBar>
+                <ProgressFill 
+                  $percentage={stats.total > 0 ? (stats.passed / stats.total) * 100 : 0}
+                  $color="#10b981"
+                />
+              </ProgressBar>
+              <ProgressLabel>
                 {stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0}% Success Rate
-              </div>
-            </div>
-          </div>
+              </ProgressLabel>
+            </ProgressCard>
+          </StatsOverview>
         )}
 
-        {/* Main Content */}
-        <div className="bg-white rounded-lg shadow-sm border">
-          {/* Tabs */}
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6">
-              {[
-                { id: 0, name: 'API Testing', icon: Route },
-                { id: 1, name: 'Configuration', icon: Settings },
-                { id: 2, name: 'Integration', icon: Code },
-                { id: 3, name: 'Diagnostics', icon: AlertTriangle }
-              ].map(tab => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                  >
-                    <Icon size={18} />
-                    {tab.name}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
+        <MainCard>
+          <TabRow>
+            <TabButton $active={activeTab === 0} onClick={() => setActiveTab(0)}>
+              <Route size={18} /> API Testing
+            </TabButton>
+            <TabButton $active={activeTab === 1} onClick={() => setActiveTab(1)}>
+              <Settings size={18} /> Configuration
+            </TabButton>
+            <TabButton $active={activeTab === 2} onClick={() => setActiveTab(2)}>
+              <Code size={18} /> Integration
+            </TabButton>
+            <TabButton $active={activeTab === 3} onClick={() => setActiveTab(3)}>
+              <AlertTriangle size={18} /> Diagnostics
+            </TabButton>
+          </TabRow>
 
-          <div className="p-6">
+          <TabContent>
             {activeTab === 0 && (
               <>
-                {/* Category Selection */}
-                <div className="mb-8">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <ControlPanel>
+                  <CategoryGrid>
                     {Object.entries(CATEGORIES).map(([key, category]) => {
                       const Icon = category.icon;
                       const categoryMethods = API_METHODS.filter(m => m.category === key);
@@ -809,186 +852,139 @@ export default function ApiClientTestLogic({
                       const hasResults = categoryResults.length > 0;
                       
                       return (
-                        <button
+                        <CategoryCard
                           key={key}
+                          $active={selectedCategory === key}
+                          $color={category.color}
                           onClick={() => setSelectedCategory(key)}
-                          className={`p-4 rounded-lg border-2 transition-all ${
-                            selectedCategory === key
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
                         >
-                          <div className="flex items-center gap-3 mb-2">
-                            <div 
-                              className="p-2 rounded"
-                              style={{ backgroundColor: `${category.color}20`, color: category.color }}
-                            >
-                              <Icon size={24} />
-                            </div>
-                            <div className="text-left">
-                              <div className="font-medium text-gray-900">{category.name}</div>
-                              <div className="text-sm text-gray-600">
-                                {hasResults ? (
-                                  <span>
-                                    <span className="text-green-600">{passed}</span>
-                                    <span className="text-gray-400">/</span>
-                                    <span>{total}</span>
-                                  </span>
-                                ) : (
-                                  <span>{total} methods</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                          <CategoryIcon $color={category.color}>
+                            <Icon size={24} />
+                          </CategoryIcon>
+                          <CategoryName>{category.name}</CategoryName>
+                          <CategoryStats>
+                            {hasResults ? (
+                              <>
+                                <span style={{ color: '#10b981' }}>{passed}</span>
+                                <span style={{ color: '#6b7280' }}>/</span>
+                                <span>{total}</span>
+                              </>
+                            ) : (
+                              <span style={{ color: '#6b7280' }}>{total} methods</span>
+                            )}
+                          </CategoryStats>
                           {hasResults && (
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="h-2 rounded-full transition-all duration-300"
-                                style={{ 
-                                  width: `${(passed / total) * 100}%`,
-                                  backgroundColor: category.color 
-                                }}
+                            <CategoryProgress>
+                              <CategoryProgressFill 
+                                $percentage={(passed / total) * 100}
+                                $color={category.color}
                               />
-                            </div>
+                            </CategoryProgress>
                           )}
-                        </button>
+                        </CategoryCard>
                       );
                     })}
-                  </div>
+                  </CategoryGrid>
 
-                  {/* Action Panel */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={runAuthFlow}
-                        disabled={isRunning}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Shield size={16} />
-                        Auth Flow
-                      </button>
+                  <ActionPanel>
+                    <ActionBar>
+                      <ActionGroup>
+                        <PrimaryButton onClick={runAuthFlow} disabled={isRunning}>
+                          <Shield size={16} />
+                          Auth Flow
+                        </PrimaryButton>
+                        
+                        <PrimaryButton onClick={runCategoryTests} disabled={isRunning}>
+                          <Play size={16} />
+                          Test {CATEGORIES[selectedCategory as keyof typeof CATEGORIES]?.name}
+                        </PrimaryButton>
+                        
+                        <PrimaryButton onClick={runComprehensiveTest} disabled={isRunning}>
+                          <Terminal size={16} />
+                          Full System Test
+                        </PrimaryButton>
+                      </ActionGroup>
                       
-                      <button
-                        onClick={runCategoryTests}
-                        disabled={isRunning}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Play size={16} />
-                        Test {CATEGORIES[selectedCategory as keyof typeof CATEGORIES]?.name}
-                      </button>
-                      
-                      <button
-                        onClick={runComprehensiveTest}
-                        disabled={isRunning}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Terminal size={16} />
-                        Full System Test
-                      </button>
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      <button
-                        onClick={clearResults}
-                        disabled={isRunning}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <RefreshCw size={16} />
-                        Clear
-                      </button>
-                      
-                      {stats.total > 0 && (
-                        <button
-                          onClick={exportResults}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-                        >
-                          <Download size={16} />
-                          Export
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                      <ActionGroup>
+                        <SecondaryButton onClick={clearResults} disabled={isRunning}>
+                          <RefreshCw size={16} />
+                          Clear
+                        </SecondaryButton>
+                        
+                        {stats.total > 0 && (
+                          <SecondaryButton onClick={exportResults}>
+                            <Download size={16} />
+                            Export
+                          </SecondaryButton>
+                        )}
+                      </ActionGroup>
+                    </ActionBar>
+                  </ActionPanel>
+                </ControlPanel>
 
-                {/* Methods List */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                <RouteSection>
+                  <SectionHeader>
+                    <SectionTitle>
                       {CATEGORIES[selectedCategory as keyof typeof CATEGORIES]?.name} Methods
-                      <span className="ml-2 text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                        {filteredMethods.length} methods
-                      </span>
-                    </h3>
-                  </div>
+                      <RouteBadge>{filteredMethods.length} methods</RouteBadge>
+                    </SectionTitle>
+                  </SectionHeader>
 
-                  <div className="space-y-4">
+                  <RouteList>
                     {filteredMethods.map(method => {
                       const testKey = `${method.category}-${method.name}`;
                       const result = testResults[testKey];
                       
                       return (
-                        <div 
-                          key={method.name} 
-                          className={`border rounded-lg p-4 ${
-                            result?.status === 'success' ? 'border-green-200 bg-green-50' :
-                            result?.status === 'error' ? 'border-red-200 bg-red-50' :
-                            result?.status === 'running' ? 'border-blue-200 bg-blue-50' :
-                            'border-gray-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div>
-                                {result ? getStatusIcon(result.status) : <AlertCircle className="text-gray-400" size={20} />}
-                              </div>
+                        <RouteCard key={method.name} $status={result?.status}>
+                          <RouteHeader>
+                            <RouteLeft>
+                              <StatusIcon>
+                                {result ? getStatusIcon(result.status) : <AlertCircle style={{ color: '#9ca3af' }} size={20} />}
+                              </StatusIcon>
                               
-                              <div>
-                                <h4 className="font-medium text-gray-900">{method.name}</h4>
-                                <p className="text-sm text-gray-600">{method.description}</p>
+                              <RouteInfo>
+                                <RouteName>{method.name}</RouteName>
+                                <RouteDescription>{method.description}</RouteDescription>
                                 
-                                <div className="flex items-center gap-2 mt-2">
-                                  <span className={`px-2 py-1 text-xs font-medium rounded ${getMethodBadgeColor(method.method)}`}>
-                                    {method.method}
-                                  </span>
+                                <RouteTags>
+                                  <MethodBadge $method={method.method}>{method.method}</MethodBadge>
                                   
                                   {method.requiresAuth && (
-                                    <span className="flex items-center gap-1 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">
-                                      <Lock size={10} />
+                                    <RouteTag $type="auth">
+                                      <Lock size={12} />
                                       Auth Required
-                                    </span>
+                                    </RouteTag>
                                   )}
                                   
                                   {method.requiresData && (
-                                    <span className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                                      <Database size={10} />
+                                    <RouteTag $type="data">
+                                      <Database size={12} />
                                       Requires Data
-                                    </span>
+                                    </RouteTag>
                                   )}
                                   
                                   {method.isDestructive && (
-                                    <span className="flex items-center gap-1 px-2 py-1 text-xs bg-red-100 text-red-800 rounded">
-                                      <AlertTriangle size={10} />
+                                    <RouteTag $type="warning">
+                                      <AlertTriangle size={12} />
                                       Destructive
-                                    </span>
+                                    </RouteTag>
                                   )}
-                                </div>
-                              </div>
-                            </div>
+                                </RouteTags>
+                              </RouteInfo>
+                            </RouteLeft>
                             
-                            <div className="flex items-center gap-3">
+                            <RouteActions>
                               {result?.duration && (
-                                <div className={`flex items-center gap-1 text-sm ${
-                                  result.status === 'success' ? 'text-green-600' : 'text-gray-600'
-                                }`}>
+                                <ResponseTime $status={result.status}>
                                   <Clock size={14} />
                                   {result.duration}ms
-                                </div>
+                                </ResponseTime>
                               )}
                               
-                              <button
+                              <TestButton
                                 onClick={() => executeTest(method)}
                                 disabled={(result?.status === 'running') || isRunning || (method.requiresAuth && !authToken)}
-                                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 {result?.status === 'running' ? (
                                   <Loader2 size={14} className="animate-spin" />
@@ -996,191 +992,174 @@ export default function ApiClientTestLogic({
                                   <Play size={14} />
                                 )}
                                 Test
-                              </button>
-                            </div>
-                          </div>
+                              </TestButton>
+                            </RouteActions>
+                          </RouteHeader>
                           
                           {method.generateTestData && (
-                            <div className="mt-4 p-3 bg-gray-100 rounded">
-                              <div className="text-sm font-medium text-gray-700 mb-2">Test Data:</div>
-                              <pre className="text-xs text-gray-600 overflow-x-auto">
-                                {JSON.stringify(method.generateTestData(), null, 2)}
-                              </pre>
-                            </div>
+                            <ResponseSection>
+                              <ResponseHeader>
+                                <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Test Data:</span>
+                              </ResponseHeader>
+                              <ResponseBody>
+                                <CodeBlock>
+                                  {JSON.stringify(method.generateTestData(), null, 2)}
+                                </CodeBlock>
+                              </ResponseBody>
+                            </ResponseSection>
                           )}
                           
                           {result?.response && (
-                            <div className="mt-4 p-3 bg-white border rounded">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className={`text-sm font-medium ${
-                                  result.status === 'success' ? 'text-green-600' : 'text-gray-700'
-                                }`}>
+                            <ResponseSection>
+                              <ResponseHeader>
+                                <ResponseStatus $success={result.status === 'success'}>
                                   {result.status === 'success' ? 'Success' : 'Response'}
-                                </span>
-                                <div className="text-xs text-gray-500">
-                                  {result.duration}ms • {result.timestamp?.toLocaleTimeString()}
-                                </div>
-                              </div>
+                                </ResponseStatus>
+                                <ResponseMeta>
+                                  <span>{result.duration}ms</span>
+                                  <span>•</span>
+                                  <span>{result.timestamp?.toLocaleTimeString()}</span>
+                                </ResponseMeta>
+                              </ResponseHeader>
                               
-                              <pre className="text-xs text-gray-700 overflow-x-auto max-h-64 overflow-y-auto">
-                                {typeof result.response === 'string'
-                                  ? result.response
-                                  : JSON.stringify(result.response, null, 2)}
-                              </pre>
-                            </div>
+                              <ResponseBody>
+                                <CodeBlock>
+                                  {typeof result.response === 'string'
+                                    ? result.response
+                                    : JSON.stringify(result.response, null, 2)}
+                                </CodeBlock>
+                              </ResponseBody>
+                            </ResponseSection>
                           )}
                           
                           {result?.error && (
-                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded">
-                              <div className="text-sm font-medium text-red-800 mb-1">Error:</div>
-                              <div className="text-sm text-red-700">{result.error}</div>
-                            </div>
+                            <ErrorSection>
+                              <ErrorTitle>Error:</ErrorTitle>
+                              <ErrorMessage>{result.error}</ErrorMessage>
+                            </ErrorSection>
                           )}
-                        </div>
+                        </RouteCard>
                       );
                     })}
-                  </div>
-                </div>
+                  </RouteList>
+                </RouteSection>
               </>
             )}
 
             {activeTab === 1 && (
-              <div className="space-y-6">
-                <div className="bg-white border rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">API Client Configuration</h3>
-                    <div className={`flex items-center gap-2 px-3 py-2 rounded ${
-                      connectionStatus === 'connected' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+              <ConfigSection>
+                <ConfigCard>
+                  <ConfigHeader>
+                    <ConfigTitle>API Client Configuration</ConfigTitle>
+                    <ConfigStatus $connected={connectionStatus === 'connected'}>
                       {connectionStatus === 'connected' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-                      <span className="capitalize">{connectionStatus}</span>
-                    </div>
-                  </div>
+                      {connectionStatus}
+                    </ConfigStatus>
+                  </ConfigHeader>
                   
-                  <div className="space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Base URL</span>
-                      <span className="font-mono text-sm">{baseUrl}</span>
-                    </div>
+                  <ConfigContent>
+                    <ConfigRow>
+                      <ConfigLabel>Base URL</ConfigLabel>
+                      <ConfigValue>{baseUrl}</ConfigValue>
+                    </ConfigRow>
                     
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Environment</span>
-                      <span className="font-mono text-sm">{process.env.NODE_ENV}</span>
-                    </div>
+                    <ConfigRow>
+                      <ConfigLabel>Environment</ConfigLabel>
+                      <ConfigValue>{process.env.NODE_ENV}</ConfigValue>
+                    </ConfigRow>
                     
                     {backendInfo && (
                       <>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Backend Status</span>
-                          <span className="font-mono text-sm">{backendInfo.status}</span>
-                        </div>
+                        <ConfigRow>
+                          <ConfigLabel>Backend Status</ConfigLabel>
+                          <ConfigValue>{backendInfo.status}</ConfigValue>
+                        </ConfigRow>
                         
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Backend Version</span>
-                          <span className="font-mono text-sm">{backendInfo.version || 'Unknown'}</span>
-                        </div>
+                        <ConfigRow>
+                          <ConfigLabel>Backend Version</ConfigLabel>
+                          <ConfigValue>{backendInfo.version || 'Unknown'}</ConfigValue>
+                        </ConfigRow>
                       </>
                     )}
                     
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Auth Token</span>
-                      <div>
+                    <ConfigRow>
+                      <ConfigLabel>Auth Token</ConfigLabel>
+                      <ConfigValue>
                         {authToken ? (
-                          <button
-                            onClick={copyToken}
-                            className="flex items-center gap-2 font-mono text-sm hover:bg-gray-100 px-2 py-1 rounded"
-                          >
+                          <TokenDisplay onClick={copyToken}>
                             {authToken.substring(0, 20)}...
                             <Copy size={14} />
-                          </button>
+                          </TokenDisplay>
                         ) : (
-                          <span className="text-gray-400">Not authenticated</span>
+                          'Not authenticated'
                         )}
-                      </div>
-                    </div>
+                      </ConfigValue>
+                    </ConfigRow>
                     
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Available Methods</span>
-                      <span className="font-mono text-sm">{API_METHODS.length} total</span>
-                    </div>
-                  </div>
+                    <ConfigRow>
+                      <ConfigLabel>Available Methods</ConfigLabel>
+                      <ConfigValue>{API_METHODS.length} total</ConfigValue>
+                    </ConfigRow>
+                  </ConfigContent>
                   
-                  <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={checkConnection}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
+                  <ConfigActions>
+                    <SecondaryButton onClick={checkConnection}>
                       <RefreshCw size={16} />
                       Test Connection
-                    </button>
+                    </SecondaryButton>
                     
                     {authToken && (
-                      <button
-                        onClick={() => {
-                          setAuthToken(null);
-                          localStorage.removeItem('api_test_token');
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                      >
+                      <SecondaryButton onClick={() => {
+                        setAuthToken(null);
+                        localStorage.removeItem('api_test_token');
+                      }}>
                         <Lock size={16} />
                         Clear Auth
-                      </button>
+                      </SecondaryButton>
                     )}
-                  </div>
-                </div>
+                  </ConfigActions>
+                </ConfigCard>
 
-                <div className="bg-white border rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Links</h3>
+                <ConfigCard>
+                  <ConfigHeader>
+                    <ConfigTitle>Quick Links</ConfigTitle>
+                  </ConfigHeader>
                   
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => window.open(baseUrl, '_blank')}
-                      className="flex items-center gap-2 w-full p-3 text-left border rounded hover:bg-gray-50"
-                    >
+                  <QuickLinks>
+                    <QuickLink onClick={() => window.open(baseUrl, '_blank')}>
                       <ExternalLink size={16} />
                       Open Backend URL
-                    </button>
+                    </QuickLink>
                     
-                    <button
-                      onClick={() => window.open('http://localhost:5000', '_blank')}
-                      className="flex items-center gap-2 w-full p-3 text-left border rounded hover:bg-gray-50"
-                    >
+                    <QuickLink onClick={() => window.open('http://localhost:5000', '_blank')}>
                       <ExternalLink size={16} />
                       Open Localhost:5000
-                    </button>
+                    </QuickLink>
                     
-                    <button
-                      onClick={() => window.open('http://localhost:4040', '_blank')}
-                      className="flex items-center gap-2 w-full p-3 text-left border rounded hover:bg-gray-50"
-                    >
+                    <QuickLink onClick={() => window.open('http://localhost:4040', '_blank')}>
                       <ExternalLink size={16} />
                       Ngrok Dashboard
-                    </button>
+                    </QuickLink>
                     
-                    <button
-                      onClick={() => window.open(`${baseUrl}/api`, '_blank')}
-                      className="flex items-center gap-2 w-full p-3 text-left border rounded hover:bg-gray-50"
-                    >
+                    <QuickLink onClick={() => window.open(`${baseUrl}/api`, '_blank')}>
                       <ExternalLink size={16} />
                       API Documentation
-                    </button>
-                  </div>
-                </div>
-              </div>
+                    </QuickLink>
+                  </QuickLinks>
+                </ConfigCard>
+              </ConfigSection>
             )}
 
             {activeTab === 2 && (
-              <div className="space-y-6">
-                <div className="bg-white border rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-blue-100 text-blue-600 rounded">
-                      <Code size={24} />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900">API Client Usage Examples</h3>
-                  </div>
+              <IntegrationSection>
+                <IntegrationCard>
+                  <CardHeader>
+                    <CardIcon $color="#3b82f6"><Code size={24} /></CardIcon>
+                    <CardTitle>API Client Usage Examples</CardTitle>
+                  </CardHeader>
                   
-                  <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-                    <pre className="text-green-400 text-sm">
+                  <CardContent>
+                    <CodeExample>
 {`// 1. Authentication Flow
 import { api } from '@/lib/api-client';
 
@@ -1239,20 +1218,18 @@ const uploadTest = await testingUtils.portfolio.testImageUpload();
 
 // Run upload diagnostics
 const diagnostics = await testingUtils.portfolio.runUploadDiagnostics();`}
-                    </pre>
-                  </div>
-                </div>
+                    </CodeExample>
+                  </CardContent>
+                </IntegrationCard>
                 
-                <div className="bg-white border rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-green-100 text-green-600 rounded">
-                      <Shield size={24} />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900">Error Handling</h3>
-                  </div>
+                <IntegrationCard>
+                  <CardHeader>
+                    <CardIcon $color="#10b981"><Shield size={24} /></CardIcon>
+                    <CardTitle>Error Handling</CardTitle>
+                  </CardHeader>
                   
-                  <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-                    <pre className="text-green-400 text-sm">
+                  <CardContent>
+                    <CodeExample>
 {`import { api, APIError } from '@/lib/api-client';
 
 try {
@@ -1274,55 +1251,54 @@ try {
     console.log('Unknown error:', error);
   }
 }`}
-                    </pre>
-                  </div>
-                </div>
-              </div>
+                    </CodeExample>
+                  </CardContent>
+                </IntegrationCard>
+              </IntegrationSection>
             )}
 
             {activeTab === 3 && (
-              <div className="space-y-6">
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <AlertTriangle className="text-orange-600" size={24} />
-                    <h3 className="text-lg font-semibold text-gray-900">Common Issues</h3>
-                  </div>
+              <DiagnosticsSection>
+                <DiagnosticCard $type="warning">
+                  <DiagnosticHeader>
+                    <AlertTriangle size={24} />
+                    <h3>Common Issues</h3>
+                  </DiagnosticHeader>
                   
-                  <div className="space-y-3">
-                    <div>
-                      <div className="font-medium text-gray-900">Authentication Required</div>
-                      <div className="text-sm text-gray-600">Many methods require login first. Run Auth Flow to authenticate.</div>
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-900">Portfolio Not Found</div>
-                      <div className="text-sm text-gray-600">User needs to create portfolio before accessing portfolio methods.</div>
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-900">Network Errors</div>
-                      <div className="text-sm text-gray-600">Check if backend is running and URL is correct.</div>
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-900">File Upload Issues</div>
-                      <div className="text-sm text-gray-600">Use debug.uploadConfig() to check upload system status.</div>
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-900">Token Expired</div>
-                      <div className="text-sm text-gray-600">Clear auth and login again if getting 401 errors.</div>
-                    </div>
-                  </div>
-                </div>
+                  <DiagnosticList>
+                    <DiagnosticItem>
+                      <strong>Authentication Required</strong>
+                      <span>Many methods require login first. Run Auth Flow to authenticate.</span>
+                    </DiagnosticItem>
+                    <DiagnosticItem>
+                      <strong>Portfolio Not Found</strong>
+                      <span>User needs to create portfolio before accessing portfolio methods.</span>
+                    </DiagnosticItem>
+                    <DiagnosticItem>
+                      <strong>Network Errors</strong>
+                      <span>Check if backend is running and URL is correct.</span>
+                    </DiagnosticItem>
+                    <DiagnosticItem>
+                      <strong>File Upload Issues</strong>
+                      <span>Use debug.uploadConfig() to check upload system status.</span>
+                    </DiagnosticItem>
+                    <DiagnosticItem>
+                      <strong>Token Expired</strong>
+                      <span>Clear auth and login again if getting 401 errors.</span>
+                    </DiagnosticItem>
+                  </DiagnosticList>
+                </DiagnosticCard>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Settings className="text-blue-600" size={24} />
-                    <h3 className="text-lg font-semibold text-gray-900">Debug Commands</h3>
-                  </div>
+                <DiagnosticCard $type="info">
+                  <DiagnosticHeader>
+                    <Settings size={24} />
+                    <h3>Debug Commands</h3>
+                  </DiagnosticHeader>
                   
-                  <div className="space-y-4">
-                    <div>
-                      <div className="font-medium text-gray-900 mb-2">Test Portfolio System</div>
-                      <div className="bg-gray-900 rounded p-3 overflow-x-auto">
-                        <pre className="text-green-400 text-xs">
+                  <DebugCommands>
+                    <DebugCommand>
+                      <CommandTitle>Test Portfolio System</CommandTitle>
+                      <CodeBlock>
 {`import { testingUtils } from '@/lib/api-client';
 
 // Full system test
@@ -1336,14 +1312,12 @@ console.log('Upload config:', config);
 // Test image upload
 const uploadTest = await testingUtils.portfolio.testImageUpload();
 console.log('Upload test:', uploadTest);`}
-                        </pre>
-                      </div>
-                    </div>
+                      </CodeBlock>
+                    </DebugCommand>
                     
-                    <div>
-                      <div className="font-medium text-gray-900 mb-2">Quick API Health Check</div>
-                      <div className="bg-gray-900 rounded p-3 overflow-x-auto">
-                        <pre className="text-green-400 text-xs">
+                    <DebugCommand>
+                      <CommandTitle>Quick API Health Check</CommandTitle>
+                      <CodeBlock>
 {`import { api } from '@/lib/api-client';
 
 // Test connection
@@ -1357,14 +1331,12 @@ console.log('Current user:', user);
 // Test portfolio
 const hasPortfolio = await api.portfolio.check();
 console.log('Has portfolio:', hasPortfolio);`}
-                        </pre>
-                      </div>
-                    </div>
+                      </CodeBlock>
+                    </DebugCommand>
                     
-                    <div>
-                      <div className="font-medium text-gray-900 mb-2">Debug Upload Issues</div>
-                      <div className="bg-gray-900 rounded p-3 overflow-x-auto">
-                        <pre className="text-green-400 text-xs">
+                    <DebugCommand>
+                      <CommandTitle>Debug Upload Issues</CommandTitle>
+                      <CodeBlock>
 {`import { api } from '@/lib/api-client';
 
 // Check upload configuration
@@ -1378,50 +1350,49 @@ console.log('File validation:', validation);
 // Check filesystem permissions
 console.log('Directory exists:', uploadConfig.filesystem.checks.uploadsExists);
 console.log('Can write:', uploadConfig.filesystem.checks.canWrite);`}
-                        </pre>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                      </CodeBlock>
+                    </DebugCommand>
+                  </DebugCommands>
+                </DiagnosticCard>
 
-                <div className="bg-green-50 border border-green-200 rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <CheckCircle className="text-green-600" size={24} />
-                    <h3 className="text-lg font-semibold text-gray-900">System Status</h3>
-                  </div>
+                <DiagnosticCard $type="success">
+                  <DiagnosticHeader>
+                    <CheckCircle size={24} />
+                    <h3>System Status</h3>
+                  </DiagnosticHeader>
                   
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-900">Backend Connection</span>
-                      <span className={connectionStatus === 'connected' ? 'text-green-600' : 'text-red-600'}>
+                  <DiagnosticList>
+                    <DiagnosticItem>
+                      <strong>Backend Connection</strong>
+                      <span style={{ color: connectionStatus === 'connected' ? '#10b981' : '#ef4444' }}>
                         {connectionStatus}
                       </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-900">Authentication</span>
-                      <span className={authToken ? 'text-green-600' : 'text-red-600'}>
+                    </DiagnosticItem>
+                    <DiagnosticItem>
+                      <strong>Authentication</strong>
+                      <span style={{ color: authToken ? '#10b981' : '#ef4444' }}>
                         {authToken ? 'Authenticated' : 'Not authenticated'}
                       </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-900">Available Methods</span>
-                      <span className="text-blue-600">
+                    </DiagnosticItem>
+                    <DiagnosticItem>
+                      <strong>Available Methods</strong>
+                      <span style={{ color: '#3b82f6' }}>
                         {API_METHODS.length} total
                       </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-medium text-gray-900">Test Success Rate</span>
-                      <span className={stats.total > 0 ? 'text-green-600' : 'text-gray-600'}>
+                    </DiagnosticItem>
+                    <DiagnosticItem>
+                      <strong>Test Success Rate</strong>
+                      <span style={{ color: stats.total > 0 ? '#10b981' : '#6b7280' }}>
                         {stats.total > 0 ? `${Math.round((stats.passed / stats.total) * 100)}%` : 'No tests run'}
                       </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                    </DiagnosticItem>
+                  </DiagnosticList>
+                </DiagnosticCard>
+              </DiagnosticsSection>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
+          </TabContent>
+        </MainCard>
+      </Container>
+    </PageWrapper>
   );
-}
+};
