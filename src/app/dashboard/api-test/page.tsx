@@ -2,7 +2,7 @@
 'use client'
 
 import React, { Suspense } from 'react';
-import ApiClientTestLogic from '@/components/apiTest/apiTestLogic';
+import { ApiClientTestLogic } from '@/components/apiTest/apiTestLogic';
 import { Loader2 } from 'lucide-react';
 
 // Loading component for better UX
