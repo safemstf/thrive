@@ -47,14 +47,14 @@ export class PortfolioApiClient extends BaseApiClient {
   // ==================== CORE PORTFOLIO OPERATIONS ====================
   
   async create(data: CreatePortfolioDto): Promise<Portfolio> {
-    return this.requestWithRetry<Portfolio>('/portfolios/me/create', {
+    return this.requestWithRetry<Portfolio>('/api/portfolios/me/create', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async update(data: UpdatePortfolioDto): Promise<Portfolio> {
-    return this.requestWithRetry<Portfolio>('/portfolios/me', {
+    return this.requestWithRetry<Portfolio>('/api/portfolios/me', {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -62,7 +62,7 @@ export class PortfolioApiClient extends BaseApiClient {
 
   async getMyPortfolio(): Promise<Portfolio | null> {
     try {
-      const response = await this.requestWithRetry<PortfolioMeResponse>('/portfolios/me');
+      const response = await this.requestWithRetry<PortfolioMeResponse>('/api/portfolios/me');
       return response;
     } catch (err: any) {
       // Treat 404 as "no portfolio"
@@ -74,14 +74,14 @@ export class PortfolioApiClient extends BaseApiClient {
   }
 
   async deleteMyPortfolio(deleteGalleryPieces: boolean = false): Promise<void> {
-    return this.requestWithRetry<void>('/portfolios/me', {
+    return this.requestWithRetry<void>('/api/portfolios/me', {
       method: 'DELETE',
       body: JSON.stringify({ deleteGalleryPieces }),
     });
   }
 
   async upgrade(kind: PortfolioKind, preserveContent: boolean = true): Promise<Portfolio> {
-    return this.requestWithRetry<Portfolio>('/portfolios/me/upgrade', {
+    return this.requestWithRetry<Portfolio>('/api/portfolios/me/upgrade', {
       method: 'PUT',
       body: JSON.stringify({ kind, preserveContent }),
     });
@@ -89,7 +89,7 @@ export class PortfolioApiClient extends BaseApiClient {
 
   async hasPortfolio(): Promise<boolean> {
     try {
-      const response = await this.requestWithRetry<{ hasPortfolio: boolean }>('/portfolios/me/check');
+      const response = await this.requestWithRetry<{ hasPortfolio: boolean }>('/api/portfolios/me/check');
       return response.hasPortfolio;
     } catch (error) {
       return false;
@@ -99,7 +99,7 @@ export class PortfolioApiClient extends BaseApiClient {
   // ==================== PUBLIC PORTFOLIO ACCESS ====================
 
   async getByUsername(username: string): Promise<Portfolio> {
-    return this.requestWithRetry<Portfolio>(`/portfolios/by-username/${username}`);
+    return this.requestWithRetry<Portfolio>(`/api/portfolios/by-username/${username}`);
   }
 
   async discover(
@@ -107,24 +107,24 @@ export class PortfolioApiClient extends BaseApiClient {
     page: number = 1,
     limit: number = 20
   ): Promise<PortfolioListResponse> {
-    return this.requestWithRetry<PortfolioListResponse>('/portfolios/discover', {
+    return this.requestWithRetry<PortfolioListResponse>('/api/portfolios/discover', {
       params: { ...filters, page, limit },
     });
   }
 
   async getStats(): Promise<any> {
-    return this.requestWithRetry('/portfolios/stats');
+    return this.requestWithRetry('/api/portfolios/stats');
   }
 
   async getTypeConfig(type: string): Promise<any> {
-    return this.requestWithRetry(`/portfolios/type-config/${type}`);
+    return this.requestWithRetry(`/api/portfolios/type-config/${type}`);
   }
 
   async trackView(
     portfolioId: string,
     data?: { referrer?: string; duration?: number }
   ): Promise<{ message: string; totalViews: number }> {
-    return this.requestWithRetry(`/portfolios/by-id/${portfolioId}/views`, {
+    return this.requestWithRetry(`/api/portfolios/by-id/${portfolioId}/views`, {
       method: 'POST',
       body: JSON.stringify(data || {}),
     });
@@ -134,7 +134,7 @@ export class PortfolioApiClient extends BaseApiClient {
   
   async getMyGalleryPieces(): Promise<GalleryPiece[]> {
     try {
-      const response = await this.requestWithRetry<any>('/portfolios/me/gallery');
+      const response = await this.requestWithRetry<any>('/api/portfolios/me/gallery');
       console.log('Raw gallery response:', response);
       
       // Handle backend response format - could be array or object with pieces property
@@ -174,7 +174,7 @@ export class PortfolioApiClient extends BaseApiClient {
     pagination: any;
     portfolio: any;
   }> {
-    return this.requestWithRetry(`/portfolios/by-username/${username}/gallery`, {
+    return this.requestWithRetry(`/api/portfolios/by-username/${username}/gallery`, {
       params: { page, limit }
     });
   }
@@ -190,21 +190,21 @@ export class PortfolioApiClient extends BaseApiClient {
     year?: number;
     displayOrder?: number;
   }): Promise<GalleryPiece> {
-    return this.requestWithRetry<GalleryPiece>('/portfolios/me/gallery', {
+    return this.requestWithRetry<GalleryPiece>('/api/portfolios/me/gallery', {
       method: 'POST',
       body: JSON.stringify(pieceData),
     });
   }
 
   async updateGalleryPiece(pieceId: string, updates: Partial<GalleryPiece>): Promise<GalleryPiece> {
-    return this.requestWithRetry<GalleryPiece>(`/portfolios/me/gallery/${pieceId}`, {
+    return this.requestWithRetry<GalleryPiece>(`/api/portfolios/me/gallery/${pieceId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
   }
 
   async deleteGalleryPiece(pieceId: string): Promise<{ message: string; id: string }> {
-    return this.requestWithRetry(`/portfolios/me/gallery/${pieceId}`, {
+    return this.requestWithRetry(`/api/portfolios/me/gallery/${pieceId}`, {
       method: 'DELETE',
     });
   }
@@ -213,7 +213,7 @@ export class PortfolioApiClient extends BaseApiClient {
     message: string;
     deletedCount: number;
   }> {
-    return this.requestWithRetry('/portfolios/me/gallery/batch', {
+    return this.requestWithRetry('/api/portfolios/me/gallery/batch', {
       method: 'DELETE',
       body: JSON.stringify({ pieceIds }),
     });
@@ -223,7 +223,7 @@ export class PortfolioApiClient extends BaseApiClient {
     pieceIds: string[], 
     visibility: GalleryVisibility
   ): Promise<{ message: string; updatedCount: number }> {
-    return this.requestWithRetry('/portfolios/me/gallery/batch/visibility', {
+    return this.requestWithRetry('/api/portfolios/me/gallery/batch/visibility', {
       method: 'PUT',
       body: JSON.stringify({ pieceIds, visibility }),
     });
@@ -237,7 +237,7 @@ export class PortfolioApiClient extends BaseApiClient {
     categories: Record<string, number>;
     recentUploads: number;
   }> {
-    return this.requestWithRetry('/portfolios/me/gallery/stats');
+    return this.requestWithRetry('/api/portfolios/me/gallery/stats');
   }
 
   // ==================== CONCEPT MANAGEMENT (Educational/Hybrid) ====================
@@ -251,7 +251,7 @@ export class PortfolioApiClient extends BaseApiClient {
       completedConcepts: number;
     };
   }> {
-    return this.requestWithRetry('/portfolios/me/concepts');
+    return this.requestWithRetry('/api/portfolios/me/concepts');
   }
 
   async addConceptToPortfolio(
@@ -263,7 +263,7 @@ export class PortfolioApiClient extends BaseApiClient {
       score?: number;
     }
   ): Promise<{ message: string; conceptProgress: ConceptProgress }> {
-    return this.requestWithRetry(`/portfolios/me/concepts/${conceptId}`, {
+    return this.requestWithRetry(`/api/portfolios/me/concepts/${conceptId}`, {
       method: 'POST',
       body: JSON.stringify({
         status: data.status || 'in-progress',
@@ -282,7 +282,7 @@ export class PortfolioApiClient extends BaseApiClient {
       completedAt?: string;
     }
   ): Promise<{ message: string; conceptProgress: ConceptProgress }> {
-    return this.requestWithRetry(`/portfolios/me/concepts/${conceptId}`, {
+    return this.requestWithRetry(`/api/portfolios/me/concepts/${conceptId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
@@ -291,7 +291,7 @@ export class PortfolioApiClient extends BaseApiClient {
   // ==================== ANALYTICS & DASHBOARD ====================
 
   async getAnalytics(period: string = '30d'): Promise<{ analytics: PortfolioAnalytics; period: string }> {
-    return this.requestWithRetry('/portfolios/me/analytics', {
+    return this.requestWithRetry('/api/portfolios/me/analytics', {
       params: { period }
     });
   }
@@ -303,7 +303,7 @@ export class PortfolioApiClient extends BaseApiClient {
     learning?: any;
     portfolio: any;
   }> {
-    return this.requestWithRetry('/portfolios/me/dashboard');
+    return this.requestWithRetry('/api/portfolios/me/dashboard');
   }
 
   // ==================== IMAGE UPLOADS - FIXED ====================
@@ -344,8 +344,7 @@ export class PortfolioApiClient extends BaseApiClient {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      // Fixed: Remove duplicate /api in URL
-      const response = await fetch(`${this.baseURL}/portfolios/upload-image`, {
+      const response = await fetch(`${this.baseURL}/api/portfolios/upload-image`, {
         method: 'POST',
         headers,
         body: formData,
@@ -378,7 +377,7 @@ export class PortfolioApiClient extends BaseApiClient {
 
   // Simplified raw upload method
   async uploadImageRaw(formData: FormData): Promise<any> {
-    const response = await fetch(`${this.baseURL}/portfolios/upload-image`, {
+    const response = await fetch(`${this.baseURL}/api/portfolios/upload-image`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.getAuthToken()}`,
@@ -438,7 +437,7 @@ export class PortfolioApiClient extends BaseApiClient {
       query: any;
     };
   }> {
-    return this.requestWithRetry('/portfolios/debug/upload-config');
+    return this.requestWithRetry('/api/portfolios/debug/upload-config');
   }
 
   async validateFile(filename: string): Promise<{
@@ -466,7 +465,7 @@ export class PortfolioApiClient extends BaseApiClient {
     };
     timestamp: string;
   }> {
-    return this.requestWithRetry(`/portfolios/debug/file-check/${filename}`);
+    return this.requestWithRetry(`/api/portfolios/debug/file-check/${filename}`);
   }
 
   // ==================== COMPREHENSIVE PORTFOLIO STATS ====================
@@ -504,19 +503,19 @@ export class PortfolioApiClient extends BaseApiClient {
   /** @deprecated Use getByUsername instead */
   async getById(id: string): Promise<PortfolioWithPieces> {
     console.warn('getById is deprecated, use getByUsername instead');
-    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/by-id/${id}`);
+    return this.requestWithRetry<PortfolioWithPieces>(`/api/portfolios/by-id/${id}`);
   }
 
   /** @deprecated Use getByUsername instead */
   async getByUserId(userId: string): Promise<PortfolioWithPieces> {
     console.warn('getByUserId is deprecated, use getByUsername instead');
-    return this.requestWithRetry<PortfolioWithPieces>(`/portfolios/user/${userId}`);
+    return this.requestWithRetry<PortfolioWithPieces>(`/api/portfolios/user/${userId}`);
   }
 
   /** @deprecated Use deleteMyPortfolio instead */
   async delete(id: string): Promise<void> {
     console.warn('delete(id) is deprecated, use deleteMyPortfolio() instead');
-    return this.requestWithRetry<void>(`/portfolios/by-id/${id}`, {
+    return this.requestWithRetry<void>(`/api/portfolios/by-id/${id}`, {
       method: 'DELETE',
     });
   }
@@ -530,19 +529,19 @@ export class PortfolioApiClient extends BaseApiClient {
   // ==================== SEARCH & DISCOVERY (if implemented) ====================
 
   async search(query: string, limit: number = 10): Promise<Portfolio[]> {
-    return this.requestWithRetry<Portfolio[]>('/portfolios/search', {
+    return this.requestWithRetry<Portfolio[]>('/api/portfolios/search', {
       params: { q: query, limit },
     });
   }
 
   async getFeatured(limit: number = 6): Promise<Portfolio[]> {
-    return this.requestWithRetry<Portfolio[]>('/portfolios/featured', {
+    return this.requestWithRetry<Portfolio[]>('/api/portfolios/featured', {
       params: { limit },
     });
   }
 
   async getTrending(period: 'day' | 'week' | 'month' = 'week'): Promise<Portfolio[]> {
-    return this.requestWithRetry<Portfolio[]>('/portfolios/trending', {
+    return this.requestWithRetry<Portfolio[]>('/api/portfolios/trending', {
       params: { period },
     });
   }
