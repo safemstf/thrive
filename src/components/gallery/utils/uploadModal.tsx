@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { api } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
-import { UploadIcon, X, Loader2 } from '@/components/ui/icons';
+import { UploadIcon, X, Loader2 } from '@/components/ui/icons'; // Removed ArrowLeft
 import { useAuth } from '@/providers/authProvider';
 import type { ArtworkCategory, GalleryPiece, GalleryStatus, GalleryUploadFile, GalleryVisibility } from '@/types/gallery.types';
 import { getPortfolioId, extractPortfolioIdFromError, getGalleryPieceId } from '@/types/portfolio.types';
@@ -22,10 +22,14 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   initialFiles
 }) => {
   const { user, isAuthenticated } = useAuth();
-  const [isUploading, setIsUploading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -48,7 +52,6 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
       if (firstFile.preview) {
         setPreview(firstFile.preview);
       } else {
-        // Create preview if not provided
         const reader = new FileReader();
         reader.onloadend = () => {
           setPreview(reader.result as string);
@@ -56,7 +59,6 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
         reader.readAsDataURL(firstFile.file);
       }
 
-      // Auto-populate title from filename if not set
       if (!formData.title && firstFile.file.name) {
         const nameWithoutExtension = firstFile.file.name.replace(/\.[^/.]+$/, '');
         setFormData(prev => ({
@@ -70,29 +72,25 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
-        setError('Please select an image file');
+        setImageUploadError('Please select an image file');
         return;
       }
       
-      // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        setError('File size must be less than 10MB');
+        setImageUploadError('File size must be less than 10MB');
         return;
       }
       
       setSelectedFile(file);
-      setError(null);
+      setImageUploadError(null);
       
-      // Create preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
 
-      // Auto-populate title from filename if not set
       if (!formData.title && file.name) {
         const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
         setFormData(prev => ({
@@ -111,7 +109,120 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     }));
   };
 
-  // Improved portfolio resolution using utility functions
+  // STEP 1: Upload image to backend
+  const uploadImage = async () => {
+    if (!selectedFile) {
+      setImageUploadError('Please select an image to upload');
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setImageUploadError(null);
+
+    try {
+      const imageFormData = new FormData();
+      imageFormData.append('file', selectedFile);
+      
+      const imageUploadResponse = await api.portfolio.images.uploadRaw(imageFormData);
+      
+      if (!imageUploadResponse?.url) {
+        throw new Error('Image upload failed - no URL returned');
+      }
+      
+      setImageUrl(imageUploadResponse.url);
+      setCurrentStep(2);
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      let errorMessage = 'Failed to upload image. Please try again.';
+
+      if (error.message) {
+        if (error.message.includes('413') || error.message.includes('file too large')) {
+          errorMessage = 'File is too large. Please choose an image under 10MB.';
+        } else if (error.message.includes('415') || error.message.includes('unsupported')) {
+          errorMessage = 'Unsupported file type. Please choose a JPG, PNG, or GIF image.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        }
+      }
+
+      setImageUploadError(errorMessage);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // STEP 2: Submit artwork metadata
+  const submitArtwork = async () => {
+    if (!imageUrl) {
+      setError('Image URL is missing. Please go back and re-upload the image.');
+      return;
+    }
+
+    if (!formData.title.trim()) {
+      setError('Please enter a title for your artwork');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      // Parse tags
+      const tagsArray = formData.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0 && tag.length <= 50)
+        .slice(0, 10);
+
+      // Prepare gallery piece data
+      const galleryPieceData = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        imageUrl: imageUrl,
+        category: formData.category,
+        medium: formData.medium.trim(),
+        tags: tagsArray,
+        visibility: 'public' as GalleryVisibility,
+        year: formData.year,
+        displayOrder: 0,
+        ...(formData.price && !isNaN(parseFloat(formData.price)) && {
+          price: parseFloat(formData.price)
+        }),
+        ...(formData.artist.trim() && formData.artist.trim() !== user?.name && {
+          artist: formData.artist.trim()
+        }),
+      };
+
+      // Submit to gallery endpoint
+      const galleryResponse = await api.portfolio.gallery.add(galleryPieceData);
+      console.log('Gallery piece created successfully:', getGalleryPieceId(galleryResponse) || 'unknown ID');
+
+      // Success!
+      onSuccess();
+    } catch (error: any) {
+      console.error('Submission error:', error);
+      
+      let errorMessage = 'Failed to create artwork. Please try again.';
+
+      if (error.message) {
+        if (error.message.includes('401') || error.message.includes('authentication')) {
+          errorMessage = 'Authentication failed. Please refresh the page and try again.';
+        } else if (error.message.includes('403')) {
+          errorMessage = 'You do not have permission to upload to this portfolio.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Fixed function declaration
   const resolvePortfolioId = async (): Promise<string> => {
     console.log('Resolving portfolio ID...');
     
@@ -218,109 +329,6 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!isAuthenticated) {
-      setError('You must be logged in to upload artwork');
-      return;
-    }
-
-    if (!selectedFile) {
-      setError('Please select an image to upload');
-      return;
-    }
-
-    if (!formData.title.trim()) {
-      setError('Please enter a title for your artwork');
-      return;
-    }
-
-    setIsUploading(true);
-    setError(null);
-
-    try {
-      console.log('Starting upload process...');
-
-      // Step 1: Resolve portfolio ID
-      const resolvedPortfolioId = await resolvePortfolioId();
-      console.log('Portfolio ID resolved:', resolvedPortfolioId);
-
-      // Step 2: Upload the image file
-      console.log('Uploading image file...');
-      const imageFormData = new FormData();
-      imageFormData.append('file', selectedFile);
-      
-      const imageUploadResponse = await api.portfolio.images.uploadRaw(imageFormData);
-      
-      if (!imageUploadResponse?.url) {
-        throw new Error('Image upload failed - no URL returned');
-      }
-      
-      console.log('Image uploaded successfully:', imageUploadResponse.url);
-
-      // Step 3: Parse tags
-      const tagsArray = formData.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0 && tag.length <= 50) // Validate tag length
-        .slice(0, 10); // Limit to 10 tags
-
-      // Step 4: Create the gallery piece with metadata
-      console.log('Creating gallery piece...');
-      const galleryPieceData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        imageUrl: imageUploadResponse.url,
-        category: formData.category,
-        medium: formData.medium.trim(),
-        tags: tagsArray,
-        visibility: 'public' as GalleryVisibility,
-        year: formData.year,
-        displayOrder: 0,
-        // Add price if provided
-        ...(formData.price && !isNaN(parseFloat(formData.price)) && {
-          price: parseFloat(formData.price)
-        }),
-        // Add artist if different from user name
-        ...(formData.artist.trim() && formData.artist.trim() !== user?.name && {
-          artist: formData.artist.trim()
-        }),
-      };
-
-      const galleryResponse = await api.portfolio.gallery.add(galleryPieceData);
-      console.log('Gallery piece created successfully:', getGalleryPieceId(galleryResponse) || 'unknown ID');
-
-      // Success!
-      onSuccess();
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      
-      let errorMessage = 'Failed to upload artwork. Please try again.';
-
-      // Handle specific error cases
-      if (error.message) {
-        if (error.message.includes('401') || error.message.includes('authentication')) {
-          errorMessage = 'Authentication failed. Please refresh the page and try again.';
-        } else if (error.message.includes('403')) {
-          errorMessage = 'You do not have permission to upload to this portfolio.';
-        } else if (error.message.includes('413') || error.message.includes('file too large')) {
-          errorMessage = 'File is too large. Please choose an image under 10MB.';
-        } else if (error.message.includes('415') || error.message.includes('unsupported')) {
-          errorMessage = 'Unsupported file type. Please choose a JPG, PNG, or GIF image.';
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorMessage = 'Network error. Please check your connection and try again.';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-
-      setError(errorMessage);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
@@ -361,213 +369,317 @@ export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
     );
   }
 
-  return (
-    <ModalOverlay onClick={handleBackdropClick}>
-      <ModalContent onClick={e => e.stopPropagation()}>
-        <ModalHeader>
-          <HeaderContent>
-            <ModalTitle>Upload Artwork</ModalTitle>
-            <ModalSubtitle>
-              {initialFiles && initialFiles.length > 0 
-                ? `Ready to upload ${selectedFile?.name || 'your image'}`
-                : 'Share your creative work with the community'
-              }
-            </ModalSubtitle>
-          </HeaderContent>
-          <CloseButton onClick={onClose} type="button">
-            <X size={20} />
-          </CloseButton>
-        </ModalHeader>
-        
-        <ModalBody>
-          <form onSubmit={handleSubmit}>
-            <FormContent>
-              <UploadSection>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  style={{ display: 'none' }}
-                />
-                
-                {preview ? (
-                  <PreviewContainer>
-                    <PreviewImage src={preview} alt="Preview" />
-                    <PreviewOverlay>
-                      <ChangeButton
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        Change Image
-                      </ChangeButton>
-                    </PreviewOverlay>
-                    {selectedFile && (
-                      <ImageInfo>
-                        <ImageName>{selectedFile.name}</ImageName>
-                        <ImageSize>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</ImageSize>
-                      </ImageInfo>
-                    )}
-                  </PreviewContainer>
-                ) : (
-                  <UploadArea onClick={() => fileInputRef.current?.click()}>
-                    <UploadIconWrapper>
-                      <UploadIcon size={32} />
-                    </UploadIconWrapper>
-                    <UploadText>Drop an image here or click to browse</UploadText>
-                    <UploadHint>JPG, PNG, GIF up to 10MB</UploadHint>
-                  </UploadArea>
+  // STEP 1: Image Upload
+  const renderUploadStep = () => (
+    <>
+      <ModalHeader>
+        <HeaderContent>
+          <ModalTitle>Upload Image</ModalTitle>
+          <ModalSubtitle>Step 1: Select your artwork image</ModalSubtitle>
+        </HeaderContent>
+        <CloseButton onClick={onClose} type="button">
+          <X size={20} />
+        </CloseButton>
+      </ModalHeader>
+      
+      <ModalBody>
+        <FormContent>
+          <UploadSection>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+            />
+            
+            {preview ? (
+              <PreviewContainer>
+                <PreviewImage src={preview} alt="Preview" />
+                <PreviewOverlay>
+                  <ChangeButton
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Change Image
+                  </ChangeButton>
+                </PreviewOverlay>
+                {selectedFile && (
+                  <ImageInfo>
+                    <ImageName>{selectedFile.name}</ImageName>
+                    <ImageSize>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</ImageSize>
+                  </ImageInfo>
                 )}
-              </UploadSection>
+              </PreviewContainer>
+            ) : (
+              <UploadArea onClick={() => fileInputRef.current?.click()}>
+                <UploadIconWrapper>
+                  <UploadIcon size={32} />
+                </UploadIconWrapper>
+                <UploadText>Drop an image here or click to browse</UploadText>
+                <UploadHint>JPG, PNG, GIF up to 10MB</UploadHint>
+              </UploadArea>
+            )}
+          </UploadSection>
+          
+          <ImageGuidelines>
+            <GuidelineTitle>Image Guidelines</GuidelineTitle>
+            <GuidelineList>
+              <li>High-quality images only (minimum 1200px on the longest side)</li>
+              <li>No watermarks or signatures visible on the artwork</li>
+              <li>Properly cropped with minimal background</li>
+              <li>Accurate color representation</li>
+              <li>No explicit or offensive content</li>
+            </GuidelineList>
+          </ImageGuidelines>
+          
+          {imageUploadError && (
+            <ErrorMessage>
+              <ErrorIcon>⚠️</ErrorIcon>
+              <ErrorText>{imageUploadError}</ErrorText>
+            </ErrorMessage>
+          )}
+        </FormContent>
+        
+        <ModalFooter>
+          <FooterContent>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isUploadingImage}>
+              Cancel
+            </Button>
+            <SubmitButton 
+              type="button" 
+              onClick={uploadImage}
+              disabled={isUploadingImage || !selectedFile}
+            >
+              {isUploadingImage ? (
+                <>
+                  <Loader2 className="animate-spin" size={16} />
+                  Uploading...
+                </>
+              ) : (
+                'Next: Add Details →' // Replaced icon with unicode arrow
+              )}
+            </SubmitButton>
+          </FooterContent>
+        </ModalFooter>
+      </ModalBody>
+    </>
+  );
+
+  // STEP 2: Metadata Entry
+  const renderMetadataStep = () => (
+    <>
+      <ModalHeader>
+        <HeaderContent>
+          <ModalTitle>Artwork Details</ModalTitle>
+          <ModalSubtitle>Step 2: Add information about your artwork</ModalSubtitle>
+        </HeaderContent>
+        <CloseButton onClick={onClose} type="button">
+          <X size={20} />
+        </CloseButton>
+      </ModalHeader>
+      
+      <ModalBody>
+        <form onSubmit={(e) => { e.preventDefault(); submitArtwork(); }}>
+          <FormContent>
+            <PreviewSection>
+              {preview && (
+                <PreviewContainer>
+                  <PreviewImage src={preview} alt="Preview" />
+                </PreviewContainer>
+              )}
+            </PreviewSection>
+            
+            <FormSection>
+              <SectionTitle>Artwork Information</SectionTitle>
               
-              <FormSection>
-                <SectionTitle>Artwork Details</SectionTitle>
-                
+              <FormGroup>
+                <Label>Title <RequiredStar>*</RequiredStar></Label>
+                <Input
+                  name="title"
+                  value={formData.title}
+                  onChange={handleInputChange}
+                  placeholder="Enter artwork title"
+                  required
+                  maxLength={100}
+                />
+              </FormGroup>
+              
+              <FormGroup>
+                <Label>Artist Name</Label>
+                <Input
+                  name="artist"
+                  value={formData.artist}
+                  onChange={handleInputChange}
+                  placeholder="Your name or artist pseudonym"
+                  maxLength={50}
+                />
+              </FormGroup>
+              
+              <FormGroup>
+                <Label>Description</Label>
+                <TextArea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  placeholder="Tell the story behind your artwork..."
+                  rows={3}
+                  maxLength={1000}
+                />
+                <FieldHint>{formData.description.length}/1000 characters</FieldHint>
+              </FormGroup>
+              
+              <FormRow>
                 <FormGroup>
-                  <Label>Title <RequiredStar>*</RequiredStar></Label>
-                  <Input
-                    name="title"
-                    value={formData.title}
+                  <Label>Category</Label>
+                  <Select
+                    name="category"
+                    value={formData.category}
                     onChange={handleInputChange}
-                    placeholder="Enter artwork title"
-                    required
-                    maxLength={100}
-                  />
+                  >
+                    <option value="portrait">Portrait</option>
+                    <option value="landscape">Landscape</option>
+                    <option value="abstract">Abstract</option>
+                    <option value="series">Series</option>
+                    <option value="mixed-media">Mixed Media</option>
+                  </Select>
                 </FormGroup>
                 
                 <FormGroup>
-                  <Label>Artist Name</Label>
+                  <Label>Medium</Label>
                   <Input
-                    name="artist"
-                    value={formData.artist}
+                    name="medium"
+                    value={formData.medium}
                     onChange={handleInputChange}
-                    placeholder="Your name or artist pseudonym"
+                    placeholder="e.g., Oil on canvas, Digital, Acrylic"
                     maxLength={50}
                   />
                 </FormGroup>
-                
-                <FormGroup>
-                  <Label>Description</Label>
-                  <TextArea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    placeholder="Tell the story behind your artwork..."
-                    rows={3}
-                    maxLength={1000}
-                  />
-                  <FieldHint>{formData.description.length}/1000 characters</FieldHint>
-                </FormGroup>
-                
-                <FormRow>
-                  <FormGroup>
-                    <Label>Category</Label>
-                    <Select
-                      name="category"
-                      value={formData.category}
-                      onChange={handleInputChange}
-                    >
-                      <option value="portrait">Portrait</option>
-                      <option value="landscape">Landscape</option>
-                      <option value="abstract">Abstract</option>
-                      <option value="series">Series</option>
-                      <option value="mixed-media">Mixed Media</option>
-                    </Select>
-                  </FormGroup>
-                  
-                  <FormGroup>
-                    <Label>Medium</Label>
-                    <Input
-                      name="medium"
-                      value={formData.medium}
-                      onChange={handleInputChange}
-                      placeholder="e.g., Oil on canvas, Digital, Acrylic"
-                      maxLength={50}
-                    />
-                  </FormGroup>
-                </FormRow>
-                
-                <FormRow>
-                  <FormGroup>
-                    <Label>Year Created</Label>
-                    <Input
-                      name="year"
-                      type="number"
-                      value={formData.year}
-                      onChange={handleInputChange}
-                      min="1900"
-                      max={new Date().getFullYear()}
-                    />
-                  </FormGroup>
-                  
-                  <FormGroup>
-                    <Label>Price (USD)</Label>
-                    <PriceInput>
-                      <PriceSymbol>$</PriceSymbol>
-                      <Input
-                        name="price"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formData.price}
-                        onChange={handleInputChange}
-                        placeholder="0.00"
-                        style={{ paddingLeft: '1.75rem' }}
-                      />
-                    </PriceInput>
-                    <FieldHint>Leave empty if not for sale</FieldHint>
-                  </FormGroup>
-                </FormRow>
-                
-                <FormGroup>
-                  <Label>Tags</Label>
-                  <Input
-                    name="tags"
-                    value={formData.tags}
-                    onChange={handleInputChange}
-                    placeholder="abstract, landscape, portrait (comma separated)"
-                    maxLength={200}
-                  />
-                  <FieldHint>Add up to 10 tags to help people discover your work</FieldHint>
-                </FormGroup>
-              </FormSection>
+              </FormRow>
               
-              {error && (
-                <ErrorMessage>
-                  <ErrorIcon>⚠️</ErrorIcon>
-                  <ErrorText>{error}</ErrorText>
-                </ErrorMessage>
-              )}
-            </FormContent>
+              <FormRow>
+                <FormGroup>
+                  <Label>Year Created</Label>
+                  <Input
+                    name="year"
+                    type="number"
+                    value={formData.year}
+                    onChange={handleInputChange}
+                    min="1900"
+                    max={new Date().getFullYear()}
+                  />
+                </FormGroup>
+                
+                <FormGroup>
+                  <Label>Price (USD)</Label>
+                  <PriceInput>
+                    <PriceSymbol>$</PriceSymbol>
+                    <Input
+                      name="price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.price}
+                      onChange={handleInputChange}
+                      placeholder="0.00"
+                      style={{ paddingLeft: '1.75rem' }}
+                    />
+                  </PriceInput>
+                  <FieldHint>Leave empty if not for sale</FieldHint>
+                </FormGroup>
+              </FormRow>
+              
+              <FormGroup>
+                <Label>Tags</Label>
+                <Input
+                  name="tags"
+                  value={formData.tags}
+                  onChange={handleInputChange}
+                  placeholder="abstract, landscape, portrait (comma separated)"
+                  maxLength={200}
+                />
+                <FieldHint>Add up to 10 tags to help people discover your work</FieldHint>
+              </FormGroup>
+            </FormSection>
             
-            <ModalFooter>
-              <FooterContent>
-                <Button type="button" variant="secondary" onClick={onClose} disabled={isUploading}>
-                  Cancel
-                </Button>
-                <SubmitButton type="submit" disabled={isUploading || !selectedFile || !formData.title.trim()}>
-                  {isUploading ? (
-                    <>
-                      <Loader2 className="animate-spin" size={16} />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <UploadIcon size={16} />
-                      Upload Artwork
-                    </>
-                  )}
-                </SubmitButton>
-              </FooterContent>
-            </ModalFooter>
-          </form>
-        </ModalBody>
+            {error && (
+              <ErrorMessage>
+                <ErrorIcon>⚠️</ErrorIcon>
+                <ErrorText>{error}</ErrorText>
+              </ErrorMessage>
+            )}
+          </FormContent>
+          
+          <ModalFooter>
+            <FooterContent>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                onClick={() => setCurrentStep(1)}
+                disabled={isSubmitting}
+              >
+                ← Back {/* Replaced icon with unicode arrow */}
+              </Button>
+              <SubmitButton 
+                type="submit" 
+                disabled={isSubmitting || !formData.title.trim()}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    Creating Artwork...
+                  </>
+                ) : (
+                  'Publish Artwork'
+                )}
+              </SubmitButton>
+            </FooterContent>
+          </ModalFooter>
+        </form>
+      </ModalBody>
+    </>
+  );
+
+  return (
+    <ModalOverlay onClick={handleBackdropClick}>
+      <ModalContent onClick={e => e.stopPropagation()}>
+        {currentStep === 1 ? renderUploadStep() : renderMetadataStep()}
       </ModalContent>
     </ModalOverlay>
   );
 };
 
-// Styled Components (keeping all existing styles - same as before)
+// ===== STYLED COMPONENTS =====
+const PreviewSection = styled.div`
+  margin-bottom: 20px;
+`;
+
+const ImageGuidelines = styled.div`
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 20px;
+`;
+
+const GuidelineTitle = styled.h4`
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #343a40;
+`;
+
+const GuidelineList = styled.ul`
+  padding-left: 20px;
+  margin: 0;
+  font-size: 13px;
+  color: #6c757d;
+  
+  li {
+    margin-bottom: 6px;
+    line-height: 1.4;
+  }
+`;
+
 const ModalOverlay = styled.div`
   position: fixed;
   inset: 0;
