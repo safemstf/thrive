@@ -635,7 +635,7 @@ const SearchInput = styled.input`
   }
 
   &::placeholder {
-    color: ${theme.colors.text.muted};
+    color: ${theme.colors.text};
   }
 `;
 
@@ -780,7 +780,7 @@ const CoverImage = styled.div<{ $coverImage?: string; $kind: string }>`
       professional: 'linear-gradient(135deg, #1f2937 0%, #374151 100%)',
       hybrid: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)'
     };
-    return gradients[$kind as keyof typeof gradients] || `linear-gradient(135deg, ${theme.colors.primary[500]} 0%, ${theme.colors.accent.muted} 100%)`;
+    return gradients[$kind as keyof typeof gradients] || `linear-gradient(135deg, ${theme.colors.primary[500]} 0%, ${theme.colors.accent} 100%)`;
   }};
   background-size: cover;
   background-position: center;
