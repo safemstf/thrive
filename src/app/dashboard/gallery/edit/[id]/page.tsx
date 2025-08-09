@@ -11,7 +11,7 @@ import { useMyGalleryPieces, useUpdateGalleryPiece, useDeleteGalleryPiece } from
 import { useAuth } from '@/providers/authProvider';
 import { Button } from '@/components/ui/button';
 import { VisibilityToggle } from '@/components/gallery/rendering';
-import type { GalleryPiece, GalleryVisibility } from '@/types/gallery.types';
+import type { GalleryPiece, GalleryVisibility, ArtworkCategory } from '@/types/gallery.types';
 
 export default function GalleryEditPage() {
   const router = useRouter();
@@ -19,26 +19,28 @@ export default function GalleryEditPage() {
   const pieceId = params.id as string;
   const { user } = useAuth();
   
-  // API hooks - Get all pieces and find the one we need
+  // API hooks
   const { data: allPieces, isLoading, error } = useMyGalleryPieces();
   const updateMutation = useUpdateGalleryPiece();
   const deleteMutation = useDeleteGalleryPiece();
   
-  // Find the specific piece from all pieces
+  // Find the specific piece
   const piece = useMemo(() => {
     return allPieces?.find(p => p.id === pieceId);
   }, [allPieces, pieceId]);
   
-  // Form state - Updated to match actual GalleryPiece type
+  // Form state
   const [formData, setFormData] = useState<Partial<GalleryPiece>>({
     title: '',
     description: '',
-    category: undefined, // Fixed: use undefined instead of empty string
+    category: undefined,
     medium: '',
     year: new Date().getFullYear(),
     visibility: 'private',
     tags: [],
     displayOrder: 0,
+    artist: '',
+    price: undefined,
   });
   
   const [tagInput, setTagInput] = useState('');
@@ -51,16 +53,17 @@ export default function GalleryEditPage() {
       setFormData({
         title: piece.title || '',
         description: piece.description || '',
-        category: piece.category || undefined, // Fixed: use undefined instead of empty string
+        category: piece.category || undefined,
         medium: piece.medium || '',
         year: piece.year || new Date().getFullYear(),
         visibility: piece.visibility || 'private',
         tags: piece.tags || [],
         displayOrder: piece.displayOrder || 0,
-        // Add any other fields that are supported by your API
+        artist: piece.artist || user?.name || '',
+        price: piece.price,
       });
     }
-  }, [piece]);
+  }, [piece, user]);
   
   // Check for changes
   useEffect(() => {
@@ -68,6 +71,12 @@ export default function GalleryEditPage() {
       const changed = Object.keys(formData).some(key => {
         const formValue = formData[key as keyof typeof formData];
         const pieceValue = piece[key as keyof GalleryPiece];
+        
+        // Special handling for price
+        if (key === 'price') {
+          return formValue !== (pieceValue ?? undefined);
+        }
+        
         return JSON.stringify(formValue) !== JSON.stringify(pieceValue);
       });
       setHasChanges(changed);
@@ -78,13 +87,19 @@ export default function GalleryEditPage() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     
-    // Handle category field specially to ensure type safety
     if (name === 'category') {
       setFormData(prev => ({
         ...prev,
-        category: value === '' ? undefined : value as any // Allow empty string to become undefined
+        category: value === '' ? undefined : value as ArtworkCategory
       }));
-    } else {
+    } 
+    else if (name === 'price') {
+      setFormData(prev => ({
+        ...prev,
+        price: value === '' ? undefined : parseFloat(value)
+      }));
+    } 
+    else {
       setFormData(prev => ({
         ...prev,
         [name]: type === 'number' ? (value ? parseFloat(value) : undefined) : value
@@ -119,7 +134,7 @@ export default function GalleryEditPage() {
     setIsSaving(true);
     try {
       await updateMutation.mutateAsync({
-        pieceId: piece.id, // Updated to use pieceId
+        pieceId: piece.id,
         updates: formData
       });
       router.push('/dashboard/gallery');
@@ -143,7 +158,7 @@ export default function GalleryEditPage() {
     }
   };
   
-  // Check permissions - simplified since these are your own pieces
+  // Check permissions
   const canEdit = piece && user;
   
   if (isLoading) {
@@ -271,6 +286,17 @@ export default function GalleryEditPage() {
           </FormGroup>
           
           <FormGroup>
+            <Label>Artist Name</Label>
+            <Input
+              name="artist"
+              value={formData.artist}
+              onChange={handleInputChange}
+              placeholder="Your name or artist pseudonym"
+              maxLength={50}
+            />
+          </FormGroup>
+          
+          <FormGroup>
             <Label>Description</Label>
             <TextArea
               name="description"
@@ -284,12 +310,18 @@ export default function GalleryEditPage() {
           <FormRow>
             <FormGroup>
               <Label>Category</Label>
-              <Input
+              <Select
                 name="category"
-                value={formData.category || ''} // Convert undefined to empty string for input
+                value={formData.category || ''}
                 onChange={handleInputChange}
-                placeholder="e.g., Painting, Digital Art"
-              />
+              >
+                <option value="">Select category</option>
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+                <option value="abstract">Abstract</option>
+                <option value="series">Series</option>
+                <option value="mixed-media">Mixed Media</option>
+              </Select>
             </FormGroup>
             
             <FormGroup>
@@ -316,6 +348,25 @@ export default function GalleryEditPage() {
               />
             </FormGroup>
             
+            <FormGroup>
+              <Label>Price (USD)</Label>
+              <PriceInput>
+                <PriceSymbol>$</PriceSymbol>
+                <Input
+                  name="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.price ?? ''}
+                  onChange={handleInputChange}
+                  placeholder="0.00"
+                />
+              </PriceInput>
+              <FieldHint>Leave empty if not for sale</FieldHint>
+            </FormGroup>
+          </FormRow>
+          
+          <FormRow>
             <FormGroup>
               <Label>Display Order</Label>
               <Input
@@ -367,7 +418,6 @@ export default function GalleryEditPage() {
             </VisibilityHelp>
           </FormGroup>
           
-          {/* Additional metadata display */}
           <SectionTitle>Metadata</SectionTitle>
           
           <MetadataGrid>
@@ -566,6 +616,39 @@ const TextArea = styled.textarea`
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
+`;
+
+const Select = styled.select`
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: white;
+  
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+`;
+
+const PriceInput = styled.div`
+  position: relative;
+  display: flex;
+  align-items: center;
+`;
+
+const PriceSymbol = styled.span`
+  position: absolute;
+  left: 0.75rem;
+  color: #6b7280;
+`;
+
+const FieldHint = styled.div`
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
 `;
 
 const TagInput = styled.div`

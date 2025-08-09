@@ -328,11 +328,12 @@ export default function DashboardLayout({
   );
 }
 
-// Enhanced Styled Components
+// Enhanced Styled Components to match elegant aesthetic
 const LayoutWrapper = styled.div`
   display: flex;
   min-height: 100vh;
-  background: #f8fafc;
+  background: #f8f8f8;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const MobileHeader = styled.header`
@@ -343,7 +344,7 @@ const MobileHeader = styled.header`
   right: 0;
   height: 64px;
   background: white;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e0e0e0;
   padding: 0 1rem;
   align-items: center;
   justify-content: space-between;
@@ -360,23 +361,24 @@ const MobileMenuButton = styled.button`
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: none;
-  background: none;
-  color: #374151;
+  border: 1px solid #e0e0e0;
+  background: white;
+  color: #2c2c2c;
   cursor: pointer;
-  border-radius: 6px;
-  transition: background 0.2s;
+  border-radius: 2px;
+  transition: all 0.3s ease;
   
   &:hover {
-    background: #f3f4f6;
+    background: #f3f3f3;
   }
 `;
 
 const MobileTitle = styled.h1`
   font-size: 1.125rem;
-  font-weight: 600;
-  color: #111827;
+  font-weight: 400;
+  color: #2c2c2c;
   margin: 0;
+  font-family: 'Cormorant Garamond', serif;
 `;
 
 const MobilePortfolioIndicator = styled.div<{ $color: string }>`
@@ -404,7 +406,7 @@ const MobileOverlay = styled.div`
 const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
   width: ${props => props.$collapsed ? '80px' : '320px'};
   background: white;
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid #e0e0e0;
   position: fixed;
   top: 0;
   left: 0;
@@ -414,7 +416,7 @@ const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
   z-index: 45;
   
   @media (max-width: 768px) {
-    width: 320px;
+    width: 280px;
     transform: ${props => props.$mobileOpen ? 'translateX(0)' : 'translateX(-100%)'};
     top: 64px;
     height: calc(100vh - 64px);
@@ -423,7 +425,7 @@ const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
 
 const SidebarHeader = styled.div`
   padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e0e0e0;
   position: relative;
 `;
 
@@ -436,15 +438,15 @@ const CollapseButton = styled.button<{ $collapsed: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   transform: ${props => props.$collapsed ? 'rotate(180deg)' : 'rotate(0deg)'};
   
   &:hover {
-    background: #e5e7eb;
+    background: #f0f0f0;
   }
   
   @media (max-width: 768px) {
@@ -476,25 +478,27 @@ const UserInfo = styled.div`
 `;
 
 const UserName = styled.h3`
-  font-size: 1rem;
-  font-weight: 600;
-  color: #111827;
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: #2c2c2c;
   margin: 0 0 0.25rem 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: 'Cormorant Garamond', serif;
 `;
 
 const UserRole = styled.p`
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #666;
   margin: 0;
   text-transform: capitalize;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const PortfolioStatus = styled.div<{ $collapsed: boolean }>`
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e0e0e0;
 `;
 
 const PortfolioInfo = styled.div`
@@ -518,11 +522,12 @@ const PortfolioDetails = styled.div`
 
 const PortfolioLabel = styled.div`
   font-size: 0.75rem;
-  color: #6b7280;
+  color: #666;
   margin-bottom: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 500;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const PortfolioType = styled.div`
@@ -537,15 +542,17 @@ const PortfolioTypeText = styled.div`
 
 const PortfolioTypeName = styled.div`
   font-size: 0.875rem;
-  font-weight: 600;
-  color: #374151;
+  font-weight: 500;
+  color: #2c2c2c;
   margin-bottom: 0.25rem;
+  font-family: 'Cormorant Garamond', serif;
 `;
 
 const PortfolioTypeDesc = styled.div`
   font-size: 0.75rem;
-  color: #6b7280;
+  color: #666;
   line-height: 1.4;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const CreatePortfolioPrompt = styled.div`
@@ -553,9 +560,9 @@ const CreatePortfolioPrompt = styled.div`
   align-items: flex-start;
   gap: 1rem;
   padding: 1.25rem;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  border: 1px solid #d1d5db;
-  border-radius: 12px;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
 `;
 
 const PromptIcon = styled.div`
@@ -576,27 +583,32 @@ const PromptText = styled.div`
 
 const PromptTitle = styled.div`
   font-size: 0.875rem;
-  font-weight: 600;
-  color: #374151;
+  font-weight: 500;
+  color: #2c2c2c;
   margin-bottom: 0.25rem;
+  font-family: 'Cormorant Garamond', serif;
 `;
 
 const PromptSubtitle = styled.div`
   font-size: 0.75rem;
-  color: #6b7280;
+  color: #666;
   margin-bottom: 0.75rem;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const PromptLink = styled(Link)`
   font-size: 0.75rem;
   color: #3b82f6;
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 500;
   background: rgba(59, 130, 246, 0.1);
   padding: 0.375rem 0.75rem;
-  border-radius: 6px;
+  border-radius: 2px;
   display: inline-block;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  font-family: 'Work Sans', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   
   &:hover {
     background: rgba(59, 130, 246, 0.2);
@@ -621,19 +633,19 @@ const NavItem = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
   align-items: center;
   gap: 1rem;
   padding: 0.875rem;
-  color: ${props => props.$active ? '#3b82f6' : '#6b7280'};
+  color: ${props => props.$active ? '#3b82f6' : '#666'};
   background: ${props => props.$active ? '#eff6ff' : 'transparent'};
-  border-radius: 10px;
+  border-radius: 2px;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   border-left: 3px solid ${props => props.$active ? '#3b82f6' : 'transparent'};
   margin-left: -1rem;
   padding-left: ${props => props.$collapsed ? '1.5rem' : '1.875rem'};
   justify-content: ${props => props.$collapsed ? 'center' : 'flex-start'};
 
   &:hover {
-    background: ${props => props.$active ? '#eff6ff' : '#f9fafb'};
-    color: ${props => props.$active ? '#3b82f6' : '#374151'};
+    background: ${props => props.$active ? '#eff6ff' : '#f9f9f9'};
+    color: ${props => props.$active ? '#3b82f6' : '#2c2c2c'};
     transform: translateX(2px);
   }
 `;
@@ -657,6 +669,7 @@ const NavLabel = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: 'Cormorant Garamond', serif;
 `;
 
 const NavDescription = styled.div`
@@ -665,11 +678,12 @@ const NavDescription = styled.div`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: 'Work Sans', sans-serif;
 `;
 
 const SidebarFooter = styled.div`
   padding: 1rem 1.5rem;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #e0e0e0;
   margin-top: auto;
   display: flex;
   flex-direction: column;
@@ -681,15 +695,16 @@ const FooterLink = styled(Link)`
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
-  color: #6b7280;
+  color: #666;
   text-decoration: none;
   font-size: 0.875rem;
-  border-radius: 6px;
-  transition: all 0.2s;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  font-family: 'Work Sans', sans-serif;
   
   &:hover {
-    background: #f3f4f6;
-    color: #374151;
+    background: #f3f3f3;
+    color: #2c2c2c;
   }
 `;
 
@@ -703,9 +718,10 @@ const LogoutButton = styled.button`
   color: #dc2626;
   text-decoration: none;
   font-size: 0.875rem;
-  border-radius: 6px;
-  transition: all 0.2s;
+  border-radius: 2px;
+  transition: all 0.3s ease;
   cursor: pointer;
+  font-family: 'Work Sans', sans-serif;
   
   &:hover {
     background: #dc2626;
@@ -718,6 +734,7 @@ const MainContent = styled.main<{ $sidebarCollapsed: boolean }>`
   margin-left: ${props => props.$sidebarCollapsed ? '80px' : '320px'};
   min-height: 100vh;
   transition: margin-left 0.3s ease;
+  background: #f8f8f8;
   
   @media (max-width: 768px) {
     margin-left: 0;
