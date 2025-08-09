@@ -67,11 +67,11 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     requiresAuth: false,
     testFunction: () => api.auth.login({ 
       email: 'admin@admin.com', 
-      password: 'admin123' 
+      password: 'Safe123' 
     }),
     generateTestData: () => ({ 
       email: 'admin@admin.com', 
-      password: 'admin123' 
+      password: 'Safe123' 
     })
   },
   {
