@@ -1,110 +1,43 @@
-// src\components\apiTest\apiTestLogic.tsx
+// src/components/apiTest/apiTestLogic.tsx - Updated to use complete API methods
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw, 
-  ExternalLink, Terminal, Settings, AlertTriangle, Route,
-  Shield, User, Book, Image, Database, Upload, Play,
-  Briefcase, Users, BarChart3, Code, Key, Lock,
-  WifiOff, Activity, Filter, Download, Copy, Check,
-  Heart, Zap, TrendingUp, Award, Eye, Clock
+  Play, Shield, Settings, Route, Heart, Book, Users,
+  Terminal, Copy, Download, ExternalLink, Clock, Key,
+  User, TrendingUp, Zap
 } from 'lucide-react';
 
-// Import styled components from the existing styles file
+// Import the real API client
+import { api } from '@/lib/api-client';
+
+// Import the COMPLETE API methods configuration
+import { 
+  CATEGORIES, 
+  createCompleteApiMethods,
+  getMethodsByCategory,
+  getAuthRequiredMethods,
+  getPublicMethods
+} from './completeApiMethods';
+
+// Import styled components
 import {
-  PageWrapper,
-  Container,
-  PageHeader,
-  HeaderLeft,
-  HeaderRight,
-  PageTitle,
-  PageSubtitle,
-  ConnectionBadge,
-  AuthTokenBadge,
-  StatsOverview,
-  StatCard,
-  StatIcon,
-  StatContent,
-  StatValue,
-  StatLabel,
-  ProgressCard,
-  ProgressBar,
-  ProgressFill,
-  ProgressLabel,
-  MainCard,
-  TabRow,
-  TabButton,
-  TabContent,
-  ControlPanel,
-  CategoryGrid,
-  CategoryCard,
-  CategoryIcon,
-  CategoryName,
-  CategoryStats,
-  CategoryProgress,
-  CategoryProgressFill,
-  ActionPanel,
-  ActionBar,
-  ActionGroup,
-  PrimaryButton,
-  SecondaryButton,
-  RouteSection,
-  SectionHeader,
-  SectionTitle,
-  RouteBadge,
-  RouteList,
-  RouteCard,
-  RouteHeader,
-  RouteLeft,
-  StatusIcon,
-  RouteInfo,
-  RouteName,
-  RouteDescription,
-  MethodBadge,
-  RouteTags,
-  RouteTag,
-  RouteActions,
-  ResponseTime,
-  TestButton,
-  ResponseSection,
-  ResponseHeader,
-  ResponseStatus,
-  ResponseMeta,
-  ResponseBody,
-  CodeBlock,
-  ErrorSection,
-  ErrorTitle,
-  ErrorMessage,
-  ConfigSection,
-  ConfigCard,
-  ConfigHeader,
-  ConfigTitle,
-  ConfigStatus,
-  ConfigContent,
-  ConfigRow,
-  ConfigLabel,
-  ConfigValue,
-  TokenDisplay,
-  ConfigActions,
-  QuickLinks,
-  QuickLink,
-  IntegrationSection,
-  IntegrationCard,
-  CardHeader,
-  CardIcon,
-  CardContent,
-  CardTitle,
-  CodeExample,
-  DiagnosticsSection,
-  DiagnosticCard,
-  DiagnosticHeader,
-  DiagnosticList,
-  DiagnosticItem,
-  DebugCommands,
-  DebugCommand,
-  CommandTitle
+  PageWrapper, Container, PageHeader, HeaderLeft, HeaderRight,
+  PageTitle, PageSubtitle, ConnectionBadge, AuthTokenBadge,
+  StatsOverview, StatCard, StatIcon, StatContent, StatValue, StatLabel,
+  MainCard, TabRow, TabButton, TabContent, ControlPanel,
+  CategoryGrid, CategoryCard, CategoryIcon, CategoryName, CategoryStats,
+  ActionPanel, ActionBar, ActionGroup, PrimaryButton, SecondaryButton,
+  RouteSection, SectionHeader, SectionTitle, RouteList, RouteCard,
+  RouteHeader, RouteLeft, StatusIcon, RouteInfo, RouteName, RouteDescription,
+  MethodBadge, RouteTags, RouteTag, RouteActions, TestButton,
+  ResponseSection, ResponseHeader, ResponseStatus, ResponseBody,
+  CodeBlock, ErrorSection, ErrorTitle, ErrorMessage,
+  ConfigSection, ConfigCard, ConfigHeader, ConfigTitle, ConfigStatus,
+  ConfigContent, ConfigRow, ConfigLabel, ConfigValue, TokenDisplay,
+  ConfigActions, QuickLinks, QuickLink
 } from './apiTestStyles';
 
-// Define test result interface
+// ==================== TYPES ====================
 interface TestResult {
   status: 'pending' | 'running' | 'success' | 'error';
   response?: any;
@@ -113,254 +46,40 @@ interface TestResult {
   timestamp?: Date;
 }
 
-// Define API method structure
 interface ApiMethod {
   name: string;
   description: string;
   category: string;
   method: string;
   requiresAuth: boolean;
-  requiresData?: boolean;
-  requiresFile?: boolean;
-  isDestructive?: boolean;
   testFunction: () => Promise<any>;
   generateTestData?: () => any;
 }
 
-// Category definitions with icons and colors
-const CATEGORIES = {
-  portfolio: {
-    name: 'Portfolio',
-    icon: Briefcase,
-    color: '#3b82f6',
-    description: 'Portfolio management and operations'
-  },
-  auth: {
-    name: 'Authentication',
-    icon: Shield,
-    color: '#f59e0b',
-    description: 'Login, signup, and token management'
-  },
-  education: {
-    name: 'Education',
-    icon: Book,
-    color: '#06b6d4',
-    description: 'Books and concepts management'
-  },
-  health: {
-    name: 'Health',
-    icon: Heart,
-    color: '#10b981',
-    description: 'System health and connectivity'
-  }
+// ==================== ICON MAPPING ====================
+const getIconComponent = (iconName: string) => {
+  const icons: Record<string, any> = {
+    Heart,
+    Shield, 
+    Route,
+    Book,
+    Users,
+    User,
+    TrendingUp,
+    Zap
+  };
+  return icons[iconName] || AlertCircle;
 };
 
-// Mock API client for demo purposes
-const mockApi = {
-  health: {
-    check: () => Promise.resolve({ status: 'healthy', version: '1.0.0', timestamp: new Date().toISOString() }),
-    testConnection: () => Promise.resolve({ connected: true, baseUrl: 'http://localhost:5000', latency: 45 })
-  },
-  auth: {
-    login: (credentials: any) => Promise.resolve({ 
-      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-      user: { id: '1', email: credentials.usernameOrEmail, username: 'testuser' }
-    }),
-    getCurrentUser: () => Promise.resolve({ 
-      id: '1', 
-      email: 'admin@admin.com', 
-      username: 'admin',
-      createdAt: '2024-01-01T00:00:00Z'
-    }),
-    verifyToken: (token: string) => Promise.resolve({ valid: true, expiresAt: '2025-01-01T00:00:00Z' })
-  },
-  portfolio: {
-    check: () => Promise.resolve(true),
-    get: () => Promise.resolve({
-      id: '1',
-      username: 'testuser',
-      title: 'My Creative Portfolio',
-      bio: 'Digital artist and photographer',
-      kind: 'creative',
-      visibility: 'public',
-      createdAt: '2024-01-01T00:00:00Z'
-    }),
-    getStats: () => Promise.resolve({
-      totalPortfolios: 1247,
-      activeUsers: 892,
-      publicPortfolios: 734,
-      galleryPieces: 5683
-    }),
-    getTypeConfig: (type: string) => Promise.resolve({
-      type,
-      features: ['gallery', 'analytics', 'custom_domain'],
-      maxGalleryPieces: 100,
-      storageLimit: '10GB'
-    }),
-    discover: (filters?: any) => Promise.resolve({
-      portfolios: [
-        { id: '1', username: 'artist1', title: 'Digital Dreams', kind: 'creative' },
-        { id: '2', username: 'dev2', title: 'Code & Coffee', kind: 'developer' }
-      ],
-      pagination: { page: 1, limit: 5, total: 156 }
-    }),
-    gallery: {
-      get: () => Promise.resolve([
-        {
-          id: '1',
-          title: 'Sunset Landscape',
-          description: 'Beautiful sunset over mountains',
-          imageUrl: 'https://picsum.photos/800/600?random=1',
-          category: 'photography',
-          visibility: 'public',
-          createdAt: '2024-01-15T00:00:00Z'
-        },
-        {
-          id: '2',
-          title: 'Digital Portrait',
-          description: 'Character design study',
-          imageUrl: 'https://picsum.photos/800/600?random=2',
-          category: 'digital',
-          visibility: 'public',
-          createdAt: '2024-01-10T00:00:00Z'
-        }
-      ]),
-      getStats: () => Promise.resolve({
-        totalPieces: 24,
-        publicPieces: 18,
-        categories: { photography: 12, digital: 8, traditional: 4 },
-        totalViews: 1847
-      }),
-      add: (data: any) => Promise.resolve({
-        id: '3',
-        ...data,
-        createdAt: new Date().toISOString()
-      })
-    },
-    concepts: {
-      get: () => Promise.resolve([
-        {
-          id: '1',
-          conceptId: 'js-fundamentals',
-          title: 'JavaScript Fundamentals',
-          status: 'completed',
-          score: 85,
-          completedAt: '2024-01-20T00:00:00Z'
-        }
-      ])
-    },
-    analytics: {
-      get: () => Promise.resolve({
-        views: { total: 1847, thisMonth: 234 },
-        likes: { total: 156, thisMonth: 23 },
-        shares: { total: 45, thisMonth: 8 },
-        topPieces: [
-          { id: '1', title: 'Sunset Landscape', views: 456 }
-        ]
-      }),
-      dashboard: () => Promise.resolve({
-        overview: {
-          portfolioViews: 1847,
-          galleryPieces: 24,
-          conceptsCompleted: 12,
-          skillLevel: 'Intermediate'
-        },
-        recentActivity: [
-          { type: 'gallery_add', title: 'Added new artwork', date: '2024-01-25T00:00:00Z' }
-        ]
-      })
-    },
-    debug: {
-      uploadConfig: () => Promise.resolve({
-        filesystem: {
-          checks: {
-            uploadsExists: true,
-            canWrite: true,
-            portfolioExists: true,
-            portfolioCount: 24
-          }
-        },
-        limits: {
-          maxFileSize: '10MB',
-          allowedTypes: ['image/jpeg', 'image/png', 'image/webp']
-        }
-      }),
-      validateFile: (filename: string) => Promise.resolve({
-        filename,
-        validation: {
-          checks: {
-            exists: true,
-            readable: true,
-            sizeHuman: '2.3 MB',
-            imageInfo: { format: 'JPEG', width: 1920, height: 1080 }
-          }
-        }
-      })
-    }
-  },
-  education: {
-    books: {
-      getAll: (params?: any) => Promise.resolve({
-        books: [
-          { id: '1', title: 'JavaScript: The Good Parts', author: 'Douglas Crockford', category: 'programming' },
-          { id: '2', title: 'Design Patterns', author: 'Gang of Four', category: 'software-design' }
-        ],
-        pagination: { page: 1, limit: 5, total: 47 }
-      })
-    },
-    concepts: {
-      getAll: (filters?: any) => Promise.resolve({
-        concepts: [
-          { id: '1', title: 'JavaScript Fundamentals', category: 'programming', difficulty: 'beginner' },
-          { id: '2', title: 'React Hooks', category: 'frontend', difficulty: 'intermediate' }
-        ],
-        pagination: { page: 1, limit: 5, total: 156 }
-      }),
-      search: (query: string, filters?: any) => Promise.resolve({
-        concepts: [
-          { id: '1', title: 'JavaScript Variables', category: 'programming', difficulty: 'beginner' }
-        ],
-        query,
-        total: 12
-      })
-    }
-  }
-};
-
-// Mock testing utils
-const mockTestingUtils = {
-  portfolio: {
-    generateGalleryPieceData: () => ({
-      title: `Test Artwork ${Date.now()}`,
-      description: 'Test artwork created by API testing suite',
-      imageUrl: 'https://picsum.photos/800/600',
-      category: 'digital',
-      medium: 'Digital Art',
-      tags: ['test', 'digital', 'automated'],
-      visibility: 'public',
-      year: 2025,
-      displayOrder: 0
-    }),
-    runFullSystemTest: () => Promise.resolve({
-      success: true,
-      tests: {
-        health: { passed: true },
-        auth: { passed: true },
-        portfolio: { passed: true },
-        gallery: { passed: true }
-      },
-      summary: 'All systems operational'
-    })
-  }
-};
-
-interface ApiClientTestLogicProps {
+// ==================== MAIN COMPONENT ====================
+interface ApiTestLogicProps {
   baseUrl?: string;
 }
 
-export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
+export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
   baseUrl = process.env.NEXT_PUBLIC_NGROK_URL || 'http://localhost:5000'
 }) => {
+  // ==================== STATE ====================
   const [activeTab, setActiveTab] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('health');
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
@@ -369,208 +88,36 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
   const [isRunning, setIsRunning] = useState(false);
   const [backendInfo, setBackendInfo] = useState<any>(null);
 
-  // Define all available API methods
-  const API_METHODS: ApiMethod[] = useMemo(() => [
-    // Health endpoints
-    {
-      name: 'Health Check',
-      description: 'Check if the backend is running',
-      category: 'health',
-      method: 'GET',
-      requiresAuth: false,
-      testFunction: () => mockApi.health.check()
-    },
-    {
-      name: 'Test Connection',
-      description: 'Test backend connectivity',
-      category: 'health',
-      method: 'GET',
-      requiresAuth: false,
-      testFunction: () => mockApi.health.testConnection()
-    },
-    
-    // Auth endpoints
-    {
-      name: 'Login',
-      description: 'Authenticate user',
-      category: 'auth',
-      method: 'POST',
-      requiresAuth: false,
-      requiresData: true,
-      testFunction: () => mockApi.auth.login({ 
-        usernameOrEmail: 'admin@admin.com', 
-        password: 'admin123' 
-      }),
-      generateTestData: () => ({ 
-        usernameOrEmail: 'admin@admin.com', 
-        password: 'admin123' 
-      })
-    },
-    {
-      name: 'Get Current User',
-      description: 'Get authenticated user info',
-      category: 'auth',
-      method: 'GET',
-      requiresAuth: true,
-      testFunction: () => mockApi.auth.getCurrentUser()
-    },
-    {
-      name: 'Verify Token',
-      description: 'Verify auth token validity',
-      category: 'auth',
-      method: 'POST',
-      requiresAuth: true,
-      testFunction: () => mockApi.auth.verifyToken(authToken || '')
-    },
-    
-    // Portfolio endpoints
-    {
-      name: 'Check Portfolio',
-      description: 'Check if user has portfolio',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: true,
-      testFunction: () => mockApi.portfolio.check()
-    },
-    {
-      name: 'Get My Portfolio',
-      description: 'Get current user portfolio',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: true,
-      testFunction: () => mockApi.portfolio.get()
-    },
-    {
-      name: 'Get Portfolio Stats',
-      description: 'Get global portfolio statistics',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: false,
-      testFunction: () => mockApi.portfolio.getStats()
-    },
-    {
-      name: 'Get Type Config',
-      description: 'Get portfolio type configuration',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: false,
-      testFunction: () => mockApi.portfolio.getTypeConfig('creative')
-    },
-    {
-      name: 'Discover Portfolios',
-      description: 'Search public portfolios',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: false,
-      testFunction: () => mockApi.portfolio.discover({ page: 1, limit: 5 })
-    },
-    
-    // Portfolio Gallery
-    {
-      name: 'Get My Gallery',
-      description: 'Get user gallery pieces',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: true,
-      testFunction: () => mockApi.portfolio.gallery.get()
-    },
-    {
-      name: 'Gallery Stats',
-      description: 'Get gallery statistics',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: true,
-      testFunction: () => mockApi.portfolio.gallery.getStats()
-    },
-    {
-      name: 'Add Gallery Piece',
-      description: 'Add piece to gallery',
-      category: 'portfolio',
-      method: 'POST',
-      requiresAuth: true,
-      requiresData: true,
-      testFunction: () => mockApi.portfolio.gallery.add(mockTestingUtils.portfolio.generateGalleryPieceData()),
-      generateTestData: () => mockTestingUtils.portfolio.generateGalleryPieceData()
-    },
-    
-    // Portfolio Concepts
-    {
-      name: 'Get My Concepts',
-      description: 'Get concept progress',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: true,
-      testFunction: () => mockApi.portfolio.concepts.get()
-    },
-    
-    // Portfolio Analytics
-    {
-      name: 'Get Analytics',
-      description: 'Get portfolio analytics',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: true,
-      testFunction: () => mockApi.portfolio.analytics.get()
-    },
-    {
-      name: 'Get Dashboard',
-      description: 'Get dashboard metrics',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: true,
-      testFunction: () => mockApi.portfolio.analytics.dashboard()
-    },
-    
-    // Portfolio Debug
-    {
-      name: 'Upload Config',
-      description: 'Check upload configuration',
-      category: 'portfolio',
-      method: 'GET',
-      requiresAuth: true,
-      testFunction: () => mockApi.portfolio.debug.uploadConfig()
-    },
-    
-    // Education endpoints
-    {
-      name: 'Get All Books',
-      description: 'Get all available books',
-      category: 'education',
-      method: 'GET',
-      requiresAuth: false,
-      testFunction: () => mockApi.education.books.getAll({ page: 1, limit: 5 })
-    },
-    {
-      name: 'Get All Concepts',
-      description: 'Get all available concepts',
-      category: 'education',
-      method: 'GET',
-      requiresAuth: false,
-      testFunction: () => mockApi.education.concepts.getAll({ page: 1, limit: 5 })
-    },
-    {
-      name: 'Search Concepts',
-      description: 'Search concepts by query',
-      category: 'education',
-      method: 'GET',
-      requiresAuth: false,
-      testFunction: () => mockApi.education.concepts.search('javascript', { limit: 5 })
-    }
-  ], [authToken]);
+  // ==================== COMPUTED VALUES ====================
+  // NOW USING THE COMPLETE API METHODS!
+  const apiMethods = useMemo(() => createCompleteApiMethods(authToken), [authToken]);
+  
+  const filteredMethods = useMemo(() => {
+    return getMethodsByCategory(apiMethods, selectedCategory);
+  }, [apiMethods, selectedCategory]);
 
-  // Load auth token on mount
+  const stats = useMemo(() => {
+    const allResults = Object.values(testResults);
+    return {
+      total: allResults.length,
+      passed: allResults.filter(r => r.status === 'success').length,
+      failed: allResults.filter(r => r.status === 'error').length,
+      running: allResults.filter(r => r.status === 'running').length,
+    };
+  }, [testResults]);
+
+  // ==================== EFFECTS ====================
   useEffect(() => {
     const token = localStorage.getItem('api_test_token');
-    if (token) {
-      setAuthToken(token);
-    }
+    if (token) setAuthToken(token);
     checkConnection();
   }, []);
 
+  // ==================== HANDLERS ====================
   const checkConnection = useCallback(async () => {
     setConnectionStatus('connecting');
     try {
-      const response = await mockApi.health.check();
+      const response = await api.health.check();
       setBackendInfo(response);
       setConnectionStatus('connected');
     } catch (error) {
@@ -584,10 +131,7 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
     
     setTestResults(prev => ({
       ...prev,
-      [testKey]: {
-        status: 'running',
-        timestamp: new Date()
-      }
+      [testKey]: { status: 'running', timestamp: new Date() }
     }));
 
     const startTime = Date.now();
@@ -628,138 +172,102 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
 
   const runCategoryTests = useCallback(async () => {
     setIsRunning(true);
-    const categoryMethods = API_METHODS.filter(m => m.category === selectedCategory);
+    const categoryMethods = filteredMethods.filter(m => !m.requiresAuth || authToken);
     
     for (const method of categoryMethods) {
-      if (method.requiresAuth && !authToken) {
-        continue; // Skip auth-required methods if not authenticated
-      }
       await executeTest(method);
     }
     
     setIsRunning(false);
-  }, [selectedCategory, authToken, API_METHODS, executeTest]);
+  }, [filteredMethods, authToken, executeTest]);
 
   const runAuthFlow = useCallback(async () => {
     setIsRunning(true);
     
-    // Run login first
-    const loginMethod = API_METHODS.find(m => m.name === 'Login');
+    const loginMethod = apiMethods.find(m => m.name === 'Login');
     if (loginMethod) {
       await executeTest(loginMethod);
       
-      // Wait a bit for token to be set
       setTimeout(async () => {
-        const userMethod = API_METHODS.find(m => m.name === 'Get Current User');
-        if (userMethod) {
-          await executeTest(userMethod);
-        }
+        const userMethod = apiMethods.find(m => m.name === 'Get Current User');
+        if (userMethod) await executeTest(userMethod);
         setIsRunning(false);
       }, 500);
     } else {
       setIsRunning(false);
     }
-  }, [API_METHODS, executeTest]);
+  }, [apiMethods, executeTest]);
 
-  const runComprehensiveTest = useCallback(async () => {
+  const runAllTests = useCallback(async () => {
     setIsRunning(true);
     
-    try {
-      // Run the comprehensive test
-      const result = await mockTestingUtils.portfolio.runFullSystemTest();
-      
-      // Update test results based on the comprehensive test
-      const testKey = 'portfolio-FullSystemTest';
-      setTestResults(prev => ({
-        ...prev,
-        [testKey]: {
-          status: result.success ? 'success' : 'error',
-          response: result,
-          timestamp: new Date()
-        }
-      }));
-      
-    } catch (error) {
-      console.error('Comprehensive test failed:', error);
+    // First run auth flow
+    const loginMethod = apiMethods.find(m => m.name === 'Login');
+    if (loginMethod) {
+      await executeTest(loginMethod);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    // Then run all available methods
+    const availableMethods = apiMethods.filter(m => !m.requiresAuth || authToken);
+    for (const method of availableMethods) {
+      if (method.name !== 'Login') { // Skip login since we already did it
+        await executeTest(method);
+      }
     }
     
     setIsRunning(false);
-  }, []);
+  }, [apiMethods, authToken, executeTest]);
 
-  const clearResults = useCallback(() => {
-    setTestResults({});
-  }, []);
+  const clearResults = useCallback(() => setTestResults({}), []);
 
   const exportResults = useCallback(() => {
     const exportData = {
       timestamp: new Date().toISOString(),
       baseUrl,
-      results: testResults
+      results: testResults,
+      summary: {
+        totalMethods: apiMethods.length,
+        testedMethods: Object.keys(testResults).length,
+        categories: Object.keys(CATEGORIES),
+        ...stats
+      }
     };
     
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `api-client-test-results-${new Date().toISOString().replace(/:/g, '-')}.json`;
+    a.download = `api-test-results-${new Date().toISOString().replace(/:/g, '-')}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [baseUrl, testResults]);
+  }, [baseUrl, testResults, apiMethods.length, stats]);
 
   const copyToken = useCallback(() => {
-    if (authToken) {
-      navigator.clipboard.writeText(authToken);
-    }
+    if (authToken) navigator.clipboard.writeText(authToken);
   }, [authToken]);
-
-  // Filter methods by category
-  const filteredMethods = useMemo(() => {
-    return API_METHODS.filter(method => method.category === selectedCategory);
-  }, [API_METHODS, selectedCategory]);
-
-  // Calculate stats
-  const stats = useMemo(() => {
-    const allResults = Object.values(testResults);
-    const categoryResults = Object.entries(testResults)
-      .filter(([key]) => key.startsWith(selectedCategory))
-      .map(([, result]) => result);
-    
-    return {
-      total: allResults.length,
-      passed: allResults.filter(r => r.status === 'success').length,
-      failed: allResults.filter(r => r.status === 'error').length,
-      running: allResults.filter(r => r.status === 'running').length,
-      categoryTotal: categoryResults.length,
-      categoryPassed: categoryResults.filter(r => r.status === 'success').length,
-      categoryFailed: categoryResults.filter(r => r.status === 'error').length,
-    };
-  }, [testResults, selectedCategory]);
 
   const getStatusIcon = useCallback((status: string) => {
     switch (status) {
-      case 'success':
-        return <CheckCircle style={{ color: '#10b981' }} size={20} />;
-      case 'error':
-        return <XCircle style={{ color: '#ef4444' }} size={20} />;
-      case 'running':
-        return <Loader2 style={{ color: '#3b82f6' }} className="animate-spin" size={20} />;
-      default:
-        return <AlertCircle style={{ color: '#9ca3af' }} size={20} />;
+      case 'success': return <CheckCircle style={{ color: '#666666' }} size={20} />;
+      case 'error': return <XCircle style={{ color: '#999999' }} size={20} />;
+      case 'running': return <Loader2 style={{ color: '#2c2c2c' }} className="animate-spin" size={20} />;
+      default: return <AlertCircle style={{ color: '#cccccc' }} size={20} />;
     }
   }, []);
 
+  // ==================== RENDER ====================
   return (
     <PageWrapper>
       <Container>
         <PageHeader>
           <HeaderLeft>
-            <PageTitle>API Client Test Suite</PageTitle>
-            <PageSubtitle>Test the real API client implementation</PageSubtitle>
+            <PageTitle>Complete API Test Suite</PageTitle>
+            <PageSubtitle>Testing all {apiMethods.length} available endpoints</PageSubtitle>
           </HeaderLeft>
           
           <HeaderRight>
             <ConnectionBadge $status={connectionStatus}>
-              {connectionStatus === 'connected' ? <Activity size={16} /> : <WifiOff size={16} />}
               {connectionStatus}
             </ConnectionBadge>
             
@@ -776,14 +284,14 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
         {stats.total > 0 && (
           <StatsOverview>
             <StatCard>
-              <StatIcon><TrendingUp size={24} /></StatIcon>
+              <StatIcon><Terminal size={24} /></StatIcon>
               <StatContent>
                 <StatValue>{stats.total}</StatValue>
                 <StatLabel>Total Tests</StatLabel>
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#10b981">
+            <StatCard $color="#666666">
               <StatIcon><CheckCircle size={24} /></StatIcon>
               <StatContent>
                 <StatValue>{stats.passed}</StatValue>
@@ -791,7 +299,7 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#ef4444">
+            <StatCard $color="#999999">
               <StatIcon><XCircle size={24} /></StatIcon>
               <StatContent>
                 <StatValue>{stats.failed}</StatValue>
@@ -799,7 +307,7 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#3b82f6">
+            <StatCard $color="#2c2c2c">
               <StatIcon><Loader2 size={24} /></StatIcon>
               <StatContent>
                 <StatValue>{stats.running}</StatValue>
@@ -807,17 +315,13 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
               </StatContent>
             </StatCard>
             
-            <ProgressCard>
-              <ProgressBar>
-                <ProgressFill 
-                  $percentage={stats.total > 0 ? (stats.passed / stats.total) * 100 : 0}
-                  $color="#10b981"
-                />
-              </ProgressBar>
-              <ProgressLabel>
-                {stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0}% Success Rate
-              </ProgressLabel>
-            </ProgressCard>
+            <StatCard $color="#555555">
+              <StatIcon><Route size={24} /></StatIcon>
+              <StatContent>
+                <StatValue>{apiMethods.length}</StatValue>
+                <StatLabel>Available</StatLabel>
+              </StatContent>
+            </StatCard>
           </StatsOverview>
         )}
 
@@ -829,12 +333,6 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
             <TabButton $active={activeTab === 1} onClick={() => setActiveTab(1)}>
               <Settings size={18} /> Configuration
             </TabButton>
-            <TabButton $active={activeTab === 2} onClick={() => setActiveTab(2)}>
-              <Code size={18} /> Integration
-            </TabButton>
-            <TabButton $active={activeTab === 3} onClick={() => setActiveTab(3)}>
-              <AlertTriangle size={18} /> Diagnostics
-            </TabButton>
           </TabRow>
 
           <TabContent>
@@ -843,14 +341,13 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                 <ControlPanel>
                   <CategoryGrid>
                     {Object.entries(CATEGORIES).map(([key, category]) => {
-                      const Icon = category.icon;
-                      const categoryMethods = API_METHODS.filter(m => m.category === key);
+                      const IconComponent = getIconComponent(category.icon);
+                      const categoryMethods = getMethodsByCategory(apiMethods, key);
                       const categoryResults = Object.entries(testResults)
                         .filter(([k]) => k.startsWith(key))
                         .map(([, r]) => r);
                       const passed = categoryResults.filter(r => r.status === 'success').length;
                       const total = categoryMethods.length;
-                      const hasResults = categoryResults.length > 0;
                       
                       return (
                         <CategoryCard
@@ -860,28 +357,20 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                           onClick={() => setSelectedCategory(key)}
                         >
                           <CategoryIcon $color={category.color}>
-                            <Icon size={24} />
+                            <IconComponent size={24} />
                           </CategoryIcon>
                           <CategoryName>{category.name}</CategoryName>
                           <CategoryStats>
-                            {hasResults ? (
+                            {categoryResults.length > 0 ? (
                               <>
-                                <span style={{ color: '#10b981' }}>{passed}</span>
-                                <span style={{ color: '#6b7280' }}>/</span>
+                                <span style={{ color: '#666666' }}>{passed}</span>
+                                <span style={{ color: '#999999' }}>/</span>
                                 <span>{total}</span>
                               </>
                             ) : (
-                              <span style={{ color: '#6b7280' }}>{total} methods</span>
+                              <span style={{ color: '#999999' }}>{total} methods</span>
                             )}
                           </CategoryStats>
-                          {hasResults && (
-                            <CategoryProgress>
-                              <CategoryProgressFill 
-                                $percentage={(passed / total) * 100}
-                                $color={category.color}
-                              />
-                            </CategoryProgress>
-                          )}
                         </CategoryCard>
                       );
                     })}
@@ -899,10 +388,10 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                           <Play size={16} />
                           Test {CATEGORIES[selectedCategory as keyof typeof CATEGORIES]?.name}
                         </PrimaryButton>
-                        
-                        <PrimaryButton onClick={runComprehensiveTest} disabled={isRunning}>
+
+                        <PrimaryButton onClick={runAllTests} disabled={isRunning}>
                           <Terminal size={16} />
-                          Full System Test
+                          Run All Tests
                         </PrimaryButton>
                       </ActionGroup>
                       
@@ -915,7 +404,7 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                         {stats.total > 0 && (
                           <SecondaryButton onClick={exportResults}>
                             <Download size={16} />
-                            Export
+                            Export Results
                           </SecondaryButton>
                         )}
                       </ActionGroup>
@@ -927,7 +416,7 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                   <SectionHeader>
                     <SectionTitle>
                       {CATEGORIES[selectedCategory as keyof typeof CATEGORIES]?.name} Methods
-                      <RouteBadge>{filteredMethods.length} methods</RouteBadge>
+                      ({filteredMethods.length} of {apiMethods.length} total)
                     </SectionTitle>
                   </SectionHeader>
 
@@ -941,7 +430,7 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                           <RouteHeader>
                             <RouteLeft>
                               <StatusIcon>
-                                {result ? getStatusIcon(result.status) : <AlertCircle style={{ color: '#9ca3af' }} size={20} />}
+                                {result ? getStatusIcon(result.status) : <AlertCircle style={{ color: '#cccccc' }} size={20} />}
                               </StatusIcon>
                               
                               <RouteInfo>
@@ -953,22 +442,7 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                                   
                                   {method.requiresAuth && (
                                     <RouteTag $type="auth">
-                                      <Lock size={12} />
                                       Auth Required
-                                    </RouteTag>
-                                  )}
-                                  
-                                  {method.requiresData && (
-                                    <RouteTag $type="data">
-                                      <Database size={12} />
-                                      Requires Data
-                                    </RouteTag>
-                                  )}
-                                  
-                                  {method.isDestructive && (
-                                    <RouteTag $type="warning">
-                                      <AlertTriangle size={12} />
-                                      Destructive
                                     </RouteTag>
                                   )}
                                 </RouteTags>
@@ -977,10 +451,10 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                             
                             <RouteActions>
                               {result?.duration && (
-                                <ResponseTime $status={result.status}>
+                                <span style={{ fontSize: '0.875rem', color: '#666666', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   <Clock size={14} />
                                   {result.duration}ms
-                                </ResponseTime>
+                                </span>
                               )}
                               
                               <TestButton
@@ -1000,7 +474,7 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                           {method.generateTestData && (
                             <ResponseSection>
                               <ResponseHeader>
-                                <span style={{ fontSize: '0.875rem', fontWeight: '500' }}>Test Data:</span>
+                                <span style={{ fontSize: '0.875rem', fontWeight: '300', textTransform: 'uppercase', letterSpacing: '1px' }}>Test Data:</span>
                               </ResponseHeader>
                               <ResponseBody>
                                 <CodeBlock>
@@ -1016,11 +490,9 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                                 <ResponseStatus $success={result.status === 'success'}>
                                   {result.status === 'success' ? 'Success' : 'Response'}
                                 </ResponseStatus>
-                                <ResponseMeta>
-                                  <span>{result.duration}ms</span>
-                                  <span>•</span>
-                                  <span>{result.timestamp?.toLocaleTimeString()}</span>
-                                </ResponseMeta>
+                                <span style={{ fontSize: '0.875rem', color: '#666666' }}>
+                                  {result.duration}ms • {result.timestamp?.toLocaleTimeString()}
+                                </span>
                               </ResponseHeader>
                               
                               <ResponseBody>
@@ -1069,6 +541,21 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                       <ConfigValue>{process.env.NODE_ENV}</ConfigValue>
                     </ConfigRow>
                     
+                    <ConfigRow>
+                      <ConfigLabel>Total API Methods</ConfigLabel>
+                      <ConfigValue>{apiMethods.length}</ConfigValue>
+                    </ConfigRow>
+
+                    <ConfigRow>
+                      <ConfigLabel>Public Methods</ConfigLabel>
+                      <ConfigValue>{getPublicMethods(apiMethods).length}</ConfigValue>
+                    </ConfigRow>
+
+                    <ConfigRow>
+                      <ConfigLabel>Auth Required Methods</ConfigLabel>
+                      <ConfigValue>{getAuthRequiredMethods(apiMethods).length}</ConfigValue>
+                    </ConfigRow>
+                    
                     {backendInfo && (
                       <>
                         <ConfigRow>
@@ -1096,11 +583,6 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                         )}
                       </ConfigValue>
                     </ConfigRow>
-                    
-                    <ConfigRow>
-                      <ConfigLabel>Available Methods</ConfigLabel>
-                      <ConfigValue>{API_METHODS.length} total</ConfigValue>
-                    </ConfigRow>
                   </ConfigContent>
                   
                   <ConfigActions>
@@ -1114,11 +596,29 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                         setAuthToken(null);
                         localStorage.removeItem('api_test_token');
                       }}>
-                        <Lock size={16} />
+                        <Key size={16} />
                         Clear Auth
                       </SecondaryButton>
                     )}
                   </ConfigActions>
+                </ConfigCard>
+
+                <ConfigCard>
+                  <ConfigHeader>
+                    <ConfigTitle>API Coverage Summary</ConfigTitle>
+                  </ConfigHeader>
+                  
+                  <ConfigContent>
+                    {Object.entries(CATEGORIES).map(([key, category]) => {
+                      const methods = getMethodsByCategory(apiMethods, key);
+                      return (
+                        <ConfigRow key={key}>
+                          <ConfigLabel>{category.name}</ConfigLabel>
+                          <ConfigValue>{methods.length} endpoints</ConfigValue>
+                        </ConfigRow>
+                      );
+                    })}
+                  </ConfigContent>
                 </ConfigCard>
 
                 <ConfigCard>
@@ -1141,255 +641,9 @@ export const ApiClientTestLogic: React.FC<ApiClientTestLogicProps> = ({
                       <ExternalLink size={16} />
                       Ngrok Dashboard
                     </QuickLink>
-                    
-                    <QuickLink onClick={() => window.open(`${baseUrl}/api`, '_blank')}>
-                      <ExternalLink size={16} />
-                      API Documentation
-                    </QuickLink>
                   </QuickLinks>
                 </ConfigCard>
               </ConfigSection>
-            )}
-
-            {activeTab === 2 && (
-              <IntegrationSection>
-                <IntegrationCard>
-                  <CardHeader>
-                    <CardIcon $color="#3b82f6"><Code size={24} /></CardIcon>
-                    <CardTitle>API Client Usage Examples</CardTitle>
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <CodeExample>
-{`// 1. Authentication Flow
-import { api } from '@/lib/api-client';
-
-// Login
-const loginResult = await api.auth.login({
-  usernameOrEmail: 'user@example.com',
-  password: 'password'
-});
-
-// Get current user
-const user = await api.auth.getCurrentUser();
-
-// 2. Portfolio Operations
-// Check if user has portfolio
-const hasPortfolio = await api.portfolio.check();
-
-// Get or create portfolio
-const portfolio = await api.portfolio.get();
-if (!portfolio) {
-  const newPortfolio = await api.portfolio.create({
-    username: 'myusername',
-    displayName: 'My Portfolio',
-    bio: 'My creative journey',
-    kind: 'creative'
-  });
-}
-
-// 3. Gallery Management
-// Get gallery pieces
-const pieces = await api.portfolio.gallery.get();
-
-// Add new piece
-const newPiece = await api.portfolio.gallery.add({
-  title: 'My Artwork',
-  description: 'Beautiful creation',
-  imageUrl: 'https://example.com/image.jpg',
-  visibility: 'public'
-});
-
-// 4. Upload Images
-const file = new File([''], 'image.jpg', { type: 'image/jpeg' });
-const uploadResult = await api.portfolio.images.upload(file, 'profile');
-
-// 5. Debug and Testing
-const uploadConfig = await api.portfolio.debug.uploadConfig();
-const fileValidation = await api.portfolio.debug.validateFile('test.jpg');
-
-// 6. Testing Utilities
-import { testingUtils } from '@/lib/api-client';
-
-// Run comprehensive system test
-const systemTest = await testingUtils.portfolio.runFullSystemTest();
-
-// Test upload functionality
-const uploadTest = await testingUtils.portfolio.testImageUpload();
-
-// Run upload diagnostics
-const diagnostics = await testingUtils.portfolio.runUploadDiagnostics();`}
-                    </CodeExample>
-                  </CardContent>
-                </IntegrationCard>
-                
-                <IntegrationCard>
-                  <CardHeader>
-                    <CardIcon $color="#10b981"><Shield size={24} /></CardIcon>
-                    <CardTitle>Error Handling</CardTitle>
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <CodeExample>
-{`import { api, APIError } from '@/lib/api-client';
-
-try {
-  const result = await api.portfolio.get();
-  console.log('Portfolio:', result);
-} catch (error) {
-  if (error instanceof APIError) {
-    console.log('API Error:', error.message);
-    console.log('Status:', error.status);
-    console.log('Code:', error.code);
-    
-    // Handle specific errors
-    if (error.status === 404) {
-      console.log('Portfolio not found');
-    } else if (error.status === 401) {
-      console.log('Authentication required');
-    }
-  } else {
-    console.log('Unknown error:', error);
-  }
-}`}
-                    </CodeExample>
-                  </CardContent>
-                </IntegrationCard>
-              </IntegrationSection>
-            )}
-
-            {activeTab === 3 && (
-              <DiagnosticsSection>
-                <DiagnosticCard $type="warning">
-                  <DiagnosticHeader>
-                    <AlertTriangle size={24} />
-                    <h3>Common Issues</h3>
-                  </DiagnosticHeader>
-                  
-                  <DiagnosticList>
-                    <DiagnosticItem>
-                      <strong>Authentication Required</strong>
-                      <span>Many methods require login first. Run Auth Flow to authenticate.</span>
-                    </DiagnosticItem>
-                    <DiagnosticItem>
-                      <strong>Portfolio Not Found</strong>
-                      <span>User needs to create portfolio before accessing portfolio methods.</span>
-                    </DiagnosticItem>
-                    <DiagnosticItem>
-                      <strong>Network Errors</strong>
-                      <span>Check if backend is running and URL is correct.</span>
-                    </DiagnosticItem>
-                    <DiagnosticItem>
-                      <strong>File Upload Issues</strong>
-                      <span>Use debug.uploadConfig() to check upload system status.</span>
-                    </DiagnosticItem>
-                    <DiagnosticItem>
-                      <strong>Token Expired</strong>
-                      <span>Clear auth and login again if getting 401 errors.</span>
-                    </DiagnosticItem>
-                  </DiagnosticList>
-                </DiagnosticCard>
-
-                <DiagnosticCard $type="info">
-                  <DiagnosticHeader>
-                    <Settings size={24} />
-                    <h3>Debug Commands</h3>
-                  </DiagnosticHeader>
-                  
-                  <DebugCommands>
-                    <DebugCommand>
-                      <CommandTitle>Test Portfolio System</CommandTitle>
-                      <CodeBlock>
-{`import { testingUtils } from '@/lib/api-client';
-
-// Full system test
-const result = await testingUtils.portfolio.runFullSystemTest();
-console.log('System test:', result);
-
-// Upload diagnostics
-const config = await testingUtils.portfolio.runUploadDiagnostics();
-console.log('Upload config:', config);
-
-// Test image upload
-const uploadTest = await testingUtils.portfolio.testImageUpload();
-console.log('Upload test:', uploadTest);`}
-                      </CodeBlock>
-                    </DebugCommand>
-                    
-                    <DebugCommand>
-                      <CommandTitle>Quick API Health Check</CommandTitle>
-                      <CodeBlock>
-{`import { api } from '@/lib/api-client';
-
-// Test connection
-const health = await api.health.check();
-console.log('Health:', health);
-
-// Test auth
-const user = await api.auth.getCurrentUser();
-console.log('Current user:', user);
-
-// Test portfolio
-const hasPortfolio = await api.portfolio.check();
-console.log('Has portfolio:', hasPortfolio);`}
-                      </CodeBlock>
-                    </DebugCommand>
-                    
-                    <DebugCommand>
-                      <CommandTitle>Debug Upload Issues</CommandTitle>
-                      <CodeBlock>
-{`import { api } from '@/lib/api-client';
-
-// Check upload configuration
-const uploadConfig = await api.portfolio.debug.uploadConfig();
-console.log('Upload config:', uploadConfig);
-
-// Validate specific file
-const validation = await api.portfolio.debug.validateFile('test.jpg');
-console.log('File validation:', validation);
-
-// Check filesystem permissions
-console.log('Directory exists:', uploadConfig.filesystem.checks.uploadsExists);
-console.log('Can write:', uploadConfig.filesystem.checks.canWrite);`}
-                      </CodeBlock>
-                    </DebugCommand>
-                  </DebugCommands>
-                </DiagnosticCard>
-
-                <DiagnosticCard $type="success">
-                  <DiagnosticHeader>
-                    <CheckCircle size={24} />
-                    <h3>System Status</h3>
-                  </DiagnosticHeader>
-                  
-                  <DiagnosticList>
-                    <DiagnosticItem>
-                      <strong>Backend Connection</strong>
-                      <span style={{ color: connectionStatus === 'connected' ? '#10b981' : '#ef4444' }}>
-                        {connectionStatus}
-                      </span>
-                    </DiagnosticItem>
-                    <DiagnosticItem>
-                      <strong>Authentication</strong>
-                      <span style={{ color: authToken ? '#10b981' : '#ef4444' }}>
-                        {authToken ? 'Authenticated' : 'Not authenticated'}
-                      </span>
-                    </DiagnosticItem>
-                    <DiagnosticItem>
-                      <strong>Available Methods</strong>
-                      <span style={{ color: '#3b82f6' }}>
-                        {API_METHODS.length} total
-                      </span>
-                    </DiagnosticItem>
-                    <DiagnosticItem>
-                      <strong>Test Success Rate</strong>
-                      <span style={{ color: stats.total > 0 ? '#10b981' : '#6b7280' }}>
-                        {stats.total > 0 ? `${Math.round((stats.passed / stats.total) * 100)}%` : 'No tests run'}
-                      </span>
-                    </DiagnosticItem>
-                  </DiagnosticList>
-                </DiagnosticCard>
-              </DiagnosticsSection>
             )}
           </TabContent>
         </MainCard>

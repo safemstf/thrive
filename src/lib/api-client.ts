@@ -1,4 +1,4 @@
-// lib/api-client.ts - Portfolio-Centric Architecture (TypeScript Fixed)
+// lib/api-client.ts - Fixed TypeScript issues
 import { BaseApiClient } from './api/base-api-client';
 import { PortfolioApiClient } from './api/portfolio-api-client';
 import { EducationalApiClient } from './api/educational-api-client';
@@ -38,11 +38,82 @@ import type {
 export { APIError } from './api/base-api-client';
 export type { RequestConfig } from './api/base-api-client';
 
-// Combined API Interface - Portfolio-Centric
+// ==================== EXTENDED API CLIENT INTERFACES ====================
+// These extend the base clients to include missing methods
+
+interface ExtendedEducationalApiClient extends EducationalApiClient {
+  // Add missing methods to educational client
+  createBook(data: any): Promise<any>;
+  composeBook(data: any): Promise<any>;
+  getBookSuggestions(id: string): Promise<any>;
+  analyzeBook(id: string): Promise<any>;
+  cloneBook(id: string): Promise<any>;
+  getConceptsByType(type: string): Promise<any>;
+  createConcept(data: any): Promise<any>;
+  updateConcept(id: string, data: any): Promise<any>;
+}
+
+// Additional client interfaces for missing functionality
+interface ProgressApiClient {
+  getProgressSummary(): Promise<any>;
+  getBookProgress(bookId: string): Promise<any>;
+  updateConceptProgress(bookId: string, conceptId: string, data: any): Promise<any>;
+  getStats(): Promise<any>;
+  resetBookProgress(bookId: string): Promise<any>;
+}
+
+interface UsersApiClient {
+  getAll(): Promise<any>;
+  getById(id: string): Promise<any>;
+  update(id: string, data: any): Promise<any>;
+  delete(id: string): Promise<any>;
+  getProgress(id: string): Promise<any>;
+  resetPassword(id: string): Promise<any>;
+}
+
+interface MeApiClient {
+  getSkills(): Promise<any>;
+  getLearningPaths(): Promise<any>;
+  getMarketIntelligence(): Promise<any>;
+  getPrivacySettings(): Promise<any>;
+  updatePrivacySettings(settings: any): Promise<any>;
+  getAccountInfo(): Promise<any>;
+  updateAccountInfo(info: any): Promise<any>;
+  getBilling(): Promise<any>;
+  upgradeBilling(plan: any): Promise<any>;
+  deleteAccount(): Promise<any>;
+}
+
+interface SimulationsApiClient {
+  getAll(filters?: any): Promise<any>;
+  create(data: any): Promise<any>;
+  getStats(): Promise<any>;
+  uploadResults(data: any): Promise<any>;
+  getById(id: string): Promise<any>;
+  getInsights(id: string): Promise<any>;
+  sendEvents(id: string, events: any): Promise<any>;
+  getLiveData(id: string): Promise<any>;
+  getStream(id: string): Promise<any>;
+  disconnect(id: string): Promise<any>;
+  delete(id: string): Promise<any>;
+}
+
+interface HealthApiClient {
+  getDetailed(): Promise<any>;
+  getReady(): Promise<any>;
+  getLive(): Promise<any>;
+}
+
+// Combined API Interface - Extended
 export interface CombinedAPI {
   portfolio: PortfolioApiClient;
-  educational: EducationalApiClient;
+  educational: ExtendedEducationalApiClient;
   auth: AuthApiClient;
+  progress: ProgressApiClient;
+  users: UsersApiClient;
+  me: MeApiClient;
+  simulations: SimulationsApiClient;
+  health: HealthApiClient;
   healthCheck(): Promise<{ status: string; version: string }>;
   testConnection(): Promise<{ connected: boolean; baseUrl: string; error?: string }>;
 }
@@ -50,18 +121,238 @@ export interface CombinedAPI {
 // ==================== MAIN API CLIENT ====================
 export class ApiClient extends BaseApiClient implements CombinedAPI {
   portfolio: PortfolioApiClient;
-  educational: EducationalApiClient;
+  educational: ExtendedEducationalApiClient;
   auth: AuthApiClient;
+  progress: ProgressApiClient;
+  users: UsersApiClient;
+  me: MeApiClient;
+  simulations: SimulationsApiClient;
+  health: HealthApiClient;
+
+  // Expose baseURL publicly for image URL generation
+  public getBaseURL(): string {
+    return (this as any).baseURL; // Access protected property safely
+  }
 
   constructor(baseURL?: string) {
     super(baseURL);
     this.portfolio = new PortfolioApiClient(baseURL);
-    this.educational = new EducationalApiClient(baseURL);
+    
+    // Create extended educational client
+    this.educational = this.createExtendedEducationalClient(baseURL);
+    
     this.auth = new AuthApiClient(baseURL);
+    
+    // Create placeholder clients for missing functionality
+    this.progress = this.createProgressClient();
+    this.users = this.createUsersClient();
+    this.me = this.createMeClient();
+    this.simulations = this.createSimulationsClient();
+    this.health = this.createHealthClient();
+  }
+
+  // ==================== CLIENT FACTORIES ====================
+  
+  private createExtendedEducationalClient(baseURL?: string): ExtendedEducationalApiClient {
+    const baseClient = new EducationalApiClient(baseURL);
+    
+    // Add missing methods to the educational client
+    const extendedClient = Object.assign(baseClient, {
+      createBook: async (data: any) => {
+        return await (baseClient as any).post('/books', data);
+      },
+      composeBook: async (data: any) => {
+        return await (baseClient as any).post('/books/compose', data);
+      },
+      getBookSuggestions: async (id: string) => {
+        return await (baseClient as any).get(`/books/${id}/suggestions`);
+      },
+      analyzeBook: async (id: string) => {
+        return await (baseClient as any).get(`/books/${id}/analysis`);
+      },
+      cloneBook: async (id: string) => {
+        return await (baseClient as any).post(`/books/${id}/clone`);
+      },
+      getConceptsByType: async (type: string) => {
+        return await (baseClient as any).get(`/concepts/type/${type}`);
+      },
+      createConcept: async (data: any) => {
+        return await (baseClient as any).post('/concepts', data);
+      },
+      updateConcept: async (id: string, data: any) => {
+        return await (baseClient as any).put(`/concepts/${id}`, data);
+      }
+    });
+
+    return extendedClient as ExtendedEducationalApiClient;
+  }
+
+  private createProgressClient(): ProgressApiClient {
+    return {
+      getProgressSummary: async () => {
+        return await this.request('/progress');
+      },
+      getBookProgress: async (bookId: string) => {
+        return await this.request(`/progress/book/${bookId}`);
+      },
+      updateConceptProgress: async (bookId: string, conceptId: string, data: any) => {
+        return await this.request(`/progress/book/${bookId}/concept/${conceptId}`, {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      },
+      getStats: async () => {
+        return await this.request('/progress/stats');
+      },
+      resetBookProgress: async (bookId: string) => {
+        return await this.request(`/progress/book/${bookId}`, {
+          method: 'DELETE'
+        });
+      }
+    };
+  }
+
+  private createUsersClient(): UsersApiClient {
+    return {
+      getAll: async () => {
+        return await this.request('/users');
+      },
+      getById: async (id: string) => {
+        return await this.request(`/users/${id}`);
+      },
+      update: async (id: string, data: any) => {
+        return await this.request(`/users/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data)
+        });
+      },
+      delete: async (id: string) => {
+        return await this.request(`/users/${id}`, {
+          method: 'DELETE'
+        });
+      },
+      getProgress: async (id: string) => {
+        return await this.request(`/users/${id}/progress`);
+      },
+      resetPassword: async (id: string) => {
+        return await this.request(`/users/${id}/reset-password`, {
+          method: 'POST'
+        });
+      }
+    };
+  }
+
+  private createMeClient(): MeApiClient {
+    return {
+      getSkills: async () => {
+        return await this.request('/users/me/skills');
+      },
+      getLearningPaths: async () => {
+        return await this.request('/users/me/learning-paths');
+      },
+      getMarketIntelligence: async () => {
+        return await this.request('/users/me/market-intelligence');
+      },
+      getPrivacySettings: async () => {
+        return await this.request('/users/me/privacy-settings');
+      },
+      updatePrivacySettings: async (settings: any) => {
+        return await this.request('/users/me/privacy-settings', {
+          method: 'PUT',
+          body: JSON.stringify(settings)
+        });
+      },
+      getAccountInfo: async () => {
+        return await this.request('/users/me/account-info');
+      },
+      updateAccountInfo: async (info: any) => {
+        return await this.request('/users/me/account-info', {
+          method: 'PUT',
+          body: JSON.stringify(info)
+        });
+      },
+      getBilling: async () => {
+        return await this.request('/users/me/billing');
+      },
+      upgradeBilling: async (plan: any) => {
+        return await this.request('/users/me/billing/upgrade', {
+          method: 'POST',
+          body: JSON.stringify(plan)
+        });
+      },
+      deleteAccount: async () => {
+        return await this.request('/users/me/delete-account', {
+          method: 'DELETE'
+        });
+      }
+    };
+  }
+
+  private createSimulationsClient(): SimulationsApiClient {
+    return {
+      getAll: async (filters?: any) => {
+        return await this.request('/simulations', { params: filters });
+      },
+      create: async (data: any) => {
+        return await this.request('/simulations', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      },
+      getStats: async () => {
+        return await this.request('/simulations/stats');
+      },
+      uploadResults: async (data: any) => {
+        return await this.request('/simulations/results', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      },
+      getById: async (id: string) => {
+        return await this.request(`/simulations/${id}`);
+      },
+      getInsights: async (id: string) => {
+        return await this.request(`/simulations/${id}/insights`);
+      },
+      sendEvents: async (id: string, events: any) => {
+        return await this.request(`/simulations/${id}/events`, {
+          method: 'POST',
+          body: JSON.stringify(events)
+        });
+      },
+      getLiveData: async (id: string) => {
+        return await this.request(`/simulations/${id}/live-data`);
+      },
+      getStream: async (id: string) => {
+        return await this.request(`/simulations/${id}/stream`);
+      },
+      disconnect: async (id: string) => {
+        return await this.request(`/simulations/${id}/disconnect`, {
+          method: 'POST'
+        });
+      },
+      delete: async (id: string) => {
+        return await this.request(`/simulations/${id}`, {
+          method: 'DELETE'
+        });
+      }
+    };
+  }
+
+  private createHealthClient(): HealthApiClient {
+    return {
+      getDetailed: async () => {
+        return await this.request('/health/detailed');
+      },
+      getReady: async () => {
+        return await this.request('/health/ready');
+      },
+      getLive: async () => {
+        return await this.request('/health/live');
+      }
+    };
   }
 }
-
-type ApiCategory = 'portfolio' | 'education' | 'auth' | 'health';
 
 // ==================== SINGLETON & EXPORTS ====================
 let apiClient: ApiClient;
@@ -78,7 +369,16 @@ export { useApiClient } from '@/providers/apiProvider';
 
 // ==================== STREAMLINED API NAMESPACE ====================
 export const api = {
-  // === PORTFOLIO API - Core hub for all portfolio operations ===
+  // === HEALTH & SYSTEM ===
+  health: {
+    check: () => getApiClient().healthCheck(),
+    testConnection: () => getApiClient().testConnection(),
+    detailed: () => getApiClient().health.getDetailed(),
+    ready: () => getApiClient().health.getReady(),
+    live: () => getApiClient().health.getLive(),
+  },
+
+  // === PORTFOLIO API - Complete System ===
   portfolio: {
     // Core Operations
     get: () => getApiClient().portfolio.getMyPortfolio(),
@@ -95,6 +395,24 @@ export const api = {
     getStats: () => getApiClient().portfolio.getStats(),
     getTypeConfig: (type: string) => getApiClient().portfolio.getTypeConfig(type),
 
+    // 2-Step Upload Wizard & Image Management
+    images: {
+      upload: (file: File, type: 'profile' | 'cover') => 
+        getApiClient().portfolio.uploadImage(file, type),
+      uploadRaw: (formData: FormData) => 
+        getApiClient().portfolio.uploadImageRaw(formData),
+      
+      // Image URL helpers (generate URLs, don't make requests)
+      getMyGalleryImageUrl: (pieceId: string, size?: 'full' | 'thumbnail') =>
+        `${getApiClient().getBaseURL()}/api/portfolios/me/gallery/${pieceId}/image${size ? `?size=${size}` : ''}`,
+      getPublicGalleryImageUrl: (username: string, pieceId: string, size?: 'full' | 'thumbnail') =>
+        `${getApiClient().getBaseURL()}/api/portfolios/by-username/${username}/gallery/${pieceId}/image${size ? `?size=${size}` : ''}`,
+      getMyProfileImageUrl: (type: 'profile' | 'cover') =>
+        `${getApiClient().getBaseURL()}/api/portfolios/me/image/${type}`,
+      getPublicProfileImageUrl: (username: string, type: 'profile' | 'cover') =>
+        `${getApiClient().getBaseURL()}/api/portfolios/by-username/${username}/image/${type}`,
+    },
+
     // Gallery Management (Portfolio-Owned)
     gallery: {
       get: () => getApiClient().portfolio.getMyGalleryPieces(),
@@ -110,6 +428,8 @@ export const api = {
         visibility?: GalleryVisibility;
         year?: number;
         displayOrder?: number;
+        price?: number;
+        artist?: string;
       }) => getApiClient().portfolio.addGalleryPiece(pieceData),
       update: (pieceId: string, updates: Partial<GalleryPiece>) => 
         getApiClient().portfolio.updateGalleryPiece(pieceId, updates),
@@ -146,14 +466,6 @@ export const api = {
         getApiClient().portfolio.trackView(portfolioId, data),
     },
 
-    // Image Uploads
-    images: {
-      upload: (file: File, type: 'profile' | 'cover') => 
-        getApiClient().portfolio.uploadImage(file, type),
-      uploadRaw: (formData: FormData) => 
-        getApiClient().portfolio.uploadImageRaw(formData),
-    },
-
     // Debug & Testing
     debug: {
       uploadConfig: () => getApiClient().portfolio.getUploadConfig(),
@@ -166,309 +478,94 @@ export const api = {
   },
   
   // === EDUCATION API ===
-  education: {
-    books: {
-      getAll: (params?: BookQueryParams) => getApiClient().educational.getBooks(params),
-      getById: (id: string) => getApiClient().educational.getBookById(id),
-      getByCategory: (category: MainCategory, subCategory?: SubCategory) => 
-        getApiClient().educational.getBooksByCategory(category, subCategory),
-    },
-    
-    concepts: {
-      getAll: (filters?: ConceptFilters) => 
-        getApiClient().educational.getConcepts(filters),
-      search: (query: string, filters?: Omit<ConceptFilters, 'search'>) => 
-        getApiClient().educational.searchConcepts(query, filters),
-      getById: (id: string) => 
-        getApiClient().educational.getConceptById(id),
-      getByBook: (bookId: string) => 
-        getApiClient().educational.getConceptsByBook(bookId),
-      markComplete: (id: string, score?: number) => 
-        getApiClient().educational.markConceptComplete(id, score),
-    },
+  books: {
+    getAll: (params?: BookQueryParams) => getApiClient().educational.getBooks(params),
+    getById: (id: string) => getApiClient().educational.getBookById(id),
+    getByCategory: (category: MainCategory, subCategory?: SubCategory) => 
+      getApiClient().educational.getBooksByCategory(category, subCategory),
+    create: (data: any) => getApiClient().educational.createBook(data),
+    compose: (data: any) => getApiClient().educational.composeBook(data),
+    getSuggestions: (id: string) => getApiClient().educational.getBookSuggestions(id),
+    analyze: (id: string) => getApiClient().educational.analyzeBook(id),
+    clone: (id: string) => getApiClient().educational.cloneBook(id),
+  },
+  
+  concepts: {
+    getAll: (filters?: ConceptFilters) => 
+      getApiClient().educational.getConcepts(filters),
+    search: (query: string, filters?: Omit<ConceptFilters, 'search'>) => 
+      getApiClient().educational.searchConcepts(query, filters),
+    getById: (id: string) => 
+      getApiClient().educational.getConceptById(id),
+    getByBook: (bookId: string) => 
+      getApiClient().educational.getConceptsByBook(bookId),
+    getByType: (type: string) => getApiClient().educational.getConceptsByType(type),
+    markComplete: (id: string, score?: number) => 
+      getApiClient().educational.markConceptComplete(id, score),
+    create: (data: any) => getApiClient().educational.createConcept(data),
+    update: (id: string, data: any) => getApiClient().educational.updateConcept(id, data),
+  },
+
+  // === PROGRESS TRACKING ===
+  progress: {
+    get: () => getApiClient().progress.getProgressSummary(),
+    getByBook: (bookId: string) => getApiClient().progress.getBookProgress(bookId),
+    updateConcept: (bookId: string, conceptId: string, data: any) =>
+      getApiClient().progress.updateConceptProgress(bookId, conceptId, data),
+    getStats: () => getApiClient().progress.getStats(),
+    resetBook: (bookId: string) => getApiClient().progress.resetBookProgress(bookId),
+  },
+
+  // === USER MANAGEMENT ===
+  users: {
+    getAll: () => getApiClient().users.getAll(),
+    getById: (id: string) => getApiClient().users.getById(id),
+    update: (id: string, data: any) => getApiClient().users.update(id, data),
+    delete: (id: string) => getApiClient().users.delete(id),
+    getProgress: (id: string) => getApiClient().users.getProgress(id),
+    resetPassword: (id: string) => getApiClient().users.resetPassword(id),
+  },
+
+  // === ACCOUNT MANAGEMENT ===
+  me: {
+    getSkills: () => getApiClient().me.getSkills(),
+    getLearningPaths: () => getApiClient().me.getLearningPaths(),
+    getMarketIntelligence: () => getApiClient().me.getMarketIntelligence(),
+    getPrivacySettings: () => getApiClient().me.getPrivacySettings(),
+    updatePrivacySettings: (settings: any) => getApiClient().me.updatePrivacySettings(settings),
+    getAccountInfo: () => getApiClient().me.getAccountInfo(),
+    updateAccountInfo: (info: any) => getApiClient().me.updateAccountInfo(info),
+    getBilling: () => getApiClient().me.getBilling(),
+    upgradeBilling: (plan: any) => getApiClient().me.upgradeBilling(plan),
+    deleteAccount: () => getApiClient().me.deleteAccount(),
+  },
+
+  // === SIMULATIONS ===
+  simulations: {
+    getAll: (filters?: any) => getApiClient().simulations.getAll(filters),
+    create: (data: any) => getApiClient().simulations.create(data),
+    getStats: () => getApiClient().simulations.getStats(),
+    uploadResults: (data: any) => getApiClient().simulations.uploadResults(data),
+    getById: (id: string) => getApiClient().simulations.getById(id),
+    getInsights: (id: string) => getApiClient().simulations.getInsights(id),
+    sendEvents: (id: string, events: any) => getApiClient().simulations.sendEvents(id, events),
+    getLiveData: (id: string) => getApiClient().simulations.getLiveData(id),
+    getStream: (id: string) => getApiClient().simulations.getStream(id),
+    disconnect: (id: string) => getApiClient().simulations.disconnect(id),
+    delete: (id: string) => getApiClient().simulations.delete(id),
   },
   
   // === AUTH API ===
   auth: {
+    register: (credentials: SignupCredentials) => getApiClient().auth.signup(credentials),
     login: (credentials: LoginCredentials) => getApiClient().auth.login(credentials),
-    signup: (credentials: SignupCredentials) => getApiClient().auth.signup(credentials),
     logout: () => getApiClient().auth.logout(),
     getCurrentUser: () => getApiClient().auth.getCurrentUser(),
     updateProfile: (updates: Partial<User>) => getApiClient().auth.updateProfile(updates),
     verifyToken: (token: string) => getApiClient().auth.verifyToken(token),
-  },
-  
-  // === HEALTH & TESTING ===
-  health: {
-    check: () => getApiClient().healthCheck(),
-    testConnection: () => getApiClient().testConnection(),
   },
 };
 
 // ==================== DEFAULT EXPORT ====================
 export default api;
 
-// ==================== TESTING UTILITIES FOR YOUR API TEST PAGE ====================
-export const testingUtils = {
-  // Get all available API methods for testing
-  getAllMethods: () => ({
-    portfolio: {
-      core: ['get', 'create', 'update', 'delete', 'upgrade', 'check'],
-      discovery: ['discover', 'getByUsername', 'getStats', 'getTypeConfig'],
-      gallery: ['gallery.get', 'gallery.getByUsername', 'gallery.add', 'gallery.update', 'gallery.delete', 'gallery.batchDelete', 'gallery.batchUpdateVisibility', 'gallery.getStats'],
-      concepts: ['concepts.get', 'concepts.add', 'concepts.updateProgress'],
-      analytics: ['analytics.get', 'analytics.dashboard', 'analytics.trackView'],
-      images: ['images.upload', 'images.uploadRaw'],
-      debug: ['debug.uploadConfig', 'debug.validateFile']
-    },
-    education: {
-      books: ['books.getAll', 'books.getById', 'books.getByCategory'],
-      concepts: ['concepts.getAll', 'concepts.search', 'concepts.getById', 'concepts.getByBook', 'concepts.markComplete']
-    },
-    auth: ['login', 'signup', 'logout', 'getCurrentUser', 'updateProfile', 'verifyToken'],
-    health: ['check', 'testConnection']
-  }),
-  
-  // Get safe methods for automated testing (read-only operations)
-  getSafeMethods: () => ({
-    portfolio: [
-      'get', 'check', 'discover', 'getByUsername', 
-      'getStats', 'getTypeConfig', 'gallery.get', 
-      'gallery.getStats', 'concepts.get', 
-      'analytics.get', 'analytics.dashboard',
-      'debug.uploadConfig', 'debug.validateFile'
-    ],
-    education: [
-      'books.getAll', 'books.getById', 'books.getByCategory',
-      'concepts.getAll', 'concepts.getById', 'concepts.getByBook'
-    ],
-    auth: ['getCurrentUser'],
-    health: ['check', 'testConnection']
-  }),
-  
-  // Check if a method is safe for testing
-  isSafeMethod: (category: string, method: string) => {
-    const safeMethods = testingUtils.getSafeMethods();
-    return safeMethods[category as keyof typeof safeMethods]?.includes(method) || false;
-  },
-  
-  // Get methods that require authentication
-  getAuthMethods: () => ({
-    portfolio: [
-      'get', 'create', 'update', 'delete', 'upgrade', 'check',
-      'gallery.get', 'gallery.add', 'gallery.update', 'gallery.delete',
-      'concepts.get', 'concepts.add', 'concepts.updateProgress',
-      'analytics.get', 'analytics.dashboard', 'images.upload',
-      'debug.uploadConfig', 'debug.validateFile'
-    ],
-    education: ['concepts.markComplete'],
-    auth: ['getCurrentUser', 'updateProfile', 'logout']
-  }),
-
-  // Get methods that modify data (be careful in testing)
-  getModificationMethods: () => ({
-    portfolio: [
-      'create', 'update', 'delete', 'upgrade',
-      'gallery.add', 'gallery.update', 'gallery.delete', 'gallery.batchDelete', 'gallery.batchUpdateVisibility',
-      'concepts.add', 'concepts.updateProgress',
-      'analytics.trackView', 'images.upload', 'images.uploadRaw'
-    ],
-    education: ['concepts.markComplete'],
-    auth: ['login', 'signup', 'logout', 'updateProfile']
-  }),
-
-  getDestructiveMethods: (): Record<ApiCategory, string[]> => ({
-    portfolio: ['delete', 'gallery.delete', 'gallery.batchDelete'],
-    education: [],
-    auth: ['logout'],
-    health: []
-  }),
-
-  // Helper to categorize API calls for your test page
-  categorizeMethod: (category: string, method: string) => {
-    const safe = testingUtils.getSafeMethods();
-    const auth = testingUtils.getAuthMethods();
-    const modification = testingUtils.getModificationMethods();
-    const destructive = testingUtils.getDestructiveMethods();
-
-    if (destructive[category as keyof typeof destructive]?.includes(method)) {
-      return 'destructive';
-    }
-    if (modification[category as keyof typeof modification]?.includes(method)) {
-      return 'modification';
-    }
-    if (auth[category as keyof typeof auth]?.includes(method)) {
-      return 'authenticated';
-    }
-    if (safe[category as keyof typeof safe]?.includes(method)) {
-      return 'safe';
-    }
-    return 'unknown';
-  },
-
-  // Portfolio-specific testing helpers
-  portfolio: {
-    // Test data generators
-    generateCreateData: (): CreatePortfolioDto => ({
-      title: `Test Portfolio ${Date.now()}`,
-      bio: 'This is a test portfolio created by the API testing suite',
-      visibility: 'public',
-      specializations: ['Digital Art', 'Photography'],
-      tags: ['test', 'portfolio', 'automated'],
-      kind: 'creative',
-    }),
-
-    generateGalleryPieceData: () => ({
-      title: `Test Artwork ${Date.now()}`,
-      description: 'Test artwork created by API testing suite',
-      imageUrl: 'https://picsum.photos/800/600',
-      category: 'digital',
-      medium: 'Digital Art',
-      tags: ['test', 'digital', 'automated'],
-      visibility: 'public' as GalleryVisibility,
-      year: 2025,
-      displayOrder: 0
-    }),
-
-    generateConceptData: () => ({
-      status: 'in-progress',
-      startedAt: new Date().toISOString(),
-      notes: 'Test concept progress via API testing'
-    }),
-
-    // Quick test sequences for portfolio functionality
-    runBasicPortfolioTest: async () => {
-      try {
-        // 1. Check if portfolio exists
-        const hasPortfolio = await api.portfolio.check();
-        console.log('Has portfolio:', hasPortfolio);
-
-        // 2. Get portfolio if exists
-        if (hasPortfolio) {
-          const portfolio = await api.portfolio.get();
-          console.log('Portfolio:', portfolio?.username);
-          
-          // 3. Get gallery stats
-          const galleryStats = await api.portfolio.gallery.getStats();
-          console.log('Gallery stats:', galleryStats);
-        }
-
-        // 4. Get public stats
-        const publicStats = await api.portfolio.getStats();
-        console.log('Public stats:', publicStats);
-
-        return { success: true, hasPortfolio };
-      } catch (error) {
-        console.error('Portfolio test failed:', error);
-        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-      }
-    },
-
-    runGalleryTest: async () => {
-      try {
-        const pieces = await api.portfolio.gallery.get();
-        console.log(`Found ${pieces.length} gallery pieces`);
-        
-        const stats = await api.portfolio.gallery.getStats();
-        console.log('Gallery stats:', stats);
-
-        return { success: true, pieceCount: pieces.length, stats };
-      } catch (error) {
-        console.error('Gallery test failed:', error);
-        return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
-      }
-    },
-
-    // Enhanced debug and upload testing
-    runUploadDiagnostics: async () => {
-      try {
-        console.log('🔍 Running upload diagnostics...');
-        
-        // 1. Check upload configuration
-        const config = await api.portfolio.debug.uploadConfig();
-        console.log('📁 Upload Config:', {
-          directoryExists: config.filesystem.checks.uploadsExists,
-          canWrite: config.filesystem.checks.canWrite,
-          portfolioDir: config.filesystem.checks.portfolioExists,
-          fileCount: config.filesystem.checks.portfolioCount || 0
-        });
-        
-        // 2. Test a file if any exist
-        if (config.filesystem.checks.portfolioContents && config.filesystem.checks.portfolioContents.length > 0) {
-          const testFile = config.filesystem.checks.portfolioContents[0];
-          const validation = await api.portfolio.debug.validateFile(testFile);
-          console.log('📄 File Validation:', {
-            filename: validation.filename,
-            exists: validation.validation.checks.exists,
-            readable: validation.validation.checks.readable,
-            size: validation.validation.checks.sizeHuman,
-            format: validation.validation.checks.imageInfo?.format
-          });
-        }
-        
-        return { 
-          success: true, 
-          config: {
-            directoryExists: config.filesystem.checks.uploadsExists,
-            canWrite: config.filesystem.checks.canWrite,
-            portfolioDir: config.filesystem.checks.portfolioExists,
-            fileCount: config.filesystem.checks.portfolioCount || 0
-          }
-        };
-      } catch (error) {
-        console.error('❌ Upload diagnostics failed:', error);
-        return { 
-          success: false, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
-        };
-      }
-    },
-
-    testImageUpload: async (file?: File) => {
-      try {
-        console.log('📤 Testing image upload...');
-        
-        // If no file provided, create a test blob
-        const testFile = file || new File(
-          [new Blob(['test'], { type: 'image/jpeg' })], 
-          'test-upload.jpg', 
-          { type: 'image/jpeg' }
-        );
-        
-        console.log('📁 Uploading file:', {
-          name: testFile.name,
-          size: `${(testFile.size / 1024).toFixed(2)} KB`,
-          type: testFile.type
-        });
-        
-        // Test the upload
-        const result = await api.portfolio.images.upload(testFile, 'profile');
-        
-        console.log('✅ Upload successful:', {
-          url: result.url,
-          filename: result.filename,
-          type: result.type,
-          message: result.message
-        });
-        
-        // Validate the uploaded file
-        if (result.filename) {
-          const validation = await api.portfolio.debug.validateFile(result.filename);
-          console.log('🔍 File validation:', {
-            exists: validation.validation.checks.exists,
-            readable: validation.validation.checks.readable,
-            format: validation.validation.checks.imageInfo?.format
-          });
-        }
-        
-        return { success: true, result };
-      } catch (error) {
-        console.error('❌ Upload test failed:', error);
-        return { 
-          success: false, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
-        };
-      }
-    },
-
-}};
