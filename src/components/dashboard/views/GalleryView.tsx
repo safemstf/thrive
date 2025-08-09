@@ -1,7 +1,8 @@
-// src/components/dashboard/views/GalleryView.tsx - Clean version using shared styles
+// src/components/dashboard/views/GalleryView.tsx - Greyscale version using shared styles
 import React, { useState } from 'react';
 import { Upload, Settings, ExternalLink, Image as GalleryIcon } from 'lucide-react';
 import type { GalleryPiece } from '@/types/gallery.types';
+import { theme } from '@/styles/theme';
 
 // Import shared styles from main dashboard styles
 import {
@@ -81,10 +82,10 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
           </SectionActions>
         </SectionHeader>
         
-        {/* Gallery Statistics */}
+        {/* Gallery Statistics - GREYSCALE */}
         <ViewStatsGrid>
           <ViewStatCard>
-            <ViewStatIcon $color="#3b82f6">
+            <ViewStatIcon $color={theme.colors.primary[600]}>
               <GalleryIcon size={20} />
             </ViewStatIcon>
             <ViewStatContent>
@@ -94,7 +95,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
           </ViewStatCard>
           
           <ViewStatCard>
-            <ViewStatIcon $color="#10b981">
+            <ViewStatIcon $color={theme.colors.primary[500]}>
               <ExternalLink size={20} />
             </ViewStatIcon>
             <ViewStatContent>
@@ -104,7 +105,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
           </ViewStatCard>
           
           <ViewStatCard>
-            <ViewStatIcon $color="#f59e0b">
+            <ViewStatIcon $color={theme.colors.primary[700]}>
               <Upload size={20} />
             </ViewStatIcon>
             <ViewStatContent>
@@ -134,10 +135,8 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
                 <ViewCardContent>
                   <ViewCardTitle>{item.title}</ViewCardTitle>
                   <ViewCardMeta>
-                    <ViewTag $variant="primary">{item.category}</ViewTag>
-                    <ViewTag 
-                      $variant={item.visibility === 'public' ? 'success' : 'info'}
-                    >
+                    <ViewTag>{item.category}</ViewTag>
+                    <ViewTag>
                       {item.visibility}
                     </ViewTag>
                   </ViewCardMeta>

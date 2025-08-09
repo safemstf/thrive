@@ -21,7 +21,7 @@ import {
   Menu,
   X,
   Plus,
-  LogOut,
+  ArrowLeft,
   GraduationCap,
   Camera,
   FolderOpen,
@@ -158,35 +158,35 @@ export default function DashboardLayout({
     switch (type) {
       case 'creative':
         return { 
-          color: '#8b5cf6', 
+          color: '#666', 
           label: 'Creative Portfolio',
           icon: <Brush size={16} />,
           description: 'Art • Photography • Design'
         };
       case 'educational':
         return { 
-          color: '#3b82f6', 
+          color: '#666', 
           label: 'Teaching Portfolio',
           icon: <GraduationCap size={16} />,
           description: 'Education • Curriculum • Training'
         };
       case 'professional':
         return { 
-          color: '#059669', 
+          color: '#666', 
           label: 'Tech Portfolio',
           icon: <Code size={16} />,
           description: 'Software • Development • Engineering'
         };
       case 'hybrid':
         return { 
-          color: '#10b981', 
+          color: '#666', 
           label: 'Multi-Portfolio',
           icon: <FolderOpen size={16} />,
           description: 'Creative • Teaching • Professional'
         };
       default:
         return { 
-          color: '#6b7280', 
+          color: '#666', 
           label: 'Portfolio',
           icon: <User size={16} />,
           description: 'Professional Portfolio'
@@ -210,7 +210,7 @@ export default function DashboardLayout({
           <MobileMenuButton onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </MobileMenuButton>
-          <MobileTitle>Portfolio Platform</MobileTitle>
+          <MobileTitle>Dashboard</MobileTitle>
           {portfolio && (
             <MobilePortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color} />
           )}
@@ -229,11 +229,11 @@ export default function DashboardLayout({
             {!sidebarCollapsed && (
               <ProfileSection>
                 <Avatar>
-                  <User size={28} />
+                  <User size={24} />
                 </Avatar>
                 <UserInfo>
                   <UserName>{user?.name || 'User'}</UserName>
-                  <UserRole>{user?.role || 'member'}</UserRole>
+                  <UserEmail>{user?.email || user?.role || 'member'}</UserEmail>
                 </UserInfo>
               </ProfileSection>
             )}
@@ -310,8 +310,8 @@ export default function DashboardLayout({
               {!sidebarCollapsed && 'Settings'}
             </FooterLink>
             <LogoutButton onClick={handleLogout}>
-              <LogOut size={16} />
-              {!sidebarCollapsed && 'Logout'}
+              <ArrowLeft size={16} />
+              {!sidebarCollapsed && 'Sign Out'}
             </LogoutButton>
           </SidebarFooter>
         </Sidebar>
@@ -328,11 +328,11 @@ export default function DashboardLayout({
   );
 }
 
-// Enhanced Styled Components to match elegant aesthetic
+// Styled Components - matching taskbar aesthetic with clean black/white and blue accents
 const LayoutWrapper = styled.div`
   display: flex;
   min-height: 100vh;
-  background: #f8f8f8;
+  background: #fafafa;
   font-family: 'Work Sans', sans-serif;
 `;
 
@@ -345,7 +345,7 @@ const MobileHeader = styled.header`
   height: 64px;
   background: white;
   border-bottom: 1px solid #e0e0e0;
-  padding: 0 1rem;
+  padding: 0 1.5rem;
   align-items: center;
   justify-content: space-between;
   z-index: 50;
@@ -361,31 +361,35 @@ const MobileMenuButton = styled.button`
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: 1px solid #e0e0e0;
-  background: white;
+  border: 1px solid #2c2c2c;
+  background: none;
   color: #2c2c2c;
   cursor: pointer;
   border-radius: 2px;
   transition: all 0.3s ease;
   
   &:hover {
-    background: #f3f3f3;
+    background: #2c2c2c;
+    color: #f8f8f8;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
   }
 `;
 
 const MobileTitle = styled.h1`
-  font-size: 1.125rem;
+  font-size: 1.5rem;
   font-weight: 400;
   color: #2c2c2c;
   margin: 0;
   font-family: 'Cormorant Garamond', serif;
+  letter-spacing: 1px;
 `;
 
 const MobilePortfolioIndicator = styled.div<{ $color: string }>`
   width: 12px;
   height: 12px;
   background: ${props => props.$color};
-  border-radius: 50%;
+  border-radius: 2px;
 `;
 
 const MobileOverlay = styled.div`
@@ -395,8 +399,9 @@ const MobileOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.3);
   z-index: 40;
+  backdrop-filter: blur(4px);
   
   @media (max-width: 768px) {
     display: block;
@@ -424,29 +429,32 @@ const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
 `;
 
 const SidebarHeader = styled.div`
-  padding: 1.5rem;
+  padding: 2rem 1.5rem;
   border-bottom: 1px solid #e0e0e0;
   position: relative;
 `;
 
 const CollapseButton = styled.button<{ $collapsed: boolean }>`
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 1.5rem;
+  right: 1.5rem;
   width: 32px;
   height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f8f8f8;
+  background: none;
   border: 1px solid #e0e0e0;
   border-radius: 2px;
   cursor: pointer;
   transition: all 0.3s ease;
   transform: ${props => props.$collapsed ? 'rotate(180deg)' : 'rotate(0deg)'};
+  color: #666;
   
   &:hover {
-    background: #f0f0f0;
+    background: #f8f8f8;
+    border-color: #2c2c2c;
+    color: #2c2c2c;
   }
   
   @media (max-width: 768px) {
@@ -463,12 +471,13 @@ const ProfileSection = styled.div`
 const Avatar = styled.div`
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  border-radius: 50%;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: #666;
   flex-shrink: 0;
 `;
 
@@ -479,25 +488,29 @@ const UserInfo = styled.div`
 
 const UserName = styled.h3`
   font-size: 1.125rem;
-  font-weight: 500;
+  font-weight: 400;
   color: #2c2c2c;
   margin: 0 0 0.25rem 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: 'Cormorant Garamond', serif;
+  letter-spacing: 0.5px;
 `;
 
-const UserRole = styled.p`
+const UserEmail = styled.p`
   font-size: 0.875rem;
   color: #666;
   margin: 0;
-  text-transform: capitalize;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: 'Work Sans', sans-serif;
+  letter-spacing: 0.25px;
 `;
 
 const PortfolioStatus = styled.div<{ $collapsed: boolean }>`
-  padding: 1rem 1.5rem;
+  padding: 1.5rem;
   border-bottom: 1px solid #e0e0e0;
 `;
 
@@ -508,10 +521,10 @@ const PortfolioInfo = styled.div`
 `;
 
 const PortfolioIndicator = styled.div<{ $color: string }>`
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   background: ${props => props.$color};
-  border-radius: 50%;
+  border-radius: 2px;
   flex-shrink: 0;
   margin-top: 0.25rem;
 `;
@@ -523,10 +536,10 @@ const PortfolioDetails = styled.div`
 const PortfolioLabel = styled.div`
   font-size: 0.75rem;
   color: #666;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 500;
+  letter-spacing: 1px;
+  font-weight: 300;
   font-family: 'Work Sans', sans-serif;
 `;
 
@@ -542,7 +555,7 @@ const PortfolioTypeText = styled.div`
 
 const PortfolioTypeName = styled.div`
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 400;
   color: #2c2c2c;
   margin-bottom: 0.25rem;
   font-family: 'Cormorant Garamond', serif;
@@ -553,13 +566,14 @@ const PortfolioTypeDesc = styled.div`
   color: #666;
   line-height: 1.4;
   font-family: 'Work Sans', sans-serif;
+  letter-spacing: 0.25px;
 `;
 
 const CreatePortfolioPrompt = styled.div`
   display: flex;
   align-items: flex-start;
   gap: 1rem;
-  padding: 1.25rem;
+  padding: 1.5rem;
   background: #f8f8f8;
   border: 1px solid #e0e0e0;
   border-radius: 2px;
@@ -569,11 +583,12 @@ const PromptIcon = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  color: white;
-  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  background: white;
+  color: #666;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
   flex-shrink: 0;
 `;
 
@@ -583,7 +598,7 @@ const PromptText = styled.div`
 
 const PromptTitle = styled.div`
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 400;
   color: #2c2c2c;
   margin-bottom: 0.25rem;
   font-family: 'Cormorant Garamond', serif;
@@ -598,11 +613,12 @@ const PromptSubtitle = styled.div`
 
 const PromptLink = styled(Link)`
   font-size: 0.75rem;
-  color: #3b82f6;
+  color: #2c2c2c;
   text-decoration: none;
-  font-weight: 500;
-  background: rgba(59, 130, 246, 0.1);
-  padding: 0.375rem 0.75rem;
+  font-weight: 300;
+  background: white;
+  border: 1px solid #2c2c2c;
+  padding: 0.5rem 1rem;
   border-radius: 2px;
   display: inline-block;
   transition: all 0.3s ease;
@@ -611,20 +627,22 @@ const PromptLink = styled(Link)`
   letter-spacing: 0.5px;
   
   &:hover {
-    background: rgba(59, 130, 246, 0.2);
-    color: #2563eb;
+    background: #2c2c2c;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
   }
 `;
 
 const Navigation = styled.nav`
-  padding: 1rem 0;
+  padding: 1.5rem 0;
   flex: 1;
 `;
 
 const NavList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
   padding: 0 1rem;
 `;
 
@@ -632,21 +650,22 @@ const NavItem = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.875rem;
-  color: ${props => props.$active ? '#3b82f6' : '#666'};
-  background: ${props => props.$active ? '#eff6ff' : 'transparent'};
+  padding: 1rem;
+  color: ${props => props.$active ? '#2c2c2c' : '#666'};
+  background: ${props => props.$active ? 'white' : 'transparent'};
+  border: 1px solid ${props => props.$active ? '#2c2c2c' : 'transparent'};
   border-radius: 2px;
   text-decoration: none;
   transition: all 0.3s ease;
-  border-left: 3px solid ${props => props.$active ? '#3b82f6' : 'transparent'};
-  margin-left: -1rem;
-  padding-left: ${props => props.$collapsed ? '1.5rem' : '1.875rem'};
   justify-content: ${props => props.$collapsed ? 'center' : 'flex-start'};
+  margin: 0.125rem 0.5rem;
 
   &:hover {
-    background: ${props => props.$active ? '#eff6ff' : '#f9f9f9'};
-    color: ${props => props.$active ? '#3b82f6' : '#2c2c2c'};
-    transform: translateX(2px);
+    background: ${props => props.$active ? 'white' : '#f8f8f8'};
+    border-color: ${props => props.$active ? '#2c2c2c' : '#e0e0e0'};
+    color: ${props => props.$active ? '#2c2c2c' : '#2c2c2c'};
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 `;
 
@@ -663,7 +682,7 @@ const NavContent = styled.div`
 `;
 
 const NavLabel = styled.div`
-  font-weight: 500;
+  font-weight: 400;
   font-size: 0.875rem;
   margin-bottom: 0.125rem;
   overflow: hidden;
@@ -674,15 +693,16 @@ const NavLabel = styled.div`
 
 const NavDescription = styled.div`
   font-size: 0.75rem;
-  opacity: 0.8;
+  opacity: 0.7;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: 'Work Sans', sans-serif;
+  letter-spacing: 0.25px;
 `;
 
 const SidebarFooter = styled.div`
-  padding: 1rem 1.5rem;
+  padding: 1.5rem;
   border-top: 1px solid #e0e0e0;
   margin-top: auto;
   display: flex;
@@ -693,39 +713,48 @@ const SidebarFooter = styled.div`
 const FooterLink = styled(Link)`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
+  gap: 0.75rem;
+  padding: 0.875rem;
   color: #666;
   text-decoration: none;
   font-size: 0.875rem;
+  border: 1px solid transparent;
   border-radius: 2px;
   transition: all 0.3s ease;
   font-family: 'Work Sans', sans-serif;
+  letter-spacing: 0.25px;
   
   &:hover {
-    background: #f3f3f3;
+    background: #f8f8f8;
+    border-color: #e0e0e0;
     color: #2c2c2c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 `;
 
 const LogoutButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
+  gap: 0.75rem;
+  padding: 0.875rem;
   background: none;
-  border: 1px solid #dc2626;
-  color: #dc2626;
+  border: 1px solid #e0e0e0;
+  color: #666;
   text-decoration: none;
   font-size: 0.875rem;
   border-radius: 2px;
   transition: all 0.3s ease;
   cursor: pointer;
   font-family: 'Work Sans', sans-serif;
+  letter-spacing: 0.25px;
   
   &:hover {
-    background: #dc2626;
-    color: white;
+    background: #f8f8f8;
+    border-color: #2c2c2c;
+    color: #2c2c2c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 `;
 
@@ -734,7 +763,7 @@ const MainContent = styled.main<{ $sidebarCollapsed: boolean }>`
   margin-left: ${props => props.$sidebarCollapsed ? '80px' : '320px'};
   min-height: 100vh;
   transition: margin-left 0.3s ease;
-  background: #f8f8f8;
+  background: #fafafa;
   
   @media (max-width: 768px) {
     margin-left: 0;

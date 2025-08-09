@@ -1,4 +1,4 @@
-// src/components/dashboard/dashboardStyles.tsx - Refined & Elegant Version
+// src/components/dashboard/dashboardStyles.tsx - Greyscale Refined & Elegant Version
 import styled, { css, keyframes } from 'styled-components';
 import { theme } from '@/styles/theme';
 
@@ -26,7 +26,7 @@ export const gentleFloat = keyframes`
 // Layout Components - Cleaner, more spacious
 export const PageWrapper = styled.div`
   min-height: 100vh;
-  background: linear-gradient(135deg, ${theme.colors.background.primary} 0%, #f1f5f9 100%);
+  background: linear-gradient(135deg, ${theme.colors.background.primary} 0%, ${theme.colors.primary[100]} 100%);
   position: relative;
 `;
 
@@ -91,7 +91,7 @@ export const WelcomeSubtitle = styled.p`
   line-height: 1.4;
 `;
 
-// Cleaner view toggle
+// Cleaner view toggle - GREYSCALE
 export const ViewToggle = styled.div`
   display: flex;
   background: rgba(255, 255, 255, 0.7);
@@ -118,7 +118,7 @@ export const ViewButton = styled.button<{ $active: boolean }>`
       ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' 
       : 'transparent'
   };
-  color: ${({ $active }) => $active ? '#3b82f6' : theme.colors.text.secondary};
+  color: ${({ $active }) => $active ? theme.colors.primary[600] : theme.colors.text.secondary};
   font-weight: ${({ $active }) => $active ? theme.typography.weights.medium : theme.typography.weights.normal};
   font-size: ${theme.typography.sizes.sm};
   cursor: pointer;
@@ -135,7 +135,7 @@ export const ViewButton = styled.button<{ $active: boolean }>`
         ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' 
         : 'rgba(255, 255, 255, 0.5)'
     };
-    color: ${({ $active }) => $active ? '#3b82f6' : theme.colors.text.primary};
+    color: ${({ $active }) => $active ? theme.colors.primary[600] : theme.colors.text.primary};
   }
   
   @media (max-width: 768px) {
@@ -144,7 +144,7 @@ export const ViewButton = styled.button<{ $active: boolean }>`
   }
 `;
 
-// Refined badge - smaller and cleaner
+// Refined badge - GREYSCALE
 export const Badge = styled.span<{ $variant?: 'primary' | 'secondary' | 'success' | 'warning' }>`
   display: inline-flex;
   align-items: center;
@@ -161,29 +161,29 @@ export const Badge = styled.span<{ $variant?: 'primary' | 'secondary' | 'success
     switch ($variant) {
       case 'success':
         return css`
-          background: rgba(16, 185, 129, 0.1);
-          color: #059669;
+          background: ${theme.colors.primary[200]};
+          color: ${theme.colors.primary[700]};
         `;
       case 'warning':
         return css`
-          background: rgba(245, 158, 11, 0.1);
-          color: #d97706;
+          background: ${theme.colors.primary[300]};
+          color: ${theme.colors.primary[800]};
         `;
       case 'secondary':
         return css`
-          background: rgba(107, 114, 128, 0.1);
-          color: #374151;
+          background: ${theme.colors.primary[100]};
+          color: ${theme.colors.primary[600]};
         `;
       default:
         return css`
-          background: rgba(59, 130, 246, 0.1);
-          color: #3b82f6;
+          background: ${theme.colors.primary[200]};
+          color: ${theme.colors.primary[700]};
         `;
     }
   }}
 `;
 
-// Loading states - cleaner
+// Loading states - GREYSCALE
 export const LoadingContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -198,7 +198,7 @@ export const LoadingSpinner = styled.div`
   width: 40px;
   height: 40px;
   border: 3px solid ${theme.colors.border.light};
-  border-top: 3px solid #3b82f6;
+  border-top: 3px solid ${theme.colors.primary[600]};
   border-radius: 50%;
   animation: spin 1s linear infinite;
   
@@ -224,7 +224,7 @@ export const LoadingSubtext = styled.p`
   text-align: center;
 `;
 
-// Error components - minimal
+// Error components - GREYSCALE
 export const ErrorContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -244,7 +244,7 @@ export const ErrorIcon = styled.div`
 export const ErrorTitle = styled.h2`
   font-family: ${theme.typography.fonts.body};
   font-size: ${theme.typography.sizes.lg};
-  color: #dc2626;
+  color: ${theme.colors.primary[700]};
   margin: 0;
   font-weight: ${theme.typography.weights.medium};
 `;
@@ -257,7 +257,7 @@ export const ErrorMessage = styled.p`
 `;
 
 export const RetryButton = styled.button`
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%);
   color: white;
   border: none;
   padding: 0.625rem ${theme.spacing.lg};
@@ -274,7 +274,7 @@ export const RetryButton = styled.button`
   }
 `;
 
-// Create Portfolio - more elegant
+// Create Portfolio - GREYSCALE
 export const CreatePortfolioSection = styled.div`
   background: ${theme.glass.background};
   backdrop-filter: blur(${theme.glass.blur});
@@ -300,7 +300,7 @@ export const CreateIcon = styled.div`
   justify-content: center;
   width: 80px;
   height: 80px;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%);
   border-radius: 50%;
   color: white;
   margin-bottom: ${theme.spacing.lg};
@@ -345,7 +345,7 @@ export const PortfolioTypeCard = styled.div`
   cursor: pointer;
   
   &:hover {
-    border-color: #3b82f6;
+    border-color: ${theme.colors.primary[600]};
     box-shadow: ${theme.shadows.md};
     transform: translateY(-2px);
   }
@@ -403,7 +403,7 @@ export const Feature = styled.div`
   color: ${theme.colors.text.light};
   
   svg {
-    color: #3b82f6;
+    color: ${theme.colors.primary[600]};
   }
 `;
 
@@ -494,8 +494,16 @@ export const StatIcon = styled.div<{ $color?: string; $gradient?: string }>`
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: ${props => props.$gradient || `${props.$color}20`};
-  color: ${props => props.$gradient ? 'white' : props.$color};
+  background: ${props => {
+    if (props.$gradient) return props.$gradient;
+    if (props.$color) return `${props.$color}20`;
+    return `${theme.colors.primary[600]}20`;
+  }};
+  color: ${props => {
+    if (props.$gradient) return 'white';
+    if (props.$color) return props.$color;
+    return theme.colors.primary[600];
+  }};
   border-radius: ${theme.borderRadius.sm};
   box-shadow: ${props => props.$gradient ? theme.shadows.sm : 'none'};
 `;
@@ -535,7 +543,7 @@ export const StatLabel = styled.div`
 
 export const StatChange = styled.div<{ $positive?: boolean }>`
   font-size: 0.625rem;
-  color: ${props => props.$positive ? '#10b981' : '#ef4444'};
+  color: ${props => props.$positive ? theme.colors.primary[600] : theme.colors.primary[700]};
   font-weight: ${theme.typography.weights.medium};
   margin-top: 2px;
 `;
@@ -555,7 +563,7 @@ export const ProgressBar = styled.div`
 export const ProgressFill = styled.div<{ $percentage: number }>`
   height: 100%;
   width: ${props => Math.min(props.$percentage, 100)}%;
-  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+  background: linear-gradient(90deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%);
   transition: width 0.6s ease;
 `;
 
@@ -619,7 +627,7 @@ export const ActionButton = styled.button<{ $primary?: boolean; $variant?: 'prim
   padding: 0.5rem 0.75rem;
   background: ${props => {
     if (props.$primary || props.$variant === 'primary') {
-      return 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)';
+      return `linear-gradient(135deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%)`;
     }
     if (props.$variant === 'ghost') {
       return 'transparent';
@@ -653,18 +661,18 @@ export const ActionButton = styled.button<{ $primary?: boolean; $variant?: 'prim
 
 export const ViewAllLink = styled.a`
   font-size: ${theme.typography.sizes.xs};
-  color: #3b82f6;
+  color: ${theme.colors.primary[600]};
   text-decoration: none;
   font-weight: ${theme.typography.weights.medium};
   cursor: pointer;
   transition: color ${theme.transitions.fast};
   
   &:hover {
-    color: #2563eb;
+    color: ${theme.colors.primary[700]};
   }
 `;
 
-// Activity Components - cleaner
+// Activity Components - GREYSCALE
 export const ActivityList = styled.div`
   display: flex;
   flex-direction: column;
@@ -694,11 +702,11 @@ export const ActivityIcon = styled.div<{ $type: string }>`
   border-radius: ${theme.borderRadius.sm};
   background: ${props => {
     switch (props.$type) {
-      case 'gallery_upload': return 'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)';
-      case 'concept_complete': return 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)';
-      case 'project_create': return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-      case 'achievement_unlock': return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-      default: return 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)';
+      case 'gallery_upload': return `linear-gradient(135deg, ${theme.colors.primary[500]} 0%, ${theme.colors.primary[600]} 100%)`;
+      case 'concept_complete': return `linear-gradient(135deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%)`;
+      case 'project_create': return `linear-gradient(135deg, ${theme.colors.primary[400]} 0%, ${theme.colors.primary[500]} 100%)`;
+      case 'achievement_unlock': return `linear-gradient(135deg, ${theme.colors.primary[300]} 0%, ${theme.colors.primary[400]} 100%)`;
+      default: return `linear-gradient(135deg, ${theme.colors.primary[500]} 0%, ${theme.colors.primary[600]} 100%)`;
     }
   }};
   color: white;
@@ -731,8 +739,8 @@ export const ActivityMetadata = styled.div`
 `;
 
 export const MetadataTag = styled.span`
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: ${theme.colors.primary[200]};
+  color: ${theme.colors.primary[700]};
   font-size: 0.5rem;
   padding: 0.125rem 0.375rem;
   border-radius: 4px;
@@ -741,12 +749,12 @@ export const MetadataTag = styled.span`
 
 export const ActivityTime = styled.div`
   font-size: 0.5rem;
-  color: ${theme.colors.text.muted};
+  color: ${theme.colors.text.tertiary};
   font-weight: ${theme.typography.weights.medium};
   flex-shrink: 0;
 `;
 
-// Quick Actions - more minimal
+// Quick Actions - GREYSCALE
 export const QuickActionGrid = styled.div`
   display: flex;
   flex-direction: column;
@@ -766,7 +774,7 @@ export const QuickAction = styled.div`
   background: rgba(255, 255, 255, 0.3);
   
   &:hover {
-    border-color: #3b82f6;
+    border-color: ${theme.colors.primary[600]};
     background: rgba(248, 250, 252, 0.6);
     transform: translateY(-1px);
   }
@@ -778,13 +786,13 @@ export const QuickActionIcon = styled.div<{ $color: string }>`
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: ${props => `${props.$color}15`};
-  color: ${props => props.$color};
+  background: ${theme.colors.primary[200]};
+  color: ${theme.colors.primary[700]};
   border-radius: ${theme.borderRadius.sm};
   transition: all ${theme.transitions.fast};
   
   ${QuickAction}:hover & {
-    background: ${props => `${props.$color}25`};
+    background: ${theme.colors.primary[300]};
   }
 `;
 
@@ -806,11 +814,11 @@ export const QuickActionDescription = styled.div`
 `;
 
 export const QuickActionArrow = styled.div`
-  color: ${theme.colors.text.muted};
+  color: ${theme.colors.text.tertiary};
   transition: all ${theme.transitions.fast};
   
   ${QuickAction}:hover & {
-    color: #3b82f6;
+    color: ${theme.colors.primary[600]};
     transform: translateX(2px);
   }
 `;
@@ -830,7 +838,7 @@ export const EmptyStateCard = styled.div`
 `;
 
 export const EmptyIcon = styled.div`
-  color: ${theme.colors.text.muted};
+  color: ${theme.colors.text.tertiary};
   margin-bottom: ${theme.spacing.sm};
   opacity: 0.6;
 `;

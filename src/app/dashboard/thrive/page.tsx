@@ -1,4 +1,4 @@
-// src/app/dashboard/thrive/page.tsx - Professional Skills Development Hub
+// src/app/dashboard/thrive/page.tsx - Fixed Objective Skills Assessment Platform
 'use client';
 
 import React, { useState } from 'react';
@@ -10,14 +10,18 @@ import {
   Clock,
   Award,
   Activity,
-  BookOpen,
   BarChart3,
-  ChevronRight,
-  Filter,
-  ArrowUpRight,
-  CheckCircle2,
-  Circle,
-  AlertCircle
+  Brain,
+  MessageSquare,
+  Code,
+  Calculator,
+  Lightbulb,
+  FileText,
+  Timer,
+  Trophy,
+  Eye,
+  Shield,
+  Zap
 } from 'lucide-react';
 
 // Import shared styled components from dashboard
@@ -53,379 +57,597 @@ import {
   Grid
 } from '@/styles/styled-components';
 
-// Professional styled components specific to Skills Hub
+// Import the missing components from employer tools
+import {
+  ViewStatsGrid,
+  ViewStatCard,
+  ViewStatIcon,
+  ViewStatContent,
+  ViewStatValue,
+  ViewStatLabel,
+  ViewGrid,
+  ViewCard,
+  ViewCardContent,
+  ViewCardTitle,
+  ViewCardDescription,
+  ViewActionGroup,
+  ViewAction,
+  VerificationBadge,
+  EmployerTools
+} from '@/components/thrive/utils/employerTools';
+
+// Modern themed styled components
 import styled from 'styled-components';
-import MarketIntelligenceSystem from '@/components/skills/marketIntelligenceSystem';
+import { theme, themeUtils } from '@/styles/theme';
 
-const MetricsCard = styled(Card)`
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border: 1px solid #e2e8f0;
+// Assessment Challenge Card - GREYSCALE ONLY
+const AssessmentCard = styled(Card)<{ $difficulty: 'novice' | 'intermediate' | 'expert' | 'master' }>`
+  ${themeUtils.glass(0.9)}
+  border: 2px solid ${props => {
+    switch (props.$difficulty) {
+      case 'novice': return theme.colors.primary[300];
+      case 'intermediate': return theme.colors.primary[500];
+      case 'expert': return theme.colors.primary[600];
+      case 'master': return theme.colors.primary[700];
+    }
+  }};
+  background: ${props => {
+    switch (props.$difficulty) {
+      case 'novice': return themeUtils.alpha(theme.colors.primary[200], 0.05);
+      case 'intermediate': return themeUtils.alpha(theme.colors.primary[400], 0.05);
+      case 'expert': return themeUtils.alpha(theme.colors.primary[600], 0.05);
+      case 'master': return themeUtils.alpha(theme.colors.primary[700], 0.05);
+    }
+  }};
+  border-radius: ${theme.borderRadius.lg};
   position: relative;
-  overflow: hidden;
-`;
-
-const MetricsHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-`;
-
-const MetricsTitle = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0;
-`;
-
-const MetricsBadge = styled.span`
-  background: #3b82f6;
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.875rem;
-  font-weight: 500;
-`;
-
-const ProgressIndicator = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-`;
-
-const ProgressBar = styled.div`
-  flex: 1;
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
-`;
-
-const ProgressFill = styled.div<{ $percentage: number; $color?: string }>`
-  height: 100%;
-  width: ${props => props.$percentage}%;
-  background: ${props => props.$color || '#3b82f6'};
-  transition: width 0.5s ease;
-`;
-
-const ProgressLabel = styled.span`
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #475569;
-  min-width: 45px;
-  text-align: right;
-`;
-
-const SkillCard = styled(Card)<{ $priority?: boolean }>`
-  border: 1px solid ${props => props.$priority ? '#dbeafe' : '#e5e7eb'};
-  background: ${props => props.$priority ? '#eff6ff' : 'white'};
-  transition: all 0.2s ease;
-
-  &:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    transform: translateY(-1px);
+  ${themeUtils.hoverLift}
+  
+  &::before {
+    content: '${props => props.$difficulty.toUpperCase()}';
+    position: absolute;
+    top: ${theme.spacing.md};
+    right: ${theme.spacing.md};
+    padding: ${theme.spacing.xs} ${theme.spacing.sm};
+    background: ${props => {
+      switch (props.$difficulty) {
+        case 'novice': return theme.colors.primary[300];
+        case 'intermediate': return theme.colors.primary[500];
+        case 'expert': return theme.colors.primary[600];
+        case 'master': return theme.colors.primary[700];
+      }
+    }};
+    color: ${props => {
+      switch (props.$difficulty) {
+        case 'novice': return theme.colors.primary[700];
+        case 'intermediate': return theme.colors.text.inverse;
+        case 'expert': return theme.colors.text.inverse;
+        case 'master': return theme.colors.text.inverse;
+      }
+    }};
+    font-size: ${theme.typography.sizes.xs};
+    font-weight: ${theme.typography.weights.bold};
+    border-radius: ${theme.borderRadius.sm};
+    letter-spacing: ${theme.typography.letterSpacing.uppercase};
+    z-index: 2;
   }
 `;
 
-const SkillHeader = styled.div`
+const AssessmentHeader = styled.div`
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  gap: ${theme.spacing.lg};
+  margin-bottom: ${theme.spacing.lg};
 `;
 
-const SkillInfo = styled.div`
+const AssessmentIcon = styled.div<{ $skillType: string }>`
+  width: 56px;
+  height: 56px;
+  border-radius: ${theme.borderRadius.md};
+  background: ${props => {
+    switch (props.$skillType) {
+      case 'critical-thinking': return `linear-gradient(135deg, ${theme.colors.primary[500]}, ${theme.colors.primary[600]})`;
+      case 'linguistic': return `linear-gradient(135deg, ${theme.colors.primary[400]}, ${theme.colors.primary[500]})`;
+      case 'technical': return `linear-gradient(135deg, ${theme.colors.primary[600]}, ${theme.colors.primary[700]})`;
+      case 'analytical': return `linear-gradient(135deg, ${theme.colors.primary[300]}, ${theme.colors.primary[400]})`;
+      case 'creative': return `linear-gradient(135deg, ${theme.colors.primary[500]}, ${theme.colors.primary[600]})`;
+      default: return `linear-gradient(135deg, ${theme.colors.primary[600]}, ${theme.colors.primary[700]})`;
+    }
+  }};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: ${theme.shadows.md};
+  flex-shrink: 0;
+`;
+
+const AssessmentContent = styled.div`
   flex: 1;
 `;
 
-const SkillTitle = styled.h4`
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #0f172a;
-  margin: 0 0 0.5rem 0;
+const AssessmentTitle = styled.h3`
+  font-size: ${theme.typography.sizes.xl};
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
+  margin: 0 0 ${theme.spacing.sm} 0;
+  font-family: ${theme.typography.fonts.secondary};
 `;
 
-const SkillCategory = styled.span`
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: #f1f5f9;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+const AssessmentDescription = styled.p`
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  margin: 0 0 ${theme.spacing.lg} 0;
+  line-height: ${theme.typography.lineHeights.relaxed};
 `;
 
-const SkillMetrics = styled.div`
+const AssessmentMetrics = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  padding: 1rem 0;
-  border-top: 1px solid #f1f5f9;
-  border-bottom: 1px solid #f1f5f9;
-  margin: 1rem 0;
+  grid-template-columns: repeat(4, 1fr);
+  gap: ${theme.spacing.md};
+  margin: ${theme.spacing.lg} 0;
+  padding: ${theme.spacing.lg};
+  background: ${themeUtils.alpha(theme.colors.background.tertiary, 0.5)};
+  border-radius: ${theme.borderRadius.md};
+  border: 1px solid ${theme.colors.border.glass};
 `;
 
-const Metric = styled.div`
+const MetricItem = styled.div`
   text-align: center;
 `;
 
 const MetricValue = styled.div`
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #0f172a;
-  margin-bottom: 0.25rem;
+  font-size: ${theme.typography.sizes.lg};
+  font-weight: ${theme.typography.weights.bold};
+  color: ${theme.colors.text.primary};
+  margin-bottom: ${theme.spacing.xs};
+  font-family: ${theme.typography.fonts.secondary};
 `;
 
 const MetricLabel = styled.div`
-  font-size: 0.75rem;
-  color: #64748b;
+  font-size: ${theme.typography.sizes.xs};
+  color: ${theme.colors.text.secondary};
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: ${theme.typography.letterSpacing.uppercase};
+  font-weight: ${theme.typography.weights.medium};
 `;
 
-const ActionButton = styled.button<{ $variant?: 'primary' | 'secondary' }>`
+const AssessmentButton = styled.button<{ $variant?: 'primary' | 'secondary' }>`
   width: 100%;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
-  font-weight: 500;
-  font-size: 0.875rem;
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
+  border-radius: ${theme.borderRadius.sm};
+  font-weight: ${theme.typography.weights.semibold};
+  font-size: ${theme.typography.sizes.sm};
+  font-family: ${theme.typography.fonts.primary};
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: ${theme.spacing.sm};
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: ${theme.transitions.normal};
+  text-transform: uppercase;
+  letter-spacing: ${theme.typography.letterSpacing.uppercase};
   
   ${props => props.$variant === 'primary' ? `
-    background: #0f172a;
-    color: white;
-    border: 1px solid #0f172a;
+    background: linear-gradient(135deg, ${theme.colors.primary[600]}, ${theme.colors.primary[700]});
+    color: ${theme.colors.text.inverse};
+    border: 1px solid ${theme.colors.primary[600]};
+    box-shadow: ${theme.shadows.md};
     
     &:hover {
-      background: #1e293b;
-      border-color: #1e293b;
+      background: linear-gradient(135deg, ${theme.colors.primary[700]}, ${theme.colors.primary[800]});
+      transform: translateY(-2px);
+      box-shadow: ${theme.shadows.lg};
     }
   ` : `
-    background: white;
-    color: #475569;
-    border: 1px solid #e2e8f0;
+    ${themeUtils.glass(0.8)}
+    color: ${theme.colors.text.secondary};
+    border: 1px solid ${theme.colors.border.glass};
     
     &:hover {
-      background: #f8fafc;
-      border-color: #cbd5e1;
+      background: ${theme.colors.background.tertiary};
+      border-color: ${theme.colors.primary[600]};
+      color: ${theme.colors.text.primary};
+      transform: translateY(-1px);
     }
   `}
 `;
 
-const InsightCard = styled(Card)`
-  background: #fefce8;
-  border: 1px solid #fef3c7;
+// Ranking/Leaderboard Components
+const RankingCard = styled(Card)`
+  ${themeUtils.glass(0.95)}
+  border: 1px solid ${theme.colors.border.glass};
+  border-radius: ${theme.borderRadius.lg};
 `;
 
-const InsightHeader = styled.div`
+const RankingHeader = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
+  justify-content: space-between;
+  padding: ${theme.spacing.xl};
+  border-bottom: 1px solid ${theme.colors.border.glass};
+  background: ${themeUtils.alpha(theme.colors.background.secondary, 0.8)};
 `;
 
-const InsightIcon = styled.div`
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: #fbbf24;
+const RankingItem = styled.div<{ $rank: number }>`
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: white;
-`;
-
-const InsightTitle = styled.h4`
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #713f12;
-  margin: 0;
-`;
-
-const InsightText = styled.p`
-  font-size: 0.875rem;
-  color: #854d0e;
-  line-height: 1.5;
-  margin: 0;
-`;
-
-const TimelineItem = styled.div`
-  display: flex;
-  gap: 1rem;
-  padding: 1rem 0;
-  border-bottom: 1px solid #f3f4f6;
+  gap: ${theme.spacing.lg};
+  padding: ${theme.spacing.lg};
+  border-bottom: 1px solid ${theme.colors.border.glass};
+  transition: ${theme.transitions.normal};
+  background: ${props => {
+    if (props.$rank <= 3) {
+      return themeUtils.alpha(theme.colors.primary[400], 0.05);
+    }
+    return 'transparent';
+  }};
+  
+  &:hover {
+    background: ${themeUtils.alpha(theme.colors.background.tertiary, 0.5)};
+    transform: translateX(4px);
+  }
   
   &:last-child {
     border-bottom: none;
   }
 `;
 
-const TimelineIndicator = styled.div<{ $status: 'completed' | 'in-progress' | 'upcoming' }>`
-  width: 32px;
-  height: 32px;
+const RankBadge = styled.div<{ $rank: number }>`
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-weight: ${theme.typography.weights.bold};
+  font-size: ${theme.typography.sizes.lg};
   flex-shrink: 0;
   
-  ${props => {
-    switch (props.$status) {
-      case 'completed':
-        return `
-          background: #dcfce7;
-          color: #166534;
-        `;
-      case 'in-progress':
-        return `
-          background: #dbeafe;
-          color: #1e40af;
-        `;
-      case 'upcoming':
-        return `
-          background: #f3f4f6;
-          color: #6b7280;
-        `;
-    }
-  }}
+  background: ${props => {
+    if (props.$rank === 1) return `linear-gradient(135deg, ${theme.colors.primary[200]}, ${theme.colors.primary[300]})`;
+    if (props.$rank === 2) return `linear-gradient(135deg, ${theme.colors.primary[300]}, ${theme.colors.primary[400]})`;
+    if (props.$rank === 3) return `linear-gradient(135deg, ${theme.colors.primary[400]}, ${theme.colors.primary[500]})`;
+    return theme.colors.background.tertiary;
+  }};
+  
+  color: ${props => {
+    if (props.$rank === 1) return theme.colors.primary[700];
+    if (props.$rank === 2) return theme.colors.primary[700];
+    if (props.$rank === 3) return theme.colors.text.inverse;
+    return theme.colors.text.secondary;
+  }};
+  
+  border: ${props => props.$rank <= 3 ? `3px solid ${theme.colors.background.secondary}` : `2px solid ${theme.colors.border.medium}`};
+  box-shadow: ${props => props.$rank <= 3 ? theme.shadows.md : 'none'};
 `;
 
-const TimelineContent = styled.div`
+const UserInfo = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
-const TimelineTitle = styled.h4`
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 0.25rem 0;
+const UserName = styled.div`
+  font-size: ${theme.typography.sizes.base};
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
+  margin-bottom: ${theme.spacing.xs};
 `;
 
-const TimelineDescription = styled.p`
-  font-size: 0.813rem;
-  color: #6b7280;
-  margin: 0;
+const UserTitle = styled.div`
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  margin-bottom: ${theme.spacing.xs};
 `;
 
-const TimelineMeta = styled.div`
+const UserSkills = styled.div`
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 0.5rem;
-  font-size: 0.75rem;
-  color: #9ca3af;
+  gap: ${theme.spacing.xs};
+  flex-wrap: wrap;
 `;
 
-interface SkillData {
-  id: string;
-  name: string;
-  category: string;
-  proficiency: number;
-  marketDemand: number;
-  learningHours: number;
-  lastPracticed: string;
-  trending: boolean;
-  priority: boolean;
-}
+const SkillBadge = styled.span`
+  padding: ${theme.spacing.xs} ${theme.spacing.sm};
+  background: ${themeUtils.alpha(theme.colors.primary[600], 0.1)};
+  color: ${theme.colors.primary[600]};
+  border-radius: ${theme.borderRadius.sm};
+  font-size: ${theme.typography.sizes.xs};
+  font-weight: ${theme.typography.weights.medium};
+`;
 
-interface LearningPath {
+const ScoreDisplay = styled.div`
+  text-align: right;
+  flex-shrink: 0;
+`;
+
+const OverallScore = styled.div`
+  font-size: ${theme.typography.sizes.xl};
+  font-weight: ${theme.typography.weights.bold};
+  color: ${theme.colors.text.primary};
+  font-family: ${theme.typography.fonts.secondary};
+`;
+
+const ScoreBreakdown = styled.div`
+  font-size: ${theme.typography.sizes.xs};
+  color: ${theme.colors.text.secondary};
+  margin-top: ${theme.spacing.xs};
+`;
+
+// Analytics Components
+const AnalyticsContent = styled.div`
+  padding: ${theme.spacing.xl};
+  display: flex;
+  flex-direction: column;
+  gap: ${theme.spacing.lg};
+`;
+
+const TrendItem = styled.div`
+  padding: ${theme.spacing.lg};
+  border: 1px solid ${theme.colors.border.glass};
+  border-radius: ${theme.borderRadius.md};
+  background: ${themeUtils.alpha(theme.colors.background.secondary, 0.5)};
+  backdrop-filter: blur(${theme.glass.blurSubtle});
+`;
+
+const TrendHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: ${theme.spacing.sm};
+`;
+
+const TrendSkill = styled.div`
+  font-size: ${theme.typography.sizes.base};
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
+`;
+
+const TrendGrowth = styled.div<{ $positive?: boolean }>`
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.bold};
+  color: ${props => props.$positive ? theme.colors.primary[600] : theme.colors.primary[700]};
+`;
+
+const TrendBar = styled.div`
+  height: 8px;
+  background: ${theme.colors.border.light};
+  border-radius: ${theme.borderRadius.sm};
+  overflow: hidden;
+  margin-bottom: ${theme.spacing.sm};
+`;
+
+const TrendFill = styled.div<{ $percentage: number }>`
+  height: 100%;
+  width: ${props => props.$percentage}%;
+  background: linear-gradient(90deg, ${theme.colors.primary[600]}, ${theme.colors.primary[500]});
+  transition: width ${theme.transitions.normal};
+`;
+
+const TrendDetails = styled.div`
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+`;
+
+const InsightItem = styled.div`
+  padding: ${theme.spacing.lg};
+  border-left: 3px solid ${theme.colors.primary[600]};
+  background: ${themeUtils.alpha(theme.colors.primary[600], 0.05)};
+  border-radius: ${theme.borderRadius.sm};
+`;
+
+const InsightTitle = styled.div`
+  font-size: ${theme.typography.sizes.base};
+  font-weight: ${theme.typography.weights.semibold};
+  color: ${theme.colors.text.primary};
+  margin-bottom: ${theme.spacing.xs};
+`;
+
+const InsightMetric = styled.div`
+  font-size: ${theme.typography.sizes.lg};
+  font-weight: ${theme.typography.weights.bold};
+  color: ${theme.colors.primary[600]};
+  margin-bottom: ${theme.spacing.sm};
+  font-family: ${theme.typography.fonts.secondary};
+`;
+
+const InsightDescription = styled.div`
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  line-height: ${theme.typography.lineHeights.relaxed};
+`;
+
+// Assessment data structure
+interface Assessment {
   id: string;
   title: string;
   description: string;
-  status: 'completed' | 'in-progress' | 'upcoming';
-  completedDate?: string;
-  estimatedHours?: number;
-  skillsGained?: string[];
+  skillType: 'critical-thinking' | 'linguistic' | 'technical' | 'analytical' | 'creative';
+  difficulty: 'novice' | 'intermediate' | 'expert' | 'master';
+  duration: number;
+  participants: number;
+  averageScore: number;
+  completionRate: number;
+  employerTrust: number;
 }
 
-export default function ProfessionalSkillsHub() {
+interface RankedUser {
+  id: string;
+  name: string;
+  title: string;
+  rank: number;
+  overallScore: number;
+  skills: string[];
+  verified: boolean;
+  criticalThinking: number;
+  linguistic: number;
+  technical: number;
+  analytical: number;
+}
+
+export default function ObjectiveSkillsAssessment() {
   const { user } = useAuth();
-  const [activeView, setActiveView] = useState<'overview' | 'skills' | 'progress' | 'insights'>('overview');
-  
-  const [skills] = useState<SkillData[]>([
+  const [activeView, setActiveView] = useState<'assessments' | 'rankings' | 'analytics' | 'employer-tools'>('assessments');
+
+  // Mock assessment data
+  const assessments: Assessment[] = [
     {
       id: '1',
-      name: 'React Performance Optimization',
-      category: 'Technical',
-      proficiency: 78,
-      marketDemand: 92,
-      learningHours: 45,
-      lastPracticed: '2 days ago',
-      trending: true,
-      priority: true
+      title: 'Advanced Critical Thinking Assessment',
+      description: 'Multi-dimensional evaluation of logical reasoning, problem decomposition, and analytical decision-making under time constraints.',
+      skillType: 'critical-thinking',
+      difficulty: 'expert',
+      duration: 45,
+      participants: 2847,
+      averageScore: 74,
+      completionRate: 68,
+      employerTrust: 94
     },
     {
       id: '2',
-      name: 'Strategic Brand Development',
-      category: 'Business',
-      proficiency: 65,
-      marketDemand: 87,
-      learningHours: 32,
-      lastPracticed: '1 week ago',
-      trending: false,
-      priority: false
+      title: 'Professional Communication Evaluation',
+      description: 'Comprehensive assessment of written communication, linguistic precision, and contextual adaptation across business scenarios.',
+      skillType: 'linguistic',
+      difficulty: 'intermediate',
+      duration: 30,
+      participants: 4321,
+      averageScore: 82,
+      completionRate: 89,
+      employerTrust: 91
     },
     {
       id: '3',
-      name: 'Data-Driven Decision Making',
-      category: 'Analytics',
-      proficiency: 82,
-      marketDemand: 95,
-      learningHours: 58,
-      lastPracticed: 'Today',
-      trending: true,
-      priority: true
+      title: 'Technical Problem Solving Challenge',
+      description: 'Real-world technical scenarios requiring systematic debugging, optimization, and implementation of scalable solutions.',
+      skillType: 'technical',
+      difficulty: 'expert',
+      duration: 60,
+      participants: 1893,
+      averageScore: 69,
+      completionRate: 54,
+      employerTrust: 96
     },
     {
       id: '4',
-      name: 'UX Research Methods',
-      category: 'Design',
-      proficiency: 71,
-      marketDemand: 78,
-      learningHours: 28,
-      lastPracticed: '3 days ago',
-      trending: false,
-      priority: false
+      title: 'Data Analysis & Interpretation',
+      description: 'Complex data scenarios requiring statistical analysis, pattern recognition, and evidence-based conclusions.',
+      skillType: 'analytical',
+      difficulty: 'intermediate',
+      duration: 40,
+      participants: 3456,
+      averageScore: 78,
+      completionRate: 76,
+      employerTrust: 88
+    },
+    {
+      id: '5',
+      title: 'Innovation & Creative Problem Solving',
+      description: 'Open-ended challenges evaluating creative thinking, ideation processes, and innovative solution development.',
+      skillType: 'creative',
+      difficulty: 'master',
+      duration: 50,
+      participants: 987,
+      averageScore: 71,
+      completionRate: 43,
+      employerTrust: 85
+    },
+    {
+      id: '6',
+      title: 'Rapid Reasoning Assessment',
+      description: 'Quick-fire logical puzzles and reasoning challenges designed to evaluate processing speed and accuracy.',
+      skillType: 'critical-thinking',
+      difficulty: 'novice',
+      duration: 15,
+      participants: 8765,
+      averageScore: 86,
+      completionRate: 94,
+      employerTrust: 79
     }
-  ]);
+  ];
 
-  const [learningPath] = useState<LearningPath[]>([
+  // Mock ranking data
+  const topPerformers: RankedUser[] = [
     {
       id: '1',
-      title: 'Advanced React Patterns',
-      description: 'Master complex React patterns and performance optimization techniques',
-      status: 'completed',
-      completedDate: 'Jan 15, 2025',
-      skillsGained: ['React Hooks', 'Performance', 'State Management']
+      name: 'Dr. Sarah Chen',
+      title: 'Senior Data Scientist',
+      rank: 1,
+      overallScore: 94,
+      skills: ['Critical Thinking', 'Analytics', 'Technical'],
+      verified: true,
+      criticalThinking: 96,
+      linguistic: 91,
+      technical: 97,
+      analytical: 94
     },
     {
       id: '2',
-      title: 'Business Analytics Fundamentals',
-      description: 'Learn to analyze business data and create actionable insights',
-      status: 'in-progress',
-      estimatedHours: 20
+      name: 'Marcus Johnson',
+      title: 'Strategic Consultant',
+      rank: 2,
+      overallScore: 91,
+      skills: ['Critical Thinking', 'Linguistic', 'Creative'],
+      verified: true,
+      criticalThinking: 93,
+      linguistic: 95,
+      technical: 84,
+      analytical: 91
     },
     {
       id: '3',
-      title: 'Leadership Communication',
-      description: 'Develop executive-level communication and presentation skills',
-      status: 'upcoming',
-      estimatedHours: 15
+      name: 'Elena Rodriguez',
+      title: 'Product Manager',
+      rank: 3,
+      overallScore: 89,
+      skills: ['Analytics', 'Technical', 'Creative'],
+      verified: true,
+      criticalThinking: 87,
+      linguistic: 88,
+      technical: 92,
+      analytical: 89
+    },
+    {
+      id: '4',
+      name: 'James Park',
+      title: 'Software Architect',
+      rank: 4,
+      overallScore: 87,
+      skills: ['Technical', 'Critical Thinking'],
+      verified: false,
+      criticalThinking: 89,
+      linguistic: 82,
+      technical: 94,
+      analytical: 84
+    },
+    {
+      id: '5',
+      name: 'Dr. Aisha Patel',
+      title: 'Research Director',
+      rank: 5,
+      overallScore: 86,
+      skills: ['Analytics', 'Linguistic', 'Critical Thinking'],
+      verified: true,
+      criticalThinking: 88,
+      linguistic: 90,
+      technical: 79,
+      analytical: 92
     }
-  ]);
+  ];
 
-  const totalSkills = skills.length;
-  const averageProficiency = Math.round(skills.reduce((acc, skill) => acc + skill.proficiency, 0) / totalSkills);
-  const totalHours = skills.reduce((acc, skill) => acc + skill.learningHours, 0);
-  const trendingSkills = skills.filter(skill => skill.trending).length;
+  const getSkillIcon = (skillType: string) => {
+    switch (skillType) {
+      case 'critical-thinking': return Brain;
+      case 'linguistic': return MessageSquare;
+      case 'technical': return Code;
+      case 'analytical': return Calculator;
+      case 'creative': return Lightbulb;
+      default: return Target;
+    }
+  };
+
+  const handleEmployerToolAction = (toolId: string) => {
+    console.log(`Employer tool action: ${toolId}`);
+    // Handle tool actions here
+  };
 
   return (
     <PageWrapper>
@@ -434,290 +656,367 @@ export default function ProfessionalSkillsHub() {
         <Header>
           <HeaderContent>
             <WelcomeSection>
-              <WelcomeTitle>Professional Development</WelcomeTitle>
+              <WelcomeTitle>Objective Skills Assessment Platform</WelcomeTitle>
               <WelcomeSubtitle>
-                Track your skills, identify opportunities, and accelerate your career growth
+                Standardized, employer-trusted evaluations that provide measurable insights into critical professional capabilities
               </WelcomeSubtitle>
             </WelcomeSection>
             
             <ViewToggle>
               <ViewButton 
-                $active={activeView === 'overview'}
-                onClick={() => setActiveView('overview')}
-              >
-                <BarChart3 size={16} />
-                Overview
-              </ViewButton>
-              <ViewButton 
-                $active={activeView === 'skills'}
-                onClick={() => setActiveView('skills')}
+                $active={activeView === 'assessments'}
+                onClick={() => setActiveView('assessments')}
               >
                 <Target size={16} />
-                Skills
+                Assessments
               </ViewButton>
               <ViewButton 
-                $active={activeView === 'progress'}
-                onClick={() => setActiveView('progress')}
+                $active={activeView === 'rankings'}
+                onClick={() => setActiveView('rankings')}
               >
-                <TrendingUp size={16} />
-                Progress
+                <Trophy size={16} />
+                Rankings
               </ViewButton>
               <ViewButton 
-                $active={activeView === 'insights'}
-                onClick={() => setActiveView('insights')}
+                $active={activeView === 'analytics'}
+                onClick={() => setActiveView('analytics')}
               >
-                <Activity size={16} />
-                Insights
+                <BarChart3 size={16} />
+                Analytics
+              </ViewButton>
+              <ViewButton 
+                $active={activeView === 'employer-tools'}
+                onClick={() => setActiveView('employer-tools')}
+              >
+                <Eye size={16} />
+                Employer Tools
               </ViewButton>
             </ViewToggle>
           </HeaderContent>
         </Header>
 
         <DashboardContent>
-          {/* Overview View */}
-          {activeView === 'overview' && (
+          {/* Assessments View */}
+          {activeView === 'assessments' && (
             <>
-              {/* Key Metrics */}
+              {/* Platform Metrics */}
               <StatsGrid>
                 <StatCard>
-                  <StatIcon $color="#3b82f6">
-                    <Target size={18} />
+                  <StatIcon $color={theme.colors.primary[600]}>
+                    <Users size={18} />
                   </StatIcon>
                   <StatContent>
-                    <StatValue>{totalSkills}</StatValue>
-                    <StatLabel>Active Skills</StatLabel>
-                    <StatChange $positive>{trendingSkills} trending</StatChange>
+                    <StatValue>23,847</StatValue>
+                    <StatLabel>Verified Professionals</StatLabel>
+                    <StatChange $positive>+1,247 this month</StatChange>
                   </StatContent>
                 </StatCard>
 
                 <StatCard>
-                  <StatIcon $color="#10b981">
-                    <TrendingUp size={18} />
+                  <StatIcon $color={theme.colors.primary[500]}>
+                    <Shield size={18} />
                   </StatIcon>
                   <StatContent>
-                    <StatValue>{averageProficiency}%</StatValue>
-                    <StatLabel>Avg. Proficiency</StatLabel>
-                    <StatChange $positive>+5% this month</StatChange>
+                    <StatValue>91%</StatValue>
+                    <StatLabel>Employer Trust Rating</StatLabel>
+                    <StatChange $positive>Industry leading</StatChange>
                   </StatContent>
                 </StatCard>
 
                 <StatCard>
-                  <StatIcon $color="#8b5cf6">
-                    <Clock size={18} />
+                  <StatIcon $color={theme.colors.primary[700]}>
+                    <Activity size={18} />
                   </StatIcon>
                   <StatContent>
-                    <StatValue>{totalHours}h</StatValue>
-                    <StatLabel>Learning Hours</StatLabel>
-                    <StatChange $positive>+12h this week</StatChange>
+                    <StatValue>342</StatValue>
+                    <StatLabel>Active Assessments</StatLabel>
+                    <StatChange>Live now</StatChange>
                   </StatContent>
                 </StatCard>
 
                 <StatCard>
-                  <StatIcon $color="#f59e0b">
-                    <Award size={18} />
+                  <StatIcon $color={theme.colors.primary[400]}>
+                    <Zap size={18} />
                   </StatIcon>
                   <StatContent>
-                    <StatValue>3</StatValue>
-                    <StatLabel>Certifications</StatLabel>
-                    <StatChange>1 in progress</StatChange>
+                    <StatValue>15min</StatValue>
+                    <StatLabel>Avg. Response Time</StatLabel>
+                    <StatChange $positive>Instant results</StatChange>
                   </StatContent>
                 </StatCard>
               </StatsGrid>
 
-              {/* Performance Overview */}
-              <MetricsCard>
-                <CardContent>
-                  <MetricsHeader>
-                    <MetricsTitle>Skill Development Overview</MetricsTitle>
-                    <MetricsBadge>This Quarter</MetricsBadge>
-                  </MetricsHeader>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.875rem', color: '#475569' }}>Technical Skills</span>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0f172a' }}>82%</span>
-                      </div>
-                      <ProgressIndicator>
-                        <ProgressBar>
-                          <ProgressFill $percentage={82} $color="#3b82f6" />
-                        </ProgressBar>
-                      </ProgressIndicator>
-                    </div>
-                    
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.875rem', color: '#475569' }}>Business Acumen</span>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0f172a' }}>68%</span>
-                      </div>
-                      <ProgressIndicator>
-                        <ProgressBar>
-                          <ProgressFill $percentage={68} $color="#10b981" />
-                        </ProgressBar>
-                      </ProgressIndicator>
-                    </div>
-                    
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                        <span style={{ fontSize: '0.875rem', color: '#475569' }}>Leadership</span>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#0f172a' }}>75%</span>
-                      </div>
-                      <ProgressIndicator>
-                        <ProgressBar>
-                          <ProgressFill $percentage={75} $color="#8b5cf6" />
-                        </ProgressBar>
-                      </ProgressIndicator>
-                    </div>
-                  </div>
-                </CardContent>
-              </MetricsCard>
-
-              {/* Quick Insights */}
-              <ContentGrid>
-                <Section>
-                  <SectionHeader>
-                    <SectionTitle>
-                      <AlertCircle size={18} />
-                      Key Insights
-                    </SectionTitle>
-                  </SectionHeader>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <InsightCard>
-                      <CardContent>
-                        <InsightHeader>
-                          <InsightIcon>
-                            <TrendingUp size={16} />
-                          </InsightIcon>
-                          <InsightTitle>High-Demand Skill Alert</InsightTitle>
-                        </InsightHeader>
-                        <InsightText>
-                          Data Analytics skills are seeing 45% increased demand in your industry. 
-                          Consider prioritizing this area for maximum career impact.
-                        </InsightText>
-                      </CardContent>
-                    </InsightCard>
-                  </div>
-                </Section>
-
-                <Section>
-                  <SectionHeader>
-                    <SectionTitle>
-                      <BookOpen size={18} />
-                      Learning Path
-                    </SectionTitle>
-                    <ViewAllLink onClick={() => setActiveView('progress')}>
-                      View all
-                    </ViewAllLink>
-                  </SectionHeader>
-                  
-                  <Card>
-                    <CardContent>
-                      {learningPath.map((item) => (
-                        <TimelineItem key={item.id}>
-                          <TimelineIndicator $status={item.status}>
-                            {item.status === 'completed' ? (
-                              <CheckCircle2 size={16} />
-                            ) : item.status === 'in-progress' ? (
-                              <Circle size={16} />
-                            ) : (
-                              <Circle size={16} />
-                            )}
-                          </TimelineIndicator>
-                          <TimelineContent>
-                            <TimelineTitle>{item.title}</TimelineTitle>
-                            <TimelineDescription>{item.description}</TimelineDescription>
-                            <TimelineMeta>
-                              {item.completedDate && (
-                                <span>Completed {item.completedDate}</span>
-                              )}
-                              {item.estimatedHours && (
-                                <span>{item.estimatedHours} hours</span>
-                              )}
-                              {item.skillsGained && (
-                                <span>{item.skillsGained.length} skills gained</span>
-                              )}
-                            </TimelineMeta>
-                          </TimelineContent>
-                        </TimelineItem>
-                      ))}
-                    </CardContent>
-                  </Card>
-                </Section>
-              </ContentGrid>
-            </>
-          )}
-
-          {/* Skills View */}
-          {activeView === 'skills' && (
-            <>
+              {/* Assessment Challenges */}
               <Section>
                 <SectionHeader>
                   <SectionTitle>
                     <Target size={18} />
-                    Skills Portfolio
+                    Professional Assessment Challenges
                   </SectionTitle>
                   <ViewAllLink>
-                    <Filter size={14} />
-                    Filter
+                    View all categories
                   </ViewAllLink>
                 </SectionHeader>
                 
-                <Grid $minWidth="350px" $gap="1rem">
-                  {skills.map((skill) => (
-                    <SkillCard key={skill.id} $priority={skill.priority}>
-                      <CardContent>
-                        <SkillHeader>
-                          <SkillInfo>
-                            <SkillTitle>{skill.name}</SkillTitle>
-                            <SkillCategory>{skill.category}</SkillCategory>
-                          </SkillInfo>
-                          {skill.trending && (
-                            <ArrowUpRight size={20} color="#3b82f6" />
-                          )}
-                        </SkillHeader>
-                        
-                        <ProgressIndicator>
-                          <ProgressBar>
-                            <ProgressFill $percentage={skill.proficiency} />
-                          </ProgressBar>
-                          <ProgressLabel>{skill.proficiency}%</ProgressLabel>
-                        </ProgressIndicator>
-                        
-                        <SkillMetrics>
-                          <Metric>
-                            <MetricValue>{skill.marketDemand}%</MetricValue>
-                            <MetricLabel>Demand</MetricLabel>
-                          </Metric>
-                          <Metric>
-                            <MetricValue>{skill.learningHours}h</MetricValue>
-                            <MetricLabel>Invested</MetricLabel>
-                          </Metric>
-                          <Metric>
-                            <MetricValue>{skill.lastPracticed}</MetricValue>
-                            <MetricLabel>Last Active</MetricLabel>
-                          </Metric>
-                        </SkillMetrics>
-                        
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <ActionButton $variant="primary">
-                            Continue Learning
-                          </ActionButton>
-                          <ActionButton $variant="secondary">
-                            View Details
-                          </ActionButton>
-                        </div>
-                      </CardContent>
-                    </SkillCard>
-                  ))}
+                <Grid $minWidth="400px" $gap={theme.spacing.xl}>
+                  {assessments.map((assessment) => {
+                    const IconComponent = getSkillIcon(assessment.skillType);
+                    return (
+                      <AssessmentCard key={assessment.id} $difficulty={assessment.difficulty}>
+                        <CardContent>
+                          <AssessmentHeader>
+                            <AssessmentIcon $skillType={assessment.skillType}>
+                              <IconComponent size={24} />
+                            </AssessmentIcon>
+                            <AssessmentContent>
+                              <AssessmentTitle>{assessment.title}</AssessmentTitle>
+                              <AssessmentDescription>{assessment.description}</AssessmentDescription>
+                            </AssessmentContent>
+                          </AssessmentHeader>
+
+                          <AssessmentMetrics>
+                            <MetricItem>
+                              <MetricValue>{assessment.duration}min</MetricValue>
+                              <MetricLabel>Duration</MetricLabel>
+                            </MetricItem>
+                            <MetricItem>
+                              <MetricValue>{assessment.participants.toLocaleString()}</MetricValue>
+                              <MetricLabel>Participants</MetricLabel>
+                            </MetricItem>
+                            <MetricItem>
+                              <MetricValue>{assessment.averageScore}%</MetricValue>
+                              <MetricLabel>Avg Score</MetricLabel>
+                            </MetricItem>
+                            <MetricItem>
+                              <MetricValue>{assessment.employerTrust}%</MetricValue>
+                              <MetricLabel>Trust Rating</MetricLabel>
+                            </MetricItem>
+                          </AssessmentMetrics>
+
+                          <div style={{ display: 'flex', gap: theme.spacing.sm }}>
+                            <AssessmentButton $variant="primary">
+                              <Timer size={16} />
+                              Begin Assessment
+                            </AssessmentButton>
+                            <AssessmentButton $variant="secondary">
+                              <FileText size={16} />
+                              Preview
+                            </AssessmentButton>
+                          </div>
+                        </CardContent>
+                      </AssessmentCard>
+                    );
+                  })}
                 </Grid>
               </Section>
             </>
           )}
 
-          {/* Progress and Insights views would follow similar professional patterns */}
+          {/* Rankings View */}
+          {activeView === 'rankings' && (
+            <RankingCard>
+              <RankingHeader>
+                <SectionTitle>
+                  <Trophy size={18} />
+                  Global Professional Rankings
+                </SectionTitle>
+                <VerificationBadge $verified={true}>
+                  <Shield size={12} />
+                  Verified Only
+                </VerificationBadge>
+              </RankingHeader>
+              
+              <div>
+                {topPerformers.map((performer) => (
+                  <RankingItem key={performer.id} $rank={performer.rank}>
+                    <RankBadge $rank={performer.rank}>
+                      {performer.rank}
+                    </RankBadge>
+                    <UserInfo>
+                      <UserName>
+                        {performer.name}
+                        {performer.verified && (
+                          <VerificationBadge $verified={true}>
+                            <Shield size={10} />
+                            Verified
+                          </VerificationBadge>
+                        )}
+                      </UserName>
+                      <UserTitle>{performer.title}</UserTitle>
+                      <UserSkills>
+                        {performer.skills.map((skill, index) => (
+                          <SkillBadge key={index}>{skill}</SkillBadge>
+                        ))}
+                      </UserSkills>
+                    </UserInfo>
+                    <ScoreDisplay>
+                      <OverallScore>{performer.overallScore}</OverallScore>
+                      <ScoreBreakdown>
+                        CT:{performer.criticalThinking} | L:{performer.linguistic} | T:{performer.technical} | A:{performer.analytical}
+                      </ScoreBreakdown>
+                    </ScoreDisplay>
+                  </RankingItem>
+                ))}
+              </div>
+            </RankingCard>
+          )}
+
+          {/* Analytics View */}
+          {activeView === 'analytics' && (
+            <>
+              <Section>
+                <SectionHeader>
+                  <SectionTitle>
+                    <BarChart3 size={18} />
+                    Skills Analytics & Market Intelligence
+                  </SectionTitle>
+                  <ViewAllLink>Export Report</ViewAllLink>
+                </SectionHeader>
+                
+                {/* Analytics Stats */}
+                <ViewStatsGrid>
+                  <ViewStatCard>
+                    <ViewStatIcon $color={theme.colors.primary[600]}>
+                      <TrendingUp size={20} />
+                    </ViewStatIcon>
+                    <ViewStatContent>
+                      <ViewStatValue>87%</ViewStatValue>
+                      <ViewStatLabel>Market Accuracy</ViewStatLabel>
+                    </ViewStatContent>
+                  </ViewStatCard>
+                  
+                  <ViewStatCard>
+                    <ViewStatIcon $color={theme.colors.primary[500]}>
+                      <Users size={20} />
+                    </ViewStatIcon>
+                    <ViewStatContent>
+                      <ViewStatValue>12,450</ViewStatValue>
+                      <ViewStatLabel>Data Points</ViewStatLabel>
+                    </ViewStatContent>
+                  </ViewStatCard>
+                  
+                  <ViewStatCard>
+                    <ViewStatIcon $color={theme.colors.primary[700]}>
+                      <BarChart3 size={20} />
+                    </ViewStatIcon>
+                    <ViewStatContent>
+                      <ViewStatValue>342</ViewStatValue>
+                      <ViewStatLabel>Skills Tracked</ViewStatLabel>
+                    </ViewStatContent>
+                  </ViewStatCard>
+                  
+                  <ViewStatCard>
+                    <ViewStatIcon $color={theme.colors.primary[400]}>
+                      <Clock size={20} />
+                    </ViewStatIcon>
+                    <ViewStatContent>
+                      <ViewStatValue>24/7</ViewStatValue>
+                      <ViewStatLabel>Live Updates</ViewStatLabel>
+                    </ViewStatContent>
+                  </ViewStatCard>
+                </ViewStatsGrid>
+
+                <ContentGrid>
+                  {/* Market Trends */}
+                  <Section>
+                    <SectionHeader>
+                      <SectionTitle>
+                        <TrendingUp size={18} />
+                        Market Demand Trends
+                      </SectionTitle>
+                    </SectionHeader>
+                    
+                    <AnalyticsContent>
+                      <TrendItem>
+                        <TrendHeader>
+                          <TrendSkill>Critical Thinking</TrendSkill>
+                          <TrendGrowth $positive>+23%</TrendGrowth>
+                        </TrendHeader>
+                        <TrendBar>
+                          <TrendFill $percentage={92} />
+                        </TrendBar>
+                        <TrendDetails>High demand across all industries</TrendDetails>
+                      </TrendItem>
+                      
+                      <TrendItem>
+                        <TrendHeader>
+                          <TrendSkill>Data Analysis</TrendSkill>
+                          <TrendGrowth $positive>+18%</TrendGrowth>
+                        </TrendHeader>
+                        <TrendBar>
+                          <TrendFill $percentage={89} />
+                        </TrendBar>
+                        <TrendDetails>Especially in tech and finance sectors</TrendDetails>
+                      </TrendItem>
+                      
+                      <TrendItem>
+                        <TrendHeader>
+                          <TrendSkill>Communication</TrendSkill>
+                          <TrendGrowth $positive>+12%</TrendGrowth>
+                        </TrendHeader>
+                        <TrendBar>
+                          <TrendFill $percentage={84} />
+                        </TrendBar>
+                        <TrendDetails>Remote work driving demand</TrendDetails>
+                      </TrendItem>
+                    </AnalyticsContent>
+                  </Section>
+
+                  {/* Industry Insights */}
+                  <Section>
+                    <SectionHeader>
+                      <SectionTitle>
+                        <Brain size={18} />
+                        Industry Insights
+                      </SectionTitle>
+                    </SectionHeader>
+                    
+                    <AnalyticsContent>
+                      <InsightItem>
+                        <InsightTitle>Technology Sector</InsightTitle>
+                        <InsightMetric>95% of roles require technical problem-solving</InsightMetric>
+                        <InsightDescription>
+                          Critical thinking and analytical skills are the top predictors of performance in tech roles.
+                        </InsightDescription>
+                      </InsightItem>
+                      
+                      <InsightItem>
+                        <InsightTitle>Financial Services</InsightTitle>
+                        <InsightMetric>89% prioritize analytical reasoning</InsightMetric>
+                        <InsightDescription>
+                          Data interpretation and risk assessment skills command premium salaries.
+                        </InsightDescription>
+                      </InsightItem>
+                      
+                      <InsightItem>
+                        <InsightTitle>Healthcare</InsightTitle>
+                        <InsightMetric>91% value critical decision-making</InsightMetric>
+                        <InsightDescription>
+                          Quick, accurate reasoning under pressure is highly valued and tested.
+                        </InsightDescription>
+                      </InsightItem>
+                    </AnalyticsContent>
+                  </Section>
+                </ContentGrid>
+              </Section>
+            </>
+          )}
+
+          {/* Employer Tools View */}
+          {activeView === 'employer-tools' && (
+            <Section>
+              <SectionHeader>
+                <SectionTitle>
+                  <Shield size={18} />
+                  Employer Verification & Tools
+                </SectionTitle>
+                <ViewAllLink>Request Demo</ViewAllLink>
+              </SectionHeader>
+              
+              <EmployerTools onToolAction={handleEmployerToolAction} />
+            </Section>
+          )}
         </DashboardContent>
-        <MarketIntelligenceSystem/>
       </Container>
     </PageWrapper>
   );

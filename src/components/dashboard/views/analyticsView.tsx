@@ -1,4 +1,4 @@
-// src/components/dashboard/views/AnalyticsView.tsx - Clean version using shared styles
+// src/components/dashboard/views/AnalyticsView.tsx - Greyscale version using shared styles
 import React, { useState, useEffect } from 'react';
 import { 
   BarChart3, ArrowUpRight, Eye, Users, TrendingUp, Clock, Activity,
@@ -35,7 +35,7 @@ import {
 } from './viewStyles';
 
 import styled from 'styled-components';
-import { theme } from '@/styles/theme';
+import { theme, themeUtils } from '@/styles/theme';
 
 // Import your existing React Query hooks
 import { 
@@ -156,10 +156,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           </HeaderActions>
         </SectionHeader>
 
-        {/* Analytics Statistics */}
+        {/* Analytics Statistics - GREYSCALE */}
         <ViewStatsGrid>
           <ViewStatCard>
-            <ViewStatIcon $gradient="linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)">
+            <ViewStatIcon $color={theme.colors.primary[600]}>
               <Eye size={20} />
             </ViewStatIcon>
             <ViewStatContent>
@@ -169,7 +169,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           </ViewStatCard>
 
           <ViewStatCard>
-            <ViewStatIcon $gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)">
+            <ViewStatIcon $color={theme.colors.primary[500]}>
               <Users size={20} />
             </ViewStatIcon>
             <ViewStatContent>
@@ -179,7 +179,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           </ViewStatCard>
 
           <ViewStatCard>
-            <ViewStatIcon $gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)">
+            <ViewStatIcon $color={theme.colors.primary[700]}>
               <TrendingUp size={20} />
             </ViewStatIcon>
             <ViewStatContent>
@@ -189,7 +189,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           </ViewStatCard>
 
           <ViewStatCard>
-            <ViewStatIcon $gradient="linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)">
+            <ViewStatIcon $color={theme.colors.primary[400]}>
               <Clock size={20} />
             </ViewStatIcon>
             <ViewStatContent>
@@ -268,7 +268,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             </ViewCardContent>
           </ViewCard>
 
-          {/* Achievements */}
+          {/* Achievements - GREYSCALE */}
           {achievements.length > 0 && (
             <ViewCard>
               <ViewCardContent>
@@ -292,7 +292,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             </ViewCard>
           )}
 
-          {/* Insights */}
+          {/* Insights - GREYSCALE */}
           <ViewCard>
             <ViewCardContent>
               <ViewCardTitle>Portfolio Insights</ViewCardTitle>
@@ -343,7 +343,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   );
 };
 
-// Analytics-specific styled components (minimal, extending shared styles)
+// Analytics-specific styled components - GREYSCALE
 const HeaderActions = styled.div`
   display: flex;
   gap: ${theme.spacing.md};
@@ -397,19 +397,19 @@ const ErrorContainer = styled.div`
   justify-content: center;
   padding: ${theme.spacing['3xl']};
   text-align: center;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: ${theme.colors.primary[100]};
+  border: 1px solid ${theme.colors.primary[200]};
   border-radius: ${theme.borderRadius.lg};
-  color: #dc2626;
+  color: ${theme.colors.primary[700]};
   
   h3 {
     margin: 1rem 0 0.5rem 0;
-    color: #dc2626;
+    color: ${theme.colors.primary[700]};
   }
   
   p {
     margin: 0 0 1rem 0;
-    color: #7f1d1d;
+    color: ${theme.colors.primary[600]};
   }
 `;
 
@@ -425,7 +425,7 @@ const AnalyticsMetric = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: ${theme.spacing.sm};
-  background: rgba(248, 250, 252, 0.5);
+  background: ${themeUtils.alpha(theme.colors.background.tertiary, 0.5)};
   border-radius: ${theme.borderRadius.sm};
 `;
 
@@ -439,7 +439,7 @@ const MetricValue = styled.span<{ $positive?: boolean }>`
   font-size: ${theme.typography.sizes.sm};
   font-weight: ${theme.typography.weights.semibold};
   color: ${props => props.$positive !== undefined ? 
-    (props.$positive ? '#10b981' : '#ef4444') : 
+    (props.$positive ? theme.colors.primary[600] : theme.colors.primary[700]) : 
     theme.colors.text.primary
   };
 `;
@@ -470,7 +470,7 @@ const SourceName = styled.span`
 
 const SourcePercentage = styled.span`
   font-weight: ${theme.typography.weights.semibold};
-  color: #3b82f6;
+  color: ${theme.colors.primary[600]};
 `;
 
 const AchievementsList = styled.div`
@@ -484,16 +484,16 @@ const AchievementItem = styled.div<{ $rarity: string }>`
   padding: ${theme.spacing.md};
   background: ${props => {
     switch (props.$rarity) {
-      case 'epic': return 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
-      case 'rare': return 'linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%)';
-      default: return 'rgba(248, 250, 252, 0.8)';
+      case 'epic': return themeUtils.alpha(theme.colors.primary[300], 0.3);
+      case 'rare': return themeUtils.alpha(theme.colors.primary[400], 0.3);
+      default: return themeUtils.alpha(theme.colors.background.tertiary, 0.8);
     }
   }};
   border-radius: ${theme.borderRadius.md};
   border-left: 4px solid ${props => {
     switch (props.$rarity) {
-      case 'epic': return '#f59e0b';
-      case 'rare': return '#8b5cf6';
+      case 'epic': return theme.colors.primary[600];
+      case 'rare': return theme.colors.primary[700];
       default: return theme.colors.border.medium;
     }
   }};
@@ -517,7 +517,7 @@ const AchievementDescription = styled.div`
 
 const AchievementTime = styled.div`
   font-size: ${theme.typography.sizes.xs};
-  color: ${theme.colors.text.muted};
+  color: ${theme.colors.text.tertiary};
   font-weight: ${theme.typography.weights.medium};
 `;
 
@@ -533,8 +533,8 @@ const InsightItem = styled.div`
   gap: ${theme.spacing.md};
   padding: ${theme.spacing.md};
   border-radius: ${theme.borderRadius.sm};
-  background: rgba(59, 130, 246, 0.05);
-  border-left: 3px solid #3b82f6;
+  background: ${themeUtils.alpha(theme.colors.primary[600], 0.05)};
+  border-left: 3px solid ${theme.colors.primary[600]};
 `;
 
 const InsightIcon = styled.div`

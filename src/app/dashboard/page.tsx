@@ -1,8 +1,9 @@
-// src/app/dashboard/page.tsx - Fully integrated with view switching
+// src/app/dashboard/page.tsx - Matching Layout Design System
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import styled from "styled-components";
 import { ProtectedRoute } from '@/components/auth/protectedRoute';
 import { usePortfolioManagement } from '@/hooks/usePortfolioManagement';
 import { useDashboardLogic } from '@/components/dashboard/dashboardLogic';
@@ -21,79 +22,13 @@ import {
   Target,
   Code,
   Plus,
-  ExternalLink
+  ExternalLink,
+  TrendingUp,
+  Users,
+  FileText,
+  Clock,
+  Eye
 } from "lucide-react";
-
-// Import existing styled components
-import {
-  PageWrapper,
-  Container,
-  Header,
-  HeaderContent,
-  WelcomeSection,
-  WelcomeTitle,
-  WelcomeSubtitle,
-  ViewToggle,
-  ViewButton,
-  LoadingContainer,
-  LoadingSpinner,
-  LoadingText,
-  ErrorContainer,
-  ErrorIcon,
-  ErrorTitle,
-  ErrorMessage,
-  RetryButton,
-  DashboardContent,
-  StatsGrid,
-  MainStatCard,
-  StatCard,
-  StatHeader,
-  StatIcon,
-  StatContent,
-  StatTitle,
-  StatValue,
-  StatLabel,
-  StatChange,
-  StatProgress,
-  ProgressBar,
-  ProgressFill,
-  ProgressText,
-  ContentGrid,
-  Section,
-  SectionHeader,
-  SectionTitle,
-  ViewAllLink,
-  ActivityList,
-  ActivityItem,
-  ActivityIcon,
-  ActivityContent,
-  ActivityTitle,
-  ActivityDescription,
-  ActivityMetadata,
-  MetadataTag,
-  ActivityTime,
-  QuickActionGrid,
-  QuickAction,
-  QuickActionIcon,
-  QuickActionContent,
-  QuickActionTitle,
-  QuickActionDescription,
-  QuickActionArrow,
-  CreatePortfolioSection,
-  CreateHeader,
-  CreateIcon,
-  CreateTitle,
-  CreateDescription,
-  PortfolioTypes,
-  PortfolioTypeCard,
-  TypeHeader,
-  TypeIcon,
-  TypeTitle,
-  TypeDescription,
-  TypeFeatures,
-  Feature,
-  CreateButton
-} from '@/components/dashboard/dashboardStyles';
 
 // Import view components
 import { GalleryView } from '@/components/dashboard/views/GalleryView';
@@ -163,10 +98,10 @@ export default function Dashboard() {
       <ProtectedRoute>
         <PageWrapper>
           <LoadingContainer>
-            <LoadingSpinner>
-              <Loader2 className="animate-spin" size={48} />
-            </LoadingSpinner>
-            <LoadingText>Loading dashboard...</LoadingText>
+            <LoadingCard>
+              <Loader2 className="animate-spin" size={32} />
+              <LoadingText>Loading dashboard...</LoadingText>
+            </LoadingCard>
           </LoadingContainer>
         </PageWrapper>
       </ProtectedRoute>
@@ -179,10 +114,14 @@ export default function Dashboard() {
       <ProtectedRoute>
         <PageWrapper>
           <ErrorContainer>
-            <ErrorIcon>⚠️</ErrorIcon>
-            <ErrorTitle>Something went wrong</ErrorTitle>
-            <ErrorMessage>{error}</ErrorMessage>
-            <RetryButton onClick={() => window.location.reload()}>Try Again</RetryButton>
+            <ErrorCard>
+              <ErrorIcon>⚠️</ErrorIcon>
+              <ErrorTitle>Something went wrong</ErrorTitle>
+              <ErrorMessage>{error}</ErrorMessage>
+              <RetryButton onClick={() => window.location.reload()}>
+                Try Again
+              </RetryButton>
+            </ErrorCard>
           </ErrorContainer>
         </PageWrapper>
       </ProtectedRoute>
@@ -196,62 +135,64 @@ export default function Dashboard() {
         <PageWrapper>
           <Container>
             <CreatePortfolioSection>
-              <CreateHeader>
-                <CreateIcon>
-                  <Sparkles size={40} />
-                </CreateIcon>
-                <CreateTitle>Welcome to Your Dashboard</CreateTitle>
-                <CreateDescription>
-                  Create your first portfolio to start tracking your professional journey and showcase your work.
-                </CreateDescription>
-              </CreateHeader>
+              <WelcomeCard>
+                <WelcomeIcon>
+                  <Sparkles size={32} />
+                </WelcomeIcon>
+                <WelcomeContent>
+                  <WelcomeTitle>Welcome to Your Dashboard</WelcomeTitle>
+                  <WelcomeDescription>
+                    Create your first portfolio to start tracking your professional journey and showcase your work.
+                  </WelcomeDescription>
+                </WelcomeContent>
+              </WelcomeCard>
 
-              <PortfolioTypes>
+              <PortfolioTypesGrid>
                 {Object.entries(PORTFOLIO_CONFIG).map(([key, config]) => (
                   <PortfolioTypeCard 
                     key={key}
                     onClick={() => router.push(`/dashboard/profile?create=${key}`)}
                   >
-                    <TypeHeader>
-                      <TypeIcon $gradient={config.gradient}>
+                    <CardHeader>
+                      <CardIcon>
                         {config.icon}
-                      </TypeIcon>
-                      <TypeTitle>{config.title}</TypeTitle>
-                    </TypeHeader>
-                    <TypeDescription>{config.description}</TypeDescription>
-                    <TypeFeatures>
+                      </CardIcon>
+                      <CardTitle>{config.title}</CardTitle>
+                    </CardHeader>
+                    <CardDescription>{config.description}</CardDescription>
+                    <CardFeatures>
                       {key === 'creative' && (
                         <>
-                          <Feature><span>✓</span> Gallery showcase</Feature>
-                          <Feature><span>✓</span> Visual projects</Feature>
+                          <Feature>Gallery showcase</Feature>
+                          <Feature>Visual projects</Feature>
                         </>
                       )}
                       {key === 'educational' && (
                         <>
-                          <Feature><span>✓</span> Learning progress</Feature>
-                          <Feature><span>✓</span> Achievement tracking</Feature>
+                          <Feature>Learning progress</Feature>
+                          <Feature>Achievement tracking</Feature>
                         </>
                       )}
                       {key === 'professional' && (
                         <>
-                          <Feature><span>✓</span> Technical skills</Feature>
-                          <Feature><span>✓</span> Project showcase</Feature>
+                          <Feature>Technical skills</Feature>
+                          <Feature>Project showcase</Feature>
                         </>
                       )}
                       {key === 'hybrid' && (
                         <>
-                          <Feature><span>✓</span> Multi-disciplinary</Feature>
-                          <Feature><span>✓</span> Flexible format</Feature>
+                          <Feature>Multi-disciplinary</Feature>
+                          <Feature>Flexible format</Feature>
                         </>
                       )}
-                    </TypeFeatures>
-                    <CreateButton $gradient={config.gradient}>
+                    </CardFeatures>
+                    <CreateButton>
                       <Plus size={16} />
                       Create {config.title}
                     </CreateButton>
                   </PortfolioTypeCard>
                 ))}
-              </PortfolioTypes>
+              </PortfolioTypesGrid>
             </CreatePortfolioSection>
           </Container>
         </PageWrapper>
@@ -343,14 +284,14 @@ export default function Dashboard() {
                 <StatsGrid>
                   <MainStatCard>
                     <StatHeader>
-                      <StatIcon $gradient={currentConfig?.gradient}>
+                      <StatIcon>
                         {currentConfig?.icon}
                       </StatIcon>
-                      <div>
+                      <StatInfo>
                         <StatTitle>Portfolio Items</StatTitle>
                         <StatValue>{galleryPieces.length}</StatValue>
                         <StatLabel>Total</StatLabel>
-                      </div>
+                      </StatInfo>
                     </StatHeader>
                     <StatProgress>
                       <ProgressBar>
@@ -361,37 +302,37 @@ export default function Dashboard() {
                   </MainStatCard>
 
                   <StatCard>
-                    <StatIcon $color="#f59e0b">
+                    <StatIcon>
                       <Activity size={18} />
                     </StatIcon>
                     <StatContent>
                       <StatValue>0</StatValue>
                       <StatLabel>Activity</StatLabel>
-                      <StatChange $positive>Recent</StatChange>
+                      <StatChange>Recent</StatChange>
                     </StatContent>
                   </StatCard>
 
                   {isViewAvailable('gallery') && (
                     <StatCard>
-                      <StatIcon $color="#8b5cf6">
+                      <StatIcon>
                         <GalleryIcon size={18} />
                       </StatIcon>
                       <StatContent>
                         <StatValue>{galleryPieces.length}</StatValue>
                         <StatLabel>Gallery</StatLabel>
-                        <StatChange $positive>Items</StatChange>
+                        <StatChange>Items</StatChange>
                       </StatContent>
                     </StatCard>
                   )}
 
                   <StatCard>
-                    <StatIcon $color="#3b82f6">
+                    <StatIcon>
                       <Target size={18} />
                     </StatIcon>
                     <StatContent>
                       <StatValue>Active</StatValue>
                       <StatLabel>Status</StatLabel>
-                      <StatChange $positive>Online</StatChange>
+                      <StatChange>Online</StatChange>
                     </StatContent>
                   </StatCard>
                 </StatsGrid>
@@ -409,7 +350,7 @@ export default function Dashboard() {
                     </SectionHeader>
                     <ActivityList>
                       <ActivityItem>
-                        <ActivityIcon $type="portfolio_update">
+                        <ActivityIcon>
                           <Settings size={14} />
                         </ActivityIcon>
                         <ActivityContent>
@@ -434,7 +375,7 @@ export default function Dashboard() {
                     </SectionHeader>
                     <QuickActionGrid>
                       <QuickAction as="a" href="/dashboard/profile">
-                        <QuickActionIcon $color="#6b7280">
+                        <QuickActionIcon>
                           <Settings size={20} />
                         </QuickActionIcon>
                         <QuickActionContent>
@@ -448,7 +389,7 @@ export default function Dashboard() {
 
                       {isViewAvailable('gallery') && (
                         <QuickAction onClick={() => handleViewChange('gallery')}>
-                          <QuickActionIcon $color="#8b5cf6">
+                          <QuickActionIcon>
                             <GalleryIcon size={20} />
                           </QuickActionIcon>
                           <QuickActionContent>
@@ -466,7 +407,7 @@ export default function Dashboard() {
                         href={`/portfolio/${portfolio!.id}`} 
                         target="_blank"
                       >
-                        <QuickActionIcon $color="#10b981">
+                        <QuickActionIcon>
                           <ExternalLink size={20} />
                         </QuickActionIcon>
                         <QuickActionContent>
@@ -513,3 +454,604 @@ export default function Dashboard() {
     </ProtectedRoute>
   );
 }
+
+// Styled Components - Matching Layout Design System
+const PageWrapper = styled.div`
+  min-height: 100vh;
+  background: #fafafa;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const Container = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  padding: 2rem;
+`;
+
+const LoadingCard = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  color: #666;
+`;
+
+const LoadingText = styled.p`
+  margin: 0;
+  color: #666;
+  font-size: 0.875rem;
+`;
+
+const ErrorContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  padding: 2rem;
+`;
+
+const ErrorCard = styled.div`
+  text-align: center;
+  padding: 2rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  max-width: 400px;
+`;
+
+const ErrorIcon = styled.div`
+  font-size: 2rem;
+  margin-bottom: 1rem;
+`;
+
+const ErrorTitle = styled.h2`
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: #2c2c2c;
+  margin-bottom: 0.5rem;
+  font-family: 'Cormorant Garamond', serif;
+`;
+
+const ErrorMessage = styled.p`
+  color: #666;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+`;
+
+const RetryButton = styled.button`
+  background: white;
+  border: 1px solid #2c2c2c;
+  color: #2c2c2c;
+  padding: 0.75rem 1.5rem;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-family: 'Work Sans', sans-serif;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: #2c2c2c;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
+  }
+`;
+
+const CreatePortfolioSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+`;
+
+const WelcomeCard = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+`;
+
+const WelcomeIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  color: #666;
+  flex-shrink: 0;
+`;
+
+const WelcomeContent = styled.div`
+  flex: 1;
+`;
+
+const WelcomeTitle = styled.h1`
+  font-size: 2rem;
+  font-weight: 400;
+  color: #2c2c2c;
+  margin: 0 0 0.5rem 0;
+  font-family: 'Cormorant Garamond', serif;
+  letter-spacing: 0.5px;
+`;
+
+const WelcomeDescription = styled.p`
+  color: #666;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+`;
+
+const PortfolioTypesGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+`;
+
+const PortfolioTypeCard = styled.button`
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    border-color: #2c2c2c;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+`;
+
+const CardHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+`;
+
+const CardIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  color: #666;
+`;
+
+const CardTitle = styled.h3`
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: #2c2c2c;
+  margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+`;
+
+const CardDescription = styled.p`
+  color: #666;
+  margin: 0 0 1.5rem 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+`;
+
+const CardFeatures = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+`;
+
+const Feature = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #666;
+  font-size: 0.8125rem;
+  
+  &::before {
+    content: '✓';
+    color: #2c2c2c;
+    font-weight: bold;
+  }
+`;
+
+const CreateButton = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  color: #2c2c2c;
+  font-size: 0.875rem;
+  font-weight: 300;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  margin-top: auto;
+  
+  ${PortfolioTypeCard}:hover & {
+    background: #2c2c2c;
+    color: white;
+    border-color: #2c2c2c;
+  }
+`;
+
+const Header = styled.header`
+  margin-bottom: 2rem;
+`;
+
+const HeaderContent = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+`;
+
+const WelcomeSection = styled.div``;
+
+const WelcomeSubtitle = styled.p`
+  color: #666;
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
+`;
+
+const ViewToggle = styled.div`
+  display: flex;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+`;
+
+const ViewButton = styled.button<{ $active: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: ${props => props.$active ? '#2c2c2c' : 'white'};
+  color: ${props => props.$active ? 'white' : '#666'};
+  border: none;
+  border-right: 1px solid #e0e0e0;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-family: 'Work Sans', sans-serif;
+  transition: all 0.3s ease;
+  
+  &:last-child {
+    border-right: none;
+  }
+  
+  &:hover {
+    background: ${props => props.$active ? '#2c2c2c' : '#f8f8f8'};
+    color: ${props => props.$active ? 'white' : '#2c2c2c'};
+  }
+`;
+
+const DashboardContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+`;
+
+const StatsGrid = styled.div`
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 1.5rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const MainStatCard = styled.div`
+  padding: 2rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+`;
+
+const StatHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+`;
+
+const StatIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  color: #666;
+  flex-shrink: 0;
+`;
+
+const StatInfo = styled.div`
+  flex: 1;
+`;
+
+const StatTitle = styled.h3`
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #666;
+  margin: 0 0 0.25rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const StatValue = styled.div`
+  font-size: 2rem;
+  font-weight: 400;
+  color: #2c2c2c;
+  margin: 0 0 0.25rem 0;
+  font-family: 'Cormorant Garamond', serif;
+`;
+
+const StatLabel = styled.div`
+  font-size: 0.75rem;
+  color: #666;
+`;
+
+const StatProgress = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const ProgressBar = styled.div`
+  height: 4px;
+  background: #f0f0f0;
+  border-radius: 2px;
+  overflow: hidden;
+`;
+
+const ProgressFill = styled.div<{ $percentage: number }>`
+  height: 100%;
+  width: ${props => props.$percentage}%;
+  background: #2c2c2c;
+  transition: width 0.3s ease;
+`;
+
+const ProgressText = styled.div`
+  font-size: 0.75rem;
+  color: #666;
+`;
+
+const StatCard = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+`;
+
+const StatContent = styled.div`
+  flex: 1;
+`;
+
+const StatChange = styled.div`
+  font-size: 0.75rem;
+  color: #666;
+`;
+
+const ContentGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const Section = styled.section`
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+`;
+
+const SectionHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e0e0e0;
+`;
+
+const SectionTitle = styled.h3`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 400;
+  color: #2c2c2c;
+  margin: 0;
+  font-family: 'Cormorant Garamond', serif;
+`;
+
+const ViewAllLink = styled.button`
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  text-decoration: underline;
+  
+  &:hover {
+    color: #2c2c2c;
+  }
+`;
+
+const ActivityList = styled.div`
+  padding: 1.5rem;
+`;
+
+const ActivityItem = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+`;
+
+const ActivityIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  color: #666;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+`;
+
+const ActivityContent = styled.div`
+  flex: 1;
+`;
+
+const ActivityTitle = styled.h4`
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #2c2c2c;
+  margin: 0 0 0.25rem 0;
+`;
+
+const ActivityDescription = styled.p`
+  font-size: 0.8125rem;
+  color: #666;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.4;
+`;
+
+const ActivityMetadata = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const MetadataTag = styled.span`
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.5rem;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const ActivityTime = styled.div`
+  font-size: 0.75rem;
+  color: #666;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+`;
+
+const QuickActionGrid = styled.div`
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const QuickAction = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  color: inherit;
+  
+  &:hover {
+    background: #f8f8f8;
+    border-color: #2c2c2c;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+`;
+
+const QuickActionIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 2px;
+  color: #666;
+  flex-shrink: 0;
+`;
+
+const QuickActionContent = styled.div`
+  flex: 1;
+  text-align: left;
+`;
+
+const QuickActionTitle = styled.div`
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #2c2c2c;
+  margin-bottom: 0.125rem;
+  font-family: 'Cormorant Garamond', serif;
+`;
+
+const QuickActionDescription = styled.div`
+  font-size: 0.75rem;
+  color: #666;
+`;
+
+const QuickActionArrow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  flex-shrink: 0;
+`;

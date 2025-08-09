@@ -1,265 +1,293 @@
-// src/components/dashboard/views/viewStyles.tsx
+// src/components/dashboard/views/viewStyles.ts - Modern Glassmorphism Design System
 import styled from 'styled-components';
-import { theme } from '@/styles/theme';
+import { theme, themeUtils } from '@/styles/theme';
 
-// Shared view components that extend base styles
+// Base container for all views
 export const ViewContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${theme.spacing.xl};
+  gap: ${theme.spacing['2xl']};
+  width: 100%;
 `;
 
+// Stats grid for view statistics
 export const ViewStatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: ${theme.spacing.md};
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: ${theme.spacing.xl};
   margin-bottom: ${theme.spacing['2xl']};
-`;
-
-export const ViewStatCard = styled.div`
-  background: rgba(248, 250, 252, 0.8);
-  backdrop-filter: blur(10px);
-  padding: ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.md};
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.md};
-  border: 1px solid ${theme.colors.border.light};
-  transition: all ${theme.transitions.normal};
   
-  &:hover {
-    background: rgba(255, 255, 255, 0.9);
-    transform: translateY(-2px);
-    box-shadow: ${theme.shadows.sm};
+  @media (max-width: ${theme.breakpoints.md}) {
+    grid-template-columns: 1fr;
+    gap: ${theme.spacing.lg};
   }
 `;
 
-export const ViewStatIcon = styled.div<{ $gradient?: string; $color?: string }>`
+// Individual stat card - Modern glass morphism
+export const ViewStatCard = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.lg};
+  padding: ${theme.spacing.xl};
+  ${themeUtils.glass(0.9)}
+  border-radius: ${theme.borderRadius.md};
+  ${themeUtils.hoverLift}
+  
+  &:hover {
+    border-color: ${theme.colors.primary[600]};
+    background: ${themeUtils.alpha(theme.colors.background.secondary, 0.95)};
+  }
+`;
+
+// Stat icon container - Modern design with color support
+export const ViewStatIcon = styled.div<{ $color?: string; $gradient?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  background: ${props => props.$gradient || `${props.$color || '#3b82f6'}20`};
-  color: ${props => props.$gradient ? 'white' : (props.$color || '#3b82f6')};
+  width: 56px;
+  height: 56px;
+  background: ${props => {
+    if (props.$gradient) return props.$gradient;
+    if (props.$color) return themeUtils.alpha(props.$color, 0.1);
+    return theme.colors.background.tertiary;
+  }};
+  border: 1px solid ${props => {
+    if (props.$color) return themeUtils.alpha(props.$color, 0.2);
+    return theme.colors.border.glass;
+  }};
+  color: ${props => {
+    if (props.$gradient) return theme.colors.text.inverse;
+    if (props.$color) return props.$color;
+    return theme.colors.text.secondary;
+  }};
   border-radius: ${theme.borderRadius.md};
-  box-shadow: ${props => props.$gradient ? theme.shadows.sm : 'none'};
+  transition: ${theme.transitions.normal};
+  flex-shrink: 0;
 `;
 
+// Stat content wrapper
 export const ViewStatContent = styled.div`
   flex: 1;
 `;
 
+// Stat value display
 export const ViewStatValue = styled.div`
-  font-size: ${theme.typography.sizes['2xl']};
-  font-weight: ${theme.typography.weights.bold};
+  font-size: ${theme.typography.sizes['3xl']};
+  font-weight: ${theme.typography.weights.normal};
   color: ${theme.colors.text.primary};
   margin-bottom: ${theme.spacing.xs};
-  
-  @media (max-width: 768px) {
-    font-size: ${theme.typography.sizes.xl};
-  }
+  font-family: ${theme.typography.fonts.secondary};
+  line-height: ${theme.typography.lineHeights.tight};
 `;
 
+// Stat label
 export const ViewStatLabel = styled.div`
   font-size: ${theme.typography.sizes.sm};
   color: ${theme.colors.text.secondary};
-  font-weight: ${theme.typography.weights.medium};
+  font-weight: ${theme.typography.weights.light};
+  text-transform: uppercase;
+  letter-spacing: ${theme.typography.letterSpacing.uppercase};
+  font-family: ${theme.typography.fonts.primary};
 `;
 
+// Grid layout for view content
 export const ViewGrid = styled.div<{ $minWidth?: string }>`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(${props => props.$minWidth || '280px'}, 1fr));
-  gap: ${theme.spacing.lg};
+  grid-template-columns: repeat(auto-fill, minmax(${props => props.$minWidth || '320px'}, 1fr));
+  gap: ${theme.spacing.xl};
   
-  @media (max-width: 768px) {
+  @media (max-width: ${theme.breakpoints.md}) {
     grid-template-columns: 1fr;
+    gap: ${theme.spacing.lg};
   }
 `;
 
-export const ViewCard = styled.div<{ $status?: string; $borderColor?: string }>`
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border-radius: ${theme.borderRadius.lg};
+// Individual view card - Modern glass design
+export const ViewCard = styled.div`
+  ${themeUtils.glass(0.9)}
+  border-radius: ${theme.borderRadius.md};
   overflow: hidden;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 2px solid ${props => 
-    props.$borderColor || 
-    (props.$status === 'completed' ? '#10b981' :
-     props.$status === 'in-progress' ? '#f59e0b' :
-     theme.colors.border.light)
-  };
-  position: relative;
+  ${themeUtils.hoverLift}
   
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: ${theme.shadows.lg};
-    border-color: #3b82f6;
+    border-color: ${theme.colors.primary[600]};
+    background: ${themeUtils.alpha(theme.colors.background.secondary, 0.95)};
   }
 `;
 
+// Card header section
 export const ViewCardHeader = styled.div`
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: ${theme.spacing.md};
+  justify-content: space-between;
+  margin-bottom: ${theme.spacing.lg};
 `;
 
+// Card content wrapper
 export const ViewCardContent = styled.div`
-  padding: ${theme.spacing.lg};
+  padding: ${theme.spacing.xl};
 `;
 
-export const ViewCardTitle = styled.h4`
-  font-size: ${theme.typography.sizes.base};
-  font-weight: ${theme.typography.weights.semibold};
+// Card title
+export const ViewCardTitle = styled.h3`
+  font-size: ${theme.typography.sizes.xl};
+  font-weight: ${theme.typography.weights.medium};
   color: ${theme.colors.text.primary};
   margin: 0 0 ${theme.spacing.sm} 0;
-  line-height: 1.3;
+  font-family: ${theme.typography.fonts.secondary};
+  letter-spacing: ${theme.typography.letterSpacing.wide};
 `;
 
-export const ViewCardMeta = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: ${theme.spacing.sm};
-  margin-bottom: ${theme.spacing.md};
-`;
-
-export const ViewCardDescription = styled.div`
+// Card description
+export const ViewCardDescription = styled.p`
   font-size: ${theme.typography.sizes.sm};
   color: ${theme.colors.text.secondary};
-  line-height: 1.4;
-  margin-bottom: ${theme.spacing.md};
+  margin: 0 0 ${theme.spacing.lg} 0;
+  line-height: ${theme.typography.lineHeights.relaxed};
+  font-family: ${theme.typography.fonts.primary};
 `;
 
-// Status indicators
-export const StatusIndicator = styled.div<{ $status: string; $size?: 'sm' | 'md' }>`
+// Card metadata container
+export const ViewCardMeta = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  margin-bottom: ${theme.spacing.lg};
+  flex-wrap: wrap;
+`;
+
+// Tag component - Modern glass design
+export const ViewTag = styled.span`
+  display: inline-flex;
+  align-items: center;
+  padding: ${theme.spacing.xs} ${theme.spacing.sm};
+  font-size: ${theme.typography.sizes.xs};
+  font-weight: ${theme.typography.weights.medium};
+  background: ${themeUtils.alpha(theme.colors.background.tertiary, 0.8)};
+  color: ${theme.colors.text.secondary};
+  border: 1px solid ${theme.colors.border.glass};
+  border-radius: ${theme.borderRadius.md};
+  text-transform: uppercase;
+  letter-spacing: ${theme.typography.letterSpacing.uppercase};
+  font-family: ${theme.typography.fonts.primary};
+  backdrop-filter: blur(${theme.glass.blurSubtle});
+`;
+
+// Status indicator - Modern design with status variants
+export const StatusIndicator = styled.div<{ $status?: 'completed' | 'in-progress' | 'not-started' | string }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: ${props => props.$size === 'sm' ? '28px' : '36px'};
-  height: ${props => props.$size === 'sm' ? '28px' : '36px'};
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
   background: ${props => {
     switch (props.$status) {
-      case 'completed': return '#d1fae5';
-      case 'in-progress': return '#fef3c7';
-      case 'public': return '#dcfce7';
-      case 'private': return '#f3f4f6';
-      default: return '#f3f4f6';
+      case 'completed':
+        return themeUtils.alpha(theme.colors.accent.emerald, 0.1);
+      case 'in-progress':
+        return themeUtils.alpha(theme.colors.accent.blue, 0.1);
+      case 'not-started':
+        return theme.colors.background.tertiary;
+      default:
+        return theme.colors.background.tertiary;
+    }
+  }};
+  border: 1px solid ${props => {
+    switch (props.$status) {
+      case 'completed':
+        return themeUtils.alpha(theme.colors.accent.emerald, 0.3);
+      case 'in-progress':
+        return themeUtils.alpha(theme.colors.accent.blue, 0.3);
+      case 'not-started':
+        return theme.colors.border.glass;
+      default:
+        return theme.colors.border.glass;
     }
   }};
   color: ${props => {
     switch (props.$status) {
-      case 'completed': return '#065f46';
-      case 'in-progress': return '#92400e';
-      case 'public': return '#166534';
-      case 'private': return theme.colors.text.secondary;
-      default: return theme.colors.text.secondary;
+      case 'completed':
+        return theme.colors.accent.emerald;
+      case 'in-progress':
+        return theme.colors.accent.blue;
+      case 'not-started':
+        return theme.colors.text.secondary;
+      default:
+        return theme.colors.text.secondary;
     }
   }};
+  border-radius: ${theme.borderRadius.md};
+  transition: ${theme.transitions.normal};
 `;
 
-// Tags and badges
-export const ViewTag = styled.span<{ $variant?: 'primary' | 'success' | 'warning' | 'info' }>`
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.sm};
-  font-size: ${theme.typography.sizes.xs};
-  font-weight: ${theme.typography.weights.medium};
-  text-transform: capitalize;
-  
-  ${props => {
-    switch (props.$variant) {
-      case 'success':
-        return `
-          background: #d1fae5;
-          color: #065f46;
-        `;
-      case 'warning':
-        return `
-          background: #fef3c7;
-          color: #92400e;
-        `;
-      case 'info':
-        return `
-          background: #dbeafe;
-          color: #1e40af;
-        `;
-      default:
-        return `
-          background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-          color: white;
-        `;
-    }
-  }}
-`;
-
-// Progress indicators
+// Progress container
 export const ProgressContainer = styled.div`
-  margin: ${theme.spacing.sm} 0;
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  margin: ${theme.spacing.lg} 0;
 `;
 
+// Progress bar - Modern glass design
 export const ProgressBar = styled.div`
-  height: 6px;
-  background: ${theme.colors.border.light};
-  border-radius: 3px;
+  flex: 1;
+  height: 8px;
+  background: ${themeUtils.alpha(theme.colors.border.light, 0.6)};
+  border-radius: ${theme.borderRadius.sm};
   overflow: hidden;
-  margin-bottom: ${theme.spacing.xs};
+  backdrop-filter: blur(${theme.glass.blurSubtle});
 `;
 
-export const ProgressFill = styled.div<{ $percentage: number; $color?: string }>`
+// Progress fill - Gradient design
+export const ProgressFill = styled.div<{ $percentage: number }>`
   height: 100%;
   width: ${props => Math.min(props.$percentage, 100)}%;
-  background: ${props => props.$color || 'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%)'};
-  transition: width 0.8s ease;
+  background: linear-gradient(90deg, ${theme.colors.primary[600]} 0%, ${theme.colors.accent.blue} 100%);
+  transition: width ${theme.transitions.normal};
+  border-radius: ${theme.borderRadius.sm};
 `;
 
-export const ProgressText = styled.div`
+// Progress text
+export const ProgressText = styled.span`
   font-size: ${theme.typography.sizes.xs};
   color: ${theme.colors.text.secondary};
+  font-weight: ${theme.typography.weights.medium};
+  min-width: 3rem;
   text-align: right;
-  font-weight: ${theme.typography.weights.semibold};
+  font-family: ${theme.typography.fonts.primary};
 `;
 
-// Action buttons
+// Action group for buttons
 export const ViewActionGroup = styled.div`
   display: flex;
   gap: ${theme.spacing.sm};
-  margin-top: ${theme.spacing.md};
+  margin-top: ${theme.spacing.lg};
 `;
 
-export const ViewAction = styled.button<{ $primary?: boolean; $variant?: 'secondary' | 'ghost' }>`
+// Individual action button - Modern glass design
+export const ViewAction = styled.button<{ $primary?: boolean }>`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.xs};
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  background: ${props => {
-    if (props.$primary) return 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)';
-    if (props.$variant === 'ghost') return 'transparent';
-    return 'rgba(243, 244, 246, 0.8)';
-  }};
-  color: ${props => props.$primary ? 'white' : theme.colors.text.primary};
-  border: 1px solid ${props => {
-    if (props.$primary) return 'transparent';
-    if (props.$variant === 'ghost') return 'transparent';
-    return theme.colors.border.light;
-  }};
-  border-radius: ${theme.borderRadius.sm};
+  gap: ${theme.spacing.sm};
+  padding: ${theme.spacing.sm} ${theme.spacing.lg};
   font-size: ${theme.typography.sizes.sm};
-  font-weight: ${theme.typography.weights.medium};
+  background: ${props => props.$primary ? theme.colors.primary[600] : themeUtils.alpha(theme.colors.background.secondary, 0.8)};
+  color: ${props => props.$primary ? theme.colors.text.inverse : theme.colors.text.secondary};
+  border: 1px solid ${props => props.$primary ? theme.colors.primary[600] : theme.colors.border.glass};
+  border-radius: ${theme.borderRadius.sm};
   cursor: pointer;
-  transition: all ${theme.transitions.fast};
+  transition: ${theme.transitions.normal};
+  text-transform: uppercase;
+  letter-spacing: ${theme.typography.letterSpacing.uppercase};
+  font-weight: ${theme.typography.weights.medium};
+  font-family: ${theme.typography.fonts.primary};
+  backdrop-filter: blur(${theme.glass.blurSubtle});
   
   &:hover {
+    background: ${props => props.$primary ? theme.colors.primary[700] : theme.colors.background.tertiary};
+    border-color: ${theme.colors.primary[600]};
     transform: translateY(-1px);
-    box-shadow: ${props => props.$primary ? '0 4px 8px rgba(59, 130, 246, 0.3)' : theme.shadows.sm};
-    background: ${props => {
-      if (props.$primary) return 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)';
-      if (props.$variant === 'ghost') return 'rgba(243, 244, 246, 0.5)';
-      return 'rgba(255, 255, 255, 0.9)';
-    }};
+    box-shadow: ${theme.shadows.glassSubtle};
   }
   
   &:active {
@@ -267,18 +295,21 @@ export const ViewAction = styled.button<{ $primary?: boolean; $variant?: 'second
   }
 `;
 
-// Image containers for gallery
+// Image container for gallery items
 export const ViewImageContainer = styled.div`
   position: relative;
+  width: 100%;
+  height: 220px;
   overflow: hidden;
-  aspect-ratio: 4/3;
-  border-radius: ${theme.borderRadius.md};
+  background: ${theme.colors.background.tertiary};
+  border-bottom: 1px solid ${theme.colors.border.glass};
+  border-radius: ${theme.borderRadius.md} ${theme.borderRadius.md} 0 0;
   
   img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.4s ease;
+    transition: transform ${theme.transitions.normal};
   }
   
   &:hover img {
@@ -286,41 +317,166 @@ export const ViewImageContainer = styled.div`
   }
 `;
 
+// Image overlay for actions - Modern glass
 export const ViewImageOverlay = styled.div`
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: ${themeUtils.alpha(theme.colors.primary[800], 0.7)};
+  backdrop-filter: blur(${theme.glass.blur});
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: ${theme.spacing.md};
+  gap: ${theme.spacing.sm};
   opacity: 0;
   transition: opacity ${theme.transitions.normal};
   
-  ${ViewCard}:hover & {
+  ${ViewImageContainer}:hover & {
     opacity: 1;
   }
 `;
 
+// Image action button - Modern glass design
 export const ViewImageAction = styled.button`
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 48px;
+  height: 48px;
+  ${themeUtils.glass(0.9)}
+  border-radius: ${theme.borderRadius.md};
   color: ${theme.colors.text.primary};
   cursor: pointer;
-  transition: all ${theme.transitions.fast};
+  transition: ${theme.transitions.normal};
   
   &:hover {
-    background: white;
-    transform: scale(1.1);
+    background: ${theme.colors.background.secondary};
+    transform: translateY(-2px);
+    box-shadow: ${theme.shadows.md};
+  }
+`;
+
+// Empty state styling - Modern glass design
+export const EmptyStateCard = styled.div`
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: ${theme.spacing['4xl']} ${theme.spacing['2xl']};
+  ${themeUtils.glass(0.8)}
+  border: 2px dashed ${theme.colors.border.glass};
+  border-radius: ${theme.borderRadius.lg};
+  text-align: center;
+  color: ${theme.colors.text.secondary};
+`;
+
+export const EmptyIcon = styled.div`
+  margin-bottom: ${theme.spacing.xl};
+  color: ${theme.colors.text.tertiary};
+  opacity: 0.7;
+`;
+
+export const EmptyTitle = styled.h3`
+  font-size: ${theme.typography.sizes['2xl']};
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.primary};
+  margin: 0 0 ${theme.spacing.sm} 0;
+  font-family: ${theme.typography.fonts.secondary};
+`;
+
+export const EmptyMessage = styled.p`
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  margin: 0 0 ${theme.spacing.xl} 0;
+  line-height: ${theme.typography.lineHeights.relaxed};
+  max-width: 400px;
+  font-family: ${theme.typography.fonts.primary};
+`;
+
+// Additional modern components
+
+// Glass card variant for special content
+export const GlassCard = styled.div`
+  ${themeUtils.glass(0.85)}
+  border-radius: ${theme.borderRadius.lg};
+  padding: ${theme.spacing.xl};
+  ${themeUtils.hoverLift}
+  
+  &:hover {
+    background: ${themeUtils.alpha(theme.colors.background.secondary, 0.95)};
+    border-color: ${theme.colors.primary[600]};
+  }
+`;
+
+// Modern button variants
+export const PrimaryButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  padding: ${theme.spacing.sm} ${theme.spacing.lg};
+  background: ${theme.colors.primary[600]};
+  color: ${theme.colors.text.inverse};
+  border: 1px solid ${theme.colors.primary[600]};
+  border-radius: ${theme.borderRadius.sm};
+  font-family: ${theme.typography.fonts.primary};
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.medium};
+  letter-spacing: ${theme.typography.letterSpacing.uppercase};
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: ${theme.transitions.normal};
+  
+  &:hover {
+    background: ${theme.colors.primary[700]};
+    transform: translateY(-1px);
+    box-shadow: ${theme.shadows.md};
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
+
+export const SecondaryButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: ${theme.spacing.sm};
+  padding: ${theme.spacing.sm} ${theme.spacing.lg};
+  ${themeUtils.glass(0.8)}
+  color: ${theme.colors.text.secondary};
+  border-radius: ${theme.borderRadius.sm};
+  font-family: ${theme.typography.fonts.primary};
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.medium};
+  letter-spacing: ${theme.typography.letterSpacing.uppercase};
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: ${theme.transitions.normal};
+  
+  &:hover {
+    background: ${theme.colors.background.tertiary};
+    border-color: ${theme.colors.primary[600]};
+    color: ${theme.colors.text.primary};
+    transform: translateY(-1px);
+    box-shadow: ${theme.shadows.glassSubtle};
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
   }
 `;
