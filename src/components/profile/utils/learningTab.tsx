@@ -111,7 +111,7 @@ export const LearningTabContent: React.FC<LearningTabContentProps> = ({ portfoli
     }
   };
 
-  const handleUpdateProgress = async (conceptId: string, newStatus: string) => {
+  const handleUpdateProgress = async (conceptId: string, newStatus: "started" | "in-progress" | "completed" ) => {
     try {
       await api.portfolio.concepts.updateProgress(conceptId, { status: newStatus });
       setConceptProgresses(prev => prev.map(cp => 

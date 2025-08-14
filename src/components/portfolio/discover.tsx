@@ -1,4 +1,4 @@
-// src/pages/portfolio/discover.tsx - Fixed to work with current API
+// src/pages/portfolio/discover.tsx 
 'use client';
 
 import React, { useState, useEffect } from 'react';

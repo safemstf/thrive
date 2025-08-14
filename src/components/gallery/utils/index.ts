@@ -6,6 +6,7 @@ import {
   GalleryVisibility,
   GalleryQueryParams 
 } from '@/types/gallery.types';
+import { BackendGalleryPiece } from '@/types/base.types';
 
 // ==================== Constants ====================
 export const GALLERY_CONSTANTS = {
@@ -171,7 +172,7 @@ export const canUserEditPiece = (
 
 export const getShareUrl = (piece: GalleryPiece): string => {
   if (piece.visibility === 'public') {
-    return `${window.location.origin}/gallery/${piece.id}`;
+    return `${window.location.origin}/gallery/${piece._id}`;
   }
   return `${window.location.origin}/gallery/shared/${piece.shareToken}`;
 };
@@ -284,6 +285,35 @@ const createFormData = (file: File): FormData => {
 };
 
 /**
+ * Convert frontend GalleryPiece to backend-compatible format
+ */
+const convertToBackendFormat = (updates: Partial<GalleryPiece>): Partial<BackendGalleryPiece> => {
+  const backendUpdates: any = { ...updates };
+  
+  // Convert dimensions if present
+  if (updates.dimensions) {
+    backendUpdates.dimensions = {
+      ...updates.dimensions,
+      // Ensure unit is in the expected format for backend
+      unit: updates.dimensions.unit as 'in' | 'cm' | 'mm' || 'cm'
+    };
+  }
+  
+  // Convert dates to ISO strings if they're Date objects
+  if (updates.createdAt instanceof Date) {
+    backendUpdates.createdAt = updates.createdAt.toISOString();
+  }
+  if (updates.updatedAt instanceof Date) {
+    backendUpdates.updatedAt = updates.updatedAt.toISOString();
+  }
+  if (updates.publishedAt instanceof Date) {
+    backendUpdates.publishedAt = updates.publishedAt.toISOString();
+  }
+  
+  return backendUpdates;
+};
+
+/**
  * Update a gallery piece through portfolio
  * TODO: Implement /portfolios/me/gallery/:pieceId endpoint with PUT method
  */
@@ -292,7 +322,8 @@ export const updateGalleryPiece = async (
   updates: Partial<GalleryPiece>
 ) => {
   try {
-    const result = await api.portfolio.gallery.update(pieceId, updates);
+    const backendUpdates = convertToBackendFormat(updates);
+    const result = await api.portfolio.gallery.update(pieceId, backendUpdates);
     console.log('[Portfolio/Gallery] Updated piece:', pieceId);
     return result;
   } catch (error) {
@@ -330,6 +361,7 @@ export const batchDeletePieces = async (pieceIds: string[]) => {
     throw error;
   }
 };
+
 /**
  * Update visibility for a single gallery piece through portfolio
  */
@@ -393,11 +425,11 @@ export const deleteGalleryPieceWithConfirmation = async (
  * Helper to check if pieces can be deleted
  */
 export const checkDeletablePieces = (
-  pieces: Array<{ id: string; ownerId: string }>,
+  pieces: Array<{ _id: string; ownerId: string }>,
   userId?: string
 ): { deletable: string[]; nonDeletable: string[] } => {
   if (!userId) {
-    return { deletable: [], nonDeletable: pieces.map(p => p.id) };
+    return { deletable: [], nonDeletable: pieces.map(p => p._id) };
   }
   
   const deletable: string[] = [];
@@ -405,9 +437,9 @@ export const checkDeletablePieces = (
   
   pieces.forEach(piece => {
     if (piece.ownerId === userId) {
-      deletable.push(piece.id);
+      deletable.push(piece._id);
     } else {
-      nonDeletable.push(piece.id);
+      nonDeletable.push(piece._id);
     }
   });
   
@@ -422,12 +454,16 @@ export const getMyGalleryPieces = async (params?: GalleryQueryParams) => {
   try {
     // Use the new portfolio gallery endpoint
     const result = await api.portfolio.gallery.get();
-    console.log('[Portfolio/Gallery] Fetched user pieces:', result.length);
+    console.log('[Portfolio/Gallery] Fetched user pieces:', result.galleryPieces?.length || 0);
+    
+    // Handle the response structure properly
+    const pieces = result.galleryPieces || [];
+    
     return {
-      pieces: result,
-      total: result.length,
+      pieces: pieces,
+      total: pieces.length,
       page: 1,
-      limit: result.length
+      limit: pieces.length
     };
   } catch (error) {
     console.error('[Portfolio/Gallery] Failed to fetch user pieces:', error);

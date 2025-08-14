@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { usePortfolioByUsername } from '@/hooks/usePortfolioQueries';
 import { useAuth } from '@/providers/authProvider';
-import { usePortfolioManager } from '@/services/portfolioService';
+import { usePortfolioManagement } from '@/hooks/usePortfolioManagement';
 import { Portfolio } from '@/types/portfolio.types';
 
 // ==================== Component Props ====================
@@ -36,7 +36,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ username }) => {
   const {
     galleryPieces,
     loading: galleryLoading
-  } = usePortfolioManager();
+  } = usePortfolioManagement();
 
   // Check if user owns this portfolio
   const isOwner = isAuthenticated && user?.username === username;

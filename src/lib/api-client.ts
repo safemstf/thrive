@@ -8,20 +8,17 @@ import { AuthApiClient } from './api/api-client-auth';
 import type {
   CreatePortfolioDto,
   UpdatePortfolioDto,
-  PortfolioFilters,
-  PortfolioKind
+  PortfolioKind,
+  Portfolio
 } from '@/types/portfolio.types';
 
 import type {
-  GalleryPiece,
   GalleryVisibility,
 } from '@/types/gallery.types';
 
 import type {
-  BookQueryParams,
-} from '@/types/api.types';
-
-import type { ConceptFilters } from '@/types/portfolio.types';
+  BackendGalleryPiece
+} from '@/types/base.types';
 
 import type {
   LoginCredentials,
@@ -32,11 +29,31 @@ import type {
 import type {
   MainCategory,
   SubCategory,
+  ConceptFilters,
+  BookQueryParams,
+  ScientificDiscipline
 } from '@/types/educational.types';
 
 // Re-export types
 export { APIError } from './api/base-api-client';
 export type { RequestConfig } from './api/base-api-client';
+
+// ==================== PORTFOLIO FILTERS TYPE ====================
+// Define this here since it's missing from portfolio.types.ts
+interface PortfolioFilters {
+  kind?: string;
+  search?: string;
+  featured?: boolean;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  visibility?: 'public' | 'private';
+  status?: 'active' | 'inactive' | 'suspended';
+  specializations?: string[];
+  tags?: string[];
+  location?: string;
+  minRating?: number;
+  hasReviews?: boolean;
+}
 
 // ==================== EXTENDED API CLIENT INTERFACES ====================
 // These extend the base clients to include missing methods
@@ -151,6 +168,32 @@ export class ApiClient extends BaseApiClient implements CombinedAPI {
     this.health = this.createHealthClient();
   }
 
+  // ==================== HEALTH & CONNECTION METHODS ====================
+  
+  async healthCheck(): Promise<{ status: string; version: string }> {
+    try {
+      return await this.request('/api/health');
+    } catch (error) {
+      return { status: 'error', version: 'unknown' };
+    }
+  }
+
+  async testConnection(): Promise<{ connected: boolean; baseUrl: string; error?: string }> {
+    try {
+      await this.request('/api/health');
+      return { 
+        connected: true, 
+        baseUrl: (this as any).baseURL 
+      };
+    } catch (error: any) {
+      return { 
+        connected: false, 
+        baseUrl: (this as any).baseURL,
+        error: error.message 
+      };
+    }
+  }
+
   // ==================== CLIENT FACTORIES ====================
   
   private createExtendedEducationalClient(baseURL?: string): ExtendedEducationalApiClient {
@@ -159,28 +202,42 @@ export class ApiClient extends BaseApiClient implements CombinedAPI {
     // Add missing methods to the educational client
     const extendedClient = Object.assign(baseClient, {
       createBook: async (data: any) => {
-        return await (baseClient as any).post('/books', data);
+        return await (baseClient as any).request('/api/books', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
       },
       composeBook: async (data: any) => {
-        return await (baseClient as any).post('/books/compose', data);
+        return await (baseClient as any).request('/api/books/compose', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
       },
       getBookSuggestions: async (id: string) => {
-        return await (baseClient as any).get(`/books/${id}/suggestions`);
+        return await (baseClient as any).request(`/api/books/${id}/suggestions`);
       },
       analyzeBook: async (id: string) => {
-        return await (baseClient as any).get(`/books/${id}/analysis`);
+        return await (baseClient as any).request(`/api/books/${id}/analysis`);
       },
       cloneBook: async (id: string) => {
-        return await (baseClient as any).post(`/books/${id}/clone`);
+        return await (baseClient as any).request(`/api/books/${id}/clone`, {
+          method: 'POST'
+        });
       },
       getConceptsByType: async (type: string) => {
-        return await (baseClient as any).get(`/concepts/type/${type}`);
+        return await (baseClient as any).request(`/api/concepts/type/${type}`);
       },
       createConcept: async (data: any) => {
-        return await (baseClient as any).post('/concepts', data);
+        return await (baseClient as any).request('/api/concepts', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
       },
       updateConcept: async (id: string, data: any) => {
-        return await (baseClient as any).put(`/concepts/${id}`, data);
+        return await (baseClient as any).request(`/api/concepts/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify(data)
+        });
       }
     });
 
@@ -190,22 +247,22 @@ export class ApiClient extends BaseApiClient implements CombinedAPI {
   private createProgressClient(): ProgressApiClient {
     return {
       getProgressSummary: async () => {
-        return await this.request('/progress');
+        return await this.request('/api/progress');
       },
       getBookProgress: async (bookId: string) => {
-        return await this.request(`/progress/book/${bookId}`);
+        return await this.request(`/api/progress/book/${bookId}`);
       },
       updateConceptProgress: async (bookId: string, conceptId: string, data: any) => {
-        return await this.request(`/progress/book/${bookId}/concept/${conceptId}`, {
+        return await this.request(`/api/progress/book/${bookId}/concept/${conceptId}`, {
           method: 'POST',
           body: JSON.stringify(data)
         });
       },
       getStats: async () => {
-        return await this.request('/progress/stats');
+        return await this.request('/api/progress/stats');
       },
       resetBookProgress: async (bookId: string) => {
-        return await this.request(`/progress/book/${bookId}`, {
+        return await this.request(`/api/progress/book/${bookId}`, {
           method: 'DELETE'
         });
       }
@@ -215,27 +272,27 @@ export class ApiClient extends BaseApiClient implements CombinedAPI {
   private createUsersClient(): UsersApiClient {
     return {
       getAll: async () => {
-        return await this.request('/users');
+        return await this.request('/api/users');
       },
       getById: async (id: string) => {
-        return await this.request(`/users/${id}`);
+        return await this.request(`/api/users/${id}`);
       },
       update: async (id: string, data: any) => {
-        return await this.request(`/users/${id}`, {
+        return await this.request(`/api/users/${id}`, {
           method: 'PUT',
           body: JSON.stringify(data)
         });
       },
       delete: async (id: string) => {
-        return await this.request(`/users/${id}`, {
+        return await this.request(`/api/users/${id}`, {
           method: 'DELETE'
         });
       },
       getProgress: async (id: string) => {
-        return await this.request(`/users/${id}/progress`);
+        return await this.request(`/api/users/${id}/progress`);
       },
       resetPassword: async (id: string) => {
-        return await this.request(`/users/${id}/reset-password`, {
+        return await this.request(`/api/users/${id}/reset-password`, {
           method: 'POST'
         });
       }
@@ -245,43 +302,43 @@ export class ApiClient extends BaseApiClient implements CombinedAPI {
   private createMeClient(): MeApiClient {
     return {
       getSkills: async () => {
-        return await this.request('/users/me/skills');
+        return await this.request('/api/users/me/skills');
       },
       getLearningPaths: async () => {
-        return await this.request('/users/me/learning-paths');
+        return await this.request('/api/users/me/learning-paths');
       },
       getMarketIntelligence: async () => {
-        return await this.request('/users/me/market-intelligence');
+        return await this.request('/api/users/me/market-intelligence');
       },
       getPrivacySettings: async () => {
-        return await this.request('/users/me/privacy-settings');
+        return await this.request('/api/users/me/privacy-settings');
       },
       updatePrivacySettings: async (settings: any) => {
-        return await this.request('/users/me/privacy-settings', {
+        return await this.request('/api/users/me/privacy-settings', {
           method: 'PUT',
           body: JSON.stringify(settings)
         });
       },
       getAccountInfo: async () => {
-        return await this.request('/users/me/account-info');
+        return await this.request('/api/users/me/account-info');
       },
       updateAccountInfo: async (info: any) => {
-        return await this.request('/users/me/account-info', {
+        return await this.request('/api/users/me/account-info', {
           method: 'PUT',
           body: JSON.stringify(info)
         });
       },
       getBilling: async () => {
-        return await this.request('/users/me/billing');
+        return await this.request('/api/users/me/billing');
       },
       upgradeBilling: async (plan: any) => {
-        return await this.request('/users/me/billing/upgrade', {
+        return await this.request('/api/users/me/billing/upgrade', {
           method: 'POST',
           body: JSON.stringify(plan)
         });
       },
       deleteAccount: async () => {
-        return await this.request('/users/me/delete-account', {
+        return await this.request('/api/users/me/delete-account', {
           method: 'DELETE'
         });
       }
@@ -291,48 +348,48 @@ export class ApiClient extends BaseApiClient implements CombinedAPI {
   private createSimulationsClient(): SimulationsApiClient {
     return {
       getAll: async (filters?: any) => {
-        return await this.request('/simulations', { params: filters });
+        return await this.request('/api/simulations', { params: filters });
       },
       create: async (data: any) => {
-        return await this.request('/simulations', {
+        return await this.request('/api/simulations', {
           method: 'POST',
           body: JSON.stringify(data)
         });
       },
       getStats: async () => {
-        return await this.request('/simulations/stats');
+        return await this.request('/api/simulations/stats');
       },
       uploadResults: async (data: any) => {
-        return await this.request('/simulations/results', {
+        return await this.request('/api/simulations/results', {
           method: 'POST',
           body: JSON.stringify(data)
         });
       },
       getById: async (id: string) => {
-        return await this.request(`/simulations/${id}`);
+        return await this.request(`/api/simulations/${id}`);
       },
       getInsights: async (id: string) => {
-        return await this.request(`/simulations/${id}/insights`);
+        return await this.request(`/api/simulations/${id}/insights`);
       },
       sendEvents: async (id: string, events: any) => {
-        return await this.request(`/simulations/${id}/events`, {
+        return await this.request(`/api/simulations/${id}/events`, {
           method: 'POST',
           body: JSON.stringify(events)
         });
       },
       getLiveData: async (id: string) => {
-        return await this.request(`/simulations/${id}/live-data`);
+        return await this.request(`/api/simulations/${id}/live-data`);
       },
       getStream: async (id: string) => {
-        return await this.request(`/simulations/${id}/stream`);
+        return await this.request(`/api/simulations/${id}/stream`);
       },
       disconnect: async (id: string) => {
-        return await this.request(`/simulations/${id}/disconnect`, {
+        return await this.request(`/api/simulations/${id}/disconnect`, {
           method: 'POST'
         });
       },
       delete: async (id: string) => {
-        return await this.request(`/simulations/${id}`, {
+        return await this.request(`/api/simulations/${id}`, {
           method: 'DELETE'
         });
       }
@@ -342,13 +399,13 @@ export class ApiClient extends BaseApiClient implements CombinedAPI {
   private createHealthClient(): HealthApiClient {
     return {
       getDetailed: async () => {
-        return await this.request('/health/detailed');
+        return await this.request('/api/health/detailed');
       },
       getReady: async () => {
-        return await this.request('/health/ready');
+        return await this.request('/api/health/ready');
       },
       getLive: async () => {
-        return await this.request('/health/live');
+        return await this.request('/api/health/live');
       }
     };
   }
@@ -381,15 +438,15 @@ export const api = {
   // === PORTFOLIO API - Complete System ===
   portfolio: {
     // Core Operations
-    get: () => getApiClient().portfolio.getMyPortfolio(),
+    get: (): Promise<Portfolio | null> => getApiClient().portfolio.getMyPortfolio(),
     create: (data: CreatePortfolioDto) => getApiClient().portfolio.create(data),
     update: (data: UpdatePortfolioDto) => getApiClient().portfolio.update(data),
     delete: (deleteGalleryPieces?: boolean) => getApiClient().portfolio.deleteMyPortfolio(deleteGalleryPieces),
-    upgrade: (kind: PortfolioKind, preserveContent?: boolean) => getApiClient().portfolio.upgrade(kind, preserveContent),
+    upgrade: (kind: PortfolioKind, preserveContent: boolean = true) => getApiClient().portfolio.upgrade(kind, preserveContent),
     check: () => getApiClient().portfolio.hasPortfolio(),
 
     // Discovery & Public Access
-    discover: (filters?: PortfolioFilters, page?: number, limit?: number) => 
+    discover: (filters?: PortfolioFilters, page: number = 1, limit: number = 20) =>
       getApiClient().portfolio.discover(filters, page, limit),
     getByUsername: (username: string) => getApiClient().portfolio.getByUsername(username),
     getStats: () => getApiClient().portfolio.getStats(),
@@ -397,26 +454,34 @@ export const api = {
 
     // 2-Step Upload Wizard & Image Management
     images: {
-      upload: (file: File, type: 'profile' | 'cover') => 
+      upload: (file: File, type: 'profile' | 'cover' | 'gallery' = 'gallery') =>
         getApiClient().portfolio.uploadImage(file, type),
-      uploadRaw: (formData: FormData) => 
-        getApiClient().portfolio.uploadImageRaw(formData),
       
+      uploadRaw: (formData: FormData) =>
+        getApiClient().portfolio.uploadImageRaw(formData),
       // Image URL helpers (generate URLs, don't make requests)
       getMyGalleryImageUrl: (pieceId: string, size?: 'full' | 'thumbnail') =>
-        `${getApiClient().getBaseURL()}/api/portfolios/me/gallery/${pieceId}/image${size ? `?size=${size}` : ''}`,
+        `${getApiClient().getBaseURL()}/api/portfolios/me/gallery/${encodeURIComponent(pieceId)}/image${size ? `?size=${encodeURIComponent(size)}` : ''}`,
       getPublicGalleryImageUrl: (username: string, pieceId: string, size?: 'full' | 'thumbnail') =>
-        `${getApiClient().getBaseURL()}/api/portfolios/by-username/${username}/gallery/${pieceId}/image${size ? `?size=${size}` : ''}`,
+        `${getApiClient().getBaseURL()}/api/portfolios/by-username/${encodeURIComponent(username)}/gallery/${encodeURIComponent(pieceId)}/image${size ? `?size=${encodeURIComponent(size)}` : ''}`,
       getMyProfileImageUrl: (type: 'profile' | 'cover') =>
-        `${getApiClient().getBaseURL()}/api/portfolios/me/image/${type}`,
+        `${getApiClient().getBaseURL()}/api/portfolios/me/image/${encodeURIComponent(type)}`,
       getPublicProfileImageUrl: (username: string, type: 'profile' | 'cover') =>
-        `${getApiClient().getBaseURL()}/api/portfolios/by-username/${username}/image/${type}`,
+        `${getApiClient().getBaseURL()}/api/portfolios/by-username/${encodeURIComponent(username)}/image/${encodeURIComponent(type)}`,
     },
 
     // Gallery Management (Portfolio-Owned)
     gallery: {
-      get: () => getApiClient().portfolio.getMyGalleryPieces(),
-      getByUsername: (username: string, page?: number, limit?: number) => 
+      get: (options?: {
+        page?: number;
+        limit?: number;
+        category?: string;
+        visibility?: 'public' | 'private' | 'unlisted' | 'all';
+        search?: string;
+        sortBy?: string;
+        sortOrder?: 'asc' | 'desc';
+      }) => getApiClient().portfolio.getMyGalleryPieces(options),
+      getByUsername: (username: string, page: number = 1, limit: number = 20) =>
         getApiClient().portfolio.getPortfolioGalleryByUsername(username, page, limit),
       add: (pieceData: {
         title: string;
@@ -431,12 +496,12 @@ export const api = {
         price?: number;
         artist?: string;
       }) => getApiClient().portfolio.addGalleryPiece(pieceData),
-      update: (pieceId: string, updates: Partial<GalleryPiece>) => 
+      update: (pieceId: string, updates: Partial<BackendGalleryPiece>) =>
         getApiClient().portfolio.updateGalleryPiece(pieceId, updates),
       delete: (pieceId: string) => getApiClient().portfolio.deleteGalleryPiece(pieceId),
-      batchDelete: (pieceIds: string[]) => 
-        getApiClient().portfolio.batchDeleteGalleryPieces(pieceIds),
-      batchUpdateVisibility: (pieceIds: string[], visibility: GalleryVisibility) => 
+      batchDelete: (pieceIds: string[], onProgress?: (completed: number, total: number) => void) =>
+        getApiClient().portfolio.batchDeleteGalleryPieces(pieceIds, onProgress),
+      batchUpdateVisibility: (pieceIds: string[], visibility: GalleryVisibility) =>
         getApiClient().portfolio.batchUpdateGalleryVisibility(pieceIds, visibility),
       getStats: () => getApiClient().portfolio.getGalleryStats(),
     },
@@ -444,14 +509,14 @@ export const api = {
     // Concept Tracking (Educational/Hybrid)
     concepts: {
       get: () => getApiClient().portfolio.getMyConcepts(),
-      add: (conceptId: string, data: { 
-        status?: string; 
+      add: (conceptId: string, data: {
+        status?: 'started' | 'in-progress' | 'completed';
         startedAt?: string;
         notes?: string;
         score?: number;
       } = {}) => getApiClient().portfolio.addConceptToPortfolio(conceptId, data),
-      updateProgress: (conceptId: string, data: { 
-        status?: string; 
+      updateProgress: (conceptId: string, data: {
+        status?: 'started' | 'in-progress' | 'completed';
         score?: number;
         notes?: string;
         completedAt?: string;
@@ -460,9 +525,9 @@ export const api = {
 
     // Analytics & Dashboard
     analytics: {
-      get: (period?: string) => getApiClient().portfolio.getAnalytics(period),
+      get: (period: '7d' | '30d' | '90d' | '1y' = '30d') => getApiClient().portfolio.getAnalytics(period),
       dashboard: () => getApiClient().portfolio.getDashboard(),
-      trackView: (portfolioId: string, data?: { referrer?: string; duration?: number }) => 
+      trackView: (portfolioId: string, data?: { referrer?: string; duration?: number }) =>
         getApiClient().portfolio.trackView(portfolioId, data),
     },
 
@@ -476,7 +541,6 @@ export const api = {
     getById: (id: string) => getApiClient().portfolio.getById(id),
     getByUserId: (userId: string) => getApiClient().portfolio.getByUserId(userId),
   },
-  
   // === EDUCATION API ===
   books: {
     getAll: (params?: BookQueryParams) => getApiClient().educational.getBooks(params),
@@ -557,7 +621,7 @@ export const api = {
   
   // === AUTH API ===
   auth: {
-    register: (credentials: SignupCredentials) => getApiClient().auth.signup(credentials),
+    signup: (credentials: SignupCredentials) => getApiClient().auth.signup(credentials),
     login: (credentials: LoginCredentials) => getApiClient().auth.login(credentials),
     logout: () => getApiClient().auth.logout(),
     getCurrentUser: () => getApiClient().auth.getCurrentUser(),
@@ -568,4 +632,3 @@ export const api = {
 
 // ==================== DEFAULT EXPORT ====================
 export default api;
-

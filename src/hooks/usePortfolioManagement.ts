@@ -15,6 +15,36 @@ type CreatePortfolioInput = {
   location?: string;
 };
 
+/** Small normalizer to handle ApiResponse<T> / { portfolio: T } / { data: T } / direct T */
+function normalizeApi<T = any>(raw: any): T | null {
+  if (raw == null) return null;
+  if (typeof raw !== 'object') return (raw as unknown) as T;
+
+  // ApiResponse<T> -> .data
+  if ('data' in raw) return raw.data as T;
+
+  // Some endpoints return { portfolio: T } or { galleryPieces: T[] } etc.
+  const knownSingleKeys = ['portfolio', 'galleryPiece', 'item', 'result'];
+  for (const k of knownSingleKeys) {
+    if (k in raw) return (raw as any)[k] as T;
+  }
+
+  // Known plural keys (lists)
+  const knownListKeys = ['galleryPieces', 'pieces', 'items', 'results', 'portfolios'];
+  for (const k of knownListKeys) {
+    if (k in raw) return (raw as any)[k] as T;
+  }
+
+  // If it looks like { success: boolean, ...payload } try to find the payload property
+  if ('success' in raw) {
+    const payloadKey = Object.keys(raw).find(k => !['success', 'message', 'error', 'code'].includes(k));
+    if (payloadKey) return (raw as any)[payloadKey] as T;
+  }
+
+  // Default: assume raw is already the payload
+  return raw as T;
+}
+
 export function usePortfolioManagement() {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,23 +58,24 @@ export function usePortfolioManagement() {
     try {
       setLoading(true);
       setError(null);
-      
-      const portfolioData = await api.portfolio.get();
-      setPortfolio(portfolioData);
+
+      const raw = await api.portfolio.get();
+      const payload = normalizeApi<Portfolio>(raw);
+      setPortfolio(payload);
     } catch (err: any) {
       console.error('Failed to fetch portfolio:', err);
-      
+
       // Handle different error types
-      if (err.status === 404 || err.message?.includes('404') || err.message?.includes('not found')) {
+      if (err && (err.status === 404 || String(err.message).includes('404') || String(err.message).toLowerCase().includes('not found'))) {
         // No portfolio exists - this is normal, not an error
         setPortfolio(null);
         setError(null);
-      } else if (err.status === 401 || err.message?.includes('unauthorized')) {
+      } else if (err && (err.status === 401 || String(err.message).toLowerCase().includes('unauthorized'))) {
         setError('Please log in to view your portfolio');
-      } else if (err.status >= 500) {
+      } else if (err && err.status >= 500) {
         setError('Server error - please try again later');
       } else {
-        setError(err.message || 'Failed to load portfolio');
+        setError(err?.message || 'Failed to load portfolio');
       }
     } finally {
       setLoading(false);
@@ -66,26 +97,27 @@ export function usePortfolioManagement() {
 
     setIsCreating(true);
     setError(null);
-    
+
     try {
       // Map your input to the proper DTO format
       const portfolioData: CreatePortfolioDto = {
         title: data.title.trim(),
         bio: data.bio || '',
-        visibility: data.visibility || 'public',
+        visibility: (data.visibility as any) || 'public',
         specializations: data.specializations || [],
         tags: data.tags || [],
-        kind: data.kind || 'professional'  // Default to professional
+        kind: (data.kind as any) || 'professional' // Default to professional
       };
 
       console.log('Creating portfolio with data:', portfolioData);
 
-      const newPortfolio = await api.portfolio.create(portfolioData);
+      const raw = await api.portfolio.create(portfolioData);
+      const newPortfolio = normalizeApi<Portfolio>(raw) ?? (raw as any);
       setPortfolio(newPortfolio);
       return newPortfolio;
     } catch (err: any) {
       console.error('Failed to create portfolio:', err);
-      const errorMessage = err.message || 'Failed to create portfolio';
+      const errorMessage = err?.message || 'Failed to create portfolio';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -108,7 +140,7 @@ export function usePortfolioManagement() {
       const updateData: UpdatePortfolioDto = {
         title: updates.title ?? portfolio.title,
         bio: updates.bio ?? portfolio.bio,
-        visibility: updates.visibility ?? portfolio.visibility,
+        visibility: (updates.visibility ?? portfolio.visibility) as any,
         specializations: updates.specializations ?? (portfolio.specializations || []),
         tags: updates.tags ?? (portfolio.tags || []),
         location: updates.location ?? portfolio.location,
@@ -121,16 +153,17 @@ export function usePortfolioManagement() {
         showContactInfo: updates.showContactInfo ?? portfolio.showContactInfo,
         customUrl: updates.customUrl ?? portfolio.customUrl,
         featuredPieces: updates.featuredPieces ?? portfolio.featuredPieces,
-        kind: updates.kind ?? portfolio.kind
+        kind: (updates.kind ?? portfolio.kind) as any
       };
 
       // Fixed: API only takes data parameter, not ID
-      const updatedPortfolio = await api.portfolio.update(updateData);
+      const raw = await api.portfolio.update(updateData);
+      const updatedPortfolio = normalizeApi<Portfolio>(raw) ?? (raw as any);
       setPortfolio(updatedPortfolio);
       return updatedPortfolio;
     } catch (err: any) {
       console.error('Failed to update portfolio:', err);
-      const errorMessage = err.message || 'Failed to update portfolio';
+      const errorMessage = err?.message || 'Failed to update portfolio';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -153,7 +186,7 @@ export function usePortfolioManagement() {
       setPortfolio(null);
     } catch (err: any) {
       console.error('Failed to delete portfolio:', err);
-      const errorMessage = err.message || 'Failed to delete portfolio';
+      const errorMessage = err?.message || 'Failed to delete portfolio';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -172,25 +205,44 @@ export function usePortfolioManagement() {
 
   const fetchGalleryPieces = useCallback(async () => {
     if (!hasPortfolio) return;
-    
+
     try {
       setGalleryLoading(true);
-      // Fixed: Use the correct API method name
-      const pieces = await api.portfolio.gallery.get();
-      setGalleryPieces(pieces);
-    } catch (err) {
-      console.error('Failed to fetch gallery pieces:', err);
-      // Don't set error for gallery pieces failure
-    } finally {
-      setGalleryLoading(false);
-    }
-  }, [hasPortfolio]);
+      // Use the correct API method name and normalize the response
+      const raw = await api.portfolio.gallery.get();
+      
+  const pieces =
+    normalizeApi<GalleryPiece[]>(raw) ??
+    (Array.isArray(raw) ? (raw as GalleryPiece[]) : (() => {
+      if (raw && typeof raw === 'object') {
+        // Prefer the typed property first
+        if ('galleryPieces' in raw && Array.isArray((raw as any).galleryPieces)) {
+          return (raw as any).galleryPieces as GalleryPiece[];
+        }
+        // Legacy alias `pieces`
+        if ('pieces' in raw && Array.isArray((raw as any).pieces)) {
+          return (raw as any).pieces as GalleryPiece[];
+        }
+        // ApiResponse-like `.data`
+        if ('data' in raw && Array.isArray((raw as any).data)) {
+          return (raw as any).data as GalleryPiece[];
+        }
+      }
+      return [] as GalleryPiece[];
+    })());      setGalleryPieces(pieces as GalleryPiece[]);
+      } catch (err) {
+        console.error('Failed to fetch gallery pieces:', err);
+        // Don't set error for gallery pieces failure
+      } finally {
+        setGalleryLoading(false);
+      }
+    }, [hasPortfolio]);
 
-  useEffect(() => {
-    if (portfolio) {
-      fetchGalleryPieces();
-    }
-  }, [portfolio, fetchGalleryPieces]);
+    useEffect(() => {
+      if (portfolio) {
+        fetchGalleryPieces();
+      }
+    }, [portfolio, fetchGalleryPieces]);
 
   return {
     // Portfolio state

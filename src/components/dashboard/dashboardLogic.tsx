@@ -5,7 +5,8 @@ import { useCallback, useMemo } from 'react';
 import { useAuth } from '@/providers/authProvider';
 import { useApiClient } from '@/lib/api-client';
 import type { Portfolio } from '@/types/portfolio.types';
-import type { GalleryPiece } from '@/types/gallery.types';
+import type { GalleryPiece, GalleryStatus } from '@/types/gallery.types';
+import type { BackendGalleryPiece } from '@/types/base.types';
 
 // Enhanced types
 export interface QuickStats {
@@ -55,6 +56,81 @@ export interface PortfolioTypeConfig {
   gradient: string;
 }
 
+// Convert BackendGalleryPiece to GalleryPiece for dashboard compatibility
+const convertToGalleryPiece = (backendPiece: BackendGalleryPiece, portfolioId?: string, userId?: string): GalleryPiece => {
+  // Ensure we have a valid ID
+  const pieceId = backendPiece._id || backendPiece.id || `piece-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  // Handle dimensions with proper type checking
+  const dimensions = backendPiece.dimensions && 
+    typeof backendPiece.dimensions.width === 'number' && 
+    typeof backendPiece.dimensions.height === 'number'
+    ? {
+        width: backendPiece.dimensions.width,
+        height: backendPiece.dimensions.height,
+        depth: backendPiece.dimensions.depth,
+        unit: backendPiece.dimensions.unit || 'cm'
+      }
+    : undefined;
+
+  // Set default status since BackendGalleryPiece doesn't have status field
+  const status: GalleryStatus = 'available'; // Default status for all pieces
+  
+  return {
+    _id: pieceId,
+    id: pieceId, // GalleryPiece requires non-optional id
+    title: backendPiece.title,
+    artist: backendPiece.artist || userId || 'Unknown Artist',
+    description: backendPiece.description,
+    
+    // Images
+    thumbnailUrl: backendPiece.thumbnailUrl || backendPiece.imageUrl,
+    imageUrl: backendPiece.imageUrl,
+    highResUrl: backendPiece.imageUrl, // Use main image as high-res fallback
+    
+    // Metadata & Accessibility
+    alt: backendPiece.title || 'Gallery piece',
+    medium: backendPiece.medium,
+    year: backendPiece.year,
+    size: 'medium' as const, // Default size
+    displayOrder: backendPiece.displayOrder || 0,
+    
+    // Dimensions (properly typed)
+    dimensions,
+    
+    // Sales/Status
+    status, // Default to 'available' since BackendGalleryPiece doesn't include status
+    price: backendPiece.price,
+    currency: 'USD', // Default currency
+    
+    // Visibility & Permissions
+    visibility: backendPiece.visibility || 'public',
+    ownerId: userId || portfolioId || '', // Use user ID or portfolio ID as fallback
+    sharedWith: [],
+    shareToken: undefined,
+    
+    // Timestamps
+    createdAt: backendPiece.createdAt ? new Date(backendPiece.createdAt) : new Date(),
+    updatedAt: backendPiece.updatedAt ? new Date(backendPiece.updatedAt) : new Date(),
+    publishedAt: backendPiece.createdAt ? new Date(backendPiece.createdAt) : undefined,
+    
+    // Tags & Categories
+    tags: backendPiece.tags,
+    category: backendPiece.category as any, // Type assertion for category
+    
+    // Upload metadata
+    uploadedBy: userId || '', // Use current user ID
+    originalFileName: undefined,
+    fileSize: backendPiece.metadata?.fileSize,
+    mimeType: backendPiece.metadata?.format,
+    
+    // Portfolio/Social Features
+    portfolioId: backendPiece.portfolioId || portfolioId,
+    views: backendPiece.stats?.views || 0,
+    likes: backendPiece.stats?.likes || 0,
+  };
+};
+
 export const useDashboardLogic = () => {
   const { user } = useAuth();
   const apiClient = useApiClient();
@@ -92,6 +168,7 @@ export const useDashboardLogic = () => {
     if (!user) return null;
     
     try {
+      // Use the correct API method from your PortfolioApiClient
       const portfolioData = await apiClient.portfolio.getMyPortfolio();
       return portfolioData;
     } catch (error: any) {
@@ -114,18 +191,51 @@ export const useDashboardLogic = () => {
       // Gallery content fetching
       if (portfolio.kind === 'creative' || portfolio.kind === 'hybrid' || portfolio.kind === 'professional') {
         try {
+          // Use the correct API method from your PortfolioApiClient
           const galleryResponse = await apiClient.portfolio.getMyGalleryPieces();
-          galleryItems = Array.isArray(galleryResponse) ? galleryResponse : galleryResponse || [];
+          
+          // Handle the response structure from your API
+          let backendPieces: BackendGalleryPiece[] = [];
+          
+          if (galleryResponse && typeof galleryResponse === 'object') {
+            if ('success' in galleryResponse && galleryResponse.success !== false) {
+              // Response with success flag - use galleryPieces from your API
+              backendPieces = galleryResponse.galleryPieces || [];
+            } else if (Array.isArray(galleryResponse)) {
+              // Direct array response
+              backendPieces = galleryResponse;
+            }
+          }
+          
+          // Convert backend pieces to dashboard-compatible format
+          galleryItems = backendPieces.map(piece => 
+            convertToGalleryPiece(piece, portfolio.id || portfolio._id, portfolio.userId)
+          );
           totalItems += galleryItems.length;
+          
+          console.log(`Loaded ${galleryItems.length} gallery items for dashboard`);
         } catch (error) {
-          console.log('No gallery data available');
+          console.log('No gallery data available:', error);
+          galleryItems = [];
         }
       }
+
       // Learning content fetching
       if (portfolio.kind === 'educational' || portfolio.kind === 'hybrid') {
         try {
+          // Use the correct API method from your PortfolioApiClient
           const conceptResponse = await apiClient.portfolio.getMyConcepts();
-          const concepts = conceptResponse.concepts || []; // Access the concepts array
+          
+          // Handle concept response structure
+          let concepts: ConceptProgress[] = [];
+          
+          if (conceptResponse && typeof conceptResponse === 'object') {
+            if ('success' in conceptResponse && conceptResponse.success !== false) {
+              concepts = conceptResponse.concepts || [];
+            } else if (Array.isArray(conceptResponse)) {
+              concepts = conceptResponse;
+            }
+          }
           
           const enhancedConcepts = concepts.map((concept: ConceptProgress, index: number) => ({
             ...concept,
@@ -145,10 +255,14 @@ export const useDashboardLogic = () => {
           averageScore = scoredConcepts.length > 0 
             ? scoredConcepts.reduce((sum: number, c: ConceptProgress) => sum + (c.score || 0), 0) / scoredConcepts.length 
             : 0;
+            
+          console.log(`Loaded ${enhancedConcepts.length} concepts for dashboard`);
         } catch (error) {
-          console.log('No concept data available');
+          console.log('No concept data available:', error);
+          conceptProgress = [];
         }
       }
+
       return {
         galleryItems,
         conceptProgress,
@@ -172,14 +286,17 @@ export const useDashboardLogic = () => {
     if (!portfolioId) return [];
     
     try {
-      // TODO: Implement when activity API is available
-      // const activityData = await apiClient.portfolio.getRecentActivity(portfolioId);
-      // return activityData.map(activity => ({
-      //   ...activity,
-      //   timestamp: new Date(activity.timestamp)
-      // }));
+      // Use the analytics method when available
+      const analytics = await apiClient.portfolio.getAnalytics('7d');
       
-      return []; // Return empty array until API is ready
+      // Extract recent activity from analytics if available
+      if (analytics && analytics.success && analytics.analytics) {
+        // Transform analytics data to recent activity format
+        // This is a placeholder - adjust based on your actual analytics structure
+        return [];
+      }
+      
+      return [];
     } catch (error) {
       console.error('Error fetching recent activity:', error);
       return [];
@@ -191,14 +308,16 @@ export const useDashboardLogic = () => {
     if (!portfolioId) return [];
     
     try {
-      // TODO: Implement when achievements API is available
-      // const achievementsData = await apiClient.portfolio.getAchievements(portfolioId);
-      // return achievementsData.map(achievement => ({
-      //   ...achievement,
-      //   unlockedAt: new Date(achievement.unlockedAt)
-      // }));
+      // Use the dashboard method to get achievement data
+      const dashboardData = await apiClient.portfolio.getDashboard();
       
-      return []; // Return empty array until API is ready
+      if (dashboardData && dashboardData.success && dashboardData.dashboard) {
+        // Extract achievements from dashboard data if available
+        // This is a placeholder - adjust based on your actual dashboard structure
+        return [];
+      }
+      
+      return [];
     } catch (error) {
       console.error('Error fetching achievements:', error);
       return [];

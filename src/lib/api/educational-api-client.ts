@@ -13,12 +13,10 @@ import type {
   DifficultyLevel,
 } from '@/types/educational.types';
 import type {
-  BookQueryParams,
-  SearchFilters,
   SearchResult,
   UserProgress,
 } from '@/types/api.types';
-import {ScientificDiscipline} from '@/types/portfolio.types'
+import {ScientificDiscipline,  BookQueryParams, SearchFilters, } from '@/types/portfolio.types'
 
 // ============================================
 // New Types for Concepts & Lessons

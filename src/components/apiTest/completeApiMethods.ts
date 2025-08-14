@@ -1,4 +1,4 @@
-// src/components/apiTest/completeApiMethods.ts - Complete API test coverage
+// src/components/apiTest/completeApiMethods.ts - Properly typed and aligned with backend
 
 import { api } from '@/lib/api-client';
 
@@ -14,8 +14,26 @@ export const CATEGORIES = {
   simulations: { name: 'Simulations', icon: 'Zap', color: '#333333' }
 };
 
-// ==================== COMPLETE API METHODS ====================
-export const createCompleteApiMethods = (authToken: string | null) => [
+// ==================== TYPES ====================
+interface ApiMethod {
+  name: string;
+  description: string;
+  category: string;
+  method: string;
+  requiresAuth: boolean;
+  testFunction: () => Promise<any>;
+  generateTestData?: () => any;
+  tags?: {
+    needsRealId?: boolean;
+    mockResponse?: boolean;
+    imageUpload?: boolean;
+    adminOnly?: boolean;
+    legacy?: boolean;
+  };
+}
+
+// ==================== API METHODS ====================
+export const createCompleteApiMethods = (authToken: string | null): ApiMethod[] => [
   // ==================== HEALTH & SYSTEM ====================
   {
     name: 'Health Check',
@@ -66,11 +84,11 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     method: 'POST',
     requiresAuth: false,
     testFunction: () => api.auth.login({ 
-      email: 'admin@admin.com', 
+      email: 'admin@admin.com',
       password: 'Safe123' 
     }),
     generateTestData: () => ({ 
-      email: 'admin@admin.com', 
+      usernameOrEmail: 'admin@admin.com', 
       password: 'Safe123' 
     })
   },
@@ -80,7 +98,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     category: 'auth',
     method: 'POST',
     requiresAuth: false,
-    testFunction: () => api.auth.register({
+    testFunction: () => api.auth.signup({
       email: `test-${Date.now()}@example.com`,
       password: 'testpass123',
       username: `testuser${Date.now()}`,
@@ -105,16 +123,10 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     name: 'Update Profile',
     description: 'Update user profile information',
     category: 'auth',
-    method: 'PATCH',
+    method: 'PUT',
     requiresAuth: true,
-    testFunction: () => api.auth.updateProfile({
-      // Using only properties that exist on User type
-      // firstName: 'Updated',
-      // lastName: 'Name'
-    }),
-    generateTestData: () => ({
-      // Profile update data would go here based on actual User type
-    })
+    testFunction: () => api.auth.updateProfile({}),
+    generateTestData: () => ({})
   },
   {
     name: 'Verify Token',
@@ -136,7 +148,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   // ==================== PORTFOLIO CORE ====================
   {
     name: 'Check Portfolio Exists',
-    description: 'Check if user has a portfolio',
+    description: 'Check if user has portfolio',
     category: 'portfolio',
     method: 'GET',
     requiresAuth: true,
@@ -160,9 +172,9 @@ export const createCompleteApiMethods = (authToken: string | null) => [
       title: 'My Test Portfolio',
       bio: 'This is a test portfolio created by the API test suite',
       kind: 'creative',
-      visibility: 'public',
       specializations: ['digital-art', 'web-design'],
-      tags: ['test', 'api', 'portfolio']
+      tags: ['test', 'api', 'portfolio'],
+      visibility: 'public'
     }),
     generateTestData: () => ({
       title: 'My Test Portfolio',
@@ -177,7 +189,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     name: 'Update Portfolio',
     description: 'Update portfolio information',
     category: 'portfolio',
-    method: 'PATCH',
+    method: 'PUT',
     requiresAuth: true,
     testFunction: () => api.portfolio.update({
       bio: `Updated bio - ${new Date().toISOString()}`,
@@ -192,10 +204,20 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     name: 'Upgrade Portfolio',
     description: 'Upgrade portfolio type',
     category: 'portfolio',
-    method: 'POST',
+    method: 'PUT',
     requiresAuth: true,
     testFunction: () => api.portfolio.upgrade('professional', true)
   },
+  {
+    name: 'Delete Portfolio',
+    description: 'Delete current portfolio',
+    category: 'portfolio',
+    method: 'DELETE',
+    requiresAuth: true,
+    testFunction: () => api.portfolio.delete(false)
+  },
+
+  // ==================== PORTFOLIO PUBLIC ====================
   {
     name: 'Get Portfolio Stats',
     description: 'Get global portfolio statistics',
@@ -232,7 +254,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   // ==================== PORTFOLIO GALLERY ====================
   {
     name: 'Get My Gallery',
-    description: 'Get all my gallery pieces',
+    description: 'Get gallery pieces for current user portfolio',
     category: 'portfolio',
     method: 'GET',
     requiresAuth: true,
@@ -240,7 +262,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Get Gallery by Username',
-    description: 'Get public gallery by username',
+    description: 'Get gallery pieces for specific portfolio',
     category: 'portfolio',
     method: 'GET',
     requiresAuth: false,
@@ -248,7 +270,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Add Gallery Piece',
-    description: 'Add new piece to gallery',
+    description: 'Add gallery piece to current user portfolio',
     category: 'portfolio',
     method: 'POST',
     requiresAuth: true,
@@ -277,40 +299,49 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Update Gallery Piece',
-    description: 'Update existing gallery piece',
+    description: 'Update gallery piece in portfolio',
     category: 'portfolio',
-    method: 'PATCH',
+    method: 'PUT',
     requiresAuth: true,
-    testFunction: () => {
-      // This would need a real piece ID - for demo purposes
-      return Promise.resolve({ message: 'Would update piece with real ID' });
-    }
+    testFunction: () => Promise.resolve({ 
+      message: 'Mock: Would update gallery piece',
+      endpoint: 'PUT /api/portfolios/me/gallery/:pieceId',
+      note: 'Requires existing piece ID'
+    }),
+    tags: { needsRealId: true, mockResponse: true }
   },
   {
-    name: 'Batch Delete Gallery Pieces',
-    description: 'Delete multiple gallery pieces',
+    name: 'Delete Gallery Piece',
+    description: 'Delete gallery piece from portfolio',
     category: 'portfolio',
     method: 'DELETE',
     requiresAuth: true,
-    testFunction: () => {
-      // This would need real piece IDs - for demo purposes
-      return Promise.resolve({ message: 'Would delete pieces with real IDs' });
-    }
+    testFunction: () => Promise.resolve({ 
+      message: 'Mock: Would delete gallery piece',
+      endpoint: 'DELETE /api/portfolios/me/gallery/:pieceId',
+      note: 'Requires existing piece ID'
+    }),
+    tags: { needsRealId: true, mockResponse: true }
   },
   {
-    name: 'Batch Update Visibility',
-    description: 'Update visibility for multiple pieces',
+    name: 'Batch Delete Gallery Pieces',
+    description: 'Batch delete gallery pieces',
     category: 'portfolio',
-    method: 'PATCH',
+    method: 'DELETE',
     requiresAuth: true,
-    testFunction: () => {
-      // This would need real piece IDs - for demo purposes
-      return Promise.resolve({ message: 'Would update visibility for real IDs' });
-    }
+    testFunction: () => api.portfolio.gallery.batchDelete(['test-id-1', 'test-id-2'])
+  },
+  {
+    name: 'Batch Update Gallery Visibility',
+    description: 'Batch update gallery piece visibility',
+    category: 'portfolio',
+    method: 'PUT',
+    requiresAuth: true,
+    testFunction: () => api.portfolio.gallery.batchUpdateVisibility(['test-id-1', 'test-id-2'], 'public')
   },
   {
     name: 'Get Gallery Stats',
-    description: 'Get gallery statistics',
+    description: 'Get gallery statistics for current user portfolio',
     category: 'portfolio',
     method: 'GET',
     requiresAuth: true,
@@ -320,7 +351,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   // ==================== PORTFOLIO CONCEPTS ====================
   {
     name: 'Get My Concepts',
-    description: 'Get portfolio concepts progress',
+    description: 'Get current user concept progress',
     category: 'portfolio',
     method: 'GET',
     requiresAuth: true,
@@ -328,28 +359,53 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Add Concept to Portfolio',
-    description: 'Add concept to portfolio tracking',
+    description: 'Add concept to current user portfolio',
     category: 'portfolio',
     method: 'POST',
     requiresAuth: true,
-    testFunction: () => {
-      // This would need a real concept ID
-      return Promise.resolve({ message: 'Would add concept with real ID' });
-    }
+    testFunction: () => api.portfolio.concepts.add('test-concept-id', {
+      status: 'started',
+      startedAt: new Date().toISOString(),
+      notes: 'Test concept tracking'
+    }),
+    generateTestData: () => ({
+      conceptId: 'test-concept-id',
+      status: 'started',
+      startedAt: new Date().toISOString(),
+      notes: 'Test concept tracking'
+    })
+  },
+  {
+    name: 'Update Concept Progress',
+    description: 'Update concept progress in portfolio',
+    category: 'portfolio',
+    method: 'PUT',
+    requiresAuth: true,
+    testFunction: () => api.portfolio.concepts.updateProgress('test-concept-id', {
+      status: 'completed',
+      score: 85,
+      completedAt: new Date().toISOString()
+    }),
+    generateTestData: () => ({
+      conceptId: 'test-concept-id',
+      status: 'completed',
+      score: 85,
+      completedAt: new Date().toISOString()
+    })
   },
 
   // ==================== PORTFOLIO ANALYTICS ====================
   {
-    name: 'Get Analytics',
-    description: 'Get portfolio analytics data',
+    name: 'Get Portfolio Analytics',
+    description: 'Get detailed analytics for portfolio',
     category: 'portfolio',
     method: 'GET',
     requiresAuth: true,
-    testFunction: () => api.portfolio.analytics.get('week')
+    testFunction: () => api.portfolio.analytics.get('7d')
   },
   {
-    name: 'Get Dashboard Metrics',
-    description: 'Get dashboard summary metrics',
+    name: 'Get Portfolio Dashboard',
+    description: 'Get dashboard metrics for portfolio',
     category: 'portfolio',
     method: 'GET',
     requiresAuth: true,
@@ -357,20 +413,25 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Track Portfolio View',
-    description: 'Record a portfolio view',
+    description: 'Track portfolio view (public)',
     category: 'portfolio',
     method: 'POST',
     requiresAuth: false,
-    testFunction: () => {
-      // This would need a real portfolio ID
-      return Promise.resolve({ message: 'Would track view for real portfolio ID' });
-    }
+    testFunction: () => api.portfolio.analytics.trackView('test-portfolio-id', {
+      referrer: 'api-test-suite',
+      duration: 5000
+    }),
+    generateTestData: () => ({
+      portfolioId: 'test-portfolio-id',
+      referrer: 'api-test-suite',
+      duration: 5000
+    })
   },
 
   // ==================== PORTFOLIO DEBUG ====================
   {
     name: 'Get Upload Config',
-    description: 'Get upload configuration',
+    description: 'System diagnostics for upload configuration',
     category: 'portfolio',
     method: 'GET',
     requiresAuth: true,
@@ -378,9 +439,9 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Validate File',
-    description: 'Validate file for upload',
+    description: 'Validate specific uploaded file',
     category: 'portfolio',
-    method: 'POST',
+    method: 'GET',
     requiresAuth: true,
     testFunction: () => api.portfolio.debug.validateFile('test-image.jpg')
   },
@@ -388,70 +449,43 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   // ==================== EDUCATION - BOOKS ====================
   {
     name: 'Get All Books',
-    description: 'Get all available books',
+    description: 'Get all books with filtering',
     category: 'education',
     method: 'GET',
     requiresAuth: false,
-    testFunction: () => api.books.getAll({ limit: 10, offset: 0 })
+    testFunction: () => api.books.getAll({ limit: 10 })
   },
   {
     name: 'Get Book by ID',
-    description: 'Get specific book details',
+    description: 'Get single book by ID',
     category: 'education',
     method: 'GET',
     requiresAuth: false,
-    testFunction: () => {
-      // This would need a real book ID
-      return Promise.resolve({ message: 'Would get book with real ID' });
-    }
+    testFunction: () => Promise.resolve({ 
+      message: 'Mock: Would get book details',
+      endpoint: 'GET /api/books/:id',
+      note: 'Requires existing book ID'
+    }),
+    tags: { needsRealId: true, mockResponse: true }
   },
   {
     name: 'Get Books by Category',
-    description: 'Get books filtered by category',
+    description: 'Get books by category',
     category: 'education',
     method: 'GET',
     requiresAuth: false,
-    testFunction: () => {
-      // Use a string instead of MainCategory enum until we know the exact type
-      return Promise.resolve({ message: 'Would get books by category - needs proper category type' });
-    }
-  },
-  {
-    name: 'Create Book',
-    description: 'Create new educational book',
-    category: 'education',
-    method: 'POST',
-    requiresAuth: true,
-    testFunction: () => api.books.create({
-      title: `Test Book ${Date.now()}`,
-      description: 'Test book created by API suite',
-      category: 'programming',
-      author: 'API Test Suite'
+    testFunction: () => Promise.resolve({ 
+      message: 'Mock: Would get books by category',
+      endpoint: 'GET /api/books/category/:mainCategory',
+      note: 'Requires proper MainCategory enum'
     }),
-    generateTestData: () => ({
-      title: `Test Book ${Date.now()}`,
-      description: 'Test book created by API suite',
-      category: 'programming',
-      author: 'API Test Suite'
-    })
-  },
-  {
-    name: 'Compose Book',
-    description: 'AI-compose book content',
-    category: 'education',
-    method: 'POST',
-    requiresAuth: true,
-    testFunction: () => api.books.compose({
-      topic: 'JavaScript Fundamentals',
-      targetAudience: 'beginners',
-      length: 'short'
-    })
+    tags: { mockResponse: true }
   },
 
   // ==================== EDUCATION - CONCEPTS ====================
   {
     name: 'Get All Concepts',
-    description: 'Get all available concepts',
+    description: 'Get all concepts with filtering',
     category: 'education',
     method: 'GET',
     requiresAuth: false,
@@ -459,7 +493,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Search Concepts',
-    description: 'Search concepts by query',
+    description: 'Search concepts',
     category: 'education',
     method: 'GET',
     requiresAuth: false,
@@ -467,33 +501,29 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Get Concept by ID',
-    description: 'Get specific concept details',
+    description: 'Get single concept by ID',
     category: 'education',
     method: 'GET',
     requiresAuth: false,
-    testFunction: () => {
-      // This would need a real concept ID
-      return Promise.resolve({ message: 'Would get concept with real ID' });
-    }
+    testFunction: () => Promise.resolve({ 
+      message: 'Mock: Would get concept details',
+      endpoint: 'GET /api/concepts/:id',
+      note: 'Requires existing concept ID'
+    }),
+    tags: { needsRealId: true, mockResponse: true }
   },
   {
     name: 'Get Concepts by Book',
-    description: 'Get concepts for specific book',
+    description: 'Get concepts for a book',
     category: 'education',
     method: 'GET',
     requiresAuth: false,
-    testFunction: () => {
-      // This would need a real book ID
-      return Promise.resolve({ message: 'Would get concepts for real book ID' });
-    }
-  },
-  {
-    name: 'Get Concepts by Type',
-    description: 'Get concepts by type/category',
-    category: 'education',
-    method: 'GET',
-    requiresAuth: false,
-    testFunction: () => api.concepts.getByType('programming')
+    testFunction: () => Promise.resolve({ 
+      message: 'Mock: Would get concepts for book',
+      endpoint: 'GET /api/concepts/book/:bookId',
+      note: 'Requires existing book ID'
+    }),
+    tags: { needsRealId: true, mockResponse: true }
   },
   {
     name: 'Mark Concept Complete',
@@ -501,42 +531,22 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     category: 'education',
     method: 'POST',
     requiresAuth: true,
-    testFunction: () => {
-      // This would need a real concept ID
-      return Promise.resolve({ message: 'Would mark concept complete with real ID' });
-    }
+    testFunction: () => Promise.resolve({ 
+      message: 'Mock: Would mark concept complete',
+      endpoint: 'POST /api/concepts/:id/complete',
+      note: 'Requires existing concept ID'
+    }),
+    tags: { needsRealId: true, mockResponse: true }
   },
 
   // ==================== PROGRESS TRACKING ====================
   {
     name: 'Get Progress Summary',
-    description: 'Get overall progress summary',
+    description: 'Get user progress summary',
     category: 'progress',
     method: 'GET',
     requiresAuth: true,
     testFunction: () => api.progress.get()
-  },
-  {
-    name: 'Get Book Progress',
-    description: 'Get progress for specific book',
-    category: 'progress',
-    method: 'GET',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real book ID
-      return Promise.resolve({ message: 'Would get progress for real book ID' });
-    }
-  },
-  {
-    name: 'Update Concept Progress',
-    description: 'Update progress for concept',
-    category: 'progress',
-    method: 'PATCH',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need real IDs
-      return Promise.resolve({ message: 'Would update concept progress with real IDs' });
-    }
   },
   {
     name: 'Get Progress Stats',
@@ -546,17 +556,6 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     requiresAuth: true,
     testFunction: () => api.progress.getStats()
   },
-  {
-    name: 'Reset Book Progress',
-    description: 'Reset all progress for a book',
-    category: 'progress',
-    method: 'DELETE',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real book ID
-      return Promise.resolve({ message: 'Would reset progress for real book ID' });
-    }
-  },
 
   // ==================== USER MANAGEMENT ====================
   {
@@ -565,68 +564,14 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     category: 'users',
     method: 'GET',
     requiresAuth: true,
-    testFunction: () => api.users.getAll()
-  },
-  {
-    name: 'Get User by ID',
-    description: 'Get specific user details',
-    category: 'users',
-    method: 'GET',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real user ID
-      return Promise.resolve({ message: 'Would get user with real ID' });
-    }
-  },
-  {
-    name: 'Update User',
-    description: 'Update user information',
-    category: 'users',
-    method: 'PATCH',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real user ID
-      return Promise.resolve({ message: 'Would update user with real ID' });
-    }
-  },
-  {
-    name: 'Delete User',
-    description: 'Delete user account',
-    category: 'users',
-    method: 'DELETE',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real user ID
-      return Promise.resolve({ message: 'Would delete user with real ID' });
-    }
-  },
-  {
-    name: 'Get User Progress',
-    description: 'Get progress for specific user',
-    category: 'users',
-    method: 'GET',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real user ID
-      return Promise.resolve({ message: 'Would get progress for real user ID' });
-    }
-  },
-  {
-    name: 'Reset User Password',
-    description: 'Reset password for user',
-    category: 'users',
-    method: 'POST',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real user ID
-      return Promise.resolve({ message: 'Would reset password for real user ID' });
-    }
+    testFunction: () => api.users.getAll(),
+    tags: { adminOnly: true }
   },
 
   // ==================== ACCOUNT MANAGEMENT (/me) ====================
   {
     name: 'Get My Skills',
-    description: 'Get current user skills',
+    description: 'Get current user skill development summary',
     category: 'me',
     method: 'GET',
     requiresAuth: true,
@@ -634,7 +579,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Get Learning Paths',
-    description: 'Get personalized learning paths',
+    description: 'Get current user learning paths and certifications',
     category: 'me',
     method: 'GET',
     requiresAuth: true,
@@ -642,7 +587,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Get Market Intelligence',
-    description: 'Get market insights for user',
+    description: 'Get relevant market intelligence data',
     category: 'me',
     method: 'GET',
     requiresAuth: true,
@@ -650,7 +595,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Get Privacy Settings',
-    description: 'Get current privacy settings',
+    description: 'Get privacy and data sharing preferences',
     category: 'me',
     method: 'GET',
     requiresAuth: true,
@@ -660,7 +605,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     name: 'Update Privacy Settings',
     description: 'Update privacy preferences',
     category: 'me',
-    method: 'PATCH',
+    method: 'PUT',
     requiresAuth: true,
     testFunction: () => api.me.updatePrivacySettings({
       profileVisibility: 'public',
@@ -675,7 +620,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Get Account Info',
-    description: 'Get detailed account information',
+    description: 'Get account and subscription info',
     category: 'me',
     method: 'GET',
     requiresAuth: true,
@@ -685,7 +630,7 @@ export const createCompleteApiMethods = (authToken: string | null) => [
     name: 'Update Account Info',
     description: 'Update account details',
     category: 'me',
-    method: 'PATCH',
+    method: 'PUT',
     requiresAuth: true,
     testFunction: () => api.me.updateAccountInfo({
       timezone: 'UTC',
@@ -725,18 +670,18 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   // ==================== SIMULATIONS ====================
   {
     name: 'Get All Simulations',
-    description: 'Get all available simulations',
+    description: 'Get all simulations with filtering',
     category: 'simulations',
     method: 'GET',
-    requiresAuth: true,
+    requiresAuth: false,
     testFunction: () => api.simulations.getAll({ limit: 10 })
   },
   {
     name: 'Create Simulation',
-    description: 'Create new simulation',
+    description: 'Register new simulation',
     category: 'simulations',
     method: 'POST',
-    requiresAuth: true,
+    requiresAuth: false,
     testFunction: () => api.simulations.create({
       name: `Test Simulation ${Date.now()}`,
       type: 'market_analysis',
@@ -756,18 +701,18 @@ export const createCompleteApiMethods = (authToken: string | null) => [
   },
   {
     name: 'Get Simulation Stats',
-    description: 'Get simulation statistics',
+    description: 'Get comprehensive simulation statistics',
     category: 'simulations',
     method: 'GET',
-    requiresAuth: true,
+    requiresAuth: false,
     testFunction: () => api.simulations.getStats()
   },
   {
     name: 'Upload Simulation Results',
-    description: 'Upload simulation result data',
+    description: 'Upload simulation results (legacy)',
     category: 'simulations',
     method: 'POST',
-    requiresAuth: true,
+    requiresAuth: false,
     testFunction: () => api.simulations.uploadResults({
       simulationId: 'test-sim-id',
       results: { accuracy: 0.95, iterations: 1000 }
@@ -776,73 +721,34 @@ export const createCompleteApiMethods = (authToken: string | null) => [
       simulationId: 'test-sim-id',
       results: { accuracy: 0.95, iterations: 1000 }
     })
-  },
-  {
-    name: 'Get Simulation by ID',
-    description: 'Get specific simulation details',
-    category: 'simulations',
-    method: 'GET',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real simulation ID
-      return Promise.resolve({ message: 'Would get simulation with real ID' });
-    }
-  },
-  {
-    name: 'Get Simulation Insights',
-    description: 'Get AI insights for simulation',
-    category: 'simulations',
-    method: 'GET',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real simulation ID
-      return Promise.resolve({ message: 'Would get insights for real simulation ID' });
-    }
-  },
-  {
-    name: 'Send Simulation Events',
-    description: 'Send real-time events to simulation',
-    category: 'simulations',
-    method: 'POST',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real simulation ID
-      return Promise.resolve({ message: 'Would send events to real simulation ID' });
-    }
-  },
-  {
-    name: 'Get Live Simulation Data',
-    description: 'Get real-time simulation data',
-    category: 'simulations',
-    method: 'GET',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real simulation ID
-      return Promise.resolve({ message: 'Would get live data for real simulation ID' });
-    }
-  },
-  {
-    name: 'Delete Simulation',
-    description: 'Delete simulation permanently',
-    category: 'simulations',
-    method: 'DELETE',
-    requiresAuth: true,
-    testFunction: () => {
-      // This would need a real simulation ID
-      return Promise.resolve({ message: 'Would delete simulation with real ID' });
-    }
   }
 ];
 
-// ==================== EXPORT HELPER ====================
-export const getMethodsByCategory = (methods: any[], category: string) => {
+// ==================== EXPORT HELPERS ====================
+export const getMethodsByCategory = (methods: ApiMethod[], category: string): ApiMethod[] => {
   return methods.filter(method => method.category === category);
 };
 
-export const getAuthRequiredMethods = (methods: any[]) => {
+export const getAuthRequiredMethods = (methods: ApiMethod[]): ApiMethod[] => {
   return methods.filter(method => method.requiresAuth);
 };
 
-export const getPublicMethods = (methods: any[]) => {
+export const getPublicMethods = (methods: ApiMethod[]): ApiMethod[] => {
   return methods.filter(method => !method.requiresAuth);
+};
+
+export const getMockMethods = (methods: ApiMethod[]): ApiMethod[] => {
+  return methods.filter(method => method.tags?.mockResponse);
+};
+
+export const getRealMethods = (methods: ApiMethod[]): ApiMethod[] => {
+  return methods.filter(method => !method.tags?.mockResponse);
+};
+
+export const getAdminMethods = (methods: ApiMethod[]): ApiMethod[] => {
+  return methods.filter(method => method.tags?.adminOnly);
+};
+
+export const getMethodsByTag = (methods: ApiMethod[], tag: keyof NonNullable<ApiMethod['tags']>): ApiMethod[] => {
+  return methods.filter(method => method.tags?.[tag]);
 };

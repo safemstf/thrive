@@ -1,559 +1,1058 @@
-// components/gallery/utils/uploadModal.tsx - Clean Component Logic
-import React, { useState, useRef, useEffect } from 'react';
-import { api } from '@/lib/api-client';
-import { X, Upload, Image as ImageIcon, DollarSign, Tag, Calendar, Palette } from 'lucide-react';
-import { useAuth } from '@/providers/authProvider';
-import type { ArtworkCategory, GalleryVisibility, GalleryUploadFile } from '@/types/gallery.types';
-import { getGalleryPieceId } from '@/types/portfolio.types';
+// components/gallery/utils/uploadModal.tsx - FIXED VERSION
+'use client';
 
-// Import all styled components
-import {
-  ModalOverlay, ModalContent, ModalHeader, HeaderContent, ModalTitle, ModalSubtitle,
-  CloseButton, StepIndicator, StepNumber, StepLine, ModalBody, FormContent,
-  UploadSection, UploadArea, UploadIconWrapper, UploadText, UploadHint,
-  PreviewContainer, PreviewImage, PreviewOverlay, ChangeButton, ImageInfo,
-  ImageName, ImageSize, GuidelinesCard, GuidelineTitle, GuidelineList,
-  GuidelineItem, GuidelineIcon, GuidelineText, TwoColumnLayout, LeftColumn,
-  RightColumn, PreviewSection, FormSection, SectionTitle, FormGroup, FormRow,
-  Label, RequiredStar, Input, TextArea, Select, PriceInputWrapper, PriceSymbol,
-  FieldHint, ErrorMessage, ErrorIcon, ErrorText, ModalFooter, FooterContent,
-  PrimaryButton, SecondaryButton, LoadingSpinner, ArrowIcon, AuthPrompt,
-  AuthIcon, AuthTitle, AuthDescription, AuthActions
-} from './uploadModalStyles';
+import React, { useState, useCallback, useRef } from 'react';
+import styled from 'styled-components';
+import { 
+  Upload, X, Image as ImageIcon, CheckCircle, 
+  AlertCircle, Loader, Eye, EyeOff 
+} from 'lucide-react';
+
+import type { BackendGalleryPiece } from '@/types/base.types';
+import api from '@/lib/api-client';
 
 interface ArtworkUploadModalProps {
-  portfolioId?: string;
+  portfolioId: string;
   onClose: () => void;
   onSuccess: () => void;
-  initialFiles?: GalleryUploadFile[];
+  initialFiles?: File[]; 
 }
 
-export const ArtworkUploadModal: React.FC<ArtworkUploadModalProps> = ({
-  portfolioId,
-  onClose,
-  onSuccess,
-  initialFiles
-}) => {
-  const { user, isAuthenticated } = useAuth();
-  const [currentStep, setCurrentStep] = useState(1);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
+interface UploadResponse {
+  success: boolean;
+  url: string;
+  fileId: string;
+  filename: string;
+  size: number;
+  contentType: string;
+  message: string;
+}
+
+interface UploadState {
+  step: 'select' | 'uploading' | 'details' | 'success' | 'error';
+  imageUrl?: string;
+  imageFile?: File;
+  uploadProgress: number;
+  error?: string;
+}
+
+interface ArtworkData {
+  title: string;
+  description: string;
+  category: string;
+  medium: string;
+  tags: string[];
+  visibility: 'public' | 'private' | 'unlisted';
+  year: number;
+  price?: number;
+  artist?: string;
+}
+
+
+export function ArtworkUploadModal({ portfolioId, onClose, onSuccess }: ArtworkUploadModalProps) {
+  const [uploadState, setUploadState] = useState<UploadState>({
+    step: 'select',
+    uploadProgress: 0
+  });
+
+  const [artworkData, setArtworkData] = useState<ArtworkData>({
     title: '',
     description: '',
-    category: 'portrait' as ArtworkCategory,
+    category: 'portrait',
     medium: '',
-    tags: '',
-    price: '',
-    artist: user?.name || '',
-    year: new Date().getFullYear()
+    tags: [],
+    visibility: 'public',
+    year: new Date().getFullYear(),
+    artist: ''
   });
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle initial files from drag & drop
-  useEffect(() => {
-    if (initialFiles && initialFiles.length > 0) {
-      const firstFile = initialFiles[0];
-      setSelectedFile(firstFile.file);
-      
-      if (firstFile.preview) {
-        setPreview(firstFile.preview);
-      } else {
-        const reader = new FileReader();
-        reader.onloadend = () => setPreview(reader.result as string);
-        reader.readAsDataURL(firstFile.file);
-      }
+  // FIXED: Enhanced image upload with proper error handling
+  const uploadImage = useCallback(async (file: File): Promise<string> => {
+    console.log('[Upload] Starting image upload:', {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
 
-      if (!formData.title && firstFile.file.name) {
-        const nameWithoutExtension = firstFile.file.name.replace(/\.[^/.]+$/, '');
-        setFormData(prev => ({
-          ...prev,
-          title: nameWithoutExtension.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-        }));
-      }
-    }
-  }, [initialFiles, formData.title]);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setImageUploadError('Please select an image file');
-      return;
-    }
-    
-    if (file.size > 10 * 1024 * 1024) {
-      setImageUploadError('File size must be less than 10MB');
-      return;
-    }
-    
-    setSelectedFile(file);
-    setImageUploadError(null);
-    
-    const reader = new FileReader();
-    reader.onloadend = () => setPreview(reader.result as string);
-    reader.readAsDataURL(file);
-
-    if (!formData.title && file.name) {
-      const nameWithoutExtension = file.name.replace(/\.[^/.]+$/, '');
-      setFormData(prev => ({
-        ...prev,
-        title: nameWithoutExtension.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-      }));
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const uploadImage = async () => {
-    if (!selectedFile) {
-      setImageUploadError('Please select an image to upload');
-      return;
-    }
-
-    setIsUploadingImage(true);
-    setImageUploadError(null);
+    const formData = new FormData();
+    formData.append('file', file);  // Changed from 'image' to 'file' to match backend
+    formData.append('type', 'gallery');
 
     try {
-      const imageFormData = new FormData();
-      imageFormData.append('file', selectedFile);
-      
-      const imageUploadResponse = await api.portfolio.images.uploadRaw(imageFormData);
-      
-      if (!imageUploadResponse?.url) {
-        throw new Error('Image upload failed - no URL returned');
-      }
-      
-      setImageUrl(imageUploadResponse.url);
-      setCurrentStep(2);
-    } catch (error: any) {
-      console.error('Image upload error:', error);
-      let errorMessage = 'Failed to upload image. Please try again.';
+      const response = await fetch('/api/portfolios/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+        // Don't set Content-Type header for FormData
+      });
 
-      if (error.message?.includes('413')) {
-        errorMessage = 'File is too large. Please choose an image under 10MB.';
-      } else if (error.message?.includes('415')) {
-        errorMessage = 'Unsupported file type. Please choose a JPG, PNG, or GIF image.';
-      } else if (error.message?.includes('network')) {
-        errorMessage = 'Network error. Please check your connection and try again.';
-      }
+      console.log('[Upload] Response status:', response.status);
+      console.log('[Upload] Response headers:', Object.fromEntries(response.headers.entries()));
 
-      setImageUploadError(errorMessage);
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
-
-  const submitArtwork = async () => {
-    if (!imageUrl) {
-      setError('Image URL is missing. Please go back and re-upload the image.');
-      return;
-    }
-
-    if (!formData.title.trim()) {
-      setError('Please enter a title for your artwork');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const tagsArray = formData.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0 && tag.length <= 50)
-        .slice(0, 10);
-
-      const galleryPieceData = {
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        imageUrl: imageUrl,
-        category: formData.category,
-        medium: formData.medium.trim(),
-        tags: tagsArray,
-        visibility: 'public' as GalleryVisibility,
-        year: formData.year,
-        displayOrder: 0,
-        ...(formData.price && !isNaN(parseFloat(formData.price)) && {
-          price: parseFloat(formData.price)
-        }),
-        ...(formData.artist.trim() && formData.artist.trim() !== user?.name && {
-          artist: formData.artist.trim()
-        }),
-      };
-
-      const galleryResponse = await api.portfolio.gallery.add(galleryPieceData);
-      console.log('Gallery piece created:', getGalleryPieceId(galleryResponse));
-      onSuccess();
-    } catch (error: any) {
-      console.error('Submission error:', error);
-      
-      let errorMessage = 'Failed to create artwork. Please try again.';
-      if (error.message?.includes('401')) {
-        errorMessage = 'Authentication failed. Please refresh and try again.';
-      } else if (error.message?.includes('403')) {
-        errorMessage = 'You do not have permission to upload to this portfolio.';
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Upload] Error response body:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: `HTTP ${response.status}: ${errorText}` };
+        }
+        
+        throw new Error(
+          errorData.message || 
+          errorData.error || 
+          `Upload failed with status ${response.status}`
+        );
       }
 
-      setError(errorMessage);
-    } finally {
-      setIsSubmitting(false);
+      const result = await response.json();
+      console.log('[Upload] Success response:', result);
+
+      // FIXED: Handle different response formats
+      let imageUrl: string | null = null;
+      
+      if (result.success && result.data?.url) {
+        // New format: { success: true, data: { url: "..." } }
+        imageUrl = result.data.url;
+      } else if (result.url) {
+        // Legacy format: { url: "..." }
+        imageUrl = result.url;
+      } else if (result.fileUrl) {
+        // Alternative format: { fileUrl: "..." }
+        imageUrl = result.fileUrl;
+      }
+
+      if (!imageUrl) {
+        console.error('[Upload] No URL in response:', result);
+        throw new Error('Upload succeeded but no image URL returned');
+      }
+
+      console.log('[Upload] Extracted URL:', imageUrl);
+      return imageUrl;
+
+    } catch (error) {
+      console.error('[Upload] Network/parsing error:', error);
+      throw error;
     }
+  }, []);
+
+  const createGalleryPiece = useCallback(async (imageUrl: string): Promise<void> => {
+  console.log('[Upload] Creating gallery piece with URL:', imageUrl);
+
+  const requestData = {
+    title: artworkData.title.trim(),
+    description: artworkData.description.trim(),
+    imageUrl: imageUrl,  // FIXED: Changed 'image' to 'imageUrl'
+    category: artworkData.category,
+    medium: artworkData.medium.trim(),
+    tags: artworkData.tags.filter(tag => tag.trim().length > 0),
+    visibility: artworkData.visibility,
+    year: artworkData.year,
+    displayOrder: 0
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
-  };
+  console.log('[Upload] Gallery piece request data:', requestData);
 
-  if (!isAuthenticated) {
-    return (
-      <ModalOverlay onClick={handleBackdropClick}>
-        <ModalContent onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-          <ModalHeader>
-            <HeaderContent>
-              <ModalTitle>Authentication Required</ModalTitle>
-              <ModalSubtitle>Please sign in to upload artwork</ModalSubtitle>
-            </HeaderContent>
-            <CloseButton onClick={onClose} type="button">
-              <X size={20} />
-            </CloseButton>
-          </ModalHeader>
-          <ModalBody>
-            <AuthPrompt>
-              <AuthIcon>🔒</AuthIcon>
-              <AuthTitle>Sign In Required</AuthTitle>
-              <AuthDescription>
-                You need to be signed in to upload and share your artwork.
-              </AuthDescription>
-              <AuthActions>
-                <SecondaryButton onClick={onClose}>Close</SecondaryButton>
-                <PrimaryButton onClick={() => window.location.href = '/login'}>
-                  Sign In
-                </PrimaryButton>
-              </AuthActions>
-            </AuthPrompt>
-          </ModalBody>
-        </ModalContent>
-      </ModalOverlay>
-    );
+  try {
+    // FIX 2: Added /me to endpoint
+    const response = await fetch('/api/portfolios/me/gallery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(requestData)
+    });
+
+    console.log('[Upload] Gallery response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Upload] Gallery error response:', errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: `HTTP ${response.status}: ${errorText}` };
+      }
+      
+      throw new Error(
+        errorData.message || 
+        errorData.error || 
+        `Failed to create gallery piece (${response.status})`
+      );
+    }
+
+    const result = await response.json();
+    console.log('[Upload] Gallery piece created:', result);
+
+    if (!result.success && !result.galleryPiece) {
+      throw new Error(result.message || 'Failed to create gallery piece');
+    }
+
+  } catch (error) {
+    console.error('[Upload] Gallery piece creation error:', error);
+    throw error;
   }
+  }, [artworkData]);
 
-  const renderUploadStep = () => (
-    <>
-      <ModalHeader>
-        <HeaderContent>
-          <StepIndicator>
-            <StepNumber $active>1</StepNumber>
-            <StepLine />
-            <StepNumber>2</StepNumber>
-          </StepIndicator>
-          <ModalTitle>Upload Artwork</ModalTitle>
-          <ModalSubtitle>Select a high-quality image</ModalSubtitle>
-        </HeaderContent>
-        <CloseButton onClick={onClose} type="button">
-          <X size={20} />
-        </CloseButton>
-      </ModalHeader>
+  // File selection handler with validation
+  const handleFileSelect = useCallback(async (file: File) => {
+    console.log('[Upload] File selected:', file.name);
+
+    // Reset any previous errors
+    setUploadState(prev => ({ ...prev, error: undefined }));
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setUploadState({
+        step: 'error',
+        uploadProgress: 0,
+        error: 'Please select a valid image file (JPG, PNG, GIF, WebP)'
+      });
+      return;
+    }
+
+    // Validate file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadState({
+        step: 'error',
+        uploadProgress: 0,
+        error: `File size (${(file.size / 1024 / 1024).toFixed(1)}MB) exceeds 10MB limit`
+      });
+      return;
+    }
+
+    // Set uploading state
+    setUploadState({
+      step: 'uploading',
+      uploadProgress: 0,
+      imageFile: file
+    });
+
+    try {
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadState(prev => ({
+          ...prev,
+          uploadProgress: Math.min(prev.uploadProgress + 10, 90)
+        }));
+      }, 200);
+
+      const uploadRes: UploadResponse = await api.portfolio.images.upload(file, 'gallery');
+      clearInterval(progressInterval);
+
+      // Auto-generate title from filename if empty
+      const fileName = file.name.replace(/\.[^/.]+$/, "");
+      const cleanTitle = fileName.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+      setArtworkData(prev => ({
+        ...prev,
+        title: prev.title || cleanTitle
+      }));
+
+      setUploadState({
+        step: 'details',
+        uploadProgress: 100,
+        imageUrl: uploadRes.url,
+        imageFile: file
+      });
+
+
+    } catch (error) {
+      console.error('[Upload] Upload process failed:', error);
+      setUploadState({
+        step: 'error',
+        uploadProgress: 0,
+        error: error instanceof Error ? error.message : 'Upload failed. Please try again.'
+      });
+    }
+  }, [uploadImage]);
+
+  // Form submission handler
+  const handleSubmit = useCallback(async () => {
+    if (!uploadState.imageUrl) {
+      setUploadState(prev => ({
+        ...prev,
+        step: 'error',
+        error: 'No image URL available. Please re-upload your image.'
+      }));
+      return;
+    }
+
+    if (!artworkData.title.trim()) {
+      setUploadState(prev => ({
+        ...prev,
+        step: 'error',
+        error: 'Title is required'
+      }));
+      return;
+    }
+
+    setUploadState(prev => ({ ...prev, step: 'uploading', uploadProgress: 0 }));
+
+    try {
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setUploadState(prev => ({
+          ...prev,
+          uploadProgress: Math.min(prev.uploadProgress + 15, 90)
+        }));
+      }, 300);
+
+      await api.portfolio.gallery.add({
+        title: artworkData.title.trim(),
+        description: artworkData.description.trim(),
+        imageUrl: uploadState.imageUrl,
+        category: artworkData.category,
+        medium: artworkData.medium.trim(),
+        tags: artworkData.tags.filter(tag => tag.trim().length > 0),
+        visibility: artworkData.visibility,
+        year: artworkData.year,
+        displayOrder: 0,
+        price: artworkData.price,
+        artist: artworkData.artist?.trim(),
+      });
       
-      <ModalBody>
-        <FormContent>
-          <UploadSection>
+      clearInterval(progressInterval);
+      setUploadState({ step: 'success', uploadProgress: 100 });
+      
+      // Auto-close and refresh after success
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
+
+    } catch (error) {
+      console.error('[Upload] Submit failed:', error);
+      setUploadState({
+        step: 'error',
+        uploadProgress: 0,
+        error: error instanceof Error ? error.message : 'Failed to create artwork'
+      });
+    }
+  }, [uploadState.imageUrl, artworkData, createGalleryPiece, onSuccess]);
+
+  // Drag and drop handlers
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+      handleFileSelect(files[0]);
+    }
+  }, [handleFileSelect]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+  }, []);
+
+  // Tag input handler
+  const handleTagsChange = useCallback((value: string) => {
+    const tags = value
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0)
+      .slice(0, 10); // Limit to 10 tags
+    
+    setArtworkData(prev => ({ ...prev, tags }));
+  }, []);
+
+  // Render different steps
+  const renderStep = () => {
+    switch (uploadState.step) {
+      case 'select':
+        return (
+          <StepContainer>
+            <StepHeader>
+              <StepTitle>Upload Artwork</StepTitle>
+              <StepSubtitle>Select a high-quality image of your artwork</StepSubtitle>
+            </StepHeader>
+            
+            <DropZone
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <UploadIcon>
+                <Upload size={48} />
+              </UploadIcon>
+              <UploadText>
+                <strong>Click to upload</strong> or drag and drop
+              </UploadText>
+              <UploadSubtext>
+                PNG, JPG, GIF, WebP up to 10MB
+              </UploadSubtext>
+              
+              <QualityHints>
+                <HintItem>📏 Minimum 1200px on longest side</HintItem>
+                <HintItem>🎨 Accurate colors and lighting</HintItem>
+                <HintItem>✂️ Properly cropped composition</HintItem>
+              </QualityHints>
+            </DropZone>
+            
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={handleFileSelect}
               style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleFileSelect(file);
+              }}
             />
-            
-            {preview ? (
-              <PreviewContainer>
-                <PreviewImage src={preview} alt="Preview" />
-                <PreviewOverlay>
-                  <ChangeButton
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Change Image
-                  </ChangeButton>
-                </PreviewOverlay>
-                {selectedFile && (
-                  <ImageInfo>
-                    <ImageName>{selectedFile.name}</ImageName>
-                    <ImageSize>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</ImageSize>
-                  </ImageInfo>
-                )}
-              </PreviewContainer>
-            ) : (
-              <UploadArea onClick={() => fileInputRef.current?.click()}>
-                <UploadIconWrapper>
-                  <Upload size={32} />
-                </UploadIconWrapper>
-                <UploadText>Drop image here or click to browse</UploadText>
-                <UploadHint>JPG, PNG, GIF up to 10MB</UploadHint>
-              </UploadArea>
-            )}
-          </UploadSection>
-          
-          <GuidelinesCard>
-            <GuidelineTitle>Quality Guidelines</GuidelineTitle>
-            <GuidelineList>
-              <GuidelineItem>
-                <GuidelineIcon>📏</GuidelineIcon>
-                <GuidelineText>Minimum 1200px on longest side</GuidelineText>
-              </GuidelineItem>
-              <GuidelineItem>
-                <GuidelineIcon>🎨</GuidelineIcon>
-                <GuidelineText>Accurate color representation</GuidelineText>
-              </GuidelineItem>
-              <GuidelineItem>
-                <GuidelineIcon>✂️</GuidelineIcon>
-                <GuidelineText>Properly cropped, minimal background</GuidelineText>
-              </GuidelineItem>
-            </GuidelineList>
-          </GuidelinesCard>
-          
-          {imageUploadError && (
-            <ErrorMessage>
-              <ErrorIcon>⚠️</ErrorIcon>
-              <ErrorText>{imageUploadError}</ErrorText>
-            </ErrorMessage>
-          )}
-        </FormContent>
-        
-        <ModalFooter>
-          <FooterContent>
-            <SecondaryButton onClick={onClose} disabled={isUploadingImage}>
-              Cancel
-            </SecondaryButton>
-            <PrimaryButton 
-              onClick={uploadImage}
-              disabled={isUploadingImage || !selectedFile}
-            >
-              {isUploadingImage ? (
-                <>
-                  <LoadingSpinner />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  Continue
-                  <ArrowIcon>→</ArrowIcon>
-                </>
-              )}
-            </PrimaryButton>
-          </FooterContent>
-        </ModalFooter>
-      </ModalBody>
-    </>
-  );
+          </StepContainer>
+        );
 
-  const renderMetadataStep = () => (
-    <>
-      <ModalHeader>
-        <HeaderContent>
-          <StepIndicator>
-            <StepNumber>1</StepNumber>
-            <StepLine $completed />
-            <StepNumber $active>2</StepNumber>
-          </StepIndicator>
-          <ModalTitle>Artwork Details</ModalTitle>
-          <ModalSubtitle>Add information about your artwork</ModalSubtitle>
-        </HeaderContent>
-        <CloseButton onClick={onClose} type="button">
-          <X size={20} />
-        </CloseButton>
-      </ModalHeader>
-      
-      <ModalBody>
-        <form onSubmit={(e: React.FormEvent) => { e.preventDefault(); submitArtwork(); }}>
-          <FormContent>
-            <TwoColumnLayout>
-              <LeftColumn>
-                {preview && (
-                  <PreviewSection>
-                    <PreviewContainer>
-                      <PreviewImage src={preview} alt="Preview" />
-                    </PreviewContainer>
-                  </PreviewSection>
+      case 'uploading':
+        return (
+          <StepContainer>
+            <StepHeader>
+              <StepTitle>
+                {uploadState.uploadProgress < 100 ? 'Uploading Image...' : 'Processing...'}
+              </StepTitle>
+              <StepSubtitle>Please wait while we upload your artwork</StepSubtitle>
+            </StepHeader>
+            
+            <ProgressContainer>
+              <ProgressBar progress={uploadState.uploadProgress} />
+              <ProgressText>{uploadState.uploadProgress}% complete</ProgressText>
+            </ProgressContainer>
+            
+            <LoadingContainer>
+              <Loader size={32} className="animate-spin" />
+              <LoadingText>
+                {uploadState.uploadProgress < 50 ? 'Uploading to server...' :
+                 uploadState.uploadProgress < 90 ? 'Processing image...' :
+                 'Almost done...'}
+              </LoadingText>
+            </LoadingContainer>
+          </StepContainer>
+        );
+
+      case 'details':
+        return (
+          <StepContainer>
+            <StepHeader>
+              <StepTitle>Artwork Details</StepTitle>
+              <StepSubtitle>Add information about your artwork</StepSubtitle>
+            </StepHeader>
+            
+            <DetailsLayout>
+              <PreviewSection>
+                {uploadState.imageUrl && (
+                  <PreviewContainer>
+                    <PreviewImage src={uploadState.imageUrl} alt="Artwork preview" />
+                    <PreviewInfo>
+                      <CheckCircle size={16} color="#10b981" />
+                      <span>Image uploaded successfully</span>
+                    </PreviewInfo>
+                  </PreviewContainer>
                 )}
-              </LeftColumn>
-              
-              <RightColumn>
-                <FormSection>
-                  <SectionTitle>Basic Information</SectionTitle>
-                  
-                  <FormGroup>
+              </PreviewSection>
+
+              <FormSection>
+                <FormGrid>
+                  <FormField>
                     <Label>
-                      Title <RequiredStar>*</RequiredStar>
+                      Title <RequiredMark>*</RequiredMark>
                     </Label>
                     <Input
-                      name="title"
-                      value={formData.title}
-                      onChange={handleInputChange}
-                      placeholder="Enter artwork title"
+                      value={artworkData.title}
+                      onChange={(e) => setArtworkData(prev => ({ 
+                        ...prev, 
+                        title: e.target.value 
+                      }))}
+                      placeholder="Enter artwork title..."
                       required
-                      maxLength={100}
                     />
-                  </FormGroup>
-                  
-                  <FormGroup>
-                    <Label>Artist Name</Label>
+                  </FormField>
+
+                  <FormField>
+                    <Label>Category</Label>
+                    <Select
+                      value={artworkData.category}
+                      onChange={(e) => setArtworkData(prev => ({ 
+                        ...prev, 
+                        category: e.target.value 
+                      }))}
+                    >
+                      <option value="portrait">Portrait</option>
+                      <option value="landscape">Landscape</option>
+                      <option value="abstract">Abstract</option>
+                      <option value="digital">Digital Art</option>
+                      <option value="photography">Photography</option>
+                      <option value="illustration">Illustration</option>
+                      <option value="mixed-media">Mixed Media</option>
+                      <option value="series">Series</option>
+                      <option value="other">Other</option>
+                    </Select>
+                  </FormField>
+
+                  <FormField>
+                    <Label>Medium</Label>
                     <Input
-                      name="artist"
-                      value={formData.artist}
-                      onChange={handleInputChange}
-                      placeholder="Your name or pseudonym"
-                      maxLength={50}
+                      value={artworkData.medium}
+                      onChange={(e) => setArtworkData(prev => ({ 
+                        ...prev, 
+                        medium: e.target.value 
+                      }))}
+                      placeholder="Oil on canvas, Digital, Acrylic..."
                     />
-                  </FormGroup>
-                  
-                  <FormGroup>
+                  </FormField>
+
+                  <FormField>
+                    <Label>Year</Label>
+                    <Input
+                      type="number"
+                      value={artworkData.year}
+                      onChange={(e) => setArtworkData(prev => ({ 
+                        ...prev, 
+                        year: parseInt(e.target.value) || new Date().getFullYear() 
+                      }))}
+                      min="1900"
+                      max={new Date().getFullYear() + 1}
+                    />
+                  </FormField>
+
+                  <FormField>
+                    <Label>Visibility</Label>
+                    <VisibilitySelect
+                      value={artworkData.visibility}
+                      onChange={(e) => setArtworkData(prev => ({ 
+                        ...prev, 
+                        visibility: e.target.value as any 
+                      }))}
+                    >
+                      <option value="public">
+                        🌍 Public - Visible to everyone
+                      </option>
+                      <option value="unlisted">
+                        🔗 Unlisted - Only accessible via direct link
+                      </option>
+                      <option value="private">
+                        🔒 Private - Only visible to you
+                      </option>
+                    </VisibilitySelect>
+                  </FormField>
+
+                  <FormField>
+                    <Label>Price (optional)</Label>
+                    <PriceInput>
+                      <span>$</span>
+                      <Input
+                        type="number"
+                        value={artworkData.price || ''}
+                        onChange={(e) => setArtworkData(prev => ({ 
+                          ...prev, 
+                          price: e.target.value ? parseFloat(e.target.value) : undefined 
+                        }))}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                        style={{ paddingLeft: '1.5rem' }}
+                      />
+                    </PriceInput>
+                  </FormField>
+
+                  <FormField fullWidth>
                     <Label>Description</Label>
                     <TextArea
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
+                      value={artworkData.description}
+                      onChange={(e) => setArtworkData(prev => ({ 
+                        ...prev, 
+                        description: e.target.value 
+                      }))}
                       placeholder="Tell the story behind your artwork..."
                       rows={3}
-                      maxLength={1000}
                     />
-                    <FieldHint>{formData.description.length}/1000 characters</FieldHint>
-                  </FormGroup>
-                </FormSection>
+                  </FormField>
 
-                <FormSection>
-                  <SectionTitle>Classification</SectionTitle>
-                  
-                  <FormRow>
-                    <FormGroup>
-                      <Label>Category</Label>
-                      <Select
-                        name="category"
-                        value={formData.category}
-                        onChange={handleInputChange}
-                      >
-                        <option value="portrait">Portrait</option>
-                        <option value="landscape">Landscape</option>
-                        <option value="abstract">Abstract</option>
-                        <option value="series">Series</option>
-                        <option value="mixed-media">Mixed Media</option>
-                      </Select>
-                    </FormGroup>
-                    
-                    <FormGroup>
-                      <Label>Medium</Label>
-                      <Input
-                        name="medium"
-                        value={formData.medium}
-                        onChange={handleInputChange}
-                        placeholder="Oil, Digital, Acrylic..."
-                        maxLength={50}
-                      />
-                    </FormGroup>
-                  </FormRow>
-                  
-                  <FormRow>
-                    <FormGroup>
-                      <Label>Year Created</Label>
-                      <Input
-                        name="year"
-                        type="number"
-                        value={formData.year}
-                        onChange={handleInputChange}
-                        min="1900"
-                        max={new Date().getFullYear()}
-                      />
-                    </FormGroup>
-                    
-                    <FormGroup>
-                      <Label>Price (USD)</Label>
-                      <PriceInputWrapper>
-                        <PriceSymbol>$</PriceSymbol>
-                        <Input
-                          name="price"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.price}
-                          onChange={handleInputChange}
-                          placeholder="0.00"
-                          style={{ paddingLeft: '2rem' }}
-                        />
-                      </PriceInputWrapper>
-                      <FieldHint>Leave empty if not for sale</FieldHint>
-                    </FormGroup>
-                  </FormRow>
-                  
-                  <FormGroup>
-                    <Label>Tags</Label>
+                  <FormField fullWidth>
+                    <Label>Tags (comma-separated)</Label>
                     <Input
-                      name="tags"
-                      value={formData.tags}
-                      onChange={handleInputChange}
-                      placeholder="abstract, portrait, nature (comma separated)"
-                      maxLength={200}
+                      value={artworkData.tags.join(', ')}
+                      onChange={(e) => handleTagsChange(e.target.value)}
+                      placeholder="abstract, portrait, nature, oil painting..."
                     />
-                    <FieldHint>Add up to 10 tags to help discovery</FieldHint>
-                  </FormGroup>
-                </FormSection>
-              </RightColumn>
-            </TwoColumnLayout>
-            
-            {error && (
-              <ErrorMessage>
-                <ErrorIcon>⚠️</ErrorIcon>
-                <ErrorText>{error}</ErrorText>
-              </ErrorMessage>
-            )}
-          </FormContent>
-          
-          <ModalFooter>
-            <FooterContent>
+                    <FieldHint>
+                      Add up to 10 tags to help people discover your artwork
+                    </FieldHint>
+                  </FormField>
+                </FormGrid>
+              </FormSection>
+            </DetailsLayout>
+
+            <ButtonGroup>
               <SecondaryButton 
-                type="button"
-                onClick={() => setCurrentStep(1)}
-                disabled={isSubmitting}
+                onClick={() => setUploadState({ step: 'select', uploadProgress: 0 })}
               >
-                <ArrowIcon style={{ transform: 'rotate(180deg)' }}>→</ArrowIcon>
                 Back
               </SecondaryButton>
               <PrimaryButton 
-                type="submit" 
-                disabled={isSubmitting || !formData.title.trim()}
+                onClick={handleSubmit} 
+                disabled={!artworkData.title.trim()}
               >
-                {isSubmitting ? (
-                  <>
-                    <LoadingSpinner />
-                    Publishing...
-                  </>
-                ) : (
-                  'Publish Artwork'
-                )}
+                Publish Artwork
               </PrimaryButton>
-            </FooterContent>
-          </ModalFooter>
-        </form>
-      </ModalBody>
-    </>
-  );
+            </ButtonGroup>
+          </StepContainer>
+        );
+
+      case 'success':
+        return (
+          <StepContainer>
+            <SuccessContainer>
+              <SuccessIcon>
+                <CheckCircle size={64} color="#10b981" />
+              </SuccessIcon>
+              <StepTitle>Artwork Published!</StepTitle>
+              <SuccessText>
+                Your artwork "{artworkData.title}" has been successfully added to your gallery.
+              </SuccessText>
+              <SuccessSubtext>
+                Redirecting to your gallery...
+              </SuccessSubtext>
+            </SuccessContainer>
+          </StepContainer>
+        );
+
+      case 'error':
+        return (
+          <StepContainer>
+            <ErrorContainer>
+              <ErrorIcon>
+                <AlertCircle size={64} color="#ef4444" />
+              </ErrorIcon>
+              <StepTitle>Upload Failed</StepTitle>
+              <ErrorText>{uploadState.error}</ErrorText>
+              <ButtonGroup>
+                <SecondaryButton 
+                  onClick={() => setUploadState({ step: 'select', uploadProgress: 0 })}
+                >
+                  Try Again
+                </SecondaryButton>
+              </ButtonGroup>
+            </ErrorContainer>
+          </StepContainer>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
-    <ModalOverlay onClick={handleBackdropClick}>
-      <ModalContent onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-        {currentStep === 1 ? renderUploadStep() : renderMetadataStep()}
+    <ModalOverlay onClick={onClose}>
+      <ModalContent onClick={(e) => e.stopPropagation()}>
+        <CloseButton onClick={onClose}>
+          <X size={24} />
+        </CloseButton>
+        {renderStep()}
       </ModalContent>
     </ModalOverlay>
   );
-};
+}
+
+// Styled Components (keeping original style but improved)
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+`;
+
+const ModalContent = styled.div`
+  position: relative;
+  background: white;
+  border-radius: 8px;
+  width: 90vw;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+`;
+
+const CloseButton = styled.button`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #666;
+  z-index: 10;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background: #f3f4f6;
+    color: #333;
+  }
+`;
+
+const StepContainer = styled.div`
+  padding: 2rem;
+`;
+
+const StepHeader = styled.div`
+  text-align: center;
+  margin-bottom: 2rem;
+`;
+
+const StepTitle = styled.h2`
+  font-size: 1.75rem;
+  font-weight: 400;
+  color: #2c2c2c;
+  margin-bottom: 0.5rem;
+  font-family: 'Cormorant Garamond', serif;
+`;
+
+const StepSubtitle = styled.p`
+  color: #666;
+  font-size: 1rem;
+  margin: 0;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const DropZone = styled.div`
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #fafafa;
+  
+  &:hover {
+    border-color: #2c2c2c;
+    background: #f5f5f5;
+    transform: translateY(-2px);
+  }
+`;
+
+const UploadIcon = styled.div`
+  color: #9ca3af;
+  margin-bottom: 1rem;
+`;
+
+const UploadText = styled.p`
+  font-size: 1.125rem;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const UploadSubtext = styled.p`
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const QualityHints = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const HintItem = styled.div`
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const ProgressContainer = styled.div`
+  margin: 2rem 0;
+  text-align: center;
+`;
+
+const ProgressBar = styled.div<{ progress: number }>`
+  width: 100%;
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  
+  &::after {
+    content: '';
+    display: block;
+    height: 100%;
+    width: ${props => props.progress}%;
+    background: linear-gradient(90deg, #2c2c2c, #4a4a4a);
+    transition: width 0.3s ease;
+  }
+`;
+
+const ProgressText = styled.div`
+  font-size: 0.875rem;
+  color: #666;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  
+  .animate-spin {
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
+const LoadingText = styled.div`
+  font-size: 0.875rem;
+  color: #666;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const DetailsLayout = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const PreviewSection = styled.div``;
+
+const PreviewContainer = styled.div`
+  position: relative;
+`;
+
+const PreviewImage = styled.img`
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+`;
+
+const PreviewInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: #10b981;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const FormSection = styled.div``;
+
+const FormGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const FormField = styled.div<{ fullWidth?: boolean }>`
+  ${props => props.fullWidth && `
+    grid-column: 1 / -1;
+  `}
+`;
+
+const Label = styled.label`
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const RequiredMark = styled.span`
+  color: #ef4444;
+  margin-left: 2px;
+`;
+
+const Input = styled.input`
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-family: 'Work Sans', sans-serif;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  
+  &:focus {
+    outline: none;
+    border-color: #2c2c2c;
+    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
+  }
+`;
+
+const Select = styled.select`
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  font-family: 'Work Sans', sans-serif;
+  
+  &:focus {
+    outline: none;
+    border-color: #2c2c2c;
+    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
+  }
+`;
+
+const VisibilitySelect = styled(Select)`
+  font-size: 0.875rem;
+`;
+
+const TextArea = styled.textarea`
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  resize: vertical;
+  font-family: 'Work Sans', sans-serif;
+  
+  &:focus {
+    outline: none;
+    border-color: #2c2c2c;
+    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
+  }
+`;
+
+const PriceInput = styled.div`
+  position: relative;
+  
+  span {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+    font-family: 'Work Sans', sans-serif;
+  }
+`;
+
+const FieldHint = styled.div`
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+  font-family: 'Work Sans', sans-serif;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+`;
+
+const PrimaryButton = styled.button`
+  background: #2c2c2c;
+  color: white;
+  border: none;
+  padding: 0.875rem 2rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Work Sans', sans-serif;
+  
+  &:hover:not(:disabled) {
+    background: #1a1a1a;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  &:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
+
+const SecondaryButton = styled.button`
+  background: none;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  padding: 0.875rem 2rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Work Sans', sans-serif;
+  
+  &:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+    color: #374151;
+  }
+`;
+
+const SuccessContainer = styled.div`
+  text-align: center;
+  padding: 2rem;
+`;
+
+const SuccessIcon = styled.div`
+  margin-bottom: 1rem;
+`;
+
+const SuccessText = styled.p`
+  color: #6b7280;
+  font-family: 'Work Sans', sans-serif;
+  line-height: 1.6;
+  margin-bottom: 0.5rem;
+`;
+
+const SuccessSubtext = styled.p`
+  color: #9ca3af;
+  font-size: 0.875rem;
+  font-family: 'Work Sans', sans-serif;
+  margin: 0;
+`;
+
+const ErrorContainer = styled.div`
+  text-align: center;
+  padding: 2rem;
+`;
+
+const ErrorIcon = styled.div`
+  margin-bottom: 1rem;
+`;
+
+const ErrorText = styled.p`
+  color: #ef4444;
+  font-family: 'Work Sans', sans-serif;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+  background: #fef2f2;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+`;

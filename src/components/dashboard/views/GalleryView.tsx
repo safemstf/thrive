@@ -1,10 +1,9 @@
-// src/components/dashboard/views/GalleryView.tsx - Greyscale version using shared styles
+// src/components/dashboard/views/GalleryView.tsx
 import React, { useState } from 'react';
 import { Upload, Settings, ExternalLink, Image as GalleryIcon } from 'lucide-react';
 import type { GalleryPiece } from '@/types/gallery.types';
 import { theme } from '@/styles/theme';
 
-// Import shared styles from main dashboard styles
 import {
   Section,
   SectionHeader,
@@ -18,7 +17,6 @@ import {
   EmptyMessage
 } from '../dashboardStyles';
 
-// Import shared view styles
 import {
   ViewContainer,
   ViewStatsGrid,
@@ -40,7 +38,6 @@ import {
   ViewImageAction
 } from './viewStyles';
 
-// Import the upload modal
 import { ArtworkUploadModal } from '@/components/gallery/utils/uploadModal';
 
 interface GalleryViewProps {
@@ -55,12 +52,11 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
   const handleModalClose = () => setIsModalOpen(false);
   const handleUploadSuccess = () => {
     setIsModalOpen(false);
-    // TODO: Add gallery refresh logic here
+    // TODO: Refresh gallery logic
   };
 
-  // Calculate stats
   const publicItems = galleryItems.filter(item => item.visibility === 'public').length;
-  const averageRating = 4.8; // TODO: Calculate from real data
+  const averageRating = 4.8; // placeholder
 
   return (
     <ViewContainer>
@@ -73,16 +69,15 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
           </SectionTitle>
           <SectionActions>
             <ActionButton $primary onClick={handleUploadClick}>
-              <Upload size={16} />
-              Upload New
+              <Upload size={16} /> Upload New
             </ActionButton>
             <ActionButton>
               <Settings size={16} />
             </ActionButton>
           </SectionActions>
         </SectionHeader>
-        
-        {/* Gallery Statistics - GREYSCALE */}
+
+        {/* Stats */}
         <ViewStatsGrid>
           <ViewStatCard>
             <ViewStatIcon $color={theme.colors.primary[600]}>
@@ -93,7 +88,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
               <ViewStatLabel>Total Pieces</ViewStatLabel>
             </ViewStatContent>
           </ViewStatCard>
-          
+
           <ViewStatCard>
             <ViewStatIcon $color={theme.colors.primary[500]}>
               <ExternalLink size={20} />
@@ -103,7 +98,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
               <ViewStatLabel>Public</ViewStatLabel>
             </ViewStatContent>
           </ViewStatCard>
-          
+
           <ViewStatCard>
             <ViewStatIcon $color={theme.colors.primary[700]}>
               <Upload size={20} />
@@ -114,7 +109,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
             </ViewStatContent>
           </ViewStatCard>
         </ViewStatsGrid>
-        
+
         {/* Gallery Grid */}
         <ViewGrid $minWidth="280px">
           {galleryItems.length > 0 ? (
@@ -123,56 +118,38 @@ export const GalleryView: React.FC<GalleryViewProps> = ({ galleryItems, portfoli
                 <ViewImageContainer>
                   <img src={item.imageUrl} alt={item.title} />
                   <ViewImageOverlay>
-                    <ViewImageAction>
-                      <ExternalLink size={16} />
-                    </ViewImageAction>
-                    <ViewImageAction>
-                      <Settings size={16} />
-                    </ViewImageAction>
+                    <ViewImageAction><ExternalLink size={16} /></ViewImageAction>
+                    <ViewImageAction><Settings size={16} /></ViewImageAction>
                   </ViewImageOverlay>
                 </ViewImageContainer>
-                
                 <ViewCardContent>
                   <ViewCardTitle>{item.title}</ViewCardTitle>
                   <ViewCardMeta>
                     <ViewTag>{item.category}</ViewTag>
-                    <ViewTag>
-                      {item.visibility}
-                    </ViewTag>
+                    <ViewTag>{item.visibility}</ViewTag>
                   </ViewCardMeta>
-                  
                   <ViewActionGroup>
-                    <ViewAction $primary>
-                      <ExternalLink size={14} />
-                      View
-                    </ViewAction>
-                    <ViewAction>
-                      <Settings size={14} />
-                      Edit
-                    </ViewAction>
+                    <ViewAction $primary><ExternalLink size={14} /> View</ViewAction>
+                    <ViewAction><Settings size={14} /> Edit</ViewAction>
                   </ViewActionGroup>
                 </ViewCardContent>
               </ViewCard>
             ))
           ) : (
             <EmptyStateCard>
-              <EmptyIcon>
-                <GalleryIcon size={48} />
-              </EmptyIcon>
+              <EmptyIcon><GalleryIcon size={48} /></EmptyIcon>
               <EmptyTitle>Your gallery awaits</EmptyTitle>
-              <EmptyMessage>
-                Upload your first artwork to start building your creative portfolio
-              </EmptyMessage>
+              <EmptyMessage>Upload your first artwork to start building your portfolio</EmptyMessage>
               <ActionButton $primary onClick={handleUploadClick}>
-                <Upload size={16} />
-                Upload first piece
+                <Upload size={16} /> Upload first piece
               </ActionButton>
             </EmptyStateCard>
           )}
         </ViewGrid>
       </Section>
 
-      {isModalOpen && (
+      {/* Upload Modal - only if portfolioId exists */}
+      {isModalOpen && portfolioId && (
         <ArtworkUploadModal
           portfolioId={portfolioId}
           onClose={handleModalClose}

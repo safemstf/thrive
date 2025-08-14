@@ -1,5 +1,43 @@
 // src/types/portfolio.types.ts 
-import { GalleryPiece } from './gallery.types';
+// Unified portfolio types including educational functionality
+
+import { BackendGalleryPiece } from './base.types';
+import { 
+  GalleryPiece, 
+  GalleryVisibility,
+  GalleryLayout,
+  GalleryStatus,
+  ArtworkSize,
+  ArtworkCategory,
+  ArtworkStatus,
+  ViewLayout,
+  GalleryMode,
+  BulkAction,
+  GalleryHeaderProps,
+  GalleryGridProps,
+  BulkActionBarProps,
+  Exhibition,
+  Publication,
+  GalleryResponse,
+  GalleryPieceCreateData,
+  GalleryPieceResponse,
+  APIErrorExtended,
+  GalleryCollection,
+  Artist,
+  GalleryApiResponse,
+  GalleryFilters,
+  GalleryQueryParams,
+  GalleryUploadFile,
+  GalleryUploadOptions,
+  GalleryViewConfig,
+  GalleryPermissions,
+  GalleryStats,
+  GalleryUpload,
+  GalleryItemProps,
+  GalleryModalProps,
+  ArtworkUploadModalProps,
+  BatchUploadResult
+} from './gallery.types';
 
 // ==================== Base Types ====================
 export interface BaseEntity {
@@ -22,6 +60,116 @@ export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
 export type CategoryIcon = MainCategory | SubCategory;
 export type ScientificDiscipline = 'physics' | 'chemistry' | 'biology';
 
+// Learning content structures
+export interface Example {
+  id?: string;
+  expression: string;
+  solution?: string;
+  steps?: string[];
+  visual?: string; // URL or diagram reference
+}
+
+export interface Strategy {
+  id?: string;
+  title: string;
+  description: string;
+  whenToUse?: string;
+}
+
+export interface Formula {
+  id?: string;
+  symbol: string;
+  name: string;
+  latex?: string;
+  units?: string;
+  description?: string;
+}
+
+export interface Rule {
+  id?: string;
+  name: string;
+  statement: string;
+  symbol?: string;
+  exceptions?: string[];
+}
+
+export interface CommonError {
+  id?: string;
+  error: string;
+  correct: string;
+  explanation?: string;
+}
+
+// Subject-specific learning content
+export interface MathConcept {
+  id: string;
+  topic: string;
+  formula?: Formula;
+  rules: Rule[];
+  examples: Example[];
+  strategies: Strategy[];
+  commonErrors?: CommonError[];
+  difficultyLevels?: {
+    [K in DifficultyLevel]?: {
+      description: string;
+      examples: Example[];
+      practiceProblems?: string[];
+    };
+  };
+}
+
+export interface ScienceConcept {
+  id: string;
+  topic: string;
+  discipline: ScientificDiscipline;
+  principle: string;
+  formulas?: Formula[];
+  laws?: Rule[];
+  examples: Example[];
+  applications: string[];
+  labSkills?: string[];
+  commonMistakes?: CommonError[];
+}
+
+export interface GrammarRule {
+  id: string;
+  topic: string;
+  rule: Rule;
+  examples: Example[];
+  exceptions?: string[];
+  commonErrors: CommonError[];
+}
+
+export interface LiteraryDevice {
+  id: string;
+  name: string;
+  definition: string;
+  symbol?: string;
+  examples: Example[];
+  effect: string;
+}
+
+export interface WritingStructure {
+  id: string;
+  type: string; // essay, paragraph, sentence
+  components: {
+    name: string;
+    purpose: string;
+    examples: string[];
+  }[];
+  transitions?: string[];
+}
+
+// Learning content union type
+export interface LearningContent {
+  mathConcepts?: MathConcept[];
+  scienceConcepts?: ScienceConcept[];
+  grammarRules?: GrammarRule[];
+  literaryDevices?: LiteraryDevice[];
+  writingStructures?: WritingStructure[];
+}
+
+// Concept and progress tracking
 export interface Concept {
   id: string;
   tags?: string[];
@@ -30,8 +178,6 @@ export interface Concept {
   summary?: string;
   estimatedMinutes?: number;
 }
-
-export type { GalleryVisibility } from '@/types/gallery.types';
 
 export interface ConceptProgress {
   conceptId: string;
@@ -43,26 +189,69 @@ export interface ConceptProgress {
   notes?: string;
 }
 
+export interface ConceptFilters {
+  type?: string;
+  discipline?: string;
+  difficulty?: DifficultyLevel;
+  bookId?: string;
+  tags?: string[];
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  mainCategory?: MainCategory;
+  subCategory?: SubCategory;
+  scientificDiscipline?: ScientificDiscipline;
+}
+
+// Educational resources
 export interface Book extends BaseEntity {
   title: string;
   subtitle?: string;
   year: string;
   mainCategory: MainCategory;
   subCategory: SubCategory;
+  scientificDiscipline?: ScientificDiscipline;
   colors: {
     primary: string;
     secondary: string;
     accent?: string;
   };
+  icon?: string; // Icon identifier
   excerpt: string;
   description: string;
+  learningContent: LearningContent;
+  metadata?: {
+    gradeLevel?: string[];
+    prerequisites?: string[];
+    duration?: string;
+    lastUpdated?: Date;
+  };
 }
 
+export interface BookQueryParams {
+  mainCategory?: MainCategory;
+  subCategory?: SubCategory;
+  scientificDiscipline?: ScientificDiscipline;
+  difficulty?: DifficultyLevel;
+  search?: string;
+  tags?: string[];
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  year?: string;
+  gradeLevel?: string[];
+}
+
+// Section configuration for UI
 export interface SectionConfig {
   key: string;
   title: string;
   mainCategory: MainCategory;
   subCategory: SubCategory;
+  disciplines?: ScientificDiscipline[];
 }
 
 export const defaultSections: SectionConfig[] = [
@@ -72,19 +261,6 @@ export const defaultSections: SectionConfig[] = [
   { key: 'ap-science', title: 'AP Science', mainCategory: 'science', subCategory: 'ap' },
   { key: 'ap-calc', title: 'AP Calculus', mainCategory: 'math', subCategory: 'ap' }
 ];
-
-export interface ConceptFilters {
-  type?: string;
-  discipline?: string;
-  difficulty?: string;
-  bookId?: string;
-  tags?: string[];
-  search?: string;
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}
 
 // ==================== Main Portfolio Interface ====================
 export interface Portfolio extends BaseEntity {
@@ -132,9 +308,249 @@ export interface Portfolio extends BaseEntity {
   // Stats
   stats: PortfolioStats;
   
+  // Educational Content (for educational/hybrid portfolios)
+  conceptProgress?: ConceptProgress[];
+  learningGoals?: string[];
+  currentBooks?: string[]; // Book IDs
+  completedBooks?: string[]; // Book IDs
+  
   // Metadata
   lastActiveAt?: Date;
   featuredPieces?: string[]; // IDs of featured gallery pieces
+}
+
+// ==================== Portfolio Settings ====================
+export interface PortfolioSettings {
+  // Review Settings
+  allowReviews: boolean;
+  allowComments?: boolean;
+  requireReviewApproval: boolean;
+  allowAnonymousReviews: boolean;
+  
+  // Display Settings
+  showStats: boolean;
+  showPrices: boolean;
+  defaultGalleryView: 'grid' | 'masonry' | 'list';
+  piecesPerPage: number;
+  
+  // Educational Settings (for educational/hybrid portfolios)
+  showProgress?: boolean;
+  publicProgress?: boolean;
+  showCertifications?: boolean;
+  trackLearningTime?: boolean;
+  
+  // Notification Settings
+  notifyOnReview: boolean;
+  notifyOnView: boolean;
+  weeklyAnalyticsEmail: boolean;
+  notifyOnConceptCompletion?: boolean;
+  weeklyProgressEmail?: boolean;
+}
+
+// ==================== Portfolio Stats ====================
+export interface PortfolioStats {
+  totalViews: number;
+  uniqueVisitors: number;
+  totalPieces: number;
+  totalReviews: number;
+  averageRating?: number;
+  responseRate?: number;
+  responseTime?: string; // e.g., "within 24 hours"
+  
+  // Time-based stats
+  viewsThisWeek: number;
+  viewsThisMonth: number;
+  
+  // Engagement
+  shareCount: number;
+  savedCount: number;
+  
+  // Educational Stats (for educational/hybrid portfolios)
+  totalConcepts?: number;
+  completedConcepts?: number;
+  inProgressConcepts?: number;
+  totalLearningHours?: number;
+  averageScore?: number;
+  streakDays?: number;
+  certificationsEarned?: number;
+}
+
+// ==================== Backend/Frontend Conversion Utilities ====================
+
+/**
+ * Convert backend portfolio data to frontend format
+ * Handles ID normalization and date parsing
+ */
+export function portfolioFromBackend(backendData: any): Portfolio {
+  if (!backendData) {
+    throw new Error('Portfolio data is required');
+  }
+
+  // Handle default values for required fields
+  const portfolio: Portfolio = {
+    // ID handling - prefer _id from MongoDB, fallback to id
+    id: backendData._id || backendData.id,
+    _id: backendData._id,
+    
+    // Basic required fields with defaults
+    userId: backendData.userId || backendData.user_id || '',
+    username: backendData.username || '',
+    title: backendData.title || 'Untitled Portfolio',
+    bio: backendData.bio || '',
+    kind: backendData.kind || 'creative',
+    visibility: backendData.visibility || 'public',
+    status: backendData.status || 'active',
+    
+    // Optional fields
+    name: backendData.name,
+    tagline: backendData.tagline,
+    profileImage: backendData.profileImage || backendData.profile_image,
+    coverImage: backendData.coverImage || backendData.cover_image,
+    shareToken: backendData.shareToken || backendData.share_token,
+    customUrl: backendData.customUrl || backendData.custom_url,
+    location: backendData.location,
+    yearsOfExperience: backendData.yearsOfExperience || backendData.years_of_experience,
+    
+    // Arrays with defaults
+    specializations: backendData.specializations || [],
+    tags: backendData.tags || [],
+    
+    // Social links
+    socialLinks: backendData.socialLinks || backendData.social_links || {},
+    contactEmail: backendData.contactEmail || backendData.contact_email,
+    showContactInfo: backendData.showContactInfo ?? backendData.show_contact_info ?? false,
+    
+    // Settings with defaults
+    settings: {
+      allowReviews: backendData.settings?.allowReviews ?? backendData.settings?.allow_reviews ?? true,
+      allowComments: backendData.settings?.allowComments ?? backendData.settings?.allow_comments ?? true,
+      requireReviewApproval: backendData.settings?.requireReviewApproval ?? backendData.settings?.require_review_approval ?? false,
+      allowAnonymousReviews: backendData.settings?.allowAnonymousReviews ?? backendData.settings?.allow_anonymous_reviews ?? true,
+      showStats: backendData.settings?.showStats ?? backendData.settings?.show_stats ?? true,
+      showPrices: backendData.settings?.showPrices ?? backendData.settings?.show_prices ?? false,
+      defaultGalleryView: backendData.settings?.defaultGalleryView ?? backendData.settings?.default_gallery_view ?? 'grid',
+      piecesPerPage: backendData.settings?.piecesPerPage ?? backendData.settings?.pieces_per_page ?? 20,
+      notifyOnReview: backendData.settings?.notifyOnReview ?? backendData.settings?.notify_on_review ?? true,
+      notifyOnView: backendData.settings?.notifyOnView ?? backendData.settings?.notify_on_view ?? false,
+      weeklyAnalyticsEmail: backendData.settings?.weeklyAnalyticsEmail ?? backendData.settings?.weekly_analytics_email ?? false,
+      // Educational settings
+      showProgress: backendData.settings?.showProgress ?? backendData.settings?.show_progress ?? true,
+      publicProgress: backendData.settings?.publicProgress ?? backendData.settings?.public_progress ?? false,
+      showCertifications: backendData.settings?.showCertifications ?? backendData.settings?.show_certifications ?? true,
+      trackLearningTime: backendData.settings?.trackLearningTime ?? backendData.settings?.track_learning_time ?? true,
+      notifyOnConceptCompletion: backendData.settings?.notifyOnConceptCompletion ?? backendData.settings?.notify_on_concept_completion ?? true,
+      weeklyProgressEmail: backendData.settings?.weeklyProgressEmail ?? backendData.settings?.weekly_progress_email ?? false,
+      ...backendData.settings
+    },
+    
+    // Stats with defaults
+    stats: {
+      totalViews: backendData.stats?.totalViews ?? backendData.stats?.total_views ?? 0,
+      uniqueVisitors: backendData.stats?.uniqueVisitors ?? backendData.stats?.unique_visitors ?? 0,
+      totalPieces: backendData.stats?.totalPieces ?? backendData.stats?.total_pieces ?? 0,
+      totalReviews: backendData.stats?.totalReviews ?? backendData.stats?.total_reviews ?? 0,
+      averageRating: backendData.stats?.averageRating ?? backendData.stats?.average_rating,
+      responseRate: backendData.stats?.responseRate ?? backendData.stats?.response_rate,
+      responseTime: backendData.stats?.responseTime ?? backendData.stats?.response_time,
+      viewsThisWeek: backendData.stats?.viewsThisWeek ?? backendData.stats?.views_this_week ?? 0,
+      viewsThisMonth: backendData.stats?.viewsThisMonth ?? backendData.stats?.views_this_month ?? 0,
+      shareCount: backendData.stats?.shareCount ?? backendData.stats?.share_count ?? 0,
+      savedCount: backendData.stats?.savedCount ?? backendData.stats?.saved_count ?? 0,
+      // Educational stats
+      totalConcepts: backendData.stats?.totalConcepts ?? backendData.stats?.total_concepts ?? 0,
+      completedConcepts: backendData.stats?.completedConcepts ?? backendData.stats?.completed_concepts ?? 0,
+      inProgressConcepts: backendData.stats?.inProgressConcepts ?? backendData.stats?.in_progress_concepts ?? 0,
+      totalLearningHours: backendData.stats?.totalLearningHours ?? backendData.stats?.total_learning_hours ?? 0,
+      averageScore: backendData.stats?.averageScore ?? backendData.stats?.average_score,
+      streakDays: backendData.stats?.streakDays ?? backendData.stats?.streak_days ?? 0,
+      certificationsEarned: backendData.stats?.certificationsEarned ?? backendData.stats?.certifications_earned ?? 0,
+      ...backendData.stats
+    },
+    
+    // Educational content
+    conceptProgress: backendData.conceptProgress || backendData.concept_progress || [],
+    learningGoals: backendData.learningGoals || backendData.learning_goals || [],
+    currentBooks: backendData.currentBooks || backendData.current_books || [],
+    completedBooks: backendData.completedBooks || backendData.completed_books || [],
+    
+    // Dates
+    createdAt: backendData.createdAt ? new Date(backendData.createdAt) : 
+               backendData.created_at ? new Date(backendData.created_at) : undefined,
+    updatedAt: backendData.updatedAt ? new Date(backendData.updatedAt) : 
+               backendData.updated_at ? new Date(backendData.updated_at) : undefined,
+    lastActiveAt: backendData.lastActiveAt ? new Date(backendData.lastActiveAt) : 
+                  backendData.last_active_at ? new Date(backendData.last_active_at) : undefined,
+    
+    // Featured pieces
+    featuredPieces: backendData.featuredPieces || backendData.featured_pieces || []
+  };
+
+  return portfolio;
+}
+
+/**
+ * Convert frontend portfolio data to backend format
+ * Handles ID normalization and proper field naming
+ */
+export function portfolioToBackend(portfolio: Portfolio): any {
+  if (!portfolio) {
+    throw new Error('Portfolio data is required');
+  }
+
+  return {
+    // Use _id for MongoDB if available, otherwise use id
+    _id: portfolio._id || portfolio.id,
+    
+    // Core fields
+    userId: portfolio.userId,
+    username: portfolio.username,
+    name: portfolio.name,
+    title: portfolio.title,
+    tagline: portfolio.tagline,
+    bio: portfolio.bio,
+    kind: portfolio.kind,
+    
+    // Images
+    profileImage: portfolio.profileImage,
+    coverImage: portfolio.coverImage,
+    
+    // Visibility & Status
+    visibility: portfolio.visibility,
+    status: portfolio.status,
+    shareToken: portfolio.shareToken,
+    customUrl: portfolio.customUrl,
+    
+    // Professional Info
+    location: portfolio.location,
+    yearsOfExperience: portfolio.yearsOfExperience,
+    specializations: portfolio.specializations,
+    tags: portfolio.tags,
+    
+    // Social & Contact
+    socialLinks: portfolio.socialLinks,
+    contactEmail: portfolio.contactEmail,
+    showContactInfo: portfolio.showContactInfo,
+    
+    // Settings
+    settings: portfolio.settings,
+    
+    // Stats
+    stats: portfolio.stats,
+    
+    // Educational content
+    conceptProgress: portfolio.conceptProgress,
+    learningGoals: portfolio.learningGoals,
+    currentBooks: portfolio.currentBooks,
+    completedBooks: portfolio.completedBooks,
+    
+    // Dates - convert to ISO strings
+    createdAt: portfolio.createdAt?.toISOString(),
+    updatedAt: portfolio.updatedAt?.toISOString(),
+    lastActiveAt: portfolio.lastActiveAt?.toISOString(),
+    
+    // Featured pieces
+    featuredPieces: portfolio.featuredPieces
+  };
 }
 
 // ==================== Utility Functions for ID Handling ====================
@@ -152,7 +568,7 @@ export function getPortfolioId(portfolio: Portfolio | null | undefined): string 
  * Safely extract gallery piece ID from either format
  * Handles both frontend (id) and backend (_id) formats
  */
-export function getGalleryPieceId(piece: GalleryPiece | null | undefined): string | null {
+export function getGalleryPieceId(piece: GalleryPiece | BackendGalleryPiece | null | undefined): string | null {
   if (!piece) return null;
   return piece.id || piece._id || null;
 }
@@ -194,45 +610,6 @@ export function extractPortfolioIdFromError(error: any): string | null {
   }
   
   return null;
-}
-
-// ==================== Portfolio Settings ====================
-export interface PortfolioSettings {
-  // Review Settings
-  allowReviews: boolean;
-  allowComments?: boolean;
-  requireReviewApproval: boolean;
-  allowAnonymousReviews: boolean;
-  
-  // Display Settings
-  showStats: boolean;
-  showPrices: boolean;
-  defaultGalleryView: 'grid' | 'masonry' | 'list';
-  piecesPerPage: number;
-  
-  // Notification Settings
-  notifyOnReview: boolean;
-  notifyOnView: boolean;
-  weeklyAnalyticsEmail: boolean;
-}
-
-// ==================== Portfolio Stats ====================
-export interface PortfolioStats {
-  totalViews: number;
-  uniqueVisitors: number;
-  totalPieces: number;
-  totalReviews: number;
-  averageRating?: number;
-  responseRate?: number;
-  responseTime?: string; // e.g., "within 24 hours"
-  
-  // Time-based stats
-  viewsThisWeek: number;
-  viewsThisMonth: number;
-  
-  // Engagement
-  shareCount: number;
-  savedCount: number;
 }
 
 // ==================== Review System ====================
@@ -396,6 +773,45 @@ export interface PortfolioAnalytics {
   views: number;
 }
 
+// ==================== Search Types ====================
+export interface SearchFilters {
+  contentType?: string;
+  difficulty?: DifficultyLevel;
+  mainCategory?: MainCategory;
+  subCategory?: SubCategory;
+  scientificDiscipline?: ScientificDiscipline;
+  bookId?: string;
+  tags?: string[];
+  minRelevance?: number;
+  dateRange?: {
+    start?: Date;
+    end?: Date;
+  };
+}
+
+export interface SearchResult {
+  bookId: string;
+  bookTitle: string;
+  contentType: string;
+  contentId: string;
+  snippet: string;
+  relevanceScore: number;
+  chapter?: string;
+  section?: string;
+  tags?: string[];
+  difficulty?: DifficultyLevel;
+  matchedTerms?: string[];
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  total: number;
+  query: string;
+  filters?: SearchFilters;
+  suggestions?: string[];
+  relatedConcepts?: Concept[];
+}
+
 // ==================== API DTOs ====================
 
 // Input type for usePortfolioManagement hook
@@ -432,6 +848,11 @@ export interface UpdatePortfolioDto extends Partial<CreatePortfolioDto> {
   customUrl?: string;
   featuredPieces?: string[];
   kind?: PortfolioKind;
+  // Educational fields
+  conceptProgress?: ConceptProgress[];
+  learningGoals?: string[];
+  currentBooks?: string[];
+  completedBooks?: string[];
 }
 
 export interface CreateReviewDto {
@@ -455,6 +876,10 @@ export interface PortfolioFilters {
   search?: string;
   sortBy?: 'recent' | 'rating' | 'views' | 'reviews';
   sortOrder?: 'asc' | 'desc';
+  // Educational filters
+  hasProgress?: boolean;
+  completionRate?: number;
+  learningCategory?: MainCategory;
 }
 
 // ==================== Response Types ====================
@@ -532,7 +957,7 @@ export const PORTFOLIO_KINDS: Record<PortfolioKind, {
   educational: {
     label: 'Educational Portfolio',
     description: 'Track your academic progress and learning achievements',
-    features: ['Progress tracking', 'Concept mastery', 'Learning analytics']
+    features: ['Progress tracking', 'Concept mastery', 'Learning analytics', 'Study resources']
   },
   professional: {
     label: 'Professional Portfolio',
@@ -542,7 +967,7 @@ export const PORTFOLIO_KINDS: Record<PortfolioKind, {
   hybrid: {
     label: 'Hybrid Portfolio',
     description: 'Combine creative works with educational progress',
-    features: ['Creative showcase', 'Learning progress', 'Unified dashboard']
+    features: ['Creative showcase', 'Learning progress', 'Unified dashboard', 'Mixed content types']
   }
 };
 
@@ -562,5 +987,40 @@ export const canUpgrade = (currentKind: PortfolioKind): boolean => {
 // Portfolio creation trigger types
 export type CreationTrigger = 'dashboard' | 'gallery' | 'profile' | 'url' | 'manual';
 
-// Re-export from gallery types
-export type { GalleryPiece };
+// Re-export gallery types for convenience
+export type {
+  GalleryPiece,
+  GalleryVisibility,
+  GalleryLayout,
+  GalleryStatus,
+  ArtworkSize,
+  ArtworkCategory,
+  ArtworkStatus,
+  ViewLayout,
+  GalleryMode,
+  BulkAction,
+  GalleryHeaderProps,
+  GalleryGridProps,
+  BulkActionBarProps,
+  Exhibition,
+  Publication,
+  GalleryResponse,
+  GalleryPieceCreateData,
+  GalleryPieceResponse,
+  APIErrorExtended,
+  GalleryCollection,
+  Artist,
+  GalleryApiResponse,
+  GalleryFilters,
+  GalleryQueryParams,
+  GalleryUploadFile,
+  GalleryUploadOptions,
+  GalleryViewConfig,
+  GalleryPermissions,
+  GalleryStats,
+  GalleryUpload,
+  GalleryItemProps,
+  GalleryModalProps,
+  ArtworkUploadModalProps,
+  BatchUploadResult
+};

@@ -42,22 +42,44 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
         setError(null);
         
         // Fetch gallery pieces
-        const pieces = await api.portfolio.gallery.get();
-        setGalleryPieces(pieces || []);
+        const response = await api.portfolio.gallery.get();
         
-        // Calculate stats from pieces (using correct property names)
-        if (pieces && pieces.length > 0) {
-          const totalViews = pieces.reduce((sum, piece) => sum + (piece.views || 0), 0);
-          const totalLikes = pieces.reduce((sum, piece) => sum + (piece.likes || 0), 0);
+        // Convert backend pieces to frontend format if needed
+        const pieces = response.galleryPieces || [];
+        const convertedPieces: GalleryPiece[] = pieces.map((piece: any) => ({
+          ...piece,
+          id: piece._id || piece.id,
+          _id: piece._id,
+          // Ensure all required GalleryPiece properties exist
+          alt: piece.alt || piece.title || 'Gallery artwork',
+          size: piece.size || 'medium',
+          status: piece.status || 'available', 
+          ownerId: piece.ownerId || piece.uploadedBy,
+          visibility: piece.visibility || 'private',
+          displayOrder: piece.displayOrder || 0,
+          views: piece.views || 0,
+          likes: piece.likes || 0,
+          // Convert date strings to Date objects if needed
+          createdAt: typeof piece.createdAt === 'string' ? new Date(piece.createdAt) : piece.createdAt,
+          updatedAt: typeof piece.updatedAt === 'string' ? new Date(piece.updatedAt) : piece.updatedAt,
+          publishedAt: piece.publishedAt ? (typeof piece.publishedAt === 'string' ? new Date(piece.publishedAt) : piece.publishedAt) : undefined
+        }));
+        
+        setGalleryPieces(convertedPieces);
+        
+        // Calculate stats from pieces
+        if (convertedPieces && convertedPieces.length > 0) {
+          const totalViews = convertedPieces.reduce((sum: number, piece: GalleryPiece) => sum + (piece.views || 0), 0);
+          const totalLikes = convertedPieces.reduce((sum: number, piece: GalleryPiece) => sum + (piece.likes || 0), 0);
           // Check if piece is featured based on your actual data structure
-          const featuredCount = pieces.filter(piece => 
+          const featuredCount = convertedPieces.filter((piece: GalleryPiece) => 
             piece.tags?.includes('featured') || // If you use tags
             piece.status === 'exhibition' ||     // If exhibition pieces are considered featured
             false // Replace with your actual featured logic
           ).length;
           
           setStats({
-            totalPieces: pieces.length,
+            totalPieces: convertedPieces.length,
             totalViews,
             totalLikes,
             featuredCount
@@ -100,8 +122,8 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
     if (!confirm('Are you sure you want to delete this piece?')) return;
     
     try {
-      await api.portfolio.gallery.get();
-      setGalleryPieces(prev => prev.filter(piece => piece.id !== pieceId));
+      await api.portfolio.gallery.delete(pieceId);
+      setGalleryPieces(prev => prev.filter(piece => piece._id !== pieceId));
     } catch (err) {
       console.error('Failed to delete piece:', err);
       alert('Failed to delete piece');
@@ -116,8 +138,8 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
       await api.portfolio.gallery.update(pieceId, { visibility: newVisibility });
       
       setGalleryPieces(prev => prev.map(piece => 
-        piece.id === pieceId 
-          ? { ...piece, visibility: newVisibility }
+        piece._id === pieceId 
+          ? { ...piece, visibility: newVisibility as any }
           : piece
       ));
     } catch (err) {
@@ -410,7 +432,7 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
       ) : (
         <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
           {filteredPieces.map((piece, index) => (
-            <div key={piece.id} style={{ 
+            <div key={piece._id} style={{ 
               padding: '1rem', 
               borderBottom: index < filteredPieces.length - 1 ? '1px solid #f3f4f6' : 'none',
               display: 'flex',
@@ -450,7 +472,7 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                   <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '600', color: '#1f2937' }}>
-                    {piece.title}
+                    {piece.title || 'Untitled'}
                   </h3>
                   <span style={{
                     background: piece.visibility === 'public' ? '#dcfce7' : '#fef3c7',
@@ -487,7 +509,7 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
               
               <div style={{ display: 'flex', gap: '0.25rem' }}>
                 <button 
-                  onClick={() => handleToggleVisibility(piece.id, piece.visibility)}
+                  onClick={() => handleToggleVisibility(piece._id, piece.visibility)}
                   title={`Make ${piece.visibility === 'public' ? 'private' : 'public'}`}
                   style={{ 
                     padding: '0.5rem', 
@@ -502,9 +524,9 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
                 </button>
                 <button 
                   onClick={() => navigator.share ? navigator.share({
-                    title: piece.title,
-                    text: piece.description,
-                    url: window.location.origin + '/gallery/' + piece.id
+                    title: piece.title || 'Untitled',
+                    text: piece.description || '',
+                    url: window.location.origin + '/gallery/' + piece._id
                   }) : null}
                   style={{ 
                     padding: '0.5rem', 
@@ -518,7 +540,7 @@ export const GalleryTabContent: React.FC<GalleryTabContentProps> = ({
                   <Share2 size={16} />
                 </button>
                 <button 
-                  onClick={() => handleDeletePiece(piece.id)}
+                  onClick={() => handleDeletePiece(piece._id)}
                   style={{ 
                     padding: '0.5rem', 
                     background: 'transparent', 

@@ -134,7 +134,7 @@ export default function GalleryEditPage() {
     setIsSaving(true);
     try {
       await updateMutation.mutateAsync({
-        pieceId: piece.id,
+        pieceId: piece._id,
         updates: formData
       });
       router.push('/dashboard/gallery');
@@ -150,7 +150,7 @@ export default function GalleryEditPage() {
     
     if (window.confirm('Are you sure you want to delete this artwork? This action cannot be undone.')) {
       try {
-        await deleteMutation.mutateAsync(piece.id);
+        await deleteMutation.mutateAsync(piece._id);
         router.push('/dashboard/gallery');
       } catch (error) {
         console.error('Failed to delete piece:', error);

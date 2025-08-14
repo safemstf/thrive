@@ -1,151 +1,187 @@
 // src/hooks/useGalleryApi.ts
+// Rewritten hooks for gallery endpoints with strong typing and response normalization
 
 import {
   useQuery,
   useMutation,
   useQueryClient,
-  useInfiniteQuery,
   UseQueryOptions,
   UseMutationOptions,
 } from '@tanstack/react-query';
 import { api, APIError } from '@/lib/api-client';
 
-import {
+import type {
   GalleryPiece,
   GalleryQueryParams,
   GalleryStats,
   GalleryVisibility,
 } from '@/types/gallery.types';
 
-// Updated query keys factory for gallery
+// --------------------- Query keys ---------------------
 export const galleryQueryKeys = {
   all: ['gallery'] as const,
   pieces: {
     all: ['gallery', 'pieces'] as const,
     my: () => [...galleryQueryKeys.pieces.all, 'my'] as const,
-    byUsername: (username: string, page?: number, limit?: number) => 
-      [...galleryQueryKeys.pieces.all, 'username', username, page, limit] as const,
+    byUsername: (username: string, page: number = 1, limit: number = 20) =>
+      [...galleryQueryKeys.pieces.all, 'username', username, 'page', page, 'limit', limit] as const,
     detail: (id: string) => [...galleryQueryKeys.pieces.all, 'detail', id] as const,
   },
   stats: ['gallery', 'stats'] as const,
 };
 
-// ==================== UPDATED HOOKS ====================
+// --------------------- Normalizer ---------------------
 
-// Get my gallery pieces
+/**
+ * Normalize API responses for gallery endpoints. Accepts:
+ * - ApiResponse<T> with `.data`
+ * - legacy shapes like `{ galleryPieces: T[] }`, `{ pieces: T[] }`
+ * - direct payload T or T[]
+ */
+function normalizeApi<T = any>(raw: any): any {
+  if (raw == null) return null;
+  if (typeof raw === 'object') {
+    if ('data' in raw) return raw.data;
+    // legacy responses
+    if ('galleryPieces' in raw) return raw.galleryPieces;
+    if ('pieces' in raw) return raw.pieces;
+    // single entity wrapper
+    if ('galleryPiece' in raw) return raw.galleryPiece;
+  }
+  return raw;
+}
+
+// --------------------- READ HOOKS ---------------------
+
 export function useMyGalleryPieces(
   options?: UseQueryOptions<GalleryPiece[], APIError>
 ) {
-  return useQuery({
+  return useQuery<GalleryPiece[], APIError>({
     queryKey: galleryQueryKeys.pieces.my(),
-    queryFn: () => api.portfolio.gallery.get(),
+    queryFn: async () => {
+      const raw = await api.portfolio.gallery.get();
+      const normalized = normalizeApi<GalleryPiece[] | GalleryPiece | null>(raw);
+
+      // If normalizeApi returned an array, return it
+      if (Array.isArray(normalized)) return normalized as GalleryPiece[];
+
+      // If it's a single item, wrap it
+      if (normalized && typeof normalized === 'object') return [normalized as GalleryPiece];
+
+      // Fallback: inspect raw object safely
+      if (raw && typeof raw === 'object') {
+        const anyRaw = raw as any;
+        if (Array.isArray(anyRaw.galleryPieces)) return anyRaw.galleryPieces as GalleryPiece[];
+        if (Array.isArray(anyRaw.pieces)) return anyRaw.pieces as GalleryPiece[];
+        if (Array.isArray(anyRaw.data)) return anyRaw.data as GalleryPiece[];
+      }
+
+      return [] as GalleryPiece[];
+    },
     ...options,
   });
 }
 
-// Get gallery pieces by username (public view)
 export function useGalleryPiecesByUsername(
   username: string,
-  page?: number,
-  limit?: number,
-  options?: UseQueryOptions<any, APIError> // Adjust type based on API response
+  params: { page?: number; limit?: number; filters?: GalleryQueryParams } = {},
+  options?: UseQueryOptions<{ galleryPieces: GalleryPiece[]; pagination?: any; filters?: any }, APIError>
 ) {
-  return useQuery({
+  const page = params.page ?? 1;
+  const limit = params.limit ?? 20;
+  return useQuery<{ galleryPieces: GalleryPiece[]; pagination?: any; filters?: any }, APIError>({
     queryKey: galleryQueryKeys.pieces.byUsername(username, page, limit),
-    queryFn: () => api.portfolio.gallery.getByUsername(username, page, limit),
+    queryFn: async () => {
+      // Call API with the supported args (username, page, limit)
+      const raw = await api.portfolio.gallery.getByUsername(username, page, limit);
+
+      // normalize results
+      const payload = normalizeApi<any>(raw) ?? raw ?? {};
+      const anyPayload = payload as any;
+
+      let galleryPieces: GalleryPiece[] = [];
+      if (Array.isArray(anyPayload)) galleryPieces = anyPayload as GalleryPiece[];
+      else if (Array.isArray(anyPayload.galleryPieces)) galleryPieces = anyPayload.galleryPieces as GalleryPiece[];
+      else if (Array.isArray(anyPayload.pieces)) galleryPieces = anyPayload.pieces as GalleryPiece[];
+      else if (Array.isArray(anyPayload.data)) galleryPieces = anyPayload.data as GalleryPiece[];
+
+      const pagination = anyPayload.pagination ?? anyPayload.pageInfo ?? {};
+      const filters = anyPayload.filters ?? params.filters ?? {};
+      return { galleryPieces, pagination, filters };
+    },
     enabled: !!username,
     ...options,
   });
 }
 
-// Get gallery stats - Updated to match actual API response
 export function useGalleryStats(
-  options?: UseQueryOptions<{
-    totalPieces: number;
-    publicPieces: number;
-    privatePieces: number;
-    unlistedPieces: number;
-    categories: Record<string, number>;
-    recentUploads: number;
-  }, APIError>
+  options?: UseQueryOptions<GalleryStats, APIError>
 ) {
-  return useQuery({
+  return useQuery<GalleryStats, APIError>({
     queryKey: galleryQueryKeys.stats,
-    queryFn: () => api.portfolio.gallery.getStats(),
+    queryFn: async () => {
+      const raw = await api.portfolio.gallery.getStats();
+      return normalizeApi<GalleryStats>(raw) as GalleryStats;
+    },
     ...options,
   });
 }
 
-// ==================== MUTATION HOOKS ====================
+// --------------------- MUTATIONS ---------------------
 
-// Add gallery piece
 export function useAddGalleryPiece(
-  options?: UseMutationOptions<
-    GalleryPiece,
-    APIError,
-    {
-      title: string;
-      description?: string;
-      imageUrl: string;
-      category?: string;
-      medium?: string;
-      tags?: string[];
-      visibility?: GalleryVisibility;
-      year?: number;
-      displayOrder?: number;
-    }
-  >
+  options?: UseMutationOptions<GalleryPiece, APIError, Partial<GalleryPiece>>
 ) {
   const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (pieceData) => api.portfolio.gallery.add(pieceData),
+  return useMutation<GalleryPiece, APIError, Partial<GalleryPiece>>({
+    mutationFn: async (pieceData) => {
+      const raw = await api.portfolio.gallery.add(pieceData as any);
+      const piece = normalizeApi<GalleryPiece>(raw) ?? (raw && (raw.galleryPiece ?? raw)) as GalleryPiece;
+      return piece as GalleryPiece;
+    },
     onSuccess: (data) => {
-      // Invalidate my gallery pieces list
+      // invalidate lists and stats
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
-      // Update stats
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.stats });
-      // Optionally set the new piece in cache
-      queryClient.setQueryData(galleryQueryKeys.pieces.detail(data.id), data);
+      if (data && (data as any).id) {
+        queryClient.setQueryData(galleryQueryKeys.pieces.detail((data as any).id), data);
+      }
     },
     ...options,
   });
 }
 
-// Update gallery piece
 export function useUpdateGalleryPiece(
-  options?: UseMutationOptions<
-    GalleryPiece,
-    APIError,
-    { pieceId: string; updates: Partial<GalleryPiece> }
-  >
+  options?: UseMutationOptions<GalleryPiece, APIError, { pieceId: string; updates: Partial<GalleryPiece> }>
 ) {
   const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ pieceId, updates }) => api.portfolio.gallery.update(pieceId, updates),
+  return useMutation<GalleryPiece, APIError, { pieceId: string; updates: Partial<GalleryPiece> }>({
+    mutationFn: async ({ pieceId, updates }) => {
+      const raw = await api.portfolio.gallery.update(pieceId, updates as any);
+      const piece = normalizeApi<GalleryPiece>(raw) ?? (raw && (raw.galleryPiece ?? raw)) as GalleryPiece;
+      return piece as GalleryPiece;
+    },
     onSuccess: (data, { pieceId }) => {
-      // Update the specific piece in cache
+      // update detail and refresh lists
       queryClient.setQueryData(galleryQueryKeys.pieces.detail(pieceId), data);
-      // Invalidate lists to refresh
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
     },
     ...options,
   });
 }
 
-// Delete single gallery piece - Updated return type
 export function useDeleteGalleryPiece(
-  options?: UseMutationOptions<{ message: string; id: string; }, APIError, string>
+  options?: UseMutationOptions<{ message?: string; id?: string }, APIError, string>
 ) {
   const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (pieceId) => api.portfolio.gallery.delete(pieceId),
+  return useMutation<{ message?: string; id?: string }, APIError, string>({
+    mutationFn: async (pieceId: string) => {
+      const raw = await api.portfolio.gallery.delete(pieceId);
+      const payload = normalizeApi<any>(raw) ?? raw;
+      return { message: payload?.message ?? raw?.message, id: payload?.deletedPieceId ?? raw?.deletedPieceId ?? pieceId };
+    },
     onSuccess: (_data, pieceId) => {
-      // Remove from cache
       queryClient.removeQueries({ queryKey: galleryQueryKeys.pieces.detail(pieceId) });
-      // Refresh lists and stats
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.stats });
     },
@@ -153,20 +189,18 @@ export function useDeleteGalleryPiece(
   });
 }
 
-// Batch delete gallery pieces - Updated return type
 export function useBatchDeleteGalleryPieces(
-  options?: UseMutationOptions<{ message: string; deletedCount: number; }, APIError, string[]>
+  options?: UseMutationOptions<{ message?: string; deletedCount: number }, APIError, string[]>
 ) {
   const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (pieceIds) => api.portfolio.gallery.batchDelete(pieceIds),
+  return useMutation<{ message?: string; deletedCount: number }, APIError, string[]>({
+    mutationFn: async (pieceIds: string[]) => {
+      const raw = await api.portfolio.gallery.batchDelete(pieceIds);
+      const payload = normalizeApi<any>(raw) ?? raw;
+      return { message: payload?.message ?? raw?.message, deletedCount: payload?.deletedCount ?? raw?.deletedCount ?? 0 };
+    },
     onSuccess: (_data, pieceIds) => {
-      // Remove all deleted pieces from cache
-      pieceIds.forEach(id => {
-        queryClient.removeQueries({ queryKey: galleryQueryKeys.pieces.detail(id) });
-      });
-      // Refresh lists and stats
+      pieceIds.forEach(id => queryClient.removeQueries({ queryKey: galleryQueryKeys.pieces.detail(id) }));
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.stats });
     },
@@ -174,114 +208,89 @@ export function useBatchDeleteGalleryPieces(
   });
 }
 
-// Batch update visibility - Updated return type
 export function useBatchUpdateGalleryVisibility(
-  options?: UseMutationOptions<{ message: string; updatedCount: number; }, APIError, { pieceIds: string[]; visibility: GalleryVisibility }>
+  options?: UseMutationOptions<{ message?: string; updatedCount: number }, APIError, { pieceIds: string[]; visibility: GalleryVisibility }>
 ) {
   const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ pieceIds, visibility }) => 
-      api.portfolio.gallery.batchUpdateVisibility(pieceIds, visibility),
+  return useMutation<{ message?: string; updatedCount: number }, APIError, { pieceIds: string[]; visibility: GalleryVisibility }>({
+    mutationFn: async ({ pieceIds, visibility }) => {
+      const raw = await api.portfolio.gallery.batchUpdateVisibility(pieceIds, visibility as any);
+      const payload = normalizeApi<any>(raw) ?? raw;
+      return { message: payload?.message ?? raw?.message, updatedCount: payload?.updatedCount ?? raw?.updatedCount ?? 0 };
+    },
     onSuccess: (_data, { pieceIds }) => {
-      // Invalidate affected pieces and lists
-      pieceIds.forEach(id => {
-        queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.detail(id) });
-      });
+      pieceIds.forEach(id => queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.detail(id) }));
       queryClient.invalidateQueries({ queryKey: galleryQueryKeys.pieces.my() });
     },
     ...options,
   });
 }
 
-// ==================== PREFETCH UTILITIES ====================
-
+// --------------------- Prefetch utilities ---------------------
 export const prefetchMyGalleryPieces = async (queryClient: any) => {
-  await queryClient.prefetchQuery({
-    queryKey: galleryQueryKeys.pieces.my(),
-    queryFn: () => api.portfolio.gallery.get(),
-  });
+  await queryClient.prefetchQuery({ queryKey: galleryQueryKeys.pieces.my(), queryFn: () => api.portfolio.gallery.get() });
 };
 
-export const prefetchGalleryPiecesByUsername = async (
-  queryClient: any, 
-  username: string, 
-  page?: number, 
-  limit?: number
-) => {
-  await queryClient.prefetchQuery({
-    queryKey: galleryQueryKeys.pieces.byUsername(username, page, limit),
-    queryFn: () => api.portfolio.gallery.getByUsername(username, page, limit),
-  });
+export const prefetchGalleryPiecesByUsername = async (queryClient: any, username?: string, page: number = 1, limit: number = 20) => {
+  if (!username) return;
+  await queryClient.prefetchQuery({ queryKey: galleryQueryKeys.pieces.byUsername(username, page, limit), queryFn: () => api.portfolio.gallery.getByUsername(username, page, limit) });
 };
 
 export const prefetchGalleryStats = async (queryClient: any) => {
-  await queryClient.prefetchQuery({
-    queryKey: galleryQueryKeys.stats,
-    queryFn: () => api.portfolio.gallery.getStats(),
-  });
+  await queryClient.prefetchQuery({ queryKey: galleryQueryKeys.stats, queryFn: () => api.portfolio.gallery.getStats() });
 };
 
-// ==================== OPTIMISTIC UPDATE UTILITIES ====================
-
+// --------------------- Optimistic utilities ---------------------
 export function useOptimisticGalleryUpdate() {
   const queryClient = useQueryClient();
 
   return {
-    // Optimistically update a piece in the list
     updatePieceOptimistically: (pieceId: string, updates: Partial<GalleryPiece>) => {
       queryClient.setQueryData<GalleryPiece[]>(galleryQueryKeys.pieces.my(), (old) => {
-        if (!old) return old;
-        return old.map(piece => piece.id === pieceId ? { ...piece, ...updates } : piece);
+        if (!old) return old ?? [];
+        return old.map(p => (p.id === pieceId ? { ...p, ...updates } : p));
       });
     },
-
-    // Optimistically add a piece to the list
     addPieceToListOptimistically: (piece: GalleryPiece) => {
       queryClient.setQueryData<GalleryPiece[]>(galleryQueryKeys.pieces.my(), (old) => {
         if (!old) return [piece];
         return [piece, ...old];
       });
     },
-
-    // Optimistically remove a piece from the list
     removePieceFromListOptimistically: (pieceId: string) => {
       queryClient.setQueryData<GalleryPiece[]>(galleryQueryKeys.pieces.my(), (old) => {
-        if (!old) return old;
-        return old.filter(piece => piece.id !== pieceId);
+        if (!old) return old ?? [];
+        return old.filter(p => p.id !== pieceId);
       });
     },
-
-    // Optimistically remove multiple pieces
     removePiecesFromListOptimistically: (pieceIds: string[]) => {
       queryClient.setQueryData<GalleryPiece[]>(galleryQueryKeys.pieces.my(), (old) => {
-        if (!old) return old;
-        return old.filter(piece => !pieceIds.includes(piece.id));
+        if (!old) return old ?? [];
+        // Guard for possibly-undefined piece ids on gallery items
+        return old.filter(p => {
+          const id = (p as any).id;
+          if (typeof id !== 'string') return true; // keep items without an id
+          return !pieceIds.includes(id);
+        });
       });
     },
   };
 }
 
-// ==================== LEGACY HOOKS (DEPRECATED) ====================
-// These are marked as deprecated to help with migration
+// --------------------- Deprecated / legacy helpers ---------------------
+export const useGalleryPieces = useMyGalleryPieces; // deprecated alias
 
-/**
- * @deprecated Use useMyGalleryPieces() instead
- */
-export const useGalleryPieces = useMyGalleryPieces;
-
-/**
- * @deprecated Collections are no longer separate entities. Use gallery pieces with category filtering.
- */
-export function useGalleryCollections() {
-  console.warn('useGalleryCollections is deprecated. Use gallery pieces with category filtering instead.');
-  return { data: [], isLoading: false, error: null };
-}
-
-/**
- * @deprecated Artists are no longer separate entities. Use portfolio discovery instead.
- */
-export function useArtists() {
-  console.warn('useArtists is deprecated. Use portfolio discovery instead.');
-  return { data: [], isLoading: false, error: null };
-}
+export default {
+  useMyGalleryPieces,
+  useGalleryPiecesByUsername,
+  useGalleryStats,
+  useAddGalleryPiece,
+  useUpdateGalleryPiece,
+  useDeleteGalleryPiece,
+  useBatchDeleteGalleryPieces,
+  useBatchUpdateGalleryVisibility,
+  prefetchMyGalleryPieces,
+  prefetchGalleryPiecesByUsername,
+  prefetchGalleryStats,
+  useOptimisticGalleryUpdate,
+};

@@ -27,6 +27,8 @@ const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
   const links: NavLink[] = [
     { href: '/', label: 'Home' },
     { href: '/thrive', label: 'Thrive' },
+    { href: '/simulations', label: 'Simulations' }, 
+
   ];
 
   if (isAuthenticated) {

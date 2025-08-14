@@ -24,7 +24,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
 
   return (
     <>
-      <Header title="Learn Morra" subtitle="Your guide to excellence" />
+      <Header title="LearnMorra" subtitle="Brag Responsibly" />
       <main className="flex-grow">{children}</main>
       <Footer />
     </>

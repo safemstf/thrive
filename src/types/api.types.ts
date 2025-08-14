@@ -1,5 +1,4 @@
 // src/types/api.types.ts - Clean, enhanced API types
-import { DifficultyLevel, MainCategory, ScientificDiscipline, SubCategory } from "./portfolio.types";
 
 // ==================== ROUTE DEFINITIONS ====================
 export interface RouteDefinition {
@@ -64,26 +63,6 @@ export interface RouteCategory {
   name: string;
   description?: string;
   routes: RouteDefinition[];
-}
-
-// ==================== QUERY PARAMETERS ====================
-export interface BookQueryParams {
-  mainCategory?: MainCategory;
-  subCategory?: SubCategory;
-  discipline?: ScientificDiscipline;
-  year?: string;
-  limit?: number;
-  offset?: number;
-  sort?: 'title' | 'year' | 'created' | 'updated';
-  order?: 'asc' | 'desc';
-}
-
-export interface SearchFilters {
-  categories?: MainCategory[];
-  subCategories?: SubCategory[];
-  disciplines?: ScientificDiscipline[];
-  difficulty?: DifficultyLevel[];
-  contentTypes?: ('math' | 'science' | 'grammar' | 'literary' | 'writing')[];
 }
 
 export interface SearchResult {

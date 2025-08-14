@@ -1,5 +1,5 @@
 // src/types/gallery.types.ts
-import { BaseEntity } from './educational.types';
+import { BackendGalleryPiece, BaseEntity } from './base.types';
 
 // === Core Unions & Types ===
 export type GalleryVisibility = 'public' | 'private' | 'unlisted';
@@ -9,6 +9,11 @@ export type GalleryStatus     = 'available' | 'sold' | 'exhibition' | 'not-for-s
 export type ArtworkSize     = 'tiny' | 'small' | 'medium' | 'large';
 export type ArtworkCategory = 'portrait' | 'landscape' | 'abstract' | 'series' | 'mixed-media';
 export type ArtworkStatus   = GalleryStatus;
+
+// Local component types
+export type ViewLayout = GalleryLayout;
+export type GalleryMode = 'public' | 'portfolio';
+export type BulkAction = 'delete' | 'visibility' | 'download' | 'collection';
 
 // === Supporting Types ===
 export interface Exhibition {
@@ -28,6 +33,55 @@ export interface Publication {
   year: string;
   pages?: string;
   isbn?: string;
+}
+
+// === Backend Gallery Piece Type ===
+export interface GalleryResponse {
+  galleryPieces: BackendGalleryPiece[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// === New Types for API ===
+export interface GalleryPieceCreateData {
+  // required minimum
+  title: string;
+  imageUrl: string;
+
+  // optional extras (form may omit these)
+  description?: string;
+  category?: string;
+  medium?: string;
+  tags?: string[];
+  visibility?: 'public' | 'private' | 'unlisted';
+  year?: number;
+  displayOrder?: number;
+
+  // optional business fields
+  artist?: string;
+  price?: number;
+
+  // attach to a portfolio when needed
+  portfolioId?: string;
+}
+
+export interface GalleryPieceResponse {
+  success: boolean;
+  galleryPiece: BackendGalleryPiece;
+  portfolioId?: string;
+  message?: string;
+  error?: string;
+  code?: string;
+  data?: {
+    galleryPiece?: BackendGalleryPiece;
+  };
+}
+
+export interface APIErrorExtended extends Error {
+  status?: number;
+  code?: string;
+  details?: Array<{ field: string; message: string }>;
 }
 
 // === Main Gallery Piece ===
@@ -83,7 +137,7 @@ export interface GalleryPiece extends BaseEntity {
   fileSize?: number;
   mimeType?: string;
 
-  // Portfolio/Social Features (ADDED)
+  // Portfolio/Social Features
   portfolioId?: string;
   views: number;
   likes: number;
@@ -214,6 +268,53 @@ export interface GalleryUpload {
 }
 
 // === Component Interface Types ===
+export interface GalleryHeaderProps {
+  galleryMode: GalleryMode;
+  setGalleryMode: (mode: GalleryMode) => void;
+  viewLayout: ViewLayout;
+  setViewLayout: (layout: ViewLayout) => void;
+  showFilters: boolean;
+  setShowFilters: (show: boolean) => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  selectedCategory: string | null;
+  setSelectedCategory: (category: string | null) => void;
+  selectedTags: Set<string>;
+  toggleTag: (tag: string) => void;
+  bulkActionMode: boolean;
+  setBulkActionMode: (mode: boolean) => void;
+  hasCreativeCapability: boolean;
+  onUpload: () => void;
+  isAuthenticated: boolean;
+  portfolio?: any; // Import Portfolio type from portfolio.types if needed
+  galleryPieces: GalleryPiece[];
+  filteredItemsCount: number;
+}
+
+export interface GalleryGridProps {
+  items: GalleryPiece[];
+  viewLayout: ViewLayout;
+  loading: boolean;
+  error: string | null;
+  galleryMode: GalleryMode;
+  bulkActionMode: boolean;
+  selectedItems: Set<string>;
+  onItemSelect: (itemId: string) => void;
+  onRetry: () => void;
+  hasCreativeCapability: boolean;
+  onUpload: () => void;
+  searchQuery: string;
+  selectedTags: Set<string>;
+  selectedCategory: string | null;
+  portfolio?: any; // Import Portfolio type from portfolio.types if needed
+}
+
+export interface BulkActionBarProps {
+  selectedItems: Set<string>;
+  onBulkAction: (action: BulkAction) => void;
+  onCancel: () => void;
+}
+
 export interface GalleryItemProps {
   piece: GalleryPiece;
   layout: GalleryLayout;
@@ -232,15 +333,15 @@ export interface GalleryModalProps {
   canDelete?: boolean;
 }
 
-// === Upload Modal Types (ADDED) ===
+// === Upload Modal Types ===
 export interface ArtworkUploadModalProps {
-  portfolioId: string;
+  portfolioId?: string;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (galleryPiece?: BackendGalleryPiece) => void;
   initialFiles?: GalleryUploadFile[];
 }
 
-// === Batch Upload Result (ADDED) ===
+// === Batch Upload Result ===
 export interface BatchUploadResult {
   successful: GalleryPiece[];
   failed: Array<{ error: string; fileName: string }>;

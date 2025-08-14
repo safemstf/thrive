@@ -1,423 +1,116 @@
-// src/app/dashboard/gallery/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import styled from 'styled-components';
-import { useRouter } from 'next/navigation';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { 
-  Plus, Grid3x3, List, Search, Edit3, 
-  Eye, EyeOff, Trash2, Upload,
-  Image as ImageIcon, ArrowLeft,
-  Container
+  Upload, Plus, Grid3x3, Eye, EyeOff, Folder, 
+  Calendar, X, Check, Image, Layers, Trash2,
+  ChevronRight, Settings, Archive, Save, Loader,
+  Tag, DollarSign, Palette, Move, Edit3, Share2,
+  Filter, Download, RefreshCw, AlertCircle, LayoutGrid,
+  List, Columns
 } from 'lucide-react';
 
-import { useAuth } from '@/providers/authProvider';
-import { usePortfolioManager } from '@/services/portfolioService';
+// Import your actual components and API
+import { api } from '@/lib/api-client';
 import { ArtworkUploadModal } from '@/components/gallery/utils/uploadModal';
-import { QuickCreateButton } from '@/components/portfolio/portfolioCreation';
-import type { GalleryPiece, GalleryLayout, GalleryVisibility } from '@/types/gallery.types';
+import type { Portfolio } from '@/types/portfolio.types';
+import type { GalleryVisibility } from '@/types/gallery.types';
+import type { BackendGalleryPiece } from '@/types/base.types';
 
-export default function GalleryPage() {
-  // ============= STATE MANAGEMENT =============
-  const [viewLayout, setViewLayout] = useState<GalleryLayout>('masonry');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [selectedPiece, setSelectedPiece] = useState<GalleryPiece | null>(null);
+// Import styled components
+import styled from 'styled-components';
+import {
+  PageContainer,
+  ContentWrapper,
+  Card,
+  CardContent,
+  BaseButton,
+  Badge,
+  LoadingContainer,
+  LoadingSpinner,
+  ErrorContainer,
+  EmptyState,
+  FlexRow,
+  FlexColumn,
+  Input,
+  TextArea,
+  Label,
+  FormGroup,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalTitle,
+  ModalBody,
+  ModalFooter,
+  TabContainer,
+  TabButton
+} from '@/styles/styled-components';
 
-  const { user, isAuthenticated } = useAuth();
-  const router = useRouter();
+// ============= TYPES =============
+type GalleryLayout = 'canvas' | 'grid' | 'masonry' | 'list';
 
-  // ============= USE PORTFOLIO MANAGER =============
-  const {
-    portfolio,
-    galleryPieces,
-    loading,
-    error,
-    refresh: refreshPortfolio,
-    hasCreativeCapability
-  } = usePortfolioManager();
-
-  // ============= DERIVED STATE =============
-  const filteredPieces = galleryPieces?.filter(piece => 
-    piece.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    piece.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    piece.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    piece.artist?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
-
-  // ============= ACCESS CONTROL =============
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-  }, [isAuthenticated, router]);
-
-  // ============= HANDLERS =============
-  const handleEditPiece = (piece: GalleryPiece) => {
-    router.push(`/dashboard/gallery/edit/${piece.id}`);
-  };
-
-  const handleUploadSuccess = useCallback(async () => {
-    setShowUploadModal(false);
-    await refreshPortfolio();
-  }, [refreshPortfolio]);
-
-  const handlePortfolioCreated = useCallback((portfolioId: string) => {
-    refreshPortfolio();
-  }, [refreshPortfolio]);
-
-  // ============= EARLY RETURNS =============
-  if (!isAuthenticated) {
-    return (
-      <LoadingContainer>
-        <p>Checking authentication...</p>
-      </LoadingContainer>
-    );
-  }
-
-  if (loading) {
-    return (
-      <LoadingContainer>
-        <p>Loading portfolio...</p>
-      </LoadingContainer>
-    );
-  }
-
-  if (!portfolio) {
-    return (
-      <PageWrapper>
-        <Container>
-          <EmptyStateContainer>
-            <EmptyStateIcon>🎨</EmptyStateIcon>
-            <EmptyStateTitle>Welcome to Your Gallery</EmptyStateTitle>
-            <EmptyStateDescription>
-              Create a creative portfolio to start showcasing your artwork, photography, and design projects.
-            </EmptyStateDescription>
-            <QuickCreateButton 
-              type="creative"
-              size="large"
-              onSuccess={handlePortfolioCreated}
-            />
-          </EmptyStateContainer>
-        </Container>
-      </PageWrapper>
-    );
-  }
-
-  if (!hasCreativeCapability) {
-    return (
-      <PageWrapper>
-        <Container>
-          <EmptyStateContainer>
-            <EmptyStateIcon>📸</EmptyStateIcon>
-            <EmptyStateTitle>Upgrade to Creative Portfolio</EmptyStateTitle>
-            <EmptyStateDescription>
-              Your current portfolio doesn't support gallery features. Upgrade to a creative or hybrid portfolio to access the gallery.
-            </EmptyStateDescription>
-            <UpgradeButton onClick={() => router.push('/dashboard/profile?upgrade=creative')}>
-              Upgrade Portfolio
-            </UpgradeButton>
-          </EmptyStateContainer>
-        </Container>
-      </PageWrapper>
-    );
-  }
-
-  // ============= RENDER MAIN GALLERY =============
-  return (
-    <PageWrapper>
-      {/* Header */}
-      <Header>
-        <BackButton onClick={() => router.push('/dashboard')}>
-          <ArrowLeft size={20} />
-          Back to Dashboard
-        </BackButton>
-
-        <HeaderContent>
-          <HeaderLeft>
-            <Title>My Gallery</Title>
-            <Subtitle>{filteredPieces.length} artworks</Subtitle>
-          </HeaderLeft>
-          
-          <HeaderRight>
-            <SearchContainer>
-              <SearchIcon>
-                <Search size={18} />
-              </SearchIcon>
-              <SearchInput
-                placeholder="Search artworks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </SearchContainer>
-            
-            <ViewControls>
-              <ViewButton 
-                active={viewLayout === 'masonry'} 
-                onClick={() => setViewLayout('masonry')}
-              >
-                <Grid3x3 size={18} />
-              </ViewButton>
-              <ViewButton 
-                active={viewLayout === 'list'} 
-                onClick={() => setViewLayout('list')}
-              >
-                <List size={18} />
-              </ViewButton>
-            </ViewControls>
-            
-            <UploadButton onClick={() => setShowUploadModal(true)}>
-              <Plus size={18} />
-              Upload Artwork
-            </UploadButton>
-          </HeaderRight>
-        </HeaderContent>
-      </Header>
-
-      {/* Gallery Grid */}
-      <GalleryContainer>
-        {filteredPieces.length === 0 ? (
-          <EmptyGallery>
-            <EmptyGalleryIcon>
-              <ImageIcon size={64} />
-            </EmptyGalleryIcon>
-            <EmptyGalleryTitle>No artworks yet</EmptyGalleryTitle>
-            <EmptyGalleryDescription>
-              {searchQuery ? 'No artworks match your search.' : 'Start building your gallery by uploading your first artwork.'}
-            </EmptyGalleryDescription>
-            {!searchQuery && (
-              <UploadButton onClick={() => setShowUploadModal(true)}>
-                <Upload size={18} />
-                Upload Your First Artwork
-              </UploadButton>
-            )}
-          </EmptyGallery>
-        ) : (
-          <GalleryGrid layout={viewLayout}>
-            {filteredPieces.map((piece) => (
-              <GalleryItem 
-                key={piece.id} 
-                layout={viewLayout}
-                onClick={() => setSelectedPiece(piece)}
-              >
-                <ItemImage>
-                  <img src={piece.thumbnailUrl || piece.imageUrl} alt={piece.title} />
-                  <ItemOverlay>
-                    <OverlayButton 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditPiece(piece);
-                      }}
-                      title="Edit artwork"
-                    >
-                      <Edit3 size={16} />
-                    </OverlayButton>
-                    <VisibilityIndicator visibility={piece.visibility}>
-                      {piece.visibility === 'public' ? <Eye size={16} /> : <EyeOff size={16} />}
-                    </VisibilityIndicator>
-                  </ItemOverlay>
-                </ItemImage>
-                
-                <ItemInfo layout={viewLayout}>
-                  <ItemTitle>{piece.title}</ItemTitle>
-                  
-                  {piece.artist && (
-                    <ItemArtist>by {piece.artist}</ItemArtist>
-                  )}
-                  
-                  <ItemMeta>
-                    <MetaItem>
-                      <VisibilityBadge visibility={piece.visibility}>
-                        {piece.visibility}
-                      </VisibilityBadge>
-                    </MetaItem>
-                    {piece.year && <MetaItem>{piece.year}</MetaItem>}
-                    {piece.views !== undefined && <MetaItem>{piece.views} views</MetaItem>}
-                    {piece.category && <MetaItem>{piece.category}</MetaItem>}
-                    
-                    {piece.price !== undefined && piece.price > 0 && (
-                      <PriceBadge>${piece.price.toFixed(2)}</PriceBadge>
-                    )}
-                  </ItemMeta>
-                  
-                  {viewLayout === 'list' && piece.description && (
-                    <ItemDescription>{piece.description}</ItemDescription>
-                  )}
-                  
-                  {piece.tags && piece.tags.length > 0 && (
-                    <TagContainer>
-                      {piece.tags.slice(0, 3).map(tag => (
-                        <TagBadge key={tag}>#{tag}</TagBadge>
-                      ))}
-                      {piece.tags.length > 3 && (
-                        <TagBadge>+{piece.tags.length - 3}</TagBadge>
-                      )}
-                    </TagContainer>
-                  )}
-                </ItemInfo>
-              </GalleryItem>
-            ))}
-          </GalleryGrid>
-        )}
-      </GalleryContainer>
-
-      {/* Upload Modal */}
-      {showUploadModal && (
-        <ArtworkUploadModal
-          portfolioId={portfolio.id}
-          onClose={() => setShowUploadModal(false)}
-          onSuccess={handleUploadSuccess}
-        />
-      )}
-
-      {/* Lightbox Modal */}
-      {selectedPiece && (
-        <LightboxOverlay onClick={() => setSelectedPiece(null)}>
-          <LightboxContent onClick={(e) => e.stopPropagation()}>
-            <CloseButton 
-              onClick={() => setSelectedPiece(null)} 
-              title="Close lightbox"
-            >
-              ×
-            </CloseButton>
-            
-            <LightboxImageContainer>
-              <img src={selectedPiece.imageUrl} alt={selectedPiece.title || 'Gallery piece'} />
-            </LightboxImageContainer>
-            
-            <LightboxInfo>
-              <LightboxTitle>{selectedPiece.title}</LightboxTitle>
-              {selectedPiece.description && (
-                <LightboxDescription>{selectedPiece.description}</LightboxDescription>
-              )}
-              
-              <LightboxMeta>
-                {selectedPiece.artist && (
-                  <MetaRow><strong>Artist:</strong> {selectedPiece.artist}</MetaRow>
-                )}
-                {selectedPiece.medium && (
-                  <MetaRow><strong>Medium:</strong> {selectedPiece.medium}</MetaRow>
-                )}
-                {selectedPiece.year && (
-                  <MetaRow><strong>Year:</strong> {selectedPiece.year}</MetaRow>
-                )}
-                {selectedPiece.category && (
-                  <MetaRow><strong>Category:</strong> {selectedPiece.category}</MetaRow>
-                )}
-                {selectedPiece.price && (
-                  <MetaRow><strong>Price:</strong> ${selectedPiece.price}</MetaRow>
-                )}
-                {selectedPiece.tags && selectedPiece.tags.length > 0 && (
-                  <MetaRow>
-                    <strong>Tags:</strong> {selectedPiece.tags.map(tag => `#${tag}`).join(', ')}
-                  </MetaRow>
-                )}
-              </LightboxMeta>
-              
-              <LightboxActions>
-                <ActionButton onClick={() => handleEditPiece(selectedPiece)}>
-                  <Edit3 size={16} />
-                  Edit Artwork
-                </ActionButton>
-              </LightboxActions>
-            </LightboxInfo>
-          </LightboxContent>
-        </LightboxOverlay>
-      )}
-    </PageWrapper>
-  );
+interface GalleryStats {
+  totalPieces: number;
+  publicPieces: number;
+  privatePieces: number;
+  unlistedPieces: number;
+  categories: Record<string, number>;
+  recentUploads: number;
+  lastUpdated: string;
 }
 
 // ============= STYLED COMPONENTS =============
-const PageWrapper = styled.div`
-  min-height: 100vh;
-  background: #fafafa;
-  font-family: 'Work Sans', sans-serif;
+const StudioHeader = styled.header`
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(15px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 1rem 2rem;
 `;
 
-const Header = styled.header`
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 1.5rem 2rem;
-`;
-
-const BackButton = styled.button`
-  background: none;
-  border: 1px solid #2c2c2c;
-  color: #2c2c2c;
-  padding: 0.5rem 1rem;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  font-weight: 300;
+const HeaderTop = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  border-radius: 2px;
-  margin-bottom: 1rem;
-
-  &:hover {
-    background: #2c2c2c;
-    color: #f8f8f8;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
-  }
-`;
-
-const HeaderContent = styled.div`
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
+  margin-bottom: 1rem;
 `;
 
-const HeaderLeft = styled.div``;
-
-const HeaderRight = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  
-  @media (max-width: 768px) {
-    flex-wrap: wrap;
-  }
-`;
-
-const Title = styled.h1`
-  font-size: 2.5rem;
+const HeaderTitle = styled.h1`
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem;
   font-weight: 400;
   color: #2c2c2c;
   margin: 0;
-  font-family: 'Cormorant Garamond', serif;
-  letter-spacing: 1px;
-  
-  @media (max-width: 768px) {
-    font-size: 2rem;
-  }
 `;
 
-const Subtitle = styled.p`
+const StatsRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-size: 0.875rem;
   color: #666;
-  margin: 0.25rem 0 0 0;
   font-family: 'Work Sans', sans-serif;
-  letter-spacing: 0.5px;
 `;
 
-const SearchContainer = styled.div`
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const SearchBox = styled.div`
   position: relative;
-  min-width: 300px;
-  
-  @media (max-width: 768px) {
-    min-width: 100%;
-  }
+  width: 280px;
+`;
+
+const SearchInput = styled(Input)`
+  padding-left: 2.5rem;
+  padding-right: 2rem;
+  height: 40px;
+  font-size: 0.875rem;
 `;
 
 const SearchIcon = styled.div`
@@ -426,498 +119,983 @@ const SearchIcon = styled.div`
   top: 50%;
   transform: translateY(-50%);
   color: #9ca3af;
+  pointer-events: none;
 `;
 
-const SearchInput = styled.input`
-  width: 100%;
-  padding: 0.75rem 0.75rem 0.75rem 2.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 2px;
-  background: white;
+const ClearButton = styled.button`
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: #9ca3af;
+  
+  &:hover {
+    color: #666;
+  }
+`;
+
+const FiltersBar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f0f0f0;
+`;
+
+const FilterSelect = styled.select`
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
   font-family: 'Work Sans', sans-serif;
+  background: white;
+  cursor: pointer;
   
   &:focus {
     outline: none;
     border-color: #2c2c2c;
-    box-shadow: 0 0 0 1px rgba(44, 44, 44, 0.1);
   }
 `;
 
-const ViewControls = styled.div`
-  display: flex;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 2px;
-  overflow: hidden;
-`;
-
-const ViewButton = styled.button<{ active: boolean }>`
-  padding: 0.75rem;
-  background: ${props => props.active ? '#f3f4f6' : 'white'};
-  border: none;
-  cursor: pointer;
-  color: ${props => props.active ? '#2c2c2c' : '#666'};
-  
-  &:hover {
-    background: #f9fafb;
-  }
-`;
-
-const UploadButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: #2c2c2c;
-  color: #f8f8f8;
-  border: none;
-  border-radius: 2px;
-  font-weight: 300;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 1px;
-  
-  &:hover {
-    background: #1a1a1a;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
-  }
-`;
-
-const GalleryContainer = styled.div`
+const MainContent = styled.main`
   padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  min-height: calc(100vh - 200px);
 `;
 
-const GalleryGrid = styled.div<{ layout: GalleryLayout }>`
-  display: grid;
-  gap: 1.5rem;
-  
-  ${props => props.layout === 'masonry' && `
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  `}
-  
-  ${props => props.layout === 'list' && `
-    grid-template-columns: 1fr;
-  `}
+const GalleryGrid = styled.div<{ $layout: GalleryLayout }>`
+  ${({ $layout }) => {
+    switch ($layout) {
+      case 'grid':
+        return `
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+          gap: 1.5rem;
+        `;
+      case 'masonry':
+        return `
+          column-count: 5;
+          column-gap: 1.5rem;
+          
+          @media (max-width: 1400px) { column-count: 4; }
+          @media (max-width: 1024px) { column-count: 3; }
+          @media (max-width: 768px) { column-count: 2; }
+          @media (max-width: 480px) { column-count: 1; }
+        `;
+      case 'canvas':
+        return `
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 2rem;
+        `;
+      case 'list':
+        return `
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        `;
+      default:
+        return '';
+    }
+  }}
 `;
 
-const GalleryItem = styled.div<{ layout: GalleryLayout }>`
+const ArtworkItem = styled.div<{ $layout: GalleryLayout; $selected: boolean }>`
+  position: relative;
   background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 2px;
+  border-radius: 12px;
   overflow: hidden;
-  cursor: pointer;
   transition: all 0.3s ease;
+  cursor: pointer;
   
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  }
+  ${({ $layout }) => $layout === 'masonry' && `
+    break-inside: avoid;
+    margin-bottom: 1.5rem;
+  `}
   
-  ${props => props.layout === 'list' && `
+  ${({ $layout }) => $layout === 'list' && `
     display: flex;
     gap: 1rem;
-    align-items: flex-start;
     padding: 1rem;
+    border: 1px solid #e5e7eb;
   `}
-`;
-
-const ItemImage = styled.div`
-  position: relative;
-  aspect-ratio: 1;
-  overflow: hidden;
   
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  ${({ $selected }) => $selected && `
+    box-shadow: 0 0 0 3px #3b82f6;
+  `}
+  
+  &:hover {
+    transform: ${({ $layout }) => $layout !== 'list' ? 'translateY(-4px)' : 'none'};
+    box-shadow: ${({ $selected }) => $selected 
+      ? '0 0 0 3px #3b82f6, 0 8px 24px rgba(0, 0, 0, 0.15)'
+      : '0 8px 24px rgba(0, 0, 0, 0.15)'};
   }
 `;
 
-const ItemOverlay = styled.div`
+const ArtworkImage = styled.img`
+  width: 100%;
+  height: auto;
+  display: block;
+`;
+
+const ArtworkOverlay = styled.div`
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 0;
   right: 0;
-  bottom: 0;
-  background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.7) 100%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  padding: 1rem;
+  color: white;
   opacity: 0;
   transition: opacity 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 1rem;
   
-  &:hover {
+  ${ArtworkItem}:hover & {
     opacity: 1;
   }
 `;
 
-const OverlayButton = styled.button`
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
+const ArtworkActions = styled.div`
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  
+  ${ArtworkItem}:hover & {
+    opacity: 1;
+  }
+`;
+
+const ActionButton = styled.button`
+  background: rgba(255, 255, 255, 0.9);
   border: none;
+  border-radius: 8px;
+  padding: 0.5rem;
   cursor: pointer;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
   
   &:hover {
-    background: rgba(0, 0, 0, 0.9);
+    background: white;
     transform: scale(1.1);
   }
 `;
 
-const VisibilityIndicator = styled.div<{ visibility: GalleryVisibility }>`
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: ${props => 
-    props.visibility === 'public' ? 'rgba(34, 197, 94, 0.9)' :
-    props.visibility === 'private' ? 'rgba(239, 68, 68, 0.9)' :
-    'rgba(251, 191, 36, 0.9)'
-  };
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const ItemInfo = styled.div<{ layout: GalleryLayout }>`
-  padding: 1rem;
-  
-  ${props => props.layout === 'list' && `
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    flex: 1;
-  `}
-`;
-
-const ItemTitle = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 400;
-  color: #2c2c2c;
-  margin: 0 0 0.25rem 0;
-  font-family: 'Cormorant Garamond', serif;
-  letter-spacing: 0.5px;
-`;
-
-const ItemArtist = styled.div`
-  font-size: 0.875rem;
-  color: #666;
-  margin-bottom: 0.5rem;
-  font-style: italic;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const ItemMeta = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-`;
-
-const MetaItem = styled.span`
-  font-size: 0.875rem;
-  color: #666;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const PriceBadge = styled.span`
-  padding: 0.25rem 0.5rem;
-  border-radius: 2px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  background: #dcfce7;
-  color: #166534;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const VisibilityBadge = styled.span<{ visibility: GalleryVisibility }>`
-  padding: 0.25rem 0.5rem;
-  border-radius: 2px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: capitalize;
-  font-family: 'Work Sans', sans-serif;
-  
-  ${props => props.visibility === 'public' && `
-    background: #dcfce7;
-    color: #166534;
-  `}
-  
-  ${props => props.visibility === 'private' && `
-    background: #fef2f2;
-    color: #dc2626;
-  `}
-  
-  ${props => props.visibility === 'unlisted' && `
-    background: #fef3c7;
-    color: #d97706;
-  `}
-`;
-
-const ItemDescription = styled.p`
-  font-size: 0.875rem;
-  color: #666;
-  margin: 0;
-  line-height: 1.5;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const TagContainer = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.5rem;
-`;
-
-const TagBadge = styled.span`
-  padding: 0.125rem 0.375rem;
-  background: #f3f4f6;
-  color: #666;
-  border-radius: 2px;
-  font-size: 0.75rem;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const EmptyGallery = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 400px;
-  text-align: center;
-  padding: 3rem;
-`;
-
-const EmptyGalleryIcon = styled.div`
-  color: #d1d5db;
-  margin-bottom: 1rem;
-`;
-
-const EmptyGalleryTitle = styled.h2`
-  font-size: 1.5rem;
-  font-weight: 400;
-  color: #2c2c2c;
-  margin: 0 0 0.5rem 0;
-  font-family: 'Cormorant Garamond', serif;
-`;
-
-const EmptyGalleryDescription = styled.p`
-  color: #666;
-  font-size: 1.125rem;
-  margin: 0 0 2rem 0;
-  max-width: 500px;
-  line-height: 1.6;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const LoadingContainer = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  color: #666;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const EmptyStateContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  text-align: center;
-  padding: 3rem 2rem;
-`;
-
-const EmptyStateIcon = styled.div`
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
-`;
-
-const EmptyStateTitle = styled.h1`
-  font-size: 2rem;
-  font-weight: 400;
-  color: #2c2c2c;
-  margin-bottom: 1rem;
-  font-family: 'Cormorant Garamond', serif;
-`;
-
-const EmptyStateDescription = styled.p`
-  font-size: 1.125rem;
-  color: #666;
-  max-width: 500px;
-  line-height: 1.6;
-  margin-bottom: 2rem;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const UpgradeButton = styled.button`
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
-  color: white;
-  border: none;
-  padding: 1rem 2rem;
-  border-radius: 2px;
-  font-size: 1.1rem;
-  font-weight: 300;
-  cursor: pointer;
-  transition: all 0.3s;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px -8px rgba(139, 92, 246, 0.4);
-  }
-`;
-
-// Lightbox components
-const LightboxOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  backdrop-filter: blur(4px);
-`;
-
-const LightboxContent = styled.div`
-  position: relative;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 2px;
-  overflow: hidden;
-  max-width: 90vw;
-  max-height: 90vh;
-  width: 900px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-`;
-
-const CloseButton = styled.button`
+const SelectionCheckbox = styled.input`
   position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  z-index: 2;
+`;
+
+const BulkActionsBar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #3b82f6;
+  color: white;
+  border-radius: 12px;
+  font-size: 0.875rem;
+`;
+
+const NotificationToast = styled.div<{ $type: 'success' | 'error' | 'info' }>`
+  position: fixed;
   top: 1rem;
   right: 1rem;
-  background: rgba(0, 0, 0, 0.5);
-  border: none;
-  color: white;
-  width: 40px;
-  height: 40px;
-  border-radius: 2px;
-  font-size: 1.5rem;
-  cursor: pointer;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 10;
-  transition: background 0.3s ease;
+  gap: 0.75rem;
+  z-index: 1000;
+  animation: slideIn 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   
-  &:hover {
-    background: rgba(0, 0, 0, 0.7);
+  ${({ $type }) => {
+    switch ($type) {
+      case 'success':
+        return `
+          background: #10b981;
+          color: white;
+        `;
+      case 'error':
+        return `
+          background: #ef4444;
+          color: white;
+        `;
+      case 'info':
+        return `
+          background: #3b82f6;
+          color: white;
+        `;
+    }
+  }}
+  
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
   }
 `;
 
-const LightboxImageContainer = styled.div`
-  width: 100%;
-  max-height: 60vh;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f8f8f8;
+const UploadProgressCard = styled(Card)`
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 320px;
+  z-index: 100;
+`;
+
+// ============= MAIN COMPONENT =============
+export default function CreativeStudio() {
+  // Core state
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [galleryPieces, setGalleryPieces] = useState<BackendGalleryPiece[]>([]);
+  const [stats, setStats] = useState<GalleryStats | null>(null);
   
-  img {
-    width: 100%;
-    height: auto;
-    max-height: 60vh;
-    object-fit: contain;
-  }
-`;
-
-const LightboxInfo = styled.div`
-  padding: 1.5rem;
-  max-height: 30vh;
-  overflow-y: auto;
-`;
-
-const LightboxTitle = styled.h2`
-  margin: 0 0 0.5rem 0;
-  font-size: 1.5rem;
-  font-weight: 400;
-  color: #2c2c2c;
-  font-family: 'Cormorant Garamond', serif;
-`;
-
-const LightboxDescription = styled.p`
-  margin: 0 0 1rem 0;
-  color: #666;
-  line-height: 1.6;
-  font-family: 'Work Sans', sans-serif;
-`;
-
-const LightboxMeta = styled.div`
-  margin-bottom: 1.5rem;
-`;
-
-const MetaRow = styled.div`
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  color: #666;
-  line-height: 1.5;
-  font-family: 'Work Sans', sans-serif;
+  // UI state
+  const [layout, setLayout] = useState<GalleryLayout>('canvas');
+  const [selectedPieces, setSelectedPieces] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
-  strong {
-    color: #2c2c2c;
-    margin-right: 0.5rem;
-    font-weight: 500;
-  }
-`;
-
-const LightboxActions = styled.div`
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-`;
-
-const ActionButton = styled.button`
-  background: none;
-  border: 1px solid #2c2c2c;
-  color: #2c2c2c;
-  padding: 0.75rem 1.5rem;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  font-weight: 300;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  border-radius: 2px;
+  // Notifications
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
   
-  &:hover {
-    background: #2c2c2c;
-    color: #f8f8f8;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
+  // Filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterVisibility, setFilterVisibility] = useState<GalleryVisibility | 'all'>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  
+  // Modals
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [editingPiece, setEditingPiece] = useState<BackendGalleryPiece | null>(null);
+  
+  // Upload progress tracking
+  const [uploadingFiles, setUploadingFiles] = useState<Map<string, number>>(new Map());
+
+  // ============= DATA FETCHING =============
+  const loadPortfolioData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch portfolio
+      const portfolioData = await api.portfolio.get();
+      if (!portfolioData) {
+        showNotification('error', 'No portfolio found. Please create a portfolio first.');
+        return;
+      }
+      setPortfolio(portfolioData);
+
+      // Fetch gallery pieces
+      const galleryResponse = await api.portfolio.gallery.get({
+        page: 1,
+        limit: 100,
+        visibility: 'all'
+      });
+      setGalleryPieces(galleryResponse.galleryPieces || []);
+
+      // Fetch stats
+      const statsResponse = await api.portfolio.gallery.getStats();
+      if (statsResponse.success) {
+        setStats(statsResponse.stats);
+      }
+
+    } catch (error: any) {
+      console.error('Failed to load portfolio data:', error);
+      showNotification('error', error.message || 'Failed to load portfolio data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPortfolioData();
+  }, [loadPortfolioData]);
+
+  // ============= NOTIFICATION SYSTEM =============
+  const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  }, []);
+
+  // ============= PIECE MANAGEMENT =============
+  const handleUploadSuccess = useCallback(() => {
+    setShowUploadModal(false);
+    loadPortfolioData();
+    showNotification('success', 'Artwork uploaded successfully!');
+  }, [loadPortfolioData]);
+
+  const updatePiece = useCallback(async (pieceId: string, updates: Partial<BackendGalleryPiece>) => {
+    try {
+      setIsSaving(true);
+      await api.portfolio.gallery.update(pieceId, updates);
+      
+      setGalleryPieces(prev => prev.map(p => 
+        (p.id === pieceId || p._id === pieceId) ? { ...p, ...updates } : p
+      ));
+      
+      showNotification('success', 'Artwork updated successfully');
+      setEditingPiece(null);
+    } catch (error: any) {
+      showNotification('error', error.message || 'Failed to update artwork');
+    } finally {
+      setIsSaving(false);
+    }
+  }, []);
+
+  const deletePieces = useCallback(async (pieceIds: string[]) => {
+    if (!confirm(`Delete ${pieceIds.length} artwork(s)? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      
+      if (pieceIds.length === 1) {
+        await api.portfolio.gallery.delete(pieceIds[0]);
+      } else {
+        await api.portfolio.gallery.batchDelete(pieceIds);
+      }
+
+      setGalleryPieces(prev => prev.filter(p => 
+        !pieceIds.includes(p.id || p._id || '')
+      ));
+      setSelectedPieces(new Set());
+      showNotification('success', `Deleted ${pieceIds.length} artwork(s)`);
+
+    } catch (error: any) {
+      showNotification('error', error.message || 'Failed to delete artworks');
+    } finally {
+      setIsSaving(false);
+    }
+  }, []);
+
+  const updateVisibility = useCallback(async (pieceIds: string[], visibility: GalleryVisibility) => {
+    try {
+      setIsSaving(true);
+      await api.portfolio.gallery.batchUpdateVisibility(pieceIds, visibility);
+
+      setGalleryPieces(prev => prev.map(p => 
+        pieceIds.includes(p.id || p._id || '') ? { ...p, visibility } : p
+      ));
+      
+      showNotification('success', `Updated visibility for ${pieceIds.length} artwork(s)`);
+    } catch (error: any) {
+      showNotification('error', error.message || 'Failed to update visibility');
+    } finally {
+      setIsSaving(false);
+    }
+  }, []);
+
+  // ============= SELECTION HANDLERS =============
+  const toggleSelection = useCallback((pieceId: string) => {
+    setSelectedPieces(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(pieceId)) {
+        newSet.delete(pieceId);
+      } else {
+        newSet.add(pieceId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    const allIds = filteredPieces.map(p => p.id || p._id || '').filter(Boolean);
+    setSelectedPieces(new Set(allIds));
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedPieces(new Set());
+  }, []);
+
+  // ============= FILTERING =============
+  const filteredPieces = galleryPieces.filter(piece => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = 
+        piece.title?.toLowerCase().includes(query) ||
+        piece.description?.toLowerCase().includes(query) ||
+        piece.artist?.toLowerCase().includes(query) ||
+        piece.tags?.some(tag => tag.toLowerCase().includes(query));
+      
+      if (!matchesSearch) return false;
+    }
+
+    if (filterVisibility !== 'all' && piece.visibility !== filterVisibility) {
+      return false;
+    }
+
+    if (filterCategory !== 'all' && piece.category !== filterCategory) {
+      return false;
+    }
+
+    return true;
+  });
+
+  const getPieceId = (piece: BackendGalleryPiece): string => {
+    return piece.id || piece._id || '';
+  };
+
+  // ============= RENDER =============
+  if (isLoading) {
+    return (
+      <PageContainer>
+        <LoadingContainer>
+          <LoadingSpinner />
+          <p>Loading Creative Studio...</p>
+        </LoadingContainer>
+      </PageContainer>
+    );
   }
-`;
+
+  if (!portfolio) {
+    return (
+      <PageContainer>
+        <ErrorContainer>
+          <AlertCircle size={48} color="#ef4444" />
+          <h2>No Portfolio Found</h2>
+          <p>Please create a portfolio to access the Creative Studio.</p>
+          <BaseButton onClick={() => window.location.href = '/dashboard'}>
+            Go to Dashboard
+          </BaseButton>
+        </ErrorContainer>
+      </PageContainer>
+    );
+  }
+
+  return (
+    <PageContainer>
+      <StudioHeader>
+        <HeaderTop>
+          <FlexRow $gap="2rem" $align="center">
+            <HeaderTitle>Creative Studio</HeaderTitle>
+            {stats && (
+              <StatsRow>
+                <span>{stats.totalPieces} artworks</span>
+                <span>•</span>
+                <span>{stats.publicPieces} public</span>
+                <span>•</span>
+                <span>{stats.privatePieces} private</span>
+              </StatsRow>
+            )}
+          </FlexRow>
+
+          <HeaderActions>
+            <SearchBox>
+              <SearchIcon>🔍</SearchIcon>
+              <SearchInput
+                type="text"
+                placeholder="Search artworks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <ClearButton onClick={() => setSearchQuery('')}>
+                  <X size={16} />
+                </ClearButton>
+              )}
+            </SearchBox>
+
+            <TabContainer>
+              <TabButton
+                $active={layout === 'canvas'}
+                onClick={() => setLayout('canvas')}
+              >
+                <Layers size={16} />
+                Canvas
+              </TabButton>
+              <TabButton
+                $active={layout === 'grid'}
+                onClick={() => setLayout('grid')}
+              >
+                <LayoutGrid size={16} />
+                Grid
+              </TabButton>
+              <TabButton
+                $active={layout === 'masonry'}
+                onClick={() => setLayout('masonry')}
+              >
+                <Columns size={16} />
+                Masonry
+              </TabButton>
+              <TabButton
+                $active={layout === 'list'}
+                onClick={() => setLayout('list')}
+              >
+                <List size={16} />
+                List
+              </TabButton>
+            </TabContainer>
+
+            {selectedPieces.size > 0 && (
+              <BulkActionsBar>
+                <span>{selectedPieces.size} selected</span>
+                <BaseButton
+                  $variant="ghost"
+                  onClick={() => updateVisibility(Array.from(selectedPieces), 'public')}
+                  style={{ padding: '0.5rem', minHeight: 'auto' }}
+                >
+                  <Eye size={16} />
+                </BaseButton>
+                <BaseButton
+                  $variant="ghost"
+                  onClick={() => updateVisibility(Array.from(selectedPieces), 'private')}
+                  style={{ padding: '0.5rem', minHeight: 'auto' }}
+                >
+                  <EyeOff size={16} />
+                </BaseButton>
+                <BaseButton
+                  $variant="ghost"
+                  onClick={() => deletePieces(Array.from(selectedPieces))}
+                  style={{ padding: '0.5rem', minHeight: 'auto', color: '#ef4444' }}
+                >
+                  <Trash2 size={16} />
+                </BaseButton>
+                <button
+                  onClick={clearSelection}
+                  style={{ 
+                    background: 'none', 
+                    border: 'none', 
+                    color: 'white', 
+                    cursor: 'pointer',
+                    textDecoration: 'underline' 
+                  }}
+                >
+                  Clear
+                </button>
+              </BulkActionsBar>
+            )}
+
+            <BaseButton onClick={() => setShowUploadModal(true)}>
+              <Plus size={16} />
+              Add Artwork
+            </BaseButton>
+
+            <BaseButton $variant="ghost" onClick={loadPortfolioData}>
+              <RefreshCw size={16} />
+            </BaseButton>
+          </HeaderActions>
+        </HeaderTop>
+
+        <FiltersBar>
+          <Filter size={16} color="#666" />
+          <FilterSelect
+            value={filterVisibility}
+            onChange={(e) => setFilterVisibility(e.target.value as any)}
+          >
+            <option value="all">All visibility</option>
+            <option value="public">Public only</option>
+            <option value="private">Private only</option>
+            <option value="unlisted">Unlisted only</option>
+          </FilterSelect>
+
+          <FilterSelect
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="all">All categories</option>
+            <option value="portrait">Portrait</option>
+            <option value="landscape">Landscape</option>
+            <option value="abstract">Abstract</option>
+            <option value="digital">Digital Art</option>
+            <option value="photography">Photography</option>
+          </FilterSelect>
+
+          {filteredPieces.length !== galleryPieces.length && (
+            <span style={{ fontSize: '0.875rem', color: '#666', marginLeft: 'auto' }}>
+              Showing {filteredPieces.length} of {galleryPieces.length}
+            </span>
+          )}
+
+          {filteredPieces.length > 0 && (
+            <button
+              onClick={selectAll}
+              style={{ 
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                color: '#3b82f6',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                textDecoration: 'underline'
+              }}
+            >
+              Select All
+            </button>
+          )}
+        </FiltersBar>
+      </StudioHeader>
+
+      <MainContent>
+        {filteredPieces.length === 0 ? (
+          <EmptyState>
+            <Image size={64} color="#d1d5db" />
+            <h3>
+              {searchQuery || filterVisibility !== 'all' || filterCategory !== 'all' 
+                ? 'No artworks match your filters' 
+                : 'Your gallery is empty'}
+            </h3>
+            <p>
+              {searchQuery || filterVisibility !== 'all' || filterCategory !== 'all'
+                ? 'Try adjusting your search or filters'
+                : 'Start by uploading your first artwork'}
+            </p>
+            {!searchQuery && filterVisibility === 'all' && filterCategory === 'all' && (
+              <BaseButton onClick={() => setShowUploadModal(true)}>
+                Upload Artwork
+              </BaseButton>
+            )}
+          </EmptyState>
+        ) : (
+          <GalleryGrid $layout={layout}>
+            {filteredPieces.map((piece) => {
+              const pieceId = getPieceId(piece);
+              const isSelected = selectedPieces.has(pieceId);
+              
+              return (
+                <ArtworkItem
+                  key={pieceId}
+                  $layout={layout}
+                  $selected={isSelected}
+                  onClick={() => layout === 'list' ? null : toggleSelection(pieceId)}
+                >
+                  <SelectionCheckbox
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelection(pieceId)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  
+                  {layout === 'list' ? (
+                    <FlexRow $gap="1rem" style={{ width: '100%' }}>
+                      <img 
+                        src={piece.thumbnailUrl || piece.imageUrl}
+                        alt={piece.title}
+                        style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px' }}
+                      />
+                      <FlexColumn $gap="0.5rem" style={{ flex: 1 }}>
+                        <h3 style={{ margin: 0, fontSize: '1rem' }}>{piece.title}</h3>
+                        {piece.description && (
+                          <p style={{ margin: 0, fontSize: '0.875rem', color: '#666' }}>
+                            {piece.description}
+                          </p>
+                        )}
+                        <FlexRow $gap="1rem">
+                          <Badge $variant={
+                            piece.visibility === 'public' ? 'success' :
+                            piece.visibility === 'private' ? 'error' : 'warning'
+                          }>
+                            {piece.visibility}
+                          </Badge>
+                          {piece.category && <span style={{ fontSize: '0.875rem', color: '#666' }}>{piece.category}</span>}
+                          {piece.year && <span style={{ fontSize: '0.875rem', color: '#666' }}>{piece.year}</span>}
+                        </FlexRow>
+                      </FlexColumn>
+                      <FlexRow $gap="0.5rem">
+                        <ActionButton onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingPiece(piece);
+                        }}>
+                          <Edit3 size={16} />
+                        </ActionButton>
+                        <ActionButton onClick={(e) => {
+                          e.stopPropagation();
+                          deletePieces([pieceId]);
+                        }}>
+                          <Trash2 size={16} color="#ef4444" />
+                        </ActionButton>
+                      </FlexRow>
+                    </FlexRow>
+                  ) : (
+                    <>
+                      <ArtworkImage 
+                        src={piece.thumbnailUrl || piece.imageUrl}
+                        alt={piece.title}
+                      />
+                      
+                      <ArtworkActions>
+                        <ActionButton onClick={(e) => {
+                          e.stopPropagation();
+                          const newVisibility = piece.visibility === 'public' ? 'private' : 'public';
+                          updateVisibility([pieceId], newVisibility);
+                        }}>
+                          {piece.visibility === 'public' ? <Eye size={16} /> : <EyeOff size={16} />}
+                        </ActionButton>
+                        <ActionButton onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingPiece(piece);
+                        }}>
+                          <Edit3 size={16} />
+                        </ActionButton>
+                      </ArtworkActions>
+                      
+                      <ArtworkOverlay>
+                        <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem' }}>{piece.title}</h3>
+                        {piece.artist && (
+                          <p style={{ margin: 0, fontSize: '0.875rem', opacity: 0.9 }}>{piece.artist}</p>
+                        )}
+                      </ArtworkOverlay>
+                      
+                      {piece.visibility !== 'public' && (
+                        <Badge 
+                          $variant={piece.visibility === 'private' ? 'error' : 'warning'}
+                          style={{ position: 'absolute', top: '0.75rem', right: '0.75rem' }}
+                        >
+                          {piece.visibility}
+                        </Badge>
+                      )}
+                    </>
+                  )}
+                </ArtworkItem>
+              );
+            })}
+          </GalleryGrid>
+        )}
+      </MainContent>
+
+      {/* Upload Modal */}
+      {showUploadModal && portfolio && (
+        <ArtworkUploadModal
+          portfolioId={portfolio.id || portfolio._id || ''}
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={handleUploadSuccess}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editingPiece && (
+        <EditArtworkModal
+          piece={editingPiece}
+          onSave={updatePiece}
+          onClose={() => setEditingPiece(null)}
+          isSaving={isSaving}
+        />
+      )}
+
+      {/* Notifications */}
+      {notification && (
+        <NotificationToast $type={notification.type}>
+          {notification.type === 'success' && <Check size={20} />}
+          {notification.type === 'error' && <AlertCircle size={20} />}
+          {notification.message}
+        </NotificationToast>
+      )}
+
+      {/* Upload Progress */}
+      {uploadingFiles.size > 0 && (
+        <UploadProgressCard>
+          <CardContent $padding="md">
+            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>Uploading...</h3>
+            {Array.from(uploadingFiles.entries()).map(([filename, progress]) => (
+              <div key={filename} style={{ marginBottom: '0.75rem' }}>
+                <div style={{ fontSize: '0.875rem', marginBottom: '0.25rem' }}>{filename}</div>
+                <div style={{ background: '#f0f0f0', height: '4px', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div 
+                    style={{ 
+                      background: '#3b82f6', 
+                      height: '100%', 
+                      width: `${progress}%`,
+                      transition: 'width 0.3s ease'
+                    }} 
+                  />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </UploadProgressCard>
+      )}
+    </PageContainer>
+  );
+}
+
+// ============= EDIT MODAL COMPONENT =============
+interface EditModalProps {
+  piece: BackendGalleryPiece;
+  onSave: (id: string, updates: Partial<BackendGalleryPiece>) => void;
+  onClose: () => void;
+  isSaving: boolean;
+}
+
+function EditArtworkModal({ piece, onSave, onClose, isSaving }: EditModalProps) {
+  const [formData, setFormData] = useState({
+    title: piece.title || '',
+    description: piece.description || '',
+    artist: piece.artist || '',
+    category: piece.category || '',
+    visibility: piece.visibility || 'public',
+    year: piece.year || new Date().getFullYear(),
+    price: piece.price || 0,
+    tags: piece.tags?.join(', ') || '',
+    medium: piece.medium || ''
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const pieceId = piece.id || piece._id || '';
+    
+    onSave(pieceId, {
+      ...formData,
+      tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      year: parseInt(formData.year.toString()),
+      price: parseFloat(formData.price.toString()) || undefined
+    });
+  };
+
+  return (
+    <Modal $isOpen={true}>
+      <ModalOverlay onClick={onClose} />
+      <ModalContent>
+        <ModalHeader>
+          <FlexRow $justify="space-between">
+            <ModalTitle>Edit Artwork</ModalTitle>
+            <button 
+              onClick={onClose}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
+            >
+              <X size={20} />
+            </button>
+          </FlexRow>
+        </ModalHeader>
+        
+        <form onSubmit={handleSubmit}>
+          <ModalBody>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <FormGroup>
+                <Label>Title *</Label>
+                <Input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  required
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Artist</Label>
+                <Input
+                  type="text"
+                  value={formData.artist}
+                  onChange={(e) => setFormData(prev => ({ ...prev, artist: e.target.value }))}
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Category</Label>
+                <FilterSelect
+                  value={formData.category}
+                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                  style={{ width: '100%', padding: '0.75rem' }}
+                >
+                  <option value="">Select category</option>
+                  <option value="portrait">Portrait</option>
+                  <option value="landscape">Landscape</option>
+                  <option value="abstract">Abstract</option>
+                  <option value="digital">Digital Art</option>
+                  <option value="photography">Photography</option>
+                </FilterSelect>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Visibility</Label>
+                <FilterSelect
+                  value={formData.visibility}
+                  onChange={(e) => setFormData(prev => ({ ...prev, visibility: e.target.value as GalleryVisibility }))}
+                  style={{ width: '100%', padding: '0.75rem' }}
+                >
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                  <option value="unlisted">Unlisted</option>
+                </FilterSelect>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Year</Label>
+                <Input
+                  type="number"
+                  value={formData.year}
+                  onChange={(e) => setFormData(prev => ({ ...prev, year: parseInt(e.target.value) }))}
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Price ($)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData(prev => ({ ...prev, price: parseFloat(e.target.value) }))}
+                />
+              </FormGroup>
+            </div>
+
+            <FormGroup>
+              <Label>Medium</Label>
+              <Input
+                type="text"
+                value={formData.medium}
+                onChange={(e) => setFormData(prev => ({ ...prev, medium: e.target.value }))}
+                placeholder="Oil on canvas, Digital, Watercolor..."
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>Description</Label>
+              <TextArea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+              />
+            </FormGroup>
+
+            <FormGroup>
+              <Label>Tags (comma-separated)</Label>
+              <Input
+                type="text"
+                value={formData.tags}
+                onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
+                placeholder="abstract, landscape, oil painting..."
+              />
+            </FormGroup>
+          </ModalBody>
+          
+          <ModalFooter>
+            <BaseButton type="button" $variant="secondary" onClick={onClose}>
+              Cancel
+            </BaseButton>
+            <BaseButton type="submit" disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader size={16} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </BaseButton>
+          </ModalFooter>
+        </form>
+      </ModalContent>
+    </Modal>
+  );
+}

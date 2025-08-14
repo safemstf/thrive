@@ -1,9 +1,10 @@
-// src/components/gallery/galleryLogic.tsx - Fixed version
+// src/components/gallery/galleryLogic.tsx - Fixed version with correct API methods
 'use client';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApiClient } from '@/lib/api-client';
 import { useAuth } from '@/providers/authProvider';
-import type { Portfolio, PortfolioKind } from '@/types/portfolio.types';
+import type { Portfolio, PortfolioKind,  } from '@/types/portfolio.types';
+import { BackendGalleryPiece } from '@/types/base.types';
 import type {
   GalleryPiece,
 } from '@/types/gallery.types';
@@ -49,6 +50,77 @@ export interface UploadFile {
   error?: string;
 }
 
+// Convert BackendGalleryPiece to GalleryPiece
+const convertToGalleryPiece = (backendPiece: BackendGalleryPiece, userId?: string): GalleryPiece => {
+  const pieceId = backendPiece._id || backendPiece.id || `piece-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
+  // Handle dimensions with proper type checking
+  const dimensions = backendPiece.dimensions && 
+    typeof backendPiece.dimensions.width === 'number' && 
+    typeof backendPiece.dimensions.height === 'number'
+    ? {
+        width: backendPiece.dimensions.width,
+        height: backendPiece.dimensions.height,
+        depth: backendPiece.dimensions.depth,
+        unit: backendPiece.dimensions.unit || 'cm'
+      }
+    : undefined;
+  
+  return {
+    _id: pieceId,
+    id: pieceId,
+    title: backendPiece.title,
+    artist: backendPiece.artist || userId || 'Unknown Artist',
+    description: backendPiece.description,
+    
+    // Images
+    thumbnailUrl: backendPiece.thumbnailUrl || backendPiece.imageUrl,
+    imageUrl: backendPiece.imageUrl,
+    highResUrl: backendPiece.imageUrl,
+    
+    // Metadata & Accessibility
+    alt: backendPiece.title || 'Gallery piece',
+    medium: backendPiece.medium,
+    year: backendPiece.year,
+    size: 'medium' as const,
+    displayOrder: backendPiece.displayOrder || 0,
+    
+    // Dimensions
+    dimensions,
+    
+    // Sales/Status
+    status: 'available' as const, // Default status
+    price: backendPiece.price,
+    currency: 'USD',
+    
+    // Visibility & Permissions
+    visibility: backendPiece.visibility || 'public',
+    ownerId: userId || '',
+    sharedWith: [],
+    shareToken: undefined,
+    
+    // Timestamps
+    createdAt: backendPiece.createdAt ? new Date(backendPiece.createdAt) : new Date(),
+    updatedAt: backendPiece.updatedAt ? new Date(backendPiece.updatedAt) : new Date(),
+    publishedAt: backendPiece.createdAt ? new Date(backendPiece.createdAt) : undefined,
+    
+    // Tags & Categories
+    tags: backendPiece.tags,
+    category: backendPiece.category as any,
+    
+    // Upload metadata
+    uploadedBy: userId || '',
+    originalFileName: undefined,
+    fileSize: backendPiece.metadata?.fileSize,
+    mimeType: backendPiece.metadata?.format,
+    
+    // Portfolio/Social Features
+    portfolioId: backendPiece.portfolioId,
+    views: backendPiece.stats?.views || 0,
+    likes: backendPiece.stats?.likes || 0,
+  };
+};
+
 // Main data fetching hook
 export const useGalleryData = () => {
   const [galleryPieces, setGalleryPieces] = useState<GalleryPiece[]>([]);
@@ -72,11 +144,26 @@ export const useGalleryData = () => {
           setPortfolio(portfolioData);
 
           if (portfolioData && (portfolioData.kind === 'creative' || portfolioData.kind === 'hybrid')) {
-            // Fetch portfolio artwork
+            // Fetch portfolio artwork using correct API method
             const piecesResponse = await apiClient.portfolio.getMyGalleryPieces();
-            const pieces = Array.isArray(piecesResponse) ? piecesResponse : [];
-            const myPieces = pieces.filter(p => p.ownerId === user?.id || p.portfolioId === portfolioData.id);
-            setGalleryPieces(myPieces);
+            
+            // Handle the response structure from your API
+            let backendPieces: BackendGalleryPiece[] = [];
+            
+            if (piecesResponse && typeof piecesResponse === 'object') {
+              if ('success' in piecesResponse && piecesResponse.success !== false) {
+                backendPieces = piecesResponse.galleryPieces || [];
+              } else if (Array.isArray(piecesResponse)) {
+                backendPieces = piecesResponse;
+              }
+            }
+            
+            // Convert backend pieces to frontend format
+            const convertedPieces = backendPieces.map(piece => 
+              convertToGalleryPiece(piece, user?.id)
+            );
+            
+            setGalleryPieces(convertedPieces);
 
           } else if (portfolioData && portfolioData.kind === 'educational') {
             setGalleryPieces([]);
@@ -96,10 +183,9 @@ export const useGalleryData = () => {
           }
         }
       } else {
-        // Fetch public gallery
-        const publicPiecesResponse = await apiClient.portfolio.getMyGalleryPieces();
-        const publicPieces = Array.isArray(publicPiecesResponse) ? publicPiecesResponse : [];
-        setGalleryPieces(publicPieces);
+        // For public gallery, we might need a different endpoint
+        // For now, return empty array since we don't have a public gallery endpoint
+        setGalleryPieces([]);
         setPortfolio(null);
       }
     } catch (err) {
@@ -110,7 +196,6 @@ export const useGalleryData = () => {
     }
   }, [isAuthenticated, user?.id, apiClient]);
 
-  // FIXED: Now uses the type parameter properly
   const createPortfolio = useCallback(async (kind: PortfolioKind) => {
     try {
       // Generate appropriate bio based on portfolio kind
@@ -131,14 +216,23 @@ export const useGalleryData = () => {
       const newPortfolio = await apiClient.portfolio.create({
         title: `${user?.name || 'My'} Portfolio`,
         bio: bios[kind],
-        kind: kind, // FIXED: Now uses the actual kind parameter
+        kind: kind,
         visibility: 'public',
         specializations: [],
         tags: [],
         tagline: taglines[kind],
         settings: {
+          allowReviews: true,
           allowComments: true,
+          requireReviewApproval: false,
+          allowAnonymousReviews: true,
           showStats: true,
+          showPrices: false,
+          defaultGalleryView: 'grid',
+          piecesPerPage: 20,
+          notifyOnReview: true,
+          notifyOnView: false,
+          weeklyAnalyticsEmail: false,
         }
       });
       
@@ -321,27 +415,29 @@ export const useBulkActions = () => {
       switch (action) {
         case 'delete':
           if (confirm(`Delete ${selectedItems.size} items?`)) {
-            // TODO: Implement bulk delete when API supports it
-            console.log('Bulk delete not yet implemented');
+            // Use the correct bulk delete API method
+            const itemIds = Array.from(selectedItems);
+            await apiClient.portfolio.batchDeleteGalleryPieces(itemIds);
+            console.log(`Deleted ${selectedItems.size} items`);
           }
           break;
         case 'visibility':
-          // TODO: Show visibility modal
-          console.log('Visibility change not yet implemented');
+          // Use the correct bulk visibility API method
+          const itemIds = Array.from(selectedItems);
+          await apiClient.portfolio.batchUpdateGalleryVisibility(itemIds, 'public');
+          console.log(`Updated visibility for ${selectedItems.size} items`);
           break;
         case 'collection':
-          // TODO: Show collection modal
           console.log('Collection assignment not yet implemented');
           break;
         case 'download':
-          // TODO: Implement bulk download
           console.log('Bulk download not yet implemented');
           break;
       }
     } catch (err) {
       console.error(`Error performing bulk ${action}:`, err);
     }
-  }, [selectedItems]);
+  }, [selectedItems, apiClient]);
 
   return {
     selectedItems,
@@ -399,34 +495,41 @@ export const useImageUpload = () => {
         });
 
         try {
-          // Use portfolio API for upload
-          const uploadData = {
-            file: uploadFile.file,
+          // First, upload the image file
+          const uploadResponse = await apiClient.portfolio.uploadImage(uploadFile.file, 'gallery');
+          
+          if (!uploadResponse.success) {
+            throw new Error(uploadResponse.message || 'Image upload failed');
+          }
+
+          // Update progress
+          setUploadFiles(prev => {
+            const newFiles = [...prev];
+            newFiles[i] = { ...newFiles[i], progress: 50 };
+            return newFiles;
+          });
+
+          // Then, add the gallery piece with the uploaded image URL
+          const pieceData = {
             title: uploadFile.file.name.replace(/\.[^/.]+$/, ""),
             description: '',
+            imageUrl: uploadResponse.url,
             category: 'digital',
             tags: [],
-            visibility: 'public' as const
+            visibility: 'public' as const,
+            medium: 'Digital',
+            year: new Date().getFullYear()
           };
 
-          // Use portfolio batch upload API
-          const result = await apiClient.portfolio.batchUploadGallery(
-            [uploadData],
-            (completed: number, total: number) => {
-              const progress = (completed / total) * 100;
-              setUploadFiles(prev => {
-                const newFiles = [...prev];
-                newFiles[i] = { ...newFiles[i], progress };
-                return newFiles;
-              });
-            }
-          );
+          const addPieceResponse = await apiClient.portfolio.addGalleryPiece(pieceData);
 
-          if (result && result.successful.length > 0) {
-            uploadedPieces.push(result.successful[0]);
-          } else if (result && result.failed.length > 0) {
-            throw new Error(result.failed[0].error);
+          if (!addPieceResponse.success) {
+            throw new Error(addPieceResponse.message || 'Failed to add gallery piece');
           }
+
+          // Convert the backend piece to frontend format
+          const convertedPiece = convertToGalleryPiece(addPieceResponse.galleryPiece);
+          uploadedPieces.push(convertedPiece);
 
           // Update file status to success
           setUploadFiles(prev => {

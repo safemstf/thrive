@@ -1,10 +1,10 @@
-// src/components/apiTest/apiTestLogic.tsx - Updated to use complete API methods
+// src/components/apiTest/apiTestLogic.tsx - Improved token management
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   CheckCircle, XCircle, AlertCircle, Loader2, RefreshCw, 
   Play, Shield, Settings, Route, Heart, Book, Users,
   Terminal, Copy, Download, ExternalLink, Clock, Key,
-  User, TrendingUp, Zap
+  User, TrendingUp, Zap, AlertTriangle
 } from 'lucide-react';
 
 // Import the real API client
@@ -56,6 +56,12 @@ interface ApiMethod {
   generateTestData?: () => any;
 }
 
+interface TestSession {
+  isActive: boolean;
+  token: string | null;
+  startTime: Date | null;
+}
+
 // ==================== ICON MAPPING ====================
 const getIconComponent = (iconName: string) => {
   const icons: Record<string, any> = {
@@ -87,9 +93,13 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [backendInfo, setBackendInfo] = useState<any>(null);
+  const [testSession, setTestSession] = useState<TestSession>({
+    isActive: false,
+    token: null,
+    startTime: null
+  });
 
   // ==================== COMPUTED VALUES ====================
-  // NOW USING THE COMPLETE API METHODS!
   const apiMethods = useMemo(() => createCompleteApiMethods(authToken), [authToken]);
   
   const filteredMethods = useMemo(() => {
@@ -109,7 +119,10 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
   // ==================== EFFECTS ====================
   useEffect(() => {
     const token = localStorage.getItem('api_test_token');
-    if (token) setAuthToken(token);
+    if (token) {
+      setAuthToken(token);
+      setTestSession(prev => ({ ...prev, token }));
+    }
     checkConnection();
   }, []);
 
@@ -125,6 +138,51 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
       setConnectionStatus('disconnected');
     }
   }, []);
+
+  const startTestSession = useCallback(async () => {
+    // Start a fresh test session with authentication
+    setTestSession({
+      isActive: true,
+      token: null,
+      startTime: new Date()
+    });
+
+    try {
+      const loginResult = await api.auth.login({ 
+        email: 'admin@admin.com', 
+        password: 'Safe123' 
+      });
+      
+      if (loginResult?.token) {
+        setAuthToken(loginResult.token);
+        localStorage.setItem('api_test_token', loginResult.token);
+        setTestSession(prev => ({ 
+          ...prev, 
+          token: loginResult.token 
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to start test session:', error);
+    }
+  }, []);
+
+  const endTestSession = useCallback(async () => {
+    if (authToken) {
+      try {
+        await api.auth.logout();
+      } catch (error) {
+        console.error('Logout failed:', error);
+      }
+    }
+    
+    setAuthToken(null);
+    localStorage.removeItem('api_test_token');
+    setTestSession({
+      isActive: false,
+      token: null,
+      startTime: null
+    });
+  }, [authToken]);
 
   const executeTest = useCallback(async (method: ApiMethod) => {
     const testKey = `${method.category}-${method.name}`;
@@ -172,52 +230,107 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
 
   const runCategoryTests = useCallback(async () => {
     setIsRunning(true);
-    const categoryMethods = filteredMethods.filter(m => !m.requiresAuth || authToken);
+    
+    // Start test session if not active and category requires auth
+    const hasAuthMethods = filteredMethods.some(m => m.requiresAuth);
+    if (hasAuthMethods && !testSession.isActive) {
+      await startTestSession();
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for auth
+    }
+    
+    // Filter methods based on auth availability
+    const categoryMethods = filteredMethods.filter(m => 
+      !m.requiresAuth || (m.requiresAuth && authToken)
+    );
     
     for (const method of categoryMethods) {
-      await executeTest(method);
-    }
-    
-    setIsRunning(false);
-  }, [filteredMethods, authToken, executeTest]);
-
-  const runAuthFlow = useCallback(async () => {
-    setIsRunning(true);
-    
-    const loginMethod = apiMethods.find(m => m.name === 'Login');
-    if (loginMethod) {
-      await executeTest(loginMethod);
-      
-      setTimeout(async () => {
-        const userMethod = apiMethods.find(m => m.name === 'Get Current User');
-        if (userMethod) await executeTest(userMethod);
-        setIsRunning(false);
-      }, 500);
-    } else {
-      setIsRunning(false);
-    }
-  }, [apiMethods, executeTest]);
-
-  const runAllTests = useCallback(async () => {
-    setIsRunning(true);
-    
-    // First run auth flow
-    const loginMethod = apiMethods.find(m => m.name === 'Login');
-    if (loginMethod) {
-      await executeTest(loginMethod);
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    
-    // Then run all available methods
-    const availableMethods = apiMethods.filter(m => !m.requiresAuth || authToken);
-    for (const method of availableMethods) {
-      if (method.name !== 'Login') { // Skip login since we already did it
+      // Skip logout in category tests to preserve session
+      if (method.name !== 'Logout') {
         await executeTest(method);
+        await new Promise(resolve => setTimeout(resolve, 200)); // Delay between tests
       }
     }
     
     setIsRunning(false);
-  }, [apiMethods, authToken, executeTest]);
+  }, [filteredMethods, authToken, testSession.isActive, startTestSession, executeTest]);
+
+  const runPublicOnlyTests = useCallback(async () => {
+    setIsRunning(true);
+    
+    const publicMethods = getPublicMethods(apiMethods);
+    
+    for (const method of publicMethods) {
+      await executeTest(method);
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    setIsRunning(false);
+  }, [apiMethods, executeTest]);
+
+  const runAuthenticatedTests = useCallback(async () => {
+    setIsRunning(true);
+    
+    // Start fresh session
+    await startTestSession();
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for auth
+    
+    const authMethods = getAuthRequiredMethods(apiMethods).filter(m => 
+      m.name !== 'Login' && m.name !== 'Logout' // Skip these special methods
+    );
+    
+    for (const method of authMethods) {
+      if (authToken) { // Double check we still have token
+        await executeTest(method);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+    
+    setIsRunning(false);
+  }, [apiMethods, authToken, startTestSession, executeTest]);
+
+  const runCompleteTestSuite = useCallback(async () => {
+    setIsRunning(true);
+    clearResults();
+    
+    try {
+      // 1. Test public endpoints first
+      console.log('🔍 Testing public endpoints...');
+      const publicMethods = getPublicMethods(apiMethods);
+      for (const method of publicMethods) {
+        await executeTest(method);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      // 2. Start auth session and test authenticated endpoints
+      console.log('🔐 Starting authenticated test session...');
+      await startTestSession();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (authToken) {
+        const authMethods = getAuthRequiredMethods(apiMethods).filter(m => 
+          m.name !== 'Login' && m.name !== 'Logout'
+        );
+        
+        for (const method of authMethods) {
+          await executeTest(method);
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+      
+      // 3. Test logout last
+      console.log('🚪 Testing logout...');
+      const logoutMethod = apiMethods.find(m => m.name === 'Logout');
+      if (logoutMethod && authToken) {
+        await executeTest(logoutMethod);
+      }
+      
+    } catch (error) {
+      console.error('Test suite error:', error);
+    } finally {
+      await endTestSession();
+      setIsRunning(false);
+    }
+  }, [apiMethods, authToken, startTestSession, endTestSession, executeTest]);
 
   const clearResults = useCallback(() => setTestResults({}), []);
 
@@ -225,12 +338,23 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
     const exportData = {
       timestamp: new Date().toISOString(),
       baseUrl,
+      testSession: {
+        ...testSession,
+        duration: testSession.startTime ? 
+          Date.now() - testSession.startTime.getTime() : 0
+      },
       results: testResults,
       summary: {
         totalMethods: apiMethods.length,
         testedMethods: Object.keys(testResults).length,
         categories: Object.keys(CATEGORIES),
         ...stats
+      },
+      issues: {
+        authTokenLoss: !authToken && stats.failed > 0,
+        backendErrors: Object.values(testResults).some(r => 
+          r.error?.includes('500') || r.error?.includes('Concept.find')
+        )
       }
     };
     
@@ -241,7 +365,7 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
     a.download = `api-test-results-${new Date().toISOString().replace(/:/g, '-')}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [baseUrl, testResults, apiMethods.length, stats]);
+  }, [baseUrl, testSession, testResults, apiMethods.length, stats, authToken]);
 
   const copyToken = useCallback(() => {
     if (authToken) navigator.clipboard.writeText(authToken);
@@ -249,10 +373,10 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
 
   const getStatusIcon = useCallback((status: string) => {
     switch (status) {
-      case 'success': return <CheckCircle style={{ color: '#666666' }} size={20} />;
-      case 'error': return <XCircle style={{ color: '#999999' }} size={20} />;
-      case 'running': return <Loader2 style={{ color: '#2c2c2c' }} className="animate-spin" size={20} />;
-      default: return <AlertCircle style={{ color: '#cccccc' }} size={20} />;
+      case 'success': return <CheckCircle size={20} />;
+      case 'error': return <XCircle size={20} />;
+      case 'running': return <Loader2 className="animate-spin" size={20} />;
+      default: return <AlertCircle size={20} />;
     }
   }, []);
 
@@ -278,45 +402,62 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                 <Copy size={14} />
               </AuthTokenBadge>
             )}
+
+            {testSession.isActive && (
+              <SecondaryButton onClick={endTestSession}>
+                <AlertTriangle size={16} />
+                End Session
+              </SecondaryButton>
+            )}
           </HeaderRight>
         </PageHeader>
 
         {stats.total > 0 && (
           <StatsOverview>
             <StatCard>
-              <StatIcon><Terminal size={24} /></StatIcon>
+              <StatIcon $statusColor="#666666">
+                <Terminal size={24} />
+              </StatIcon>
               <StatContent>
                 <StatValue>{stats.total}</StatValue>
                 <StatLabel>Total Tests</StatLabel>
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#666666">
-              <StatIcon><CheckCircle size={24} /></StatIcon>
+            <StatCard>
+              <StatIcon $statusColor="#16a34a">
+                <CheckCircle size={24} />
+              </StatIcon>
               <StatContent>
                 <StatValue>{stats.passed}</StatValue>
                 <StatLabel>Passed</StatLabel>
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#999999">
-              <StatIcon><XCircle size={24} /></StatIcon>
+            <StatCard>
+              <StatIcon $statusColor="#dc2626">
+                <XCircle size={24} />
+              </StatIcon>
               <StatContent>
                 <StatValue>{stats.failed}</StatValue>
                 <StatLabel>Failed</StatLabel>
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#2c2c2c">
-              <StatIcon><Loader2 size={24} /></StatIcon>
+            <StatCard>
+              <StatIcon $statusColor="#2563eb">
+                <Loader2 size={24} />
+              </StatIcon>
               <StatContent>
                 <StatValue>{stats.running}</StatValue>
                 <StatLabel>Running</StatLabel>
               </StatContent>
             </StatCard>
             
-            <StatCard $color="#555555">
-              <StatIcon><Route size={24} /></StatIcon>
+            <StatCard>
+              <StatIcon $statusColor="#64748b">
+                <Route size={24} />
+              </StatIcon>
               <StatContent>
                 <StatValue>{apiMethods.length}</StatValue>
                 <StatLabel>Available</StatLabel>
@@ -347,6 +488,7 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                         .filter(([k]) => k.startsWith(key))
                         .map(([, r]) => r);
                       const passed = categoryResults.filter(r => r.status === 'success').length;
+                      const failed = categoryResults.filter(r => r.status === 'error').length;
                       const total = categoryMethods.length;
                       
                       return (
@@ -363,9 +505,16 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                           <CategoryStats>
                             {categoryResults.length > 0 ? (
                               <>
-                                <span style={{ color: '#666666' }}>{passed}</span>
-                                <span style={{ color: '#999999' }}>/</span>
-                                <span>{total}</span>
+                                <span style={{ color: '#16a34a', fontWeight: '500' }}>{passed}</span>
+                                <span style={{ color: '#666' }}>/</span>
+                                <span style={{ color: failed > 0 ? '#dc2626' : '#666' }}>{total}</span>
+                                {failed > 0 && (
+                                  <>
+                                    <span style={{ color: '#666' }}> (</span>
+                                    <span style={{ color: '#dc2626' }}>{failed} failed</span>
+                                    <span style={{ color: '#666' }}>)</span>
+                                  </>
+                                )}
                               </>
                             ) : (
                               <span style={{ color: '#999999' }}>{total} methods</span>
@@ -379,9 +528,14 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                   <ActionPanel>
                     <ActionBar>
                       <ActionGroup>
-                        <PrimaryButton onClick={runAuthFlow} disabled={isRunning}>
+                        <PrimaryButton onClick={runPublicOnlyTests} disabled={isRunning}>
+                          <Heart size={16} />
+                          Public Only
+                        </PrimaryButton>
+                        
+                        <PrimaryButton onClick={runAuthenticatedTests} disabled={isRunning}>
                           <Shield size={16} />
-                          Auth Flow
+                          Auth Required
                         </PrimaryButton>
                         
                         <PrimaryButton onClick={runCategoryTests} disabled={isRunning}>
@@ -389,9 +543,9 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                           Test {CATEGORIES[selectedCategory as keyof typeof CATEGORIES]?.name}
                         </PrimaryButton>
 
-                        <PrimaryButton onClick={runAllTests} disabled={isRunning}>
+                        <PrimaryButton onClick={runCompleteTestSuite} disabled={isRunning}>
                           <Terminal size={16} />
-                          Run All Tests
+                          Complete Suite
                         </PrimaryButton>
                       </ActionGroup>
                       
@@ -429,8 +583,8 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                         <RouteCard key={method.name} $status={result?.status}>
                           <RouteHeader>
                             <RouteLeft>
-                              <StatusIcon>
-                                {result ? getStatusIcon(result.status) : <AlertCircle style={{ color: '#cccccc' }} size={20} />}
+                              <StatusIcon $status={result?.status}>
+                                {result ? getStatusIcon(result.status) : <AlertCircle size={20} />}
                               </StatusIcon>
                               
                               <RouteInfo>
@@ -440,9 +594,14 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                                 <RouteTags>
                                   <MethodBadge $method={method.method}>{method.method}</MethodBadge>
                                   
-                                  {method.requiresAuth && (
+                                  {method.requiresAuth ? (
                                     <RouteTag $type="auth">
+                                      <Shield size={14} />
                                       Auth Required
+                                    </RouteTag>
+                                  ) : (
+                                    <RouteTag $type="public">
+                                      Public
                                     </RouteTag>
                                   )}
                                 </RouteTags>
@@ -451,13 +610,20 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                             
                             <RouteActions>
                               {result?.duration && (
-                                <span style={{ fontSize: '0.875rem', color: '#666666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ 
+                                  fontSize: '0.875rem', 
+                                  color: '#666666', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '4px' 
+                                }}>
                                   <Clock size={14} />
                                   {result.duration}ms
                                 </span>
                               )}
                               
                               <TestButton
+                                $status={result?.status}
                                 onClick={() => executeTest(method)}
                                 disabled={(result?.status === 'running') || isRunning || (method.requiresAuth && !authToken)}
                               >
@@ -507,7 +673,10 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                           
                           {result?.error && (
                             <ErrorSection>
-                              <ErrorTitle>Error:</ErrorTitle>
+                              <ErrorTitle>
+                                <XCircle size={16} />
+                                Error
+                              </ErrorTitle>
                               <ErrorMessage>{result.error}</ErrorMessage>
                             </ErrorSection>
                           )}
@@ -539,6 +708,21 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                     <ConfigRow>
                       <ConfigLabel>Environment</ConfigLabel>
                       <ConfigValue>{process.env.NODE_ENV}</ConfigValue>
+                    </ConfigRow>
+                    
+                    <ConfigRow>
+                      <ConfigLabel>Test Session Active</ConfigLabel>
+                      <ConfigValue>{testSession.isActive ? 'Yes' : 'No'}</ConfigValue>
+                    </ConfigRow>
+
+                    <ConfigRow>
+                      <ConfigLabel>Session Duration</ConfigLabel>
+                      <ConfigValue>
+                        {testSession.startTime ? 
+                          `${Math.floor((Date.now() - testSession.startTime.getTime()) / 1000)}s` : 
+                          'N/A'
+                        }
+                      </ConfigValue>
                     </ConfigRow>
                     
                     <ConfigRow>
@@ -591,13 +775,15 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                       Test Connection
                     </SecondaryButton>
                     
-                    {authToken && (
-                      <SecondaryButton onClick={() => {
-                        setAuthToken(null);
-                        localStorage.removeItem('api_test_token');
-                      }}>
+                    <SecondaryButton onClick={startTestSession} disabled={testSession.isActive}>
+                      <Shield size={16} />
+                      Start Session
+                    </SecondaryButton>
+                    
+                    {(authToken || testSession.isActive) && (
+                      <SecondaryButton onClick={endTestSession}>
                         <Key size={16} />
-                        Clear Auth
+                        End Session
                       </SecondaryButton>
                     )}
                   </ConfigActions>
@@ -611,13 +797,50 @@ export const ApiClientTestLogic: React.FC<ApiTestLogicProps> = ({
                   <ConfigContent>
                     {Object.entries(CATEGORIES).map(([key, category]) => {
                       const methods = getMethodsByCategory(apiMethods, key);
+                      const categoryResults = Object.entries(testResults)
+                        .filter(([k]) => k.startsWith(key))
+                        .map(([, r]) => r);
+                      const passed = categoryResults.filter(r => r.status === 'success').length;
+                      const failed = categoryResults.filter(r => r.status === 'error').length;
+                      
                       return (
                         <ConfigRow key={key}>
                           <ConfigLabel>{category.name}</ConfigLabel>
-                          <ConfigValue>{methods.length} endpoints</ConfigValue>
+                          <ConfigValue>
+                            {methods.length} endpoints
+                            {categoryResults.length > 0 && (
+                              <span style={{ marginLeft: '8px', fontSize: '0.75rem' }}>
+                                (<span style={{ color: '#16a34a' }}>{passed}</span>/
+                                <span style={{ color: failed > 0 ? '#dc2626' : '#666' }}>{methods.length}</span>)
+                              </span>
+                            )}
+                          </ConfigValue>
                         </ConfigRow>
                       );
                     })}
+                  </ConfigContent>
+                </ConfigCard>
+
+                <ConfigCard>
+                  <ConfigHeader>
+                    <ConfigTitle>Known Issues</ConfigTitle>
+                  </ConfigHeader>
+                  
+                  <ConfigContent>
+                    <ConfigRow>
+                      <ConfigLabel>Concept Model Error</ConfigLabel>
+                      <ConfigValue>Backend concept routes failing</ConfigValue>
+                    </ConfigRow>
+                    
+                    <ConfigRow>
+                      <ConfigLabel>Educational Client</ConfigLabel>
+                      <ConfigValue>Extended methods not working</ConfigValue>
+                    </ConfigRow>
+                    
+                    <ConfigRow>
+                      <ConfigLabel>Auth Token Loss</ConfigLabel>
+                      <ConfigValue>Session management needed</ConfigValue>
+                    </ConfigRow>
                   </ConfigContent>
                 </ConfigCard>
 

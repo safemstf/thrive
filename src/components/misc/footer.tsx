@@ -303,11 +303,10 @@ export function Footer() {
               </Link>
             </LogoContainer>
             <BrandInfo>
-              <BrandTitle>Learn Morra</BrandTitle>
-              <BrandTagline>Your guide to excellence</BrandTagline>
+              <BrandTitle>LearnMorra</BrandTitle>
+              <BrandTagline>Brag Responsibly</BrandTagline>
               <BrandDescription>
-                Empowering learners with thoughtfully crafted educational experiences and resources.
-              </BrandDescription>
+                Where your skills shine, your work speaks, and bragging is encouraged.              </BrandDescription>
             </BrandInfo>
           </BrandSection>
 

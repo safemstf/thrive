@@ -460,13 +460,13 @@ export const GalleryGrid: React.FC<GalleryGridProps> = ({
     <ItemsGrid $layout={viewLayout}>
       {items.map(item => (
         <GalleryItem
-          key={item.id}
+          key={item._id}
           item={item}
           layout={viewLayout}
           galleryMode={galleryMode}
           bulkActionMode={bulkActionMode}
-          selected={selectedItems.has(item.id)}
-          onSelect={() => onItemSelect(item.id)}
+          selected={selectedItems.has(item._id)}
+          onSelect={() => onItemSelect(item._id)}
         />
       ))}
     </ItemsGrid>
@@ -502,7 +502,10 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
         />
       )}
       <ImageContainer>
-        <img src={item.thumbnailUrl || item.imageUrl} alt={item.alt || item.title} />
+        <img 
+          src={item.thumbnailUrl || item.imageUrl} 
+          alt={item.alt! || item.title! || 'Gallery artwork'} 
+        />
         {galleryMode === 'portfolio' && (
           <VisibilityBadge $visibility={item.visibility}>
             {item.visibility === 'private' ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -530,14 +533,14 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
         </QuickActions>
       </ImageContainer>
       <ItemInfo>
-        <ItemTitle>{item.title}</ItemTitle>
+        <ItemTitle>{item.title! || 'Untitled'}</ItemTitle>
         <ItemMeta>
-          <span>{item.artist}</span>
+          <span>{item.artist! || 'Unknown artist'}</span>
           {item.year && <span>{item.year}</span>}
         </ItemMeta>
         {item.tags && item.tags.length > 0 && (
           <TagList>
-            {item.tags.slice(0, 3).map(tag => (
+            {item.tags?.slice(0, 3).map(tag => (
               <TagBadge key={tag}>{tag}</TagBadge>
             ))}
           </TagList>

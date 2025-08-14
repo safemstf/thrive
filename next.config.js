@@ -26,6 +26,12 @@ const nextConfig = {
         port: '5000',
         pathname: '/uploads/**',
       },
+
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        pathname: '/**',
+      },
       // Ngrok tunnels
       {
         protocol: 'http',

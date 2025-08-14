@@ -35,7 +35,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
           ) : (
             <Image
               src={(piece.highResUrl || piece.imageUrl).replace(/^http:\/\//, 'https://')}
-              alt={piece.alt}
+              alt={piece.alt! || piece.title! || 'Gallery artwork'}
               width={80}
               height={80}
               style={{ objectFit: 'cover' }}
@@ -46,7 +46,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
         
         <ListInfo>
           <ListTitle>
-            {piece.title}
+            {piece.title! || 'Untitled'}
             {showPrivateIndicator && piece.visibility !== 'public' && (
               <VisibilityBadge $visibility={piece.visibility}>
                 {piece.visibility === 'private' ? <Lock size={14} /> : <Link size={14} />}
@@ -66,8 +66,8 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               title="Edit"
               onClick={e => {
                 e.stopPropagation();
-                console.log('List Edit clicked for piece:', piece.id, piece);
-                onQuickAction('edit', piece.id);
+                console.log('List Edit clicked for piece:', piece._id, piece);
+                onQuickAction('edit', piece._id);
               }}
             >
               <Edit3 size={16} />
@@ -77,8 +77,8 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               data-variant="danger"
               onClick={e => {
                 e.stopPropagation();
-                console.log('List Delete clicked for piece:', piece.id, piece);
-                onQuickAction('delete', piece.id);
+                console.log('List Delete clicked for piece:', piece._id, piece);
+                onQuickAction('delete', piece._id);
               }}
             >
               <Trash2 size={16} />
@@ -106,7 +106,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
         ) : (
           <Image
             src={piece.thumbnailUrl.replace(/^http:\/\//, 'https://')}
-            alt={piece.alt}
+            alt={piece.alt! || piece.title! || 'Gallery artwork'}
             fill
             style={{ objectFit: 'cover' }}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -137,8 +137,8 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               title="Edit"
               onClick={e => {
                 e.stopPropagation();
-                console.log('Edit clicked for piece:', piece.id, piece);
-                onQuickAction('edit', piece.id);
+                console.log('Edit clicked for piece:', piece._id, piece);
+                onQuickAction('edit', piece._id);
               }}
             >
               <Edit3 size={16} />
@@ -148,8 +148,8 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
               data-variant="danger"
               onClick={e => {
                 e.stopPropagation();
-                console.log('Delete clicked for piece:', piece.id, piece);
-                onQuickAction('delete', piece.id);
+                console.log('Delete clicked for piece:', piece._id, piece);
+                onQuickAction('delete', piece._id);
               }}
             >
               <Trash2 size={16} />
@@ -159,7 +159,7 @@ export const GalleryItem: React.FC<GalleryItemProps> = ({
       </ImageContainer>
 
       <ItemInfo>
-        <ItemTitle>{piece.title}</ItemTitle>
+        <ItemTitle>{piece.title! || 'Untitled'}</ItemTitle>
         {piece.artist && <ItemArtist>{piece.artist}</ItemArtist>}
         {piece.status === 'available' && piece.price && (
           <ItemPrice>${piece.price.toLocaleString()}</ItemPrice>
@@ -292,7 +292,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
           ) : (
             <Image
               src={piece.highResUrl || piece.imageUrl}
-              alt={piece.alt}
+              alt={piece.alt! || piece.title! || 'Gallery artwork'}
               fill
               style={{ objectFit: 'contain' }}
               sizes="100vw"
@@ -305,7 +305,7 @@ export const GalleryModal: React.FC<GalleryModalProps> = ({
         <ModalInfo>
           <ModalHeader>
             <div>
-              <ModalTitle>{piece.title}</ModalTitle>
+              <ModalTitle>{piece.title! || 'Untitled'}</ModalTitle>
               {piece.artist && <ModalArtist>by {piece.artist}</ModalArtist>}
             </div>
             {piece.status === 'available' && piece.price && (

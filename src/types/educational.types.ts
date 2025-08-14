@@ -1,20 +1,17 @@
 // src/types/educational.types.ts
 
-import { ScientificDiscipline } from "./portfolio.types";
+import { BaseEntity } from "./base.types";
 
 // Base types for better database migration
-export interface BaseEntity {
-  id: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
 // Main category types
 export type MainCategory = 'math' | 'english' | 'science';
 export type SubCategory = 'sat' | 'foundations' | 'ap';
 
 // Difficulty levels
 export type DifficultyLevel = 'beginner' | 'intermediate' | 'advanced';
+
+// Scientific disciplines (was missing)
+export type ScientificDiscipline = 'physics' | 'chemistry' | 'biology';
 
 // Concept types
 export interface Concept {
@@ -34,6 +31,23 @@ export interface ConceptProgress {
   score?: number;
   attempts?: number;
   notes?: string;
+}
+
+// MISSING: ConceptFilters interface
+export interface ConceptFilters {
+  type?: string;
+  discipline?: string;
+  difficulty?: DifficultyLevel;
+  bookId?: string;
+  tags?: string[];
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  mainCategory?: MainCategory;
+  subCategory?: SubCategory;
+  scientificDiscipline?: ScientificDiscipline;
 }
 
 // Content types for different subjects
@@ -193,3 +207,19 @@ export const defaultSections: SectionConfigUI[] = [
   { key: 'ap-science', title: 'AP Science', mainCategory: 'science', subCategory: 'ap' },
   { key: 'ap-calc', title: 'AP Calculus', mainCategory: 'math', subCategory: 'ap' }
 ];
+
+// MISSING: BookQueryParams interface (needed by API client)
+export interface BookQueryParams {
+  mainCategory?: MainCategory;
+  subCategory?: SubCategory;
+  scientificDiscipline?: ScientificDiscipline;
+  difficulty?: DifficultyLevel;
+  search?: string;
+  tags?: string[];
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  year?: string;
+  gradeLevel?: string[];
+}

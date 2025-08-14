@@ -1,6 +1,196 @@
 // src/components/dashboard/dashboardStyles.tsx - Greyscale Refined & Elegant Version
 import styled, { css, keyframes } from 'styled-components';
-import { theme } from '@/styles/theme';
+import { theme, themeUtils } from '@/styles/theme';
+
+
+export const ToolGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: ${theme.spacing.xl};
+  width: 100%;
+`;
+
+export const ToolIcon = styled.div<{ status?: 'active' | 'pending' | 'inactive' }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: ${theme.borderRadius.md};
+  background: ${({ status }) => 
+    status === 'active' ? theme.colors.accent.cyan : 
+    status === 'pending' ? theme.colors.accent.amber : 
+    theme.colors.background.tertiary};
+  color: ${({ status }) => 
+    status === 'active' ? theme.colors.text.inverse : 
+    status === 'pending' ? theme.colors.text.primary : 
+    theme.colors.text.tertiary};
+`;
+
+export const ToolTitle = styled.h3`
+  margin: 0;
+  font-size: ${theme.typography.sizes.lg};
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.primary};
+`;
+
+export const ToolDescription = styled.p`
+  margin: 0;
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  line-height: ${theme.typography.lineHeights.relaxed};
+`;
+
+export const ToolActionButton = styled.button<{ status?: 'active' | 'pending' | 'inactive' }>`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  padding: ${theme.spacing.xs} ${theme.spacing.sm};
+  background: none;
+  border: none;
+  color: ${({ status }) => 
+    status === 'active' ? theme.colors.primary[600] : 
+    status === 'pending' ? theme.colors.accent.amber : 
+    theme.colors.text.tertiary};
+  font-family: ${theme.typography.fonts.primary};
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.medium};
+  cursor: ${({ status }) => status !== 'inactive' ? 'pointer' : 'not-allowed'};
+  transition: ${theme.transitions.normal};
+  border-radius: ${theme.borderRadius.xs};
+
+  &:hover {
+    background: ${({ status }) => 
+      status !== 'inactive' ? themeUtils.alpha(theme.colors.primary[600], 0.1) : 'none'};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  ${({ status }) => status === 'pending' && css`
+    &:hover {
+      background: ${themeUtils.alpha(theme.colors.accent.amber, 0.1)};
+    }
+  `}
+`;
+
+export const FilterContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  padding: ${theme.spacing.lg} 0;
+  margin-bottom: ${theme.spacing.lg};
+  border-bottom: 1px solid ${theme.colors.border.subtle};
+
+  .filter-group {
+    display: flex;
+    gap: ${theme.spacing.md};
+    align-items: center;
+  }
+`;
+
+export const FilterLabel = styled.span`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  color: ${theme.colors.text.secondary};
+  font-size: ${theme.typography.sizes.sm};
+`;
+
+export const FilterSelect = styled.select`
+  padding: ${theme.spacing.xs} ${theme.spacing.sm};
+  border-radius: ${theme.borderRadius.xs};
+  border: 1px solid ${theme.colors.border.medium};
+  background: ${theme.colors.background.secondary};
+  color: ${theme.colors.text.primary};
+  font-family: ${theme.typography.fonts.primary};
+  font-size: ${theme.typography.sizes.sm};
+  cursor: pointer;
+  transition: ${theme.transitions.normal};
+
+  &:hover {
+    border-color: ${theme.colors.border.dark};
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px ${theme.colors.states.focus};
+  }
+`;
+
+export const Card = styled.div`
+  border-radius: ${theme.borderRadius.md};
+  box-shadow: ${theme.shadows.glassSubtle};
+  border: 1px solid ${theme.colors.glass.border};
+  overflow: hidden;
+  transition: ${theme.transitions.normal};
+  
+  &:hover {
+    box-shadow: ${theme.shadows.md};
+  }
+`;
+
+export const CardHeader = styled.div`
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
+  border-bottom: 1px solid ${theme.colors.border.subtle};
+  background: ${theme.colors.glass.subtle};
+`;
+
+export const CardTitle = styled.h3`
+  margin: 0;
+  font-size: ${theme.typography.sizes.lg};
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.primary};
+`;
+
+export const CardContent = styled.div`
+  padding: ${theme.spacing.lg};
+  height: 300px;
+`;
+
+export const CardFooter = styled.div`
+  padding: ${theme.spacing.md} ${theme.spacing.lg};
+  border-top: 1px solid ${theme.colors.border.subtle};
+  background: ${theme.colors.glass.subtle};
+`;
+
+export const MetricCard = styled.div`
+  padding: ${theme.spacing.lg};
+  border-radius: ${theme.borderRadius.md};
+  box-shadow: ${theme.shadows.glassSubtle};
+  border: 1px solid ${theme.colors.glass.border};
+`;
+
+export const MetricLabel = styled.div`
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
+  margin-bottom: ${theme.spacing.xs};
+`;
+
+export const MetricValue = styled.div`
+  font-size: ${theme.typography.sizes['3xl']};
+  font-weight: ${theme.typography.weights.bold};
+  color: ${theme.colors.text.primary};
+  line-height: 1.2;
+`;
+
+export const MetricChange = styled.div<{ positive?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: ${theme.spacing.xs};
+  font-size: ${theme.typography.sizes.sm};
+  color: ${({ positive }) => 
+    positive ? theme.colors.accent.emerald : theme.colors.accent.rose};
+  margin-top: ${theme.spacing.sm};
+`;
+
+export const ChartContainer = styled.div`
+  position: relative;
+  height: 100%;
+  width: 100%;
+`;
+
 
 // Refined animations - subtler and more elegant
 export const fadeInUp = keyframes`

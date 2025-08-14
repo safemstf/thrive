@@ -1,5 +1,6 @@
-// app/portfolio/[username]/page.tsx - Fixed Image URL handling to match backend routes
+// app/portfolio/[username]/page.tsx - Fixed Type handling and API response structure
 'use client';
+import styled from 'styled-components';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
@@ -9,9 +10,63 @@ import {
   Grid3x3, List, Layers, Loader2, ArrowLeft
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
-import type { Portfolio, GalleryPiece } from '@/types/portfolio.types';
+import type { Portfolio } from '@/types/portfolio.types';
 import { getPortfolioId, getGalleryPieceId } from '@/types/portfolio.types';
-import styled from 'styled-components';
+import { BackendGalleryPiece } from '@/types/base.types';
+
+// Define a unified gallery piece type for this component
+interface DisplayGalleryPiece {
+  id?: string;
+  _id?: string;
+  title: string;
+  description?: string;
+  imageUrl: string;
+  thumbnailUrl?: string;
+  category?: string;
+  medium?: string;
+  tags?: string[];
+  visibility?: 'public' | 'private' | 'unlisted';
+  year?: number;
+  price?: number;
+  artist?: string;
+  displayOrder?: number;
+  views?: number;
+  likes?: number;
+  portfolioId?: string;
+  createdAt?: Date | string;
+  updatedAt?: Date | string;
+}
+
+// Helper function to safely get gallery piece ID for DisplayGalleryPiece
+const getDisplayGalleryPieceId = (piece: DisplayGalleryPiece | null | undefined): string | null => {
+  if (!piece) return null;
+  return piece.id || piece._id || null;
+}
+
+// Convert BackendGalleryPiece to DisplayGalleryPiece
+const normalizeGalleryPiece = (piece: BackendGalleryPiece): DisplayGalleryPiece => {
+  return {
+    id: piece.id || piece._id,
+    _id: piece._id,
+    title: piece.title,
+    description: piece.description,
+    imageUrl: piece.imageUrl,
+    thumbnailUrl: piece.thumbnailUrl,
+    category: piece.category,
+    medium: piece.medium,
+    tags: piece.tags,
+    visibility: piece.visibility,
+    year: piece.year,
+    price: piece.price,
+    artist: piece.artist,
+    displayOrder: piece.displayOrder,
+    views: piece.stats?.views || 0,
+    likes: piece.stats?.likes || 0,
+    portfolioId: piece.portfolioId,
+    createdAt: piece.createdAt,
+    updatedAt: piece.updatedAt,
+  };
+};
 
 // Enhanced image URL normalization that matches your backend routes exactly
 const normalizeImageUrl = (
@@ -149,11 +204,11 @@ export default function PortfolioPage() {
   const username = params.username as string;
   
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
-  const [galleryPieces, setGalleryPieces] = useState<GalleryPiece[]>([]);
+  const [galleryPieces, setGalleryPieces] = useState<DisplayGalleryPiece[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('masonry');
-  const [selectedPiece, setSelectedPiece] = useState<GalleryPiece | null>(null);
+  const [selectedPiece, setSelectedPiece] = useState<DisplayGalleryPiece | null>(null);
 
   useEffect(() => {
     const fetchPortfolioData = async () => {
@@ -161,25 +216,37 @@ export default function PortfolioPage() {
         setLoading(true);
         setError(null);
 
+        // Fetch portfolio data
         const portfolioResponse = await api.portfolio.getByUsername(username);
-        if (!portfolioResponse) {
+        if (!portfolioResponse || !portfolioResponse.success) {
           throw new Error('Portfolio not found');
         }
         
-        setPortfolio(portfolioResponse);
+        // Extract the actual portfolio from the response
+        const portfolioData = portfolioResponse.portfolio;
+        setPortfolio(portfolioData);
 
-        if (['creative', 'hybrid', 'professional'].includes(portfolioResponse.kind)) {
+        // Fetch gallery if portfolio supports it
+        if (['creative', 'hybrid', 'professional'].includes(portfolioData.kind)) {
           try {
             const galleryResponse = await api.portfolio.gallery.getByUsername(username, 1, 50);
             
-            let pieces: GalleryPiece[] = [];
+            let pieces: DisplayGalleryPiece[] = [];
             
             if (galleryResponse && typeof galleryResponse === 'object') {
+              // Handle different possible response structures
+              let rawPieces: BackendGalleryPiece[] = [];
+              
               if ('pieces' in galleryResponse) {
-                pieces = galleryResponse.pieces || [];
+                rawPieces = galleryResponse.pieces || [];
+              } else if ('galleryPieces' in galleryResponse) {
+                rawPieces = (galleryResponse as any).galleryPieces || [];
               } else if (Array.isArray(galleryResponse)) {
-                pieces = galleryResponse;
+                rawPieces = galleryResponse;
               }
+              
+              // Convert backend pieces to display pieces
+              pieces = rawPieces.map(normalizeGalleryPiece);
             }
             
             setGalleryPieces(pieces);
@@ -191,7 +258,7 @@ export default function PortfolioPage() {
 
         // Track view
         try {
-          const portfolioId = getPortfolioId(portfolioResponse);
+          const portfolioId = getPortfolioId(portfolioData);
           if (portfolioId) {
             await api.portfolio.analytics.trackView(portfolioId, {
               referrer: document.referrer || undefined,
@@ -241,11 +308,11 @@ export default function PortfolioPage() {
     }
   };
 
-  const handleDownload = useCallback(async (piece: GalleryPiece) => {
+  const handleDownload = useCallback(async (piece: DisplayGalleryPiece) => {
     if (!piece.imageUrl) return;
 
     try {
-      const pieceId = getGalleryPieceId(piece);
+      const pieceId = getDisplayGalleryPieceId(piece);
       let secureUrl: string | null = null;
       
       if (pieceId && portfolio?.username) {
@@ -548,7 +615,7 @@ export default function PortfolioPage() {
 
             <GalleryGrid $viewMode={viewMode}>
               {galleryPieces.map((piece, index) => {
-                const pieceId = getGalleryPieceId(piece) || `piece-${index}`;
+                const pieceId = getDisplayGalleryPieceId(piece) || `piece-${index}`;
                 return (
                   <GalleryCard 
                     key={pieceId}
@@ -560,7 +627,7 @@ export default function PortfolioPage() {
                         src={piece.imageUrl}
                         alt={piece.title || 'Gallery piece'}
                         username={portfolio.username}
-                        pieceId={getGalleryPieceId(piece) || undefined}
+                        pieceId={getDisplayGalleryPieceId(piece) || undefined}
                         imageType="gallery"
                       />
                       <GalleryOverlay>
@@ -642,7 +709,7 @@ export default function PortfolioPage() {
                 src={selectedPiece.imageUrl}
                 alt={selectedPiece.title || 'Gallery piece'}
                 username={portfolio.username}
-                pieceId={getGalleryPieceId(selectedPiece) || undefined}
+                pieceId={getDisplayGalleryPieceId(selectedPiece) || undefined}
                 imageType="gallery"
               />
             </LightboxImageContainer>

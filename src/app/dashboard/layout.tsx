@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx
+// src/app/dashboard/layout.tsx - Polished & Professional
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -9,6 +9,7 @@ import { ProtectedRoute } from '@/components/auth/protectedRoute';
 import { useAuth } from '@/providers/authProvider';
 import { useApiClient } from '@/lib/api-client';
 import type { Portfolio } from '@/types/portfolio.types';
+import { theme } from '@/styles/theme';
 import { 
   User,
   Target, 
@@ -28,7 +29,8 @@ import {
   Briefcase,
   Code,
   BookOpen,
-  Brush
+  Brush,
+  Circle
 } from 'lucide-react';
 
 interface NavItem {
@@ -39,31 +41,33 @@ interface NavItem {
   requiresPortfolio?: boolean;
   portfolioTypes?: string[];
   isAdmin?: boolean;
+  badge?: string;
 }
 
 const navItems: NavItem[] = [
   {
     href: '/dashboard',
     label: 'Overview',
-    icon: <Home size={20} />,
+    icon: <Home size={18} />,
     description: 'Dashboard home'
   },
   {
     href: '/dashboard/thrive',
     label: 'Survival of the Fittest',
-    icon: <Target size={20} />,
-    description: 'Challenges & skill development'
+    icon: <Target size={18} />,
+    description: 'Challenges & skill development',
+    badge: 'New'
   },
   {
     href: '/dashboard/profile',
     label: 'Portfolio Hub',
-    icon: <User size={20} />,
+    icon: <User size={18} />,
     description: 'Manage your portfolio & profile'
   },
   {
     href: '/dashboard/gallery',
     label: 'Creative Studio',
-    icon: <Brush size={20} />,
+    icon: <Brush size={18} />,
     description: 'Art, photography & design portfolio',
     requiresPortfolio: true,
     portfolioTypes: ['creative', 'hybrid']
@@ -71,7 +75,7 @@ const navItems: NavItem[] = [
   {
     href: '/dashboard/writing',
     label: 'Teaching Portfolio',
-    icon: <GraduationCap size={20} />,
+    icon: <GraduationCap size={18} />,
     description: 'Educational content & curriculum',
     requiresPortfolio: true,
     portfolioTypes: ['educational', 'hybrid']
@@ -79,7 +83,7 @@ const navItems: NavItem[] = [
   {
     href: '/dashboard/projects',
     label: 'Tech Portfolio',
-    icon: <Code size={20} />,
+    icon: <Code size={18} />,
     description: 'Software projects & development',
     requiresPortfolio: true,
     portfolioTypes: ['professional', 'hybrid']
@@ -87,14 +91,14 @@ const navItems: NavItem[] = [
   {
     href: '/dashboard/api-test',
     label: 'Admin Panel',
-    icon: <Shield size={20} />,
+    icon: <Shield size={18} />,
     description: 'System administration',
     isAdmin: true
   },
   {
     href: '/',
     label: 'Homepage',
-    icon: <Home size={20} />,
+    icon: <Home size={18} />,
     description: 'Return to main site'
   }
 ];
@@ -122,7 +126,6 @@ export default function DashboardLayout({
         const portfolioData = await apiClient.portfolio.getMyPortfolio();
         setPortfolio(portfolioData);
       } catch (error: any) {
-        // No portfolio exists, which is fine
         if (error?.status !== 404) {
           console.error('Error fetching portfolio:', error);
         }
@@ -137,17 +140,11 @@ export default function DashboardLayout({
   // Filter navigation items based on user state
   const getVisibleNavItems = (): NavItem[] => {
     return navItems.filter(item => {
-      // Hide portfolio-required items if no portfolio
       if (item.requiresPortfolio && !portfolio) return false;
-      
-      // Show portfolio items based on type
       if (item.portfolioTypes && portfolio) {
         return item.portfolioTypes.includes(portfolio.kind);
       }
-      
-      // Hide admin items if not admin
       if (item.isAdmin && user?.role !== 'admin') return false;
-      
       return true;
     });
   };
@@ -158,37 +155,37 @@ export default function DashboardLayout({
     switch (type) {
       case 'creative':
         return { 
-          color: '#666', 
+          color: '#8b5cf6', 
           label: 'Creative Portfolio',
-          icon: <Brush size={16} />,
+          icon: <Brush size={14} />,
           description: 'Art • Photography • Design'
         };
       case 'educational':
         return { 
-          color: '#666', 
+          color: '#3b82f6', 
           label: 'Teaching Portfolio',
-          icon: <GraduationCap size={16} />,
+          icon: <GraduationCap size={14} />,
           description: 'Education • Curriculum • Training'
         };
       case 'professional':
         return { 
-          color: '#666', 
+          color: '#059669', 
           label: 'Tech Portfolio',
-          icon: <Code size={16} />,
+          icon: <Code size={14} />,
           description: 'Software • Development • Engineering'
         };
       case 'hybrid':
         return { 
-          color: '#666', 
+          color: '#10b981', 
           label: 'Multi-Portfolio',
-          icon: <FolderOpen size={16} />,
+          icon: <FolderOpen size={14} />,
           description: 'Creative • Teaching • Professional'
         };
       default:
         return { 
-          color: '#666', 
+          color: '#666666', 
           label: 'Portfolio',
-          icon: <User size={16} />,
+          icon: <User size={14} />,
           description: 'Professional Portfolio'
         };
     }
@@ -208,110 +205,124 @@ export default function DashboardLayout({
         {/* Mobile Header */}
         <MobileHeader>
           <MobileMenuButton onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </MobileMenuButton>
           <MobileTitle>Dashboard</MobileTitle>
           {portfolio && (
-            <MobilePortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color} />
+            <PortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color}>
+              <Circle size={8} fill="currentColor" />
+            </PortfolioIndicator>
           )}
         </MobileHeader>
 
         {/* Sidebar */}
         <Sidebar $collapsed={sidebarCollapsed} $mobileOpen={mobileMenuOpen}>
-          <SidebarHeader>
-            <CollapseButton 
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              $collapsed={sidebarCollapsed}
-            >
-              <ChevronLeft size={16} />
-            </CollapseButton>
-            
-            {!sidebarCollapsed && (
-              <ProfileSection>
-                <Avatar>
-                  <User size={24} />
-                </Avatar>
-                <UserInfo>
-                  <UserName>{user?.name || 'User'}</UserName>
-                  <UserEmail>{user?.email || user?.role || 'member'}</UserEmail>
-                </UserInfo>
-              </ProfileSection>
-            )}
-          </SidebarHeader>
-
-          {/* Portfolio Status */}
-          {!portfolioLoading && (
-            <PortfolioStatus $collapsed={sidebarCollapsed}>
-              {portfolio ? (
-                <PortfolioInfo>
-                  <PortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color} />
-                  {!sidebarCollapsed && (
-                    <PortfolioDetails>
-                      <PortfolioLabel>Active Portfolio</PortfolioLabel>
-                      <PortfolioType>
-                        {getPortfolioTypeInfo(portfolio.kind).icon}
-                        <PortfolioTypeText>
-                          <PortfolioTypeName>
-                            {getPortfolioTypeInfo(portfolio.kind).label}
-                          </PortfolioTypeName>
-                          <PortfolioTypeDesc>
-                            {getPortfolioTypeInfo(portfolio.kind).description}
-                          </PortfolioTypeDesc>
-                        </PortfolioTypeText>
-                      </PortfolioType>
-                    </PortfolioDetails>
-                  )}
-                </PortfolioInfo>
-              ) : (
-                !sidebarCollapsed && (
-                  <CreatePortfolioPrompt>
-                    <PromptIcon>
-                      <Plus size={16} />
-                    </PromptIcon>
-                    <PromptText>
-                      <PromptTitle>Create Your Portfolio</PromptTitle>
-                      <PromptSubtitle>Choose your professional focus</PromptSubtitle>
-                      <PromptLink href="/dashboard/profile">Get Started</PromptLink>
-                    </PromptText>
-                  </CreatePortfolioPrompt>
-                )
+          <SidebarContent>
+            {/* Header Section */}
+            <SidebarHeader>
+              <CollapseButton 
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                $collapsed={sidebarCollapsed}
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                <ChevronLeft size={14} />
+              </CollapseButton>
+              
+              {!sidebarCollapsed && (
+                <ProfileSection>
+                  <UserAvatar>
+                    <User size={20} />
+                  </UserAvatar>
+                  <UserInfo>
+                    <UserName>{user?.name || 'User'}</UserName>
+                    <UserEmail>{user?.email || user?.role || 'member'}</UserEmail>
+                  </UserInfo>
+                </ProfileSection>
               )}
-            </PortfolioStatus>
-          )}
+            </SidebarHeader>
 
-          {/* Navigation */}
-          <Navigation>
-            <NavList>
-              {visibleNavItems.map((item) => (
-                <NavItem
-                  key={item.href}
-                  href={item.href}
-                  $active={pathname === item.href}
-                  $collapsed={sidebarCollapsed}
-                  title={sidebarCollapsed ? `${item.label} - ${item.description}` : undefined}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <NavIcon>{item.icon}</NavIcon>
-                  {!sidebarCollapsed && (
-                    <NavContent>
-                      <NavLabel>{item.label}</NavLabel>
-                      <NavDescription>{item.description}</NavDescription>
-                    </NavContent>
-                  )}
-                </NavItem>
-              ))}
-            </NavList>
-          </Navigation>
+            {/* Portfolio Status */}
+            {!portfolioLoading && (
+              <PortfolioSection $collapsed={sidebarCollapsed}>
+                {portfolio ? (
+                  <PortfolioCard>
+                    <PortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color}>
+                      <Circle size={6} fill="currentColor" />
+                    </PortfolioIndicator>
+                    {!sidebarCollapsed && (
+                      <PortfolioDetails>
+                        <PortfolioStatus>Active Portfolio</PortfolioStatus>
+                        <PortfolioType>
+                          {getPortfolioTypeInfo(portfolio.kind).icon}
+                          <PortfolioInfo>
+                            <PortfolioName>
+                              {getPortfolioTypeInfo(portfolio.kind).label}
+                            </PortfolioName>
+                            <PortfolioDesc>
+                              {getPortfolioTypeInfo(portfolio.kind).description}
+                            </PortfolioDesc>
+                          </PortfolioInfo>
+                        </PortfolioType>
+                      </PortfolioDetails>
+                    )}
+                  </PortfolioCard>
+                ) : (
+                  !sidebarCollapsed && (
+                    <CreatePortfolioCard>
+                      <CreatePortfolioIcon>
+                        <Plus size={14} />
+                      </CreatePortfolioIcon>
+                      <CreatePortfolioContent>
+                        <CreatePortfolioTitle>Create Portfolio</CreatePortfolioTitle>
+                        <CreatePortfolioSubtitle>Choose your focus</CreatePortfolioSubtitle>
+                        <CreatePortfolioButton href="/dashboard/profile">
+                          Get Started
+                        </CreatePortfolioButton>
+                      </CreatePortfolioContent>
+                    </CreatePortfolioCard>
+                  )
+                )}
+              </PortfolioSection>
+            )}
 
-          {/* Sidebar Footer */}
-          <SidebarFooter>
-            <FooterLink href="/dashboard/settings">
+            {/* Navigation */}
+            <NavigationSection>
+              <NavList>
+                {visibleNavItems.map((item) => (
+                  <NavItemWrapper key={item.href}>
+                    <NavItemLink
+                      href={item.href}
+                      $active={pathname === item.href}
+                      $collapsed={sidebarCollapsed}
+                      title={sidebarCollapsed ? `${item.label} - ${item.description}` : undefined}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <NavIcon>{item.icon}</NavIcon>
+                      {!sidebarCollapsed && (
+                        <NavContent>
+                          <NavLabelRow>
+                            <NavLabel>{item.label}</NavLabel>
+                            {item.badge && <NavBadge>{item.badge}</NavBadge>}
+                          </NavLabelRow>
+                          <NavDescription>{item.description}</NavDescription>
+                        </NavContent>
+                      )}
+                    </NavItemLink>
+                  </NavItemWrapper>
+                ))}
+              </NavList>
+            </NavigationSection>
+          </SidebarContent>
+
+          {/* Footer */}
+          <SidebarFooter $collapsed={sidebarCollapsed}>
+            <FooterButton href="/dashboard/settings">
               <Settings size={16} />
-              {!sidebarCollapsed && 'Settings'}
-            </FooterLink>
+              {!sidebarCollapsed && <span>Settings</span>}
+            </FooterButton>
             <LogoutButton onClick={handleLogout}>
               <ArrowLeft size={16} />
-              {!sidebarCollapsed && 'Sign Out'}
+              {!sidebarCollapsed && <span>Sign Out</span>}
             </LogoutButton>
           </SidebarFooter>
         </Sidebar>
@@ -328,12 +339,15 @@ export default function DashboardLayout({
   );
 }
 
-// Styled Components - matching taskbar aesthetic with clean black/white and blue accents
+// ===========================================
+// STYLED COMPONENTS - POLISHED & CONSISTENT
+// ===========================================
+
 const LayoutWrapper = styled.div`
   display: flex;
   min-height: 100vh;
-  background: #fafafa;
-  font-family: 'Work Sans', sans-serif;
+  background: ${theme.colors.background.primary};
+  font-family: ${theme.typography.fonts.body};
 `;
 
 const MobileHeader = styled.header`
@@ -342,15 +356,15 @@ const MobileHeader = styled.header`
   top: 0;
   left: 0;
   right: 0;
-  height: 64px;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 0 1.5rem;
+  height: 60px;
+  background: ${theme.colors.background.secondary};
+  border-bottom: 1px solid ${theme.colors.border.medium};
+  padding: 0 ${theme.spacing.lg};
   align-items: center;
   justify-content: space-between;
   z-index: 50;
   
-  @media (max-width: 768px) {
+  @media (max-width: ${theme.breakpoints.md}) {
     display: flex;
   }
 `;
@@ -361,35 +375,27 @@ const MobileMenuButton = styled.button`
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: 1px solid #2c2c2c;
-  background: none;
-  color: #2c2c2c;
+  border: 1px solid ${theme.colors.border.medium};
+  background: ${theme.colors.background.secondary};
+  color: ${theme.colors.text.primary};
   cursor: pointer;
-  border-radius: 2px;
-  transition: all 0.3s ease;
+  border-radius: ${theme.borderRadius.xs};
+  transition: all ${theme.transitions.fast};
   
   &:hover {
-    background: #2c2c2c;
-    color: #f8f8f8;
+    background: ${theme.colors.background.tertiary};
+    border-color: ${theme.colors.primary[600]};
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
+    box-shadow: ${theme.shadows.sm};
   }
 `;
 
 const MobileTitle = styled.h1`
-  font-size: 1.5rem;
-  font-weight: 400;
-  color: #2c2c2c;
+  font-size: ${theme.typography.sizes.lg};
+  font-weight: ${theme.typography.weights.normal};
+  color: ${theme.colors.text.primary};
   margin: 0;
-  font-family: 'Cormorant Garamond', serif;
-  letter-spacing: 1px;
-`;
-
-const MobilePortfolioIndicator = styled.div<{ $color: string }>`
-  width: 12px;
-  height: 12px;
-  background: ${props => props.$color};
-  border-radius: 2px;
+  font-family: ${theme.typography.fonts.display};
 `;
 
 const MobileOverlay = styled.div`
@@ -399,65 +405,93 @@ const MobileOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.4);
   z-index: 40;
   backdrop-filter: blur(4px);
   
-  @media (max-width: 768px) {
+  @media (max-width: ${theme.breakpoints.md}) {
     display: block;
   }
 `;
 
 const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
-  width: ${props => props.$collapsed ? '80px' : '320px'};
-  background: white;
-  border-right: 1px solid #e0e0e0;
+  width: ${props => props.$collapsed ? '72px' : '280px'};
+  background: ${theme.colors.background.secondary};
+  border-right: 1px solid ${theme.colors.border.medium};
   position: fixed;
   top: 0;
   left: 0;
   height: 100vh;
-  overflow-y: auto;
-  transition: width 0.3s ease;
+  transition: width ${theme.transitions.normal};
   z-index: 45;
+  display: flex;
+  flex-direction: column;
   
-  @media (max-width: 768px) {
+  @media (max-width: ${theme.breakpoints.md}) {
     width: 280px;
     transform: ${props => props.$mobileOpen ? 'translateX(0)' : 'translateX(-100%)'};
-    top: 64px;
-    height: calc(100vh - 64px);
+    top: 60px;
+    height: calc(100vh - 60px);
+  }
+`;
+
+const SidebarContent = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  /* Custom scrollbar */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: ${theme.colors.border.medium};
+    border-radius: 3px;
+    
+    &:hover {
+      background: ${theme.colors.border.dark};
+    }
   }
 `;
 
 const SidebarHeader = styled.div`
-  padding: 2rem 1.5rem;
-  border-bottom: 1px solid #e0e0e0;
+  padding: ${theme.spacing.xl};
+  border-bottom: 1px solid ${theme.colors.border.light};
   position: relative;
+  flex-shrink: 0;
 `;
 
 const CollapseButton = styled.button<{ $collapsed: boolean }>`
   position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-  width: 32px;
-  height: 32px;
+  top: ${theme.spacing.lg};
+  right: ${theme.spacing.lg};
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: none;
-  border: 1px solid #e0e0e0;
-  border-radius: 2px;
+  background: ${theme.colors.background.tertiary};
+  border: 1px solid ${theme.colors.border.medium};
+  border-radius: ${theme.borderRadius.xs};
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all ${theme.transitions.fast};
   transform: ${props => props.$collapsed ? 'rotate(180deg)' : 'rotate(0deg)'};
-  color: #666;
+  color: ${theme.colors.text.secondary};
   
   &:hover {
-    background: #f8f8f8;
-    border-color: #2c2c2c;
-    color: #2c2c2c;
+    background: ${theme.colors.background.secondary};
+    border-color: ${theme.colors.primary[600]};
+    color: ${theme.colors.text.primary};
+    transform: ${props => props.$collapsed ? 'rotate(180deg) translateY(-1px)' : 'rotate(0deg) translateY(-1px)'};
+    box-shadow: ${theme.shadows.sm};
   }
   
-  @media (max-width: 768px) {
+  @media (max-width: ${theme.breakpoints.md}) {
     display: none;
   }
 `;
@@ -465,19 +499,19 @@ const CollapseButton = styled.button<{ $collapsed: boolean }>`
 const ProfileSection = styled.div`
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: ${theme.spacing.md};
 `;
 
-const Avatar = styled.div`
-  width: 48px;
-  height: 48px;
-  background: #f8f8f8;
-  border: 1px solid #e0e0e0;
-  border-radius: 2px;
+const UserAvatar = styled.div`
+  width: 44px;
+  height: 44px;
+  background: ${theme.colors.background.tertiary};
+  border: 1px solid ${theme.colors.border.medium};
+  border-radius: ${theme.borderRadius.xs};
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666;
+  color: ${theme.colors.text.secondary};
   flex-shrink: 0;
 `;
 
@@ -487,185 +521,192 @@ const UserInfo = styled.div`
 `;
 
 const UserName = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 400;
-  color: #2c2c2c;
-  margin: 0 0 0.25rem 0;
+  font-size: ${theme.typography.sizes.base};
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.primary};
+  margin: 0 0 ${theme.spacing.xs} 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'Cormorant Garamond', serif;
-  letter-spacing: 0.5px;
+  font-family: ${theme.typography.fonts.display};
 `;
 
 const UserEmail = styled.p`
-  font-size: 0.875rem;
-  color: #666;
+  font-size: ${theme.typography.sizes.sm};
+  color: ${theme.colors.text.secondary};
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 0.25px;
 `;
 
-const PortfolioStatus = styled.div<{ $collapsed: boolean }>`
-  padding: 1.5rem;
-  border-bottom: 1px solid #e0e0e0;
+const PortfolioSection = styled.div<{ $collapsed: boolean }>`
+  padding: ${theme.spacing.lg};
+  border-bottom: 1px solid ${theme.colors.border.light};
+  flex-shrink: 0;
 `;
 
-const PortfolioInfo = styled.div`
+const PortfolioCard = styled.div`
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
+  gap: ${theme.spacing.md};
 `;
 
 const PortfolioIndicator = styled.div<{ $color: string }>`
-  width: 12px;
-  height: 12px;
-  background: ${props => props.$color};
-  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: ${props => props.$color};
   flex-shrink: 0;
-  margin-top: 0.25rem;
+  margin-top: 2px;
 `;
 
 const PortfolioDetails = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
-const PortfolioLabel = styled.div`
-  font-size: 0.75rem;
-  color: #666;
-  margin-bottom: 0.75rem;
+const PortfolioStatus = styled.div`
+  font-size: ${theme.typography.sizes.xs};
+  color: ${theme.colors.text.secondary};
+  margin-bottom: ${theme.spacing.sm};
   text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: 300;
-  font-family: 'Work Sans', sans-serif;
+  letter-spacing: ${theme.typography.letterSpacing.wide};
+  font-weight: ${theme.typography.weights.medium};
 `;
 
 const PortfolioType = styled.div`
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
+  gap: ${theme.spacing.sm};
 `;
 
-const PortfolioTypeText = styled.div`
+const PortfolioInfo = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
-const PortfolioTypeName = styled.div`
-  font-size: 0.875rem;
-  font-weight: 400;
-  color: #2c2c2c;
-  margin-bottom: 0.25rem;
-  font-family: 'Cormorant Garamond', serif;
+const PortfolioName = styled.div`
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.primary};
+  margin-bottom: ${theme.spacing.xs};
+  font-family: ${theme.typography.fonts.display};
 `;
 
-const PortfolioTypeDesc = styled.div`
-  font-size: 0.75rem;
-  color: #666;
+const PortfolioDesc = styled.div`
+  font-size: ${theme.typography.sizes.xs};
+  color: ${theme.colors.text.secondary};
   line-height: 1.4;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 0.25px;
 `;
 
-const CreatePortfolioPrompt = styled.div`
+const CreatePortfolioCard = styled.div`
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
-  padding: 1.5rem;
-  background: #f8f8f8;
-  border: 1px solid #e0e0e0;
-  border-radius: 2px;
+  gap: ${theme.spacing.md};
+  padding: ${theme.spacing.lg};
+  background: ${theme.colors.background.tertiary};
+  border: 1px solid ${theme.colors.border.medium};
+  border-radius: ${theme.borderRadius.sm};
 `;
 
-const PromptIcon = styled.div`
+const CreatePortfolioIcon = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: white;
-  color: #666;
-  border: 1px solid #e0e0e0;
-  border-radius: 2px;
+  width: 28px;
+  height: 28px;
+  background: ${theme.colors.background.secondary};
+  color: ${theme.colors.text.secondary};
+  border: 1px solid ${theme.colors.border.medium};
+  border-radius: ${theme.borderRadius.xs};
   flex-shrink: 0;
 `;
 
-const PromptText = styled.div`
+const CreatePortfolioContent = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
-const PromptTitle = styled.div`
-  font-size: 0.875rem;
-  font-weight: 400;
-  color: #2c2c2c;
-  margin-bottom: 0.25rem;
-  font-family: 'Cormorant Garamond', serif;
+const CreatePortfolioTitle = styled.div`
+  font-size: ${theme.typography.sizes.sm};
+  font-weight: ${theme.typography.weights.medium};
+  color: ${theme.colors.text.primary};
+  margin-bottom: ${theme.spacing.xs};
+  font-family: ${theme.typography.fonts.display};
 `;
 
-const PromptSubtitle = styled.div`
-  font-size: 0.75rem;
-  color: #666;
-  margin-bottom: 0.75rem;
-  font-family: 'Work Sans', sans-serif;
+const CreatePortfolioSubtitle = styled.div`
+  font-size: ${theme.typography.sizes.xs};
+  color: ${theme.colors.text.secondary};
+  margin-bottom: ${theme.spacing.md};
 `;
 
-const PromptLink = styled(Link)`
-  font-size: 0.75rem;
-  color: #2c2c2c;
+const CreatePortfolioButton = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  font-size: ${theme.typography.sizes.xs};
+  color: ${theme.colors.text.primary};
   text-decoration: none;
-  font-weight: 300;
-  background: white;
-  border: 1px solid #2c2c2c;
-  padding: 0.5rem 1rem;
-  border-radius: 2px;
-  display: inline-block;
-  transition: all 0.3s ease;
-  font-family: 'Work Sans', sans-serif;
+  font-weight: ${theme.typography.weights.medium};
+  background: ${theme.colors.background.secondary};
+  border: 1px solid ${theme.colors.primary[600]};
+  padding: ${theme.spacing.sm} ${theme.spacing.md};
+  border-radius: ${theme.borderRadius.xs};
+  transition: all ${theme.transitions.fast};
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: ${theme.typography.letterSpacing.wide};
   
   &:hover {
-    background: #2c2c2c;
+    background: ${theme.colors.primary[600]};
     color: white;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
+    box-shadow: ${theme.shadows.sm};
   }
 `;
 
-const Navigation = styled.nav`
-  padding: 1.5rem 0;
+const NavigationSection = styled.nav`
   flex: 1;
+  padding: ${theme.spacing.lg} 0;
 `;
 
 const NavList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0 1rem;
+  gap: ${theme.spacing.xs};
+  padding: 0 ${theme.spacing.md};
 `;
 
-const NavItem = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
+const NavItemWrapper = styled.div`
+  /* Consistent wrapper for navigation items */
+`;
+
+const NavItemLink = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  color: ${props => props.$active ? '#2c2c2c' : '#666'};
-  background: ${props => props.$active ? 'white' : 'transparent'};
-  border: 1px solid ${props => props.$active ? '#2c2c2c' : 'transparent'};
-  border-radius: 2px;
+  gap: ${theme.spacing.md};
+  padding: ${theme.spacing.md};
+  color: ${props => props.$active ? theme.colors.text.primary : theme.colors.text.secondary};
+  background: ${props => props.$active ? theme.colors.background.tertiary : 'transparent'};
+  border: 1px solid ${props => props.$active ? theme.colors.border.medium : 'transparent'};
+  border-radius: ${theme.borderRadius.xs};
   text-decoration: none;
-  transition: all 0.3s ease;
+  transition: all ${theme.transitions.fast};
   justify-content: ${props => props.$collapsed ? 'center' : 'flex-start'};
-  margin: 0.125rem 0.5rem;
+  min-height: 44px; /* Consistent touch target */
 
   &:hover {
-    background: ${props => props.$active ? 'white' : '#f8f8f8'};
-    border-color: ${props => props.$active ? '#2c2c2c' : '#e0e0e0'};
-    color: ${props => props.$active ? '#2c2c2c' : '#2c2c2c'};
+    background: ${props => props.$active ? theme.colors.background.tertiary : theme.colors.background.quaternary};
+    border-color: ${theme.colors.border.medium};
+    color: ${theme.colors.text.primary};
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: ${theme.shadows.sm};
+  }
+  
+  &:active {
+    transform: translateY(0);
   }
 `;
 
@@ -673,6 +714,8 @@ const NavIcon = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
 `;
 
@@ -681,92 +724,107 @@ const NavContent = styled.div`
   min-width: 0;
 `;
 
+const NavLabelRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+`;
+
 const NavLabel = styled.div`
-  font-weight: 400;
-  font-size: 0.875rem;
-  margin-bottom: 0.125rem;
+  font-weight: ${theme.typography.weights.medium};
+  font-size: ${theme.typography.sizes.sm};
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: ${theme.typography.fonts.display};
+`;
+
+const NavBadge = styled.span`
+  font-size: ${theme.typography.sizes.xs};
+  padding: 2px ${theme.spacing.xs};
+  background: ${theme.colors.accent.blue};
+  color: white;
+  border-radius: ${theme.borderRadius.xs};
+  text-transform: uppercase;
+  letter-spacing: ${theme.typography.letterSpacing.wide};
+  font-weight: ${theme.typography.weights.medium};
+  flex-shrink: 0;
 `;
 
 const NavDescription = styled.div`
-  font-size: 0.75rem;
-  opacity: 0.7;
+  font-size: ${theme.typography.sizes.xs};
+  color: ${theme.colors.text.tertiary};
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 0.25px;
+  line-height: 1.2;
 `;
 
-const SidebarFooter = styled.div`
-  padding: 1.5rem;
-  border-top: 1px solid #e0e0e0;
-  margin-top: auto;
+const SidebarFooter = styled.div<{ $collapsed: boolean }>`
+  padding: ${theme.spacing.lg};
+  border-top: 1px solid ${theme.colors.border.light};
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: ${theme.spacing.xs};
+  flex-shrink: 0;
 `;
 
-const FooterLink = styled(Link)`
+const FooterButton = styled(Link)`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.875rem;
-  color: #666;
+  gap: ${theme.spacing.md};
+  padding: ${theme.spacing.md};
+  color: ${theme.colors.text.secondary};
   text-decoration: none;
-  font-size: 0.875rem;
+  font-size: ${theme.typography.sizes.sm};
   border: 1px solid transparent;
-  border-radius: 2px;
-  transition: all 0.3s ease;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 0.25px;
+  border-radius: ${theme.borderRadius.xs};
+  transition: all ${theme.transitions.fast};
+  min-height: 40px;
   
   &:hover {
-    background: #f8f8f8;
-    border-color: #e0e0e0;
-    color: #2c2c2c;
+    background: ${theme.colors.background.tertiary};
+    border-color: ${theme.colors.border.medium};
+    color: ${theme.colors.text.primary};
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: ${theme.shadows.sm};
   }
 `;
 
 const LogoutButton = styled.button`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.875rem;
-  background: none;
-  border: 1px solid #e0e0e0;
-  color: #666;
-  text-decoration: none;
-  font-size: 0.875rem;
-  border-radius: 2px;
-  transition: all 0.3s ease;
+  gap: ${theme.spacing.md};
+  padding: ${theme.spacing.md};
+  background: transparent;
+  border: 1px solid ${theme.colors.border.medium};
+  color: ${theme.colors.text.secondary};
+  font-size: ${theme.typography.sizes.sm};
+  border-radius: ${theme.borderRadius.xs};
+  transition: all ${theme.transitions.fast};
   cursor: pointer;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 0.25px;
+  font-family: ${theme.typography.fonts.body};
+  min-height: 40px;
   
   &:hover {
-    background: #f8f8f8;
-    border-color: #2c2c2c;
-    color: #2c2c2c;
+    background: ${theme.colors.background.tertiary};
+    border-color: ${theme.colors.primary[600]};
+    color: ${theme.colors.text.primary};
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: ${theme.shadows.sm};
   }
 `;
 
 const MainContent = styled.main<{ $sidebarCollapsed: boolean }>`
   flex: 1;
-  margin-left: ${props => props.$sidebarCollapsed ? '80px' : '320px'};
+  margin-left: ${props => props.$sidebarCollapsed ? '72px' : '280px'};
   min-height: 100vh;
-  transition: margin-left 0.3s ease;
-  background: #fafafa;
+  transition: margin-left ${theme.transitions.normal};
+  background: ${theme.colors.background.primary};
   
-  @media (max-width: 768px) {
+  @media (max-width: ${theme.breakpoints.md}) {
     margin-left: 0;
-    padding-top: 64px;
+    padding-top: 60px;
   }
 `;

@@ -1,19 +1,21 @@
-// src\hooks\usePortfolioQueries.ts - Fixed to match your API structure
-import type { PortfolioStats } from '@/lib/api/portfolio-api-client';
-import { ConceptProgress } from '@/types/educational.types';
-import type { GalleryPiece, GalleryVisibility } from '@/types/gallery.types';
+// src/hooks/usePortfolioQueries.ts
+// Fixed to use proper types matching your API structure
+
 import {
   useQuery,
   useMutation,
   useQueryClient,
-  useInfiniteQuery,
   UseQueryOptions,
   UseMutationOptions,
-  UseInfiniteQueryOptions,
 } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { APIError } from '@/lib/api-client';
-import {
+import type {
+  ApiResponse,
+  PaginatedResponse,
+} from '@/types/api.types';
+
+import type {
   Portfolio,
   PortfolioWithPieces,
   PortfolioListResponse,
@@ -22,12 +24,22 @@ import {
   PortfolioFilters,
   PortfolioReview,
   CreateReviewDto,
-  ReviewListResponse,
-  PortfolioAnalytics,
+  PortfolioStats,
   PortfolioShareLink,
+  PortfolioWithPieces as PortfolioWithPiecesType,
 } from '@/types/portfolio.types';
 
-// ==================== Query Keys Factory ====================
+import type { GalleryPiece } from '@/types/gallery.types';
+
+// --------------------- Helper types ---------------------
+
+type PortfolioWithOwner = Portfolio & { isOwner?: boolean };
+
+type ApiPortfolioResponse = ApiResponse<PortfolioWithOwner | null>;
+type ApiPortfolioWithPiecesResponse = ApiResponse<PortfolioWithPieces | null>;
+type ApiPortfolioListResponse = ApiResponse<{ portfolios: Portfolio[]; pagination?: any }>;
+
+// --------------------- Query keys ---------------------
 export const portfolioQueryKeys = {
   all: ['portfolio'] as const,
   portfolios: () => [...portfolioQueryKeys.all, 'portfolios'] as const,
@@ -35,51 +47,79 @@ export const portfolioQueryKeys = {
   portfolioByUser: (userId: string) => [...portfolioQueryKeys.all, 'user', userId] as const,
   portfolioByUsername: (username: string) => [...portfolioQueryKeys.all, 'username', username] as const,
   myPortfolio: () => [...portfolioQueryKeys.all, 'me'] as const,
-  discover: (filters: PortfolioFilters) => [...portfolioQueryKeys.all, 'discover', filters] as const,
-  search: (query: string) => [...portfolioQueryKeys.all, 'search', query] as const,
+  discover: (filters: PortfolioFilters, page: number, limit: number) => [...portfolioQueryKeys.all, 'discover', JSON.stringify(filters), page, limit] as const,
   featured: () => [...portfolioQueryKeys.all, 'featured'] as const,
-  trending: (period: string) => [...portfolioQueryKeys.all, 'trending', period] as const,
-  saved: () => [...portfolioQueryKeys.all, 'saved'] as const,
-  reviews: (portfolioId: string) => [...portfolioQueryKeys.all, 'reviews', portfolioId] as const,
-  analytics: (portfolioId: string, period: string) =>
-    [...portfolioQueryKeys.all, 'analytics', portfolioId, period] as const,
-  views: (portfolioId: string) => [...portfolioQueryKeys.all, 'views', portfolioId] as const,
-  shareLinks: (portfolioId: string) => [...portfolioQueryKeys.all, 'shares', portfolioId] as const,
+  myGallery: () => [...portfolioQueryKeys.all, 'myGallery'] as const,
+  galleryByUsername: (username: string, page?: number, limit?: number) => [...portfolioQueryKeys.all, 'gallery', username, page ?? 1, limit ?? 20] as const,
 };
 
-// ==================== Core Portfolio Queries ====================
+// --------------------- Normalizer ---------------------
 
-// Fixed: Use correct API method name
+/**
+ * Normalize API responses so hooks can accept either:
+ * - ApiResponse<T> (with `.data`) or
+ * - a direct payload T or
+ * - legacy shapes like `{ portfolio: T }` or `{ portfolios: T[] }`.
+ */
+function normalizeApi<T>(response: any): T | null {
+  if (response == null) return null;
+
+  // Common wrapper: ApiResponse<T> with `.data`
+  if (typeof response === 'object' && 'data' in response) return response.data as T;
+
+  // Common wrapper variant: { success: true, portfolio: T }
+  if (typeof response === 'object' && 'portfolio' in response) return (response as any).portfolio as T;
+
+  // Some endpoints return `{ portfolios: T[] }` etc.
+  if (typeof response === 'object' && 'portfolios' in response) return (response as any) as unknown as T;
+
+  // If already matches T
+  return response as T;
+}
+
+// --------------------- Core queries ---------------------
+
 export function useMyPortfolio(
   options?: UseQueryOptions<Portfolio | null, APIError>
 ) {
-  return useQuery({
+  return useQuery<Portfolio | null, APIError>({
     queryKey: portfolioQueryKeys.myPortfolio(),
-    queryFn: () => api.portfolio.get(), // Fixed: was getMyPortfolio()
+    queryFn: async () => {
+      const raw = await api.portfolio.get();
+      const normalized = normalizeApi<PortfolioWithOwner | null>(raw);
+      return normalized ? (normalized as Portfolio) : null;
+    },
     ...options,
   });
 }
 
 export function usePortfolioByUsername(
   username: string,
-  options?: UseQueryOptions<Portfolio, APIError>
+  options?: UseQueryOptions<Portfolio | null, APIError>
 ) {
-  return useQuery({
+  return useQuery<Portfolio | null, APIError>({
     queryKey: portfolioQueryKeys.portfolioByUsername(username),
-    queryFn: () => api.portfolio.getByUsername(username),
+    queryFn: async () => {
+      const raw = await api.portfolio.getByUsername(username);
+      const normalized = normalizeApi<PortfolioWithOwner | null>(raw);
+      return normalized ? (normalized as Portfolio) : null;
+    },
     enabled: !!username,
     ...options,
   });
 }
 
-// Legacy methods - these may not work if the API doesn't have them
 export function usePortfolio(
   id: string,
-  options?: UseQueryOptions<Portfolio, APIError>
+  options?: UseQueryOptions<Portfolio | null, APIError>
 ) {
-  return useQuery({
+  return useQuery<Portfolio | null, APIError>({
     queryKey: portfolioQueryKeys.portfolio(id),
-    queryFn: () => api.portfolio.getById(id), // This might not exist in your API
+    queryFn: async () => {
+      const raw = await api.portfolio.getById(id);
+      const normalized = normalizeApi<Portfolio | null>(raw);
+      return normalized;
+    },
     enabled: !!id,
     ...options,
   });
@@ -87,52 +127,81 @@ export function usePortfolio(
 
 export function usePortfolioByUserId(
   userId: string,
-  options?: UseQueryOptions<Portfolio, APIError>
+  options?: UseQueryOptions<Portfolio | null, APIError>
 ) {
-  return useQuery({
+  return useQuery<Portfolio | null, APIError>({
     queryKey: portfolioQueryKeys.portfolioByUser(userId),
-    queryFn: () => api.portfolio.getByUserId(userId), // This might not exist in your API
+    queryFn: async () => {
+      const raw = await api.portfolio.getByUserId(userId);
+      const normalized = normalizeApi<Portfolio | null>(raw);
+      return normalized;
+    },
     enabled: !!userId,
     ...options,
   });
 }
 
-// ==================== Discovery Queries ====================
+// --------------------- Discover / Listing (FIXED) ---------------------
+
 export function useDiscoverPortfolios(
   filters: PortfolioFilters = {},
   page: number = 1,
   limit: number = 20,
   options?: UseQueryOptions<PortfolioListResponse, APIError>
 ) {
-  return useQuery({
-    queryKey: [...portfolioQueryKeys.discover(filters), 'page', page, 'limit', limit], // Fixed: don't put page in filters
-    queryFn: () => api.portfolio.discover(filters, page, limit),
+  return useQuery<PortfolioListResponse, APIError>({
+    queryKey: portfolioQueryKeys.discover(filters, page, limit),
+    queryFn: async () => {
+      // Cast to any to resolve type mismatch between PortfolioFilters interface and API client expectations
+      const raw = await api.portfolio.discover(filters as any, page, limit);
+
+      // Try to normalize a few likely shapes
+      const payload = normalizeApi<{ portfolios?: Portfolio[]; pagination?: any }>(raw) || raw || {};
+
+      const portfolios = payload?.portfolios ?? (raw && (raw as any).portfolios) ?? [];
+      const pagination = payload?.pagination ?? (raw && (raw as any).pagination) ?? { page, limit, total: 0, pages: 1 };
+
+      return {
+        data: portfolios,
+        portfolios,
+        total: pagination.total ?? 0,
+        page: pagination.page ?? page,
+        pageSize: pagination.limit ?? limit,
+        hasMore: (pagination.page ?? page) < (pagination.pages ?? 1),
+      } as PortfolioListResponse;
+    },
     ...options,
   });
 }
 
-// ==================== Portfolio Stats ====================
+// --------------------- Stats ---------------------
 export function usePortfolioStats(
-  options?: UseQueryOptions<any, APIError> // Type might need adjustment based on actual API response
+  options?: UseQueryOptions<PortfolioStats, APIError>
 ) {
-  return useQuery({
+  return useQuery<PortfolioStats, APIError>({
     queryKey: [...portfolioQueryKeys.all, 'stats'],
-    queryFn: () => api.portfolio.getStats(),
+    queryFn: async () => {
+      const raw = await api.portfolio.getStats();
+      return normalizeApi<PortfolioStats>(raw) as PortfolioStats;
+    },
     ...options,
   });
 }
 
-// ==================== Portfolio CRUD Mutations ====================
-
+// --------------------- CRUD Mutations ---------------------
 export function useCreatePortfolio(
   options?: UseMutationOptions<Portfolio, APIError, CreatePortfolioDto>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: api.portfolio.create,
-    onSuccess: data => {
-      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.all });
-      queryClient.setQueryData(portfolioQueryKeys.myPortfolio(), data);
+  const qc = useQueryClient();
+  return useMutation<Portfolio, APIError, CreatePortfolioDto>({
+    mutationFn: async (data) => {
+      const raw = await api.portfolio.create(data);
+      const payload = normalizeApi<Portfolio>(raw);
+      return payload as Portfolio;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: portfolioQueryKeys.all });
+      qc.setQueryData(portfolioQueryKeys.myPortfolio(), data);
     },
     ...options,
   });
@@ -141,384 +210,295 @@ export function useCreatePortfolio(
 export function useUpdatePortfolio(
   options?: UseMutationOptions<Portfolio, APIError, UpdatePortfolioDto>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: UpdatePortfolioDto) => api.portfolio.update(data), // Fixed: no ID parameter
+  const qc = useQueryClient();
+  return useMutation<Portfolio, APIError, UpdatePortfolioDto>({
+    mutationFn: async (data) => {
+      const raw = await api.portfolio.update(data);
+      const payload = normalizeApi<Portfolio>(raw);
+      return payload as Portfolio;
+    },
     onSuccess: (data) => {
-      queryClient.setQueryData(portfolioQueryKeys.myPortfolio(), data);
-      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.all });
+      qc.setQueryData(portfolioQueryKeys.myPortfolio(), data);
+      qc.invalidateQueries({ queryKey: portfolioQueryKeys.all });
     },
     ...options,
   });
 }
 
 export function useDeletePortfolio(
-  options?: UseMutationOptions<void, APIError, boolean>
+  options?: UseMutationOptions<void, APIError, { portfolioId?: string; deleteGalleryPieces?: boolean }>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (deleteGalleryPieces: boolean = false) => api.portfolio.delete(deleteGalleryPieces),
+  const qc = useQueryClient();
+  return useMutation<void, APIError, { portfolioId?: string; deleteGalleryPieces?: boolean }>({
+    mutationFn: async ({ deleteGalleryPieces = false } = {}) => {
+      await api.portfolio.delete(deleteGalleryPieces);
+    },
     onSuccess: () => {
-      queryClient.setQueryData(portfolioQueryKeys.myPortfolio(), null);
-      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.all });
+      qc.setQueryData(portfolioQueryKeys.myPortfolio(), null);
+      qc.invalidateQueries({ queryKey: portfolioQueryKeys.all });
     },
     ...options,
   });
 }
 
-// ==================== Gallery Management ====================
+// --------------------- Gallery Queries & Mutations ---------------------
 
 export function useMyGalleryPieces(
   options?: UseQueryOptions<GalleryPiece[], APIError>
 ) {
-  return useQuery({
-    queryKey: [...portfolioQueryKeys.all, 'myGallery'],
-    queryFn: () => api.portfolio.gallery.get(),
+  return useQuery<GalleryPiece[], APIError>({
+    queryKey: portfolioQueryKeys.myGallery(),
+    queryFn: async () => {
+      const raw = await api.portfolio.gallery.get();
+      const payload = normalizeApi<any>(raw) ?? raw;
+
+      // prefer galleryPieces, then legacy 'pieces', then direct array payload
+      if (payload && typeof payload === 'object' && 'galleryPieces' in payload) {
+        return (payload as any).galleryPieces as GalleryPiece[];
+      }
+
+      if (payload && typeof payload === 'object' && 'pieces' in payload) {
+        return (payload as any).pieces as GalleryPiece[];
+      }
+
+      if (Array.isArray(payload)) {
+        return payload as GalleryPiece[];
+      }
+
+      // fallback to checking raw in case normalizeApi returned null
+      if (raw && typeof raw === 'object' && 'galleryPieces' in raw) {
+        return (raw as any).galleryPieces as GalleryPiece[];
+      }
+
+      if (raw && typeof raw === 'object' && 'pieces' in raw) {
+        return (raw as any).pieces as GalleryPiece[];
+      }
+
+      return [] as GalleryPiece[];
+    },
     ...options,
   });
 }
 
 export function usePortfolioGalleryByUsername(
   username: string,
-  page?: number,
-  limit?: number,
-  options?: UseQueryOptions<any, APIError> // Type depends on API response format
+  page: number = 1,
+  limit: number = 20,
+  options?: UseQueryOptions<{ galleryPieces: GalleryPiece[]; pagination?: any; portfolio?: Portfolio | null }, APIError>
 ) {
-  return useQuery({
-    queryKey: [...portfolioQueryKeys.all, 'gallery', username, page, limit],
-    queryFn: () => api.portfolio.gallery.getByUsername(username, page, limit),
+  return useQuery<{ galleryPieces: GalleryPiece[]; pagination?: any; portfolio?: Portfolio | null }, APIError>({
+    queryKey: portfolioQueryKeys.galleryByUsername(username, page, limit),
+    queryFn: async () => {
+      const raw = await api.portfolio.gallery.getByUsername(username, page, limit);
+      const payload = normalizeApi<any>(raw) || raw;
+      const pieces = (payload?.galleryPieces ?? payload?.pieces ?? raw?.pieces ?? raw?.pieces ?? []) as GalleryPiece[];
+      const pagination = payload?.pagination ?? raw?.pagination ?? { page, limit, total: 0, pages: 1 };
+      const portfolio = normalizeApi<Portfolio>(payload?.portfolio ?? raw?.portfolio) ?? null;
+      return { galleryPieces: pieces, pagination, portfolio };
+    },
     enabled: !!username,
     ...options,
   });
 }
 
 export function useGalleryStats(
-  options?: UseQueryOptions<{
-    totalPieces: number;
-    publicPieces: number;
-    privatePieces: number;
-    unlistedPieces: number;
-    categories: Record<string, number>;
-    recentUploads: number;
-  }, APIError>
+  options?: UseQueryOptions<any, APIError>
 ) {
-  return useQuery({
+  return useQuery<any, APIError>({
     queryKey: [...portfolioQueryKeys.all, 'galleryStats'],
-    queryFn: () => api.portfolio.gallery.getStats(),
+    queryFn: async () => {
+      const raw = await api.portfolio.gallery.getStats();
+      return normalizeApi<any>(raw);
+    },
     ...options,
   });
 }
 
-// ==================== Gallery Mutations ====================
-
 export function useAddGalleryPiece(
-  options?: UseMutationOptions<
-    GalleryPiece,
-    APIError,
-    {
-      title: string;
-      description?: string;
-      imageUrl: string;
-      category?: string;
-      medium?: string;
-      tags?: string[];
-      visibility?: GalleryVisibility;
-      year?: number;
-      displayOrder?: number;
-    }
-  >
+  options?: UseMutationOptions<GalleryPiece, APIError, any>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (pieceData) => api.portfolio.gallery.add(pieceData),
+  const qc = useQueryClient();
+  return useMutation<GalleryPiece, APIError, any>({
+    mutationFn: async (pieceData) => {
+      const raw = await api.portfolio.gallery.add(pieceData);
+      const payload = normalizeApi<GalleryPiece>(raw) ?? raw?.galleryPiece ?? raw;
+      return payload as GalleryPiece;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
+      qc.invalidateQueries({ queryKey: portfolioQueryKeys.myGallery() });
+      qc.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
     },
     ...options,
   });
 }
 
 export function useUpdateGalleryPiece(
-  options?: UseMutationOptions<GalleryPiece, APIError, { pieceId: string; updates: Partial<GalleryPiece> }>
+  options?: UseMutationOptions<GalleryPiece, APIError, { pieceId: string; updates: any }>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ pieceId, updates }) => api.portfolio.gallery.update(pieceId, updates),
+  const qc = useQueryClient();
+  return useMutation<GalleryPiece, APIError, { pieceId: string; updates: any }>({
+    mutationFn: async ({ pieceId, updates }) => {
+      const raw = await api.portfolio.gallery.update(pieceId, updates);
+      const payload = normalizeApi<GalleryPiece>(raw) ?? raw?.galleryPiece ?? raw;
+      return payload as GalleryPiece;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
-      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+      qc.invalidateQueries({ queryKey: portfolioQueryKeys.myGallery() });
+      qc.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
     },
     ...options,
   });
 }
 
 export function useDeleteGalleryPiece(
-  options?: UseMutationOptions<{ message: string; id: string; }, APIError, string>
+  options?: UseMutationOptions<{ message?: string; id?: string }, APIError, string>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (pieceId: string) => api.portfolio.gallery.delete(pieceId),
+  const qc = useQueryClient();
+  return useMutation<{ message?: string; id?: string }, APIError, string>({
+    mutationFn: async (pieceId: string) => {
+      const raw = await api.portfolio.gallery.delete(pieceId);
+      const payload = normalizeApi<any>(raw) ?? raw;
+      return { message: payload?.message ?? raw?.message, id: payload?.deletedPieceId ?? raw?.deletedPieceId };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
-      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+      qc.invalidateQueries({ queryKey: portfolioQueryKeys.myGallery() });
+      qc.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
     },
     ...options,
   });
 }
 
 export function useBatchDeleteGalleryPieces(
-  options?: UseMutationOptions<{ message: string; deletedCount: number; }, APIError, string[]>
+  options?: UseMutationOptions<{ message?: string; deletedCount: number }, APIError, string[]>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (pieceIds: string[]) => api.portfolio.gallery.batchDelete(pieceIds),
+  const qc = useQueryClient();
+  return useMutation<{ message?: string; deletedCount: number }, APIError, string[]>({
+    mutationFn: async (pieceIds: string[]) => {
+      const raw = await api.portfolio.gallery.batchDelete(pieceIds);
+      const payload = normalizeApi<any>(raw) ?? raw;
+      return { message: payload?.message ?? raw?.message, deletedCount: payload?.deletedCount ?? raw?.deletedCount ?? 0 };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'galleryStats'] });
-      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+      qc.invalidateQueries({ queryKey: portfolioQueryKeys.myGallery() });
     },
     ...options,
   });
 }
 
 export function useBatchUpdateGalleryVisibility(
-  options?: UseMutationOptions<
-    { message: string; updatedCount: number; },
-    APIError,
-    { pieceIds: string[]; visibility: GalleryVisibility }
-  >
+  options?: UseMutationOptions<{ message?: string; updatedCount: number }, APIError, { pieceIds: string[]; visibility: string }>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ pieceIds, visibility }) => 
-      api.portfolio.gallery.batchUpdateVisibility(pieceIds, visibility),
+  const qc = useQueryClient();
+  return useMutation<{ message?: string; updatedCount: number }, APIError, { pieceIds: string[]; visibility: string }>({
+    mutationFn: async ({ pieceIds, visibility }) => {
+      const raw = await api.portfolio.gallery.batchUpdateVisibility(pieceIds, visibility as any);
+      const payload = normalizeApi<any>(raw) ?? raw;
+      return { message: payload?.message ?? raw?.message, updatedCount: payload?.updatedCount ?? raw?.updatedCount ?? 0 };
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'myGallery'] });
-      queryClient.invalidateQueries({ queryKey: ['gallery'] });
+      qc.invalidateQueries({ queryKey: portfolioQueryKeys.myGallery() });
     },
     ...options,
   });
 }
 
-// ==================== Concept Management ====================
-
+// --------------------- Concepts (lightweight) ---------------------
 export function useMyConcepts(
-  options?: UseQueryOptions<{
-    concepts: ConceptProgress[];
-    portfolio: {
-      id: string;
-      kind: any; // PortfolioKind type
-      totalConcepts: number;
-      completedConcepts: number;
-    };
-  }, APIError>
+  options?: UseQueryOptions<any, APIError>
 ) {
-  return useQuery({
+  return useQuery<any, APIError>({
     queryKey: [...portfolioQueryKeys.all, 'concepts'],
-    queryFn: () => api.portfolio.concepts.get(),
+    queryFn: async () => {
+      const raw = await api.portfolio.concepts.get();
+      return normalizeApi<any>(raw) ?? raw;
+    },
     ...options,
   });
 }
 
 export function useAddConceptToPortfolio(
-  options?: UseMutationOptions<
-    { message: string; conceptProgress: ConceptProgress; }, 
-    APIError, 
-    { 
-      conceptId: string; 
-      data?: { 
-        status?: string; 
-        startedAt?: string;
-        notes?: string;
-        score?: number;
-      } 
-    }
-  >
+  options?: UseMutationOptions<any, APIError, { conceptId: string; data?: any }>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ conceptId, data = {} }) => api.portfolio.concepts.add(conceptId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] });
+  const qc = useQueryClient();
+  return useMutation<any, APIError, { conceptId: string; data?: any }>({
+    mutationFn: async ({ conceptId, data = {} }) => {
+      const raw = await api.portfolio.concepts.add(conceptId, data);
+      return normalizeApi<any>(raw) ?? raw;
     },
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] }),
     ...options,
   });
 }
 
 export function useUpdateConceptProgress(
-  options?: UseMutationOptions<
-    { message: string; conceptProgress: ConceptProgress; }, 
-    APIError, 
-    { 
-      conceptId: string; 
-      data?: { 
-        status?: string; 
-        score?: number;
-        notes?: string;
-        completedAt?: string;
-      } 
-    }
-  >
+  options?: UseMutationOptions<any, APIError, { conceptId: string; data?: any }>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ conceptId, data = {} }) => api.portfolio.concepts.updateProgress(conceptId, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] });
+  const qc = useQueryClient();
+  return useMutation<any, APIError, { conceptId: string; data?: any }>({
+    mutationFn: async ({ conceptId, data = {} }) => {
+      const raw = await api.portfolio.concepts.updateProgress(conceptId, data);
+      return normalizeApi<any>(raw) ?? raw;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...portfolioQueryKeys.all, 'concepts'] }),
+    ...options,
+  });
+}
+
+// --------------------- Analytics & Utilities ---------------------
+export function usePortfolioAnalytics(
+  period: '7d' | '30d' | '90d' | '1y' = '30d',
+  options?: UseQueryOptions<any, APIError>
+) {
+  return useQuery<any, APIError>({
+    queryKey: [...portfolioQueryKeys.all, 'analytics', period],
+    queryFn: async () => {
+      const raw = await api.portfolio.analytics.get(period);
+      return normalizeApi<any>(raw) ?? raw;
     },
     ...options,
   });
 }
-
-// ==================== Analytics ====================
-
-export function usePortfolioAnalytics(
-  period?: string,
-  options?: UseQueryOptions<any, APIError> // Type depends on actual API response
-) {
-  return useQuery({
-    queryKey: [...portfolioQueryKeys.all, 'analytics', period],
-    queryFn: () => api.portfolio.analytics.get(period),
-    ...options,
-  });
-}
-
-export function usePortfolioDashboard(
-  options?: UseQueryOptions<any, APIError> // Type depends on actual API response
-) {
-  return useQuery({
-    queryKey: [...portfolioQueryKeys.all, 'dashboard'],
-    queryFn: () => api.portfolio.analytics.dashboard(),
-    ...options,
-  });
-}
-
-export function useTrackPortfolioView(
-  options?: UseMutationOptions<
-    { message: string; totalViews: number; }, 
-    APIError, 
-    { portfolioId: string; data?: { referrer?: string; duration?: number } }
-  >
-) {
-  return useMutation({
-    mutationFn: ({ portfolioId, data }) => api.portfolio.analytics.trackView(portfolioId, data),
-    ...options,
-  });
-}
-
-// ==================== Image Upload ====================
 
 export function useUploadPortfolioImage(
   options?: UseMutationOptions<{ url: string }, APIError, { file: File; type: 'profile' | 'cover' }>
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
+  const qc = useQueryClient();
+  return useMutation<{ url: string }, APIError, { file: File; type: 'profile' | 'cover' }>({
     mutationFn: ({ file, type }) => api.portfolio.images.upload(file, type),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: portfolioQueryKeys.myPortfolio() });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: portfolioQueryKeys.myPortfolio() }),
     ...options,
   });
 }
 
-// ==================== Utility Hooks ====================
-
+// --------------------- Utility hooks ---------------------
 export function useHasPortfolio() {
   const { data: portfolio, isLoading } = useMyPortfolio();
-  
-  return {
-    hasPortfolio: portfolio !== null && portfolio !== undefined,
-    isLoading,
-    portfolio
-  };
+  return { hasPortfolio: !!portfolio, isLoading, portfolio };
 }
 
-export function usePortfolioCheck(
-  options?: UseQueryOptions<boolean, APIError>
-) {
-  return useQuery({
+export function usePortfolioCheck(options?: UseQueryOptions<boolean, APIError>) {
+  return useQuery<boolean, APIError>({
     queryKey: [...portfolioQueryKeys.all, 'check'],
-    queryFn: () => api.portfolio.check(),
-    ...options,
-  });
-}
-
-// ==================== DEPRECATED HOOKS ====================
-// These hooks may not work with your current API but are kept for backward compatibility
-
-/**
- * @deprecated - These methods may not exist in your streamlined API
- */
-export function useSearchPortfolios(
-  query: string,
-  limit?: number,
-  options?: UseQueryOptions<Portfolio[], APIError>
-) {
-  console.warn('useSearchPortfolios: This hook may not work with the current API structure');
-  return useQuery({
-    queryKey: portfolioQueryKeys.search(query),
-    queryFn: () => {
-      // This method might not exist in your API
-      throw new Error('Search portfolios method not implemented');
+    queryFn: async () => {
+      const raw = await api.portfolio.check();
+      // expected shape: { hasPortfolio: boolean }
+      const payload = normalizeApi<any>(raw) ?? raw;
+      return payload?.hasPortfolio ?? raw?.hasPortfolio ?? false;
     },
-    enabled: false, // Disabled by default
-    ...options,
-  });
-}
-
-/**
- * @deprecated - These methods may not exist in your streamlined API
- */
-export function useFeaturedPortfolios(
-  limit?: number,
-  options?: UseQueryOptions<Portfolio[], APIError>
-) {
-  console.warn('useFeaturedPortfolios: This hook may not work with the current API structure');
-  return useQuery({
-    queryKey: portfolioQueryKeys.featured(),
-    queryFn: () => {
-      // This method might not exist in your API
-      throw new Error('Featured portfolios method not implemented');
-    },
-    enabled: false, // Disabled by default
-    ...options,
-  });
-}
-
-/**
- * @deprecated - These methods may not exist in your streamlined API
- */
-export function useTrendingPortfolios(
-  period: 'day' | 'week' | 'month' = 'week',
-  options?: UseQueryOptions<Portfolio[], APIError>
-) {
-  console.warn('useTrendingPortfolios: This hook may not work with the current API structure');
-  return useQuery({
-    queryKey: portfolioQueryKeys.trending(period),
-    queryFn: () => {
-      // This method might not exist in your API
-      throw new Error('Trending portfolios method not implemented');
-    },
-    enabled: false, // Disabled by default
     ...options,
   });
 }
 
 export default {
-  // Core queries
   useMyPortfolio,
   usePortfolioByUsername,
+  usePortfolio,
+  usePortfolioByUserId,
   useDiscoverPortfolios,
   usePortfolioStats,
-  
-  // CRUD mutations
   useCreatePortfolio,
   useUpdatePortfolio,
   useDeletePortfolio,
-  
-  // Gallery
   useMyGalleryPieces,
   usePortfolioGalleryByUsername,
   useGalleryStats,
@@ -527,21 +507,11 @@ export default {
   useDeleteGalleryPiece,
   useBatchDeleteGalleryPieces,
   useBatchUpdateGalleryVisibility,
-  
-  // Concepts
   useMyConcepts,
   useAddConceptToPortfolio,
   useUpdateConceptProgress,
-  
-  // Analytics
   usePortfolioAnalytics,
-  usePortfolioDashboard,
-  useTrackPortfolioView,
-  
-  // Images
   useUploadPortfolioImage,
-  
-  // Utility
   useHasPortfolio,
   usePortfolioCheck,
 };

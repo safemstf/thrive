@@ -1,14 +1,51 @@
-// src\components\apiTest\apiTestStyles.ts - Modern Professional Greyscale Design
+// src/components/apiTest/apiTestStyles.ts - Greyscale with Status Colors
 
 import styled from 'styled-components';
 
-// Styled Components - Professional Greyscale Square Design
+// ==================== COLOR VARIABLES ====================
+const colors = {
+  // Base greyscale palette
+  primary: '#2c2c2c',
+  secondary: '#666666',
+  tertiary: '#999999',
+  background: '#fafafa',
+  surface: '#ffffff',
+  surfaceHover: '#f8f8f8',
+  border: '#e0e0e0',
+  borderLight: '#f0f0f0',
+  text: '#2c2c2c',
+  textSecondary: '#666666',
+  textTertiary: '#999999',
+  
+  // Status colors for testing feedback
+  success: '#16a34a',      // Green for success
+  successLight: '#dcfce7', // Light green background
+  successBorder: '#bbf7d0', // Green border
+  
+  error: '#dc2626',        // Red for errors
+  errorLight: '#fef2f2',   // Light red background
+  errorBorder: '#fecaca',  // Red border
+  
+  warning: '#ea580c',      // Orange for warnings
+  warningLight: '#fff7ed', // Light orange background
+  warningBorder: '#fed7aa', // Orange border
+  
+  running: '#2563eb',      // Blue for running
+  runningLight: '#eff6ff', // Light blue background
+  runningBorder: '#bfdbfe', // Blue border
+  
+  pending: '#64748b',      // Slate for pending
+  pendingLight: '#f8fafc', // Light slate background
+  pendingBorder: '#e2e8f0', // Slate border
+};
+
+// ==================== BASE STYLES ====================
 export const PageWrapper = styled.div`
   min-height: 100vh;
-  background: #fafafa;
+  background: ${colors.background};
   padding: 2rem 1rem;
   font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: #2c2c2c;
+  color: ${colors.text};
 `;
 
 export const Container = styled.div`
@@ -36,7 +73,7 @@ export const HeaderRight = styled.div`
 export const PageTitle = styled.h1`
   font-size: 2.5rem;
   font-weight: 300;
-  color: #2c2c2c;
+  color: ${colors.primary};
   margin: 0 0 0.5rem 0;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -44,7 +81,7 @@ export const PageTitle = styled.h1`
 
 export const PageSubtitle = styled.p`
   font-size: 1rem;
-  color: #666;
+  color: ${colors.secondary};
   margin: 0;
   font-weight: 300;
   text-transform: uppercase;
@@ -57,16 +94,17 @@ export const ConnectionBadge = styled.div<{ $status: string }>`
   gap: 0.75rem;
   padding: 0.75rem 1.25rem;
   background: ${({ $status }) => 
-    $status === 'connected' ? '#2c2c2c' : 
-    $status === 'disconnected' ? '#666666' : 
-    '#999999'};
-  color: #f8f8f8;
+    $status === 'connected' ? colors.success : 
+    $status === 'disconnected' ? colors.error : 
+    colors.warning};
+  color: #ffffff;
   font-size: 0.875rem;
   font-weight: 300;
   text-transform: uppercase;
   letter-spacing: 1px;
   border: none;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 `;
 
 export const AuthTokenBadge = styled.button`
@@ -74,20 +112,20 @@ export const AuthTokenBadge = styled.button`
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1.25rem;
-  background: transparent;
-  color: #2c2c2c;
-  border: 1px solid #e0e0e0;
+  background: ${colors.success};
+  color: #ffffff;
+  border: 1px solid ${colors.success};
   font-size: 0.875rem;
   font-weight: 300;
   text-transform: uppercase;
   letter-spacing: 1px;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   
   &:hover {
-    background: #2c2c2c;
-    color: #f8f8f8;
-    border-color: #2c2c2c;
+    background: #15803d;
+    border-color: #15803d;
   }
 `;
 
@@ -99,8 +137,8 @@ export const StatsOverview = styled.div`
 `;
 
 export const StatCard = styled.div<{ $color?: string }>`
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
+  background: ${colors.surface};
+  border: 1px solid ${colors.border};
   padding: 2rem;
   display: flex;
   align-items: center;
@@ -108,16 +146,17 @@ export const StatCard = styled.div<{ $color?: string }>`
   transition: all 0.2s ease;
   
   &:hover {
-    background: #f8f8f8;
-    border-color: #2c2c2c;
+    background: ${colors.surfaceHover};
+    border-color: ${colors.primary};
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 `;
 
-export const StatIcon = styled.div`
+export const StatIcon = styled.div<{ $statusColor?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666666;
+  color: ${({ $statusColor }) => $statusColor || colors.secondary};
 `;
 
 export const StatContent = styled.div``;
@@ -126,64 +165,29 @@ export const StatValue = styled.div`
   font-size: 2.5rem;
   font-weight: 300;
   line-height: 1;
-  color: #2c2c2c;
+  color: ${colors.primary};
   margin-bottom: 0.5rem;
 `;
 
 export const StatLabel = styled.div`
   font-size: 0.875rem;
-  color: #666;
+  color: ${colors.secondary};
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 300;
-`;
-
-export const ProgressCard = styled.div`
-  grid-column: span 2;
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  padding: 2rem;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    background: #f8f8f8;
-    border-color: #2c2c2c;
-  }
-`;
-
-export const ProgressBar = styled.div`
-  height: 2px;
-  background: #f0f0f0;
-  margin-bottom: 1rem;
-  overflow: hidden;
-`;
-
-export const ProgressFill = styled.div<{ $percentage: number; $color: string }>`
-  height: 100%;
-  width: ${({ $percentage }) => $percentage}%;
-  background: #2c2c2c;
-  transition: width 0.3s ease;
-`;
-
-export const ProgressLabel = styled.div`
-  font-size: 0.875rem;
-  color: #666;
-  text-align: center;
-  font-weight: 300;
-  text-transform: uppercase;
-  letter-spacing: 1px;
 `;
 
 export const MainCard = styled.div`
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
+  background: ${colors.surface};
+  border: 1px solid ${colors.border};
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 `;
 
 export const TabRow = styled.div`
   display: flex;
-  background: #f8f8f8;
-  border-bottom: 1px solid #e0e0e0;
+  background: ${colors.surfaceHover};
+  border-bottom: 1px solid ${colors.border};
   overflow-x: auto;
 `;
 
@@ -194,8 +198,8 @@ export const TabButton = styled.button<{ $active: boolean }>`
   font-size: 0.875rem;
   font-weight: 300;
   border: none;
-  background: ${({ $active }) => ($active ? "#ffffff" : "transparent")};
-  color: ${({ $active }) => ($active ? "#2c2c2c" : "#666")};
+  background: ${({ $active }) => ($active ? colors.surface : "transparent")};
+  color: ${({ $active }) => ($active ? colors.primary : colors.secondary)};
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -215,12 +219,12 @@ export const TabButton = styled.button<{ $active: boolean }>`
     left: 0;
     right: 0;
     height: 2px;
-    background: ${({ $active }) => ($active ? "#2c2c2c" : "transparent")};
+    background: ${({ $active }) => ($active ? colors.primary : "transparent")};
   }
 
   &:hover {
-    background: ${({ $active }) => ($active ? "#ffffff" : "#f0f0f0")};
-    color: #2c2c2c;
+    background: ${({ $active }) => ($active ? colors.surface : colors.borderLight)};
+    color: ${colors.primary};
   }
 `;
 
@@ -240,18 +244,20 @@ export const CategoryGrid = styled.div`
 `;
 
 export const CategoryCard = styled.button<{ $active: boolean; $color: string }>`
-  background: ${({ $active }) => $active ? '#2c2c2c' : '#ffffff'};
-  border: 1px solid ${({ $active }) => $active ? '#2c2c2c' : '#e0e0e0'};
+  background: ${({ $active }) => $active ? colors.primary : colors.surface};
+  border: 1px solid ${({ $active }) => $active ? colors.primary : colors.border};
   padding: 2rem;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: center;
   position: relative;
   overflow: hidden;
+  color: ${({ $active }) => $active ? '#ffffff' : colors.text};
   
   &:hover {
-    background: ${({ $active }) => $active ? '#2c2c2c' : '#f8f8f8'};
-    border-color: #2c2c2c;
+    background: ${({ $active }) => $active ? colors.primary : colors.surfaceHover};
+    border-color: ${colors.primary};
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 `;
 
@@ -262,8 +268,8 @@ export const CategoryIcon = styled.div<{ $color: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f0f0f0;
-  color: #666666;
+  background: ${colors.borderLight};
+  color: ${colors.secondary};
 `;
 
 export const CategoryName = styled.div`
@@ -282,93 +288,10 @@ export const CategoryStats = styled.div`
   opacity: 0.7;
 `;
 
-export const CategoryProgress = styled.div`
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #f0f0f0;
-`;
-
-export const CategoryProgressFill = styled.div<{ $percentage: number; $color: string }>`
-  height: 100%;
-  width: ${({ $percentage }) => $percentage}%;
-  background: #666666;
-  transition: width 0.3s ease;
-`;
-
 export const ActionPanel = styled.div`
   display: flex;
   flex-direction: column;
   gap: 1rem;
-`;
-
-export const SearchBar = styled.div`
-  display: flex;
-  gap: 1rem;
-`;
-
-export const SearchInput = styled.input`
-  flex: 1;
-  padding: 1rem 1.5rem;
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  color: #2c2c2c;
-  font-size: 0.875rem;
-  font-family: 'Work Sans', sans-serif;
-  font-weight: 300;
-  
-  &:focus {
-    outline: none;
-    border-color: #2c2c2c;
-    background: #f8f8f8;
-  }
-  
-  &::placeholder {
-    color: #999999;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-`;
-
-export const FilterBar = styled.div`
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-`;
-
-export const FilterGroup = styled.div`
-  display: flex;
-  gap: 0.5rem;
-`;
-
-export const FilterButton = styled.button<{ $active: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1.25rem;
-  border: 1px solid ${({ $active }) => $active ? '#2c2c2c' : '#e0e0e0'};
-  background: ${({ $active }) => $active ? '#2c2c2c' : '#ffffff'};
-  color: ${({ $active }) => $active ? '#f8f8f8' : '#666'};
-  font-size: 0.875rem;
-  font-weight: 300;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: 'Work Sans', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-
-  &:hover {
-    background: ${({ $active }) => $active ? '#2c2c2c' : '#f8f8f8'};
-    color: ${({ $active }) => $active ? '#f8f8f8' : '#2c2c2c'};
-    border-color: #2c2c2c;
-  }
-  
-  svg {
-    width: 16px;
-    height: 16px;
-  }
 `;
 
 export const ActionBar = styled.div`
@@ -389,9 +312,9 @@ export const PrimaryButton = styled.button`
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 2rem;
-  border: 1px solid #2c2c2c;
-  background: #2c2c2c;
-  color: #f8f8f8;
+  border: 1px solid ${colors.primary};
+  background: ${colors.primary};
+  color: #ffffff;
   font-size: 0.875rem;
   font-weight: 300;
   cursor: pointer;
@@ -399,10 +322,12 @@ export const PrimaryButton = styled.button`
   font-family: 'Work Sans', sans-serif;
   text-transform: uppercase;
   letter-spacing: 1px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 
   &:hover:not(:disabled) {
     background: #1a1a1a;
     border-color: #1a1a1a;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
   &:disabled {
@@ -412,17 +337,17 @@ export const PrimaryButton = styled.button`
 `;
 
 export const SecondaryButton = styled(PrimaryButton)`
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  color: #2c2c2c;
+  background: ${colors.surface};
+  border: 1px solid ${colors.border};
+  color: ${colors.primary};
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   
   &:hover:not(:disabled) {
-    background: #f8f8f8;
-    border-color: #2c2c2c;
+    background: ${colors.surfaceHover};
+    border-color: ${colors.primary};
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 `;
-
-export const ActionButton = styled(SecondaryButton)``;
 
 export const RouteSection = styled.div``;
 
@@ -436,47 +361,12 @@ export const SectionHeader = styled.div`
 export const SectionTitle = styled.h3`
   font-size: 1.25rem;
   font-weight: 300;
-  color: #2c2c2c;
+  color: ${colors.primary};
   display: flex;
   align-items: center;
   gap: 1rem;
   text-transform: uppercase;
   letter-spacing: 1px;
-`;
-
-export const RouteBadge = styled.span`
-  font-size: 0.875rem;
-  font-weight: 300;
-  color: #666;
-  background: #f0f0f0;
-  padding: 0.5rem 1rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-`;
-
-export const SelectionControls = styled.div`
-  display: flex;
-  gap: 0.5rem;
-`;
-
-export const SelectButton = styled.button`
-  padding: 0.75rem 1.25rem;
-  font-size: 0.875rem;
-  color: #666;
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: 'Work Sans', sans-serif;
-  font-weight: 300;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  
-  &:hover {
-    background: #f8f8f8;
-    color: #2c2c2c;
-    border-color: #2c2c2c;
-  }
 `;
 
 export const RouteList = styled.div`
@@ -486,19 +376,48 @@ export const RouteList = styled.div`
 `;
 
 export const RouteCard = styled.div<{ $status?: string; $selected?: boolean }>`
-  background: #ffffff;
-  border: 2px solid ${({ $status, $selected }) => 
-    $selected ? '#2c2c2c' :
-    $status === 'success' ? '#666666' : 
-    $status === 'error' ? '#999999' : 
-    $status === 'running' ? '#2c2c2c' : 
-    '#e0e0e0'};
+  background: ${({ $status }) => {
+    switch ($status) {
+      case 'success': return colors.successLight;
+      case 'error': return colors.errorLight;
+      case 'running': return colors.runningLight;
+      case 'pending': return colors.pendingLight;
+      default: return colors.surface;
+    }
+  }};
+  border: 2px solid ${({ $status, $selected }) => {
+    if ($selected) return colors.primary;
+    switch ($status) {
+      case 'success': return colors.successBorder;
+      case 'error': return colors.errorBorder;
+      case 'running': return colors.runningBorder;
+      case 'pending': return colors.pendingBorder;
+      default: return colors.border;
+    }
+  }};
   padding: 2rem;
   transition: all 0.2s ease;
   
   &:hover {
-    background: #f8f8f8;
-    border-color: #2c2c2c;
+    background: ${({ $status }) => {
+      switch ($status) {
+        case 'success': return colors.successLight;
+        case 'error': return colors.errorLight;
+        case 'running': return colors.runningLight;
+        case 'pending': return colors.pendingLight;
+        default: return colors.surfaceHover;
+      }
+    }};
+    border-color: ${({ $status }) => {
+      switch ($status) {
+        case 'success': return colors.success;
+        case 'error': return colors.error;
+        case 'running': return colors.running;
+        case 'pending': return colors.pending;
+        default: return colors.primary;
+      }
+    }};
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
 `;
 
@@ -515,19 +434,16 @@ export const RouteLeft = styled.div`
   flex: 1;
 `;
 
-export const RouteCheckbox = styled.div`
-  padding-top: 0.25rem;
-  
-  input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
-    accent-color: #2c2c2c;
-  }
-`;
-
-export const StatusIcon = styled.div`
-  color: #666666;
+export const StatusIcon = styled.div<{ $status?: string }>`
+  color: ${({ $status }) => {
+    switch ($status) {
+      case 'success': return colors.success;
+      case 'error': return colors.error;
+      case 'running': return colors.running;
+      case 'pending': return colors.pending;
+      default: return colors.tertiary;
+    }
+  }};
 `;
 
 export const RouteInfo = styled.div`
@@ -536,30 +452,16 @@ export const RouteInfo = styled.div`
 
 export const RouteName = styled.div`
   font-weight: 300;
-  color: #2c2c2c;
+  color: ${colors.primary};
   margin-bottom: 0.75rem;
   font-size: 1.125rem;
   text-transform: uppercase;
   letter-spacing: 1px;
 `;
 
-export const RouteEndpoint = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-`;
-
-export const EndpointPath = styled.span`
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.875rem;
-  color: #666;
-  font-weight: 400;
-`;
-
 export const RouteDescription = styled.div`
   font-size: 0.875rem;
-  color: #666;
+  color: ${colors.secondary};
   margin-bottom: 1rem;
   font-weight: 300;
   line-height: 1.6;
@@ -569,10 +471,19 @@ export const MethodBadge = styled.span<{ $method: string }>`
   font-weight: 300;
   font-size: 0.875rem;
   padding: 0.5rem 1rem;
-  background: #f0f0f0;
-  color: #2c2c2c;
+  background: ${({ $method }) => {
+    switch ($method.toUpperCase()) {
+      case 'GET': return colors.success;
+      case 'POST': return colors.running;
+      case 'PUT': return colors.warning;
+      case 'DELETE': return colors.error;
+      default: return colors.secondary;
+    }
+  }};
+  color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 1px;
+  border-radius: 0;
 `;
 
 export const RouteTags = styled.div`
@@ -587,8 +498,20 @@ export const RouteTag = styled.div<{ $type: string }>`
   gap: 0.5rem;
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
-  background: #f0f0f0;
-  color: #666666;
+  background: ${({ $type }) => {
+    switch ($type) {
+      case 'auth': return colors.warning;
+      case 'public': return colors.success;
+      default: return colors.borderLight;
+    }
+  }};
+  color: ${({ $type }) => {
+    switch ($type) {
+      case 'auth': return '#ffffff';
+      case 'public': return '#ffffff';
+      default: return colors.secondary;
+    }
+  }};
   text-transform: uppercase;
   letter-spacing: 1px;
   font-weight: 300;
@@ -605,28 +528,35 @@ export const RouteActions = styled.div`
   gap: 1rem;
 `;
 
-export const ResponseTime = styled.div<{ $status: string }>`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: #666666;
-  font-weight: 300;
-  
-  svg {
-    width: 16px;
-    height: 16px;
-  }
-`;
-
-export const TestButton = styled.button`
+export const TestButton = styled.button<{ $status?: string }>`
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1.5rem;
-  border: 1px solid #e0e0e0;
-  background: #ffffff;
-  color: #666;
+  border: 1px solid ${({ $status }) => {
+    switch ($status) {
+      case 'success': return colors.success;
+      case 'error': return colors.error;
+      case 'running': return colors.running;
+      default: return colors.border;
+    }
+  }};
+  background: ${({ $status }) => {
+    switch ($status) {
+      case 'success': return colors.success;
+      case 'error': return colors.error;
+      case 'running': return colors.running;
+      default: return colors.surface;
+    }
+  }};
+  color: ${({ $status }) => {
+    switch ($status) {
+      case 'success': return '#ffffff';
+      case 'error': return '#ffffff';
+      case 'running': return '#ffffff';
+      default: return colors.secondary;
+    }
+  }};
   font-size: 0.875rem;
   font-weight: 300;
   cursor: pointer;
@@ -636,9 +566,24 @@ export const TestButton = styled.button`
   letter-spacing: 1px;
 
   &:hover:not(:disabled) {
-    background: #2c2c2c;
-    color: #f8f8f8;
-    border-color: #2c2c2c;
+    background: ${({ $status }) => {
+      switch ($status) {
+        case 'success': return '#15803d';
+        case 'error': return '#b91c1c';
+        case 'running': return '#1d4ed8';
+        default: return colors.primary;
+      }
+    }};
+    color: #ffffff;
+    border-color: ${({ $status }) => {
+      switch ($status) {
+        case 'success': return '#15803d';
+        case 'error': return '#b91c1c';
+        case 'running': return '#1d4ed8';
+        default: return colors.primary;
+      }
+    }};
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
   &:disabled {
@@ -656,42 +601,10 @@ export const TestButton = styled.button`
   }
 `;
 
-export const RouteDetails = styled.div`
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid #e0e0e0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 2rem;
-`;
-
-export const DetailSection = styled.div``;
-
-export const DetailTitle = styled.div`
-  font-size: 0.875rem;
-  font-weight: 300;
-  color: #666;
-  margin-bottom: 1rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-`;
-
-export const CodeBlock = styled.pre`
-  background: #f8f8f8;
-  border: 1px solid #e0e0e0;
-  padding: 1.5rem;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.813rem;
-  overflow: auto;
-  max-height: 250px;
-  color: #2c2c2c;
-  line-height: 1.6;
-`;
-
 export const ResponseSection = styled.div`
   margin-top: 2rem;
   padding-top: 2rem;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid ${colors.border};
 `;
 
 export const ResponseHeader = styled.div`
@@ -703,38 +616,57 @@ export const ResponseHeader = styled.div`
 
 export const ResponseStatus = styled.div<{ $success: boolean }>`
   font-weight: 300;
-  color: #2c2c2c;
+  color: ${({ $success }) => $success ? colors.success : colors.error};
   text-transform: uppercase;
   letter-spacing: 1px;
-`;
-
-export const ResponseMeta = styled.div`
   display: flex;
-  gap: 1rem;
-  font-size: 0.875rem;
-  color: #666;
-  font-weight: 300;
+  align-items: center;
+  gap: 0.5rem;
+  
+  &::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: ${({ $success }) => $success ? colors.success : colors.error};
+    border-radius: 50%;
+  }
 `;
 
 export const ResponseBody = styled.div``;
 
+export const CodeBlock = styled.pre`
+  background: ${colors.surfaceHover};
+  border: 1px solid ${colors.border};
+  padding: 1.5rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.813rem;
+  overflow: auto;
+  max-height: 250px;
+  color: ${colors.primary};
+  line-height: 1.6;
+`;
+
 export const ErrorSection = styled.div`
   margin-top: 2rem;
   padding: 2rem;
-  background: #f8f8f8;
-  border: 1px solid #e0e0e0;
+  background: ${colors.errorLight};
+  border: 1px solid ${colors.errorBorder};
+  border-left: 4px solid ${colors.error};
 `;
 
 export const ErrorTitle = styled.div`
   font-weight: 300;
-  color: #2c2c2c;
+  color: ${colors.error};
   margin-bottom: 1rem;
   text-transform: uppercase;
   letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 `;
 
 export const ErrorMessage = styled.div`
-  color: #666666;
+  color: ${colors.textSecondary};
   font-size: 0.875rem;
   font-weight: 300;
   line-height: 1.6;
@@ -748,9 +680,10 @@ export const ConfigSection = styled.div`
 `;
 
 export const ConfigCard = styled.div`
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
+  background: ${colors.surface};
+  border: 1px solid ${colors.border};
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 `;
 
 export const ConfigHeader = styled.div`
@@ -758,14 +691,14 @@ export const ConfigHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 2rem;
-  border-bottom: 1px solid #e0e0e0;
-  background: #f8f8f8;
+  border-bottom: 1px solid ${colors.border};
+  background: ${colors.surfaceHover};
 `;
 
 export const ConfigTitle = styled.h3`
   font-size: 1.125rem;
   font-weight: 300;
-  color: #2c2c2c;
+  color: ${colors.primary};
   margin: 0;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -775,7 +708,7 @@ export const ConfigStatus = styled.div<{ $connected: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: #666666;
+  color: ${({ $connected }) => $connected ? colors.success : colors.error};
   font-size: 0.875rem;
   font-weight: 300;
   text-transform: uppercase;
@@ -791,7 +724,7 @@ export const ConfigRow = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 1rem 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid ${colors.borderLight};
   
   &:last-child {
     border-bottom: none;
@@ -800,7 +733,7 @@ export const ConfigRow = styled.div`
 
 export const ConfigLabel = styled.div`
   font-size: 0.875rem;
-  color: #666;
+  color: ${colors.secondary};
   font-weight: 300;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -809,7 +742,7 @@ export const ConfigLabel = styled.div`
 export const ConfigValue = styled.div`
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.875rem;
-  color: #2c2c2c;
+  color: ${colors.primary};
   text-align: right;
   max-width: 60%;
   word-break: break-all;
@@ -821,23 +754,26 @@ export const TokenDisplay = styled.div`
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
-  background: #f0f0f0;
+  background: ${colors.successLight};
+  border: 1px solid ${colors.successBorder};
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: 'JetBrains Mono', monospace;
+  color: ${colors.success};
   
   &:hover {
-    background: #e0e0e0;
-    color: #2c2c2c;
+    background: ${colors.success};
+    color: #ffffff;
+    border-color: ${colors.success};
   }
 `;
 
 export const ConfigActions = styled.div`
   padding: 2rem;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid ${colors.border};
   display: flex;
   gap: 1rem;
-  background: #f8f8f8;
+  background: ${colors.surfaceHover};
 `;
 
 export const QuickLinks = styled.div`
@@ -852,9 +788,9 @@ export const QuickLink = styled.button`
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.5rem;
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  color: #666;
+  background: ${colors.surface};
+  border: 1px solid ${colors.border};
+  color: ${colors.secondary};
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -865,246 +801,9 @@ export const QuickLink = styled.button`
   letter-spacing: 1px;
   
   &:hover {
-    background: #f8f8f8;
-    color: #2c2c2c;
-    border-color: #2c2c2c;
+    background: ${colors.surfaceHover};
+    color: ${colors.primary};
+    border-color: ${colors.primary};
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
-`;
-
-export const SetupSteps = styled.div`
-  padding: 2rem;
-`;
-
-export const SetupStep = styled.div`
-  display: flex;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-  
-  &:last-child {
-    margin-bottom: 0;
-  }
-`;
-
-export const StepNumber = styled.div`
-  width: 40px;
-  height: 40px;
-  background: #2c2c2c;
-  color: #f8f8f8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 300;
-  flex-shrink: 0;
-  font-size: 1.125rem;
-`;
-
-export const StepContent = styled.div`
-  flex: 1;
-`;
-
-export const StepTitle = styled.div`
-  font-weight: 300;
-  color: #2c2c2c;
-  margin-bottom: 1rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-size: 1rem;
-`;
-
-export const CodeSnippet = styled.code`
-  display: block;
-  padding: 1rem 1.5rem;
-  background: #f8f8f8;
-  border: 1px solid #e0e0e0;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.875rem;
-  color: #2c2c2c;
-  margin-bottom: 0.5rem;
-  font-weight: 400;
-`;
-
-export const StepNote = styled.div`
-  font-size: 0.875rem;
-  color: #666666;
-  font-style: italic;
-  font-weight: 300;
-`;
-
-// Integration Tab Styles
-export const IntegrationSection = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-  gap: 2rem;
-`;
-
-export const IntegrationCard = styled.div`
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-`;
-
-export const CardHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 2rem;
-  border-bottom: 1px solid #e0e0e0;
-  background: #f8f8f8;
-`;
-
-export const CardIcon = styled.div<{ $color: string }>`
-  width: 48px;
-  height: 48px;
-  background: #f0f0f0;
-  color: #666666;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-export const CardTitle = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 300;
-  color: #2c2c2c;
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-`;
-
-export const CardContent = styled.div`
-  padding: 2rem;
-  
-  p {
-    margin: 0 0 1.5rem 0;
-    color: #666;
-    line-height: 1.6;
-    font-weight: 300;
-  }
-`;
-
-export const CodeExample = styled.pre`
-  background: #f8f8f8;
-  border: 1px solid #e0e0e0;
-  padding: 2rem;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.813rem;
-  overflow: auto;
-  color: #2c2c2c;
-  line-height: 1.6;
-  font-weight: 400;
-`;
-
-// Diagnostics Tab Styles
-export const DiagnosticsSection = styled.div`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 2rem;
-`;
-
-export const DiagnosticCard = styled.div<{ $type: 'warning' | 'error' | 'info' | 'success' }>`
-  background: #ffffff;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-`;
-
-export const DiagnosticHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 2rem;
-  border-bottom: 1px solid #e0e0e0;
-  background: #f8f8f8;
-  
-  svg {
-    color: #666666;
-  }
-  
-  h3 {
-    margin: 0;
-    font-size: 1.125rem;
-    font-weight: 300;
-    color: #2c2c2c;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-`;
-
-export const DiagnosticList = styled.div`
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-`;
-
-export const DiagnosticItem = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  
-  strong {
-    color: #2c2c2c;
-    font-size: 0.875rem;
-    font-weight: 300;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  
-  span {
-    color: #666;
-    font-size: 0.875rem;
-    font-weight: 300;
-    line-height: 1.6;
-  }
-`;
-
-export const DebugCommands = styled.div`
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-`;
-
-export const DebugCommand = styled.div``;
-
-export const CommandTitle = styled.div`
-  font-weight: 300;
-  color: #2c2c2c;
-  margin-bottom: 1rem;
-  font-size: 0.875rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-`;
-
-export const HealthChecks = styled.div`
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-`;
-
-export const HealthCheck = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-`;
-
-export const HealthIcon = styled.div<{ $status: boolean }>`
-  color: #666666;
-`;
-
-export const HealthLabel = styled.div`
-  flex: 1;
-  font-size: 0.875rem;
-  color: #666;
-  font-weight: 300;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-`;
-
-export const HealthStatus = styled.div`
-  font-size: 0.875rem;
-  font-weight: 300;
-  color: #2c2c2c;
-  text-transform: uppercase;
-  letter-spacing: 1px;
 `;
