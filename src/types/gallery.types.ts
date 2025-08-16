@@ -111,6 +111,8 @@ export interface GalleryPiece extends BaseEntity {
     unit: string;
   };
 
+  forSale?: boolean;
+
   // Sales/Status
   status: ArtworkStatus;
   price?: number;

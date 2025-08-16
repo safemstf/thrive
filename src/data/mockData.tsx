@@ -1,7 +1,7 @@
 // src/data/mockData.tsx - Fixed imports and exports
 
-import { GalleryPiece } from "@/types/gallery.types";
-import { Portfolio, PortfolioReview } from "@/types/portfolio.types";
+import { ArtworkCategory, ArtworkSize, ArtworkStatus, GalleryPiece, GalleryVisibility } from "@/types/gallery.types";
+import { ConceptProgress, Portfolio, PortfolioKind, PortfolioReview, PortfolioSettings, PortfolioStats } from "@/types/portfolio.types";
 import type { TopPerformer, AssessmentLeaderboard, RankingPlatformStats } from '@/types/thrive.types';
 
 // ==============================================
@@ -889,3 +889,395 @@ export const EMPLOYER_PLATFORM_METRICS = {
   monthlyAssessments: 8930,
   averageVerificationTime: '2.3s'
 };
+
+// ==============================================
+// Mock Portfolio Data
+// ==============================================
+
+export const createMockPortfolio = (kind: PortfolioKind = 'hybrid'): Portfolio => ({
+  id: 'portfolio-dev-123',
+  _id: 'portfolio-dev-123',
+  userId: 'dev-user-123',
+  username: 'devuser',
+  name: 'Dev User',
+  title: 'Full-Stack Developer & Designer',
+  tagline: 'Building digital experiences that matter',
+  bio: 'Passionate full-stack developer with a love for clean code and beautiful design. Currently exploring AI/ML applications and always learning something new.',
+  kind,
+  
+  // Images
+  profileImage: 'https://picsum.photos/200/200?random=profile',
+  coverImage: 'https://picsum.photos/800/300?random=cover',
+  
+  // Visibility & Access
+  visibility: 'public',
+  status: 'active',
+  customUrl: 'dev-portfolio',
+  
+  // Professional Info
+  location: 'Seattle, WA',
+  yearsOfExperience: 5,
+  specializations: ['React', 'Node.js', 'TypeScript', 'UI/UX Design', 'PostgreSQL'],
+  tags: ['Frontend', 'Backend', 'Design', 'Full-Stack', 'React', 'Next.js'],
+  
+  // Social & Contact
+  socialLinks: {
+    website: 'https://devportfolio.com',
+    github: 'https://github.com/devuser',
+    linkedin: 'https://linkedin.com/in/devuser',
+    twitter: 'https://twitter.com/devuser'
+  },
+  contactEmail: 'dev@example.com',
+  showContactInfo: true,
+  
+  // Settings - Fix: Properly type as PortfolioSettings
+  settings: {
+    allowReviews: true,
+    allowComments: true,
+    requireReviewApproval: false,
+    allowAnonymousReviews: true,
+    showStats: true,
+    showPrices: false,
+    defaultGalleryView: 'grid',
+    piecesPerPage: 20,
+    notifyOnReview: true,
+    notifyOnView: false,
+    weeklyAnalyticsEmail: true,
+    // Educational settings for hybrid/educational portfolios
+    showProgress: true,
+    publicProgress: false,
+    showCertifications: true,
+    trackLearningTime: true,
+    notifyOnConceptCompletion: true,
+    weeklyProgressEmail: false
+  } as PortfolioSettings,
+  
+  // Stats - Fix: Properly type as PortfolioStats
+  stats: {
+    totalViews: 2847,
+    uniqueVisitors: 1253,
+    totalPieces: 12,
+    totalReviews: 8,
+    averageRating: 4.7,
+    responseRate: 95,
+    responseTime: 'within 2 hours',
+    viewsThisWeek: 156,
+    viewsThisMonth: 612,
+    shareCount: 23,
+    savedCount: 45,
+    // Educational stats for hybrid/educational portfolios
+    totalConcepts: 45,
+    completedConcepts: 32,
+    inProgressConcepts: 8,
+    totalLearningHours: 127,
+    averageScore: 87,
+    streakDays: 12,
+    certificationsEarned: 3
+  } as PortfolioStats,
+  
+  // Educational Content - Fix: Properly type as ConceptProgress[]
+  conceptProgress: [
+    {
+      conceptId: 'react-hooks',
+      status: 'completed',
+      startedAt: '2024-01-10T10:00:00Z',
+      completedAt: '2024-01-12T14:30:00Z',
+      score: 92,
+      attempts: 2,
+      notes: 'Mastered useState and useEffect'
+    },
+    {
+      conceptId: 'typescript-generics',
+      status: 'in-progress',
+      startedAt: '2024-01-15T09:00:00Z',
+      score: 78,
+      attempts: 1,
+      notes: 'Need more practice with complex generic constraints'
+    },
+    {
+      conceptId: 'database-optimization',
+      status: 'not-started'
+    }
+  ] as ConceptProgress[],
+  
+  learningGoals: [
+    'Master advanced TypeScript patterns',
+    'Build scalable microservices architecture',
+    'Complete AWS certification',
+    'Contribute to open source projects'
+  ],
+  
+  currentBooks: ['typescript-handbook', 'system-design-primer'],
+  completedBooks: ['react-patterns', 'clean-code', 'you-dont-know-js'],
+  
+  // Metadata
+  createdAt: new Date('2024-01-15T10:00:00Z'),
+  updatedAt: new Date('2024-01-20T15:30:00Z'),
+  lastActiveAt: new Date('2024-01-22T12:00:00Z'),
+  featuredPieces: ['piece-1', 'piece-3', 'piece-5']
+});
+
+// ==============================================
+// Mock Gallery Pieces - Fixed categories and dimensions
+// ==============================================
+
+// Fixed createMockGalleryPieces function - Corrected property names
+// Fixed createMockGalleryPieces function - Matches your GalleryPiece interface exactly
+export const createMockGalleryPieces = (): GalleryPiece[] => [
+  {
+    _id: 'piece-1',
+    title: 'E-commerce Dashboard',
+    artist: 'Dev User',
+    description: 'Modern React dashboard with real-time analytics and intuitive UX design',
+    
+    // Images
+    thumbnailUrl: 'https://picsum.photos/400/300?random=1',
+    imageUrl: 'https://picsum.photos/800/600?random=1',
+    
+    // Metadata & Accessibility
+    alt: 'E-commerce dashboard interface screenshot',
+    medium: 'Digital',
+    year: 2024,
+    size: 'large' as ArtworkSize,
+    displayOrder: 1,
+    
+    // Dimensions
+    dimensions: {
+      width: 1920,
+      height: 1080,
+      unit: 'px'
+    },
+    
+    // Sales/Status
+    forSale: false,
+    status: 'published' as ArtworkStatus,
+    price: 0,
+    currency: 'USD',
+    
+    // Visibility & Permissions
+    visibility: 'public' as GalleryVisibility,
+    ownerId: 'dev-user-123',
+    
+    // Timestamps
+    createdAt: new Date('2024-01-16T10:00:00Z'),
+    updatedAt: new Date('2024-01-16T10:00:00Z'),
+    publishedAt: new Date('2024-01-16T10:00:00Z'),
+    
+    // Tags & Categories
+    tags: ['React', 'TypeScript', 'Dashboard', 'Analytics'],
+    category: 'Digital' as ArtworkCategory,
+    
+    // Upload metadata
+    uploadedBy: 'dev-user-123',
+    originalFileName: 'ecommerce-dashboard.png',
+    fileSize: 2.1,
+    mimeType: 'image/png',
+    
+    // Portfolio/Social Features
+    portfolioId: 'portfolio-dev-123',
+    views: 245,
+    likes: 18
+  },
+  {
+    _id: 'piece-2',
+    title: 'Mobile Banking App',
+    artist: 'Dev User',
+    description: 'Clean and secure mobile banking interface with biometric authentication',
+    
+    // Images
+    thumbnailUrl: 'https://picsum.photos/400/300?random=2',
+    imageUrl: 'https://picsum.photos/800/600?random=2',
+    
+    // Metadata & Accessibility
+    alt: 'Mobile banking app UI design mockup',
+    medium: 'Digital',
+    year: 2024,
+    size: 'medium' as ArtworkSize,
+    displayOrder: 2,
+    
+    // Dimensions
+    dimensions: {
+      width: 375,
+      height: 812,
+      unit: 'px'
+    },
+    
+    // Sales/Status
+    forSale: false,
+    status: 'published' as ArtworkStatus,
+    price: 0,
+    
+    // Visibility & Permissions
+    visibility: 'public' as GalleryVisibility,
+    ownerId: 'dev-user-123',
+    
+    // Timestamps
+    createdAt: new Date('2024-01-18T14:00:00Z'),
+    updatedAt: new Date('2024-01-18T14:00:00Z'),
+    publishedAt: new Date('2024-01-18T14:00:00Z'),
+    
+    // Tags & Categories
+    tags: ['UI/UX', 'Mobile', 'Fintech', 'Design System'],
+    category: 'Design' as ArtworkCategory,
+    
+    // Upload metadata
+    uploadedBy: 'dev-user-123',
+    originalFileName: 'banking-app-ui.png',
+    fileSize: 1.8,
+    mimeType: 'image/png',
+    
+    // Portfolio/Social Features
+    portfolioId: 'portfolio-dev-123',
+    views: 189,
+    likes: 12
+  },
+  {
+    _id: 'piece-3',
+    title: 'Task Management API',
+    artist: 'Dev User',
+    description: 'RESTful API built with Node.js and PostgreSQL featuring real-time updates',
+    
+    // Images (using placeholder for code project)
+    thumbnailUrl: 'https://picsum.photos/400/300?random=3',
+    imageUrl: 'https://picsum.photos/800/600?random=3',
+    
+    // Metadata & Accessibility
+    alt: 'Task Management API architecture diagram',
+    medium: 'Code',
+    year: 2024,
+    size: 'medium' as ArtworkSize,
+    displayOrder: 3,
+    
+    // Sales/Status
+    forSale: false,
+    status: 'published' as ArtworkStatus,
+    
+    // Visibility & Permissions
+    visibility: 'public' as GalleryVisibility,
+    ownerId: 'dev-user-123',
+    
+    // Timestamps
+    createdAt: new Date('2024-01-20T09:00:00Z'),
+    updatedAt: new Date('2024-01-20T09:00:00Z'),
+    publishedAt: new Date('2024-01-20T09:00:00Z'),
+    
+    // Tags & Categories
+    tags: ['Node.js', 'PostgreSQL', 'REST API', 'Real-time'],
+    category: 'Digital' as ArtworkCategory,
+    
+    // Upload metadata
+    uploadedBy: 'dev-user-123',
+    originalFileName: 'api-architecture.png',
+    fileSize: 1.2,
+    mimeType: 'image/png',
+    
+    // Portfolio/Social Features
+    portfolioId: 'portfolio-dev-123',
+    views: 156,
+    likes: 23
+  },
+  {
+    _id: 'piece-4',
+    title: 'Brand Identity Design',
+    artist: 'Dev User',
+    description: 'Complete brand identity package for a sustainable fashion startup',
+    
+    // Images
+    thumbnailUrl: 'https://picsum.photos/400/300?random=4',
+    imageUrl: 'https://picsum.photos/800/600?random=4',
+    
+    // Metadata & Accessibility
+    alt: 'Brand identity design showcase with logo and color palette',
+    medium: 'Digital',
+    year: 2024,
+    size: 'large' as ArtworkSize,
+    displayOrder: 4,
+    
+    // Dimensions
+    dimensions: {
+      width: 2000,
+      height: 1500,
+      unit: 'px'
+    },
+    
+    // Sales/Status
+    forSale: false,
+    status: 'published' as ArtworkStatus,
+    
+    // Visibility & Permissions
+    visibility: 'public' as GalleryVisibility,
+    ownerId: 'dev-user-123',
+    
+    // Timestamps
+    createdAt: new Date('2024-01-19T11:00:00Z'),
+    updatedAt: new Date('2024-01-19T11:00:00Z'),
+    publishedAt: new Date('2024-01-19T11:00:00Z'),
+    
+    // Tags & Categories
+    tags: ['Branding', 'Logo Design', 'Identity', 'Sustainability'],
+    category: 'Design' as ArtworkCategory,
+    
+    // Upload metadata
+    uploadedBy: 'dev-user-123',
+    originalFileName: 'brand-identity.jpg',
+    fileSize: 3.2,
+    mimeType: 'image/jpeg',
+    
+    // Portfolio/Social Features
+    portfolioId: 'portfolio-dev-123',
+    views: 312,
+    likes: 27
+  },
+  {
+    _id: 'piece-5',
+    title: 'Learning Management System',
+    artist: 'Dev User',
+    description: 'Full-stack LMS with video streaming, progress tracking, and assessments',
+    
+    // Images
+    thumbnailUrl: 'https://picsum.photos/400/300?random=5',
+    imageUrl: 'https://picsum.photos/800/600?random=5',
+    
+    // Metadata & Accessibility
+    alt: 'Learning Management System dashboard interface',
+    medium: 'Digital',
+    year: 2024,
+    size: 'large' as ArtworkSize,
+    displayOrder: 5,
+    
+    // Dimensions
+    dimensions: {
+      width: 1440,
+      height: 900,
+      unit: 'px'
+    },
+    
+    // Sales/Status
+    forSale: false,
+    status: 'published' as ArtworkStatus,
+    
+    // Visibility & Permissions
+    visibility: 'public' as GalleryVisibility,
+    ownerId: 'dev-user-123',
+    
+    // Timestamps
+    createdAt: new Date('2024-01-21T16:00:00Z'),
+    updatedAt: new Date('2024-01-21T16:00:00Z'),
+    publishedAt: new Date('2024-01-21T16:00:00Z'),
+    
+    // Tags & Categories
+    tags: ['React', 'Node.js', 'Education', 'Video Streaming'],
+    category: 'Digital' as ArtworkCategory,
+    
+    // Upload metadata
+    uploadedBy: 'dev-user-123',
+    originalFileName: 'lms-dashboard.png',
+    fileSize: 2.8,
+    mimeType: 'image/png',
+    
+    // Portfolio/Social Features
+    portfolioId: 'portfolio-dev-123',
+    views: 198,
+    likes: 15
+  }
+];

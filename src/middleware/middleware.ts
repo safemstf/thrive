@@ -4,6 +4,8 @@ import type { NextRequest } from 'next/server';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:5000';
 
+import { DEV_CONFIG, logDevMode } from '@/config/dev';
+
 // Define which routes require authentication
 const protectedRoutes = ['/admin', '/dashboard', '/profile'];
 const adminRoutes = ['/admin'];
@@ -12,6 +14,22 @@ const publicRoutes = ['/login', '/signup', '/', '/about', '/contact'];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('auth-token')?.value;
+  
+  // 🔓 BYPASS ALL AUTH IN DEV MODE
+  if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
+    logDevMode(`Skipping auth for: ${pathname}`, 'Middleware');
+    
+    // Add mock user headers for server components that expect them
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-user-id', DEV_CONFIG.MOCK_HEADERS['x-user-id']);
+    requestHeaders.set('x-user-role', DEV_CONFIG.MOCK_HEADERS['x-user-role']);
+    
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
   
   // Check if this is a protected route
   const isProtectedRoute = protectedRoutes.some(route => 

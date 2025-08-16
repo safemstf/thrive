@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { User, AuthContextType, SignupCredentials } from '@/types/auth.types';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api-client';
+import { DEV_CONFIG, logDevMode } from '@/config/dev';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -18,6 +19,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkAuth = useCallback(async () => {
     try {
+      // 🔓 BYPASS AUTH IN DEV MODE
+      if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
+        logDevMode('Using mock user data', 'AuthProvider');
+        setUser(DEV_CONFIG.MOCK_USER);
+        setLoading(false);
+        return;
+      }
+
       // Check if we have a token
       const token = localStorage.getItem('auth-token');
       if (!token) {
@@ -45,6 +54,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (usernameOrEmail: string, password: string) => {
     try {
+      // 🔓 MOCK LOGIN IN DEV MODE
+      if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
+        logDevMode('Mock login successful', 'AuthProvider');
+        setUser(DEV_CONFIG.MOCK_USER);
+        
+        // Redirect as normal
+        const searchParams = new URLSearchParams(window.location.search);
+        const redirect = searchParams.get('redirect') || '/dashboard';
+        router.push(redirect);
+        return;
+      }
+
       // Use the API client which will automatically store the token
       const response = await api.auth.login({
         email: usernameOrEmail, // The API client will convert this to usernameOrEmail
@@ -67,6 +88,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (credentials: SignupCredentials) => {
     try {
+      // 🔓 MOCK SIGNUP IN DEV MODE
+      if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
+        logDevMode('Mock signup successful', 'AuthProvider');
+        setUser(DEV_CONFIG.MOCK_USER);
+        router.push('/dashboard');
+        return;
+      }
+
       // Use the API client which will automatically store the token
       const response = await api.auth.signup(credentials);
       
@@ -82,6 +111,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      // 🔓 MOCK LOGOUT IN DEV MODE
+      if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
+        logDevMode('Mock logout', 'AuthProvider');
+        setUser(null);
+        router.push('/');
+        return;
+      }
+
       // Use the API client which will clear the token
       await api.auth.logout();
     } catch (error) {
@@ -94,6 +131,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateUser = async (updates: Partial<User>) => {
     try {
+      // 🔓 MOCK UPDATE IN DEV MODE
+      if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
+        logDevMode('Mock user update', 'AuthProvider');
+        setUser(prev => prev ? { ...prev, ...updates } : null);
+        return;
+      }
+
       const updatedUser = await api.auth.updateProfile(updates);
       setUser(updatedUser);
     } catch (error) {
