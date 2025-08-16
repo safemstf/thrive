@@ -31,7 +31,7 @@ import {
   Check
 } from 'lucide-react';
 
-import { theme } from '@/styles/theme';
+import { theme } from '@/styles/styled-components';
 import styled from 'styled-components';
 import type { Portfolio } from '@/types/portfolio.types';
 

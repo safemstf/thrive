@@ -31,7 +31,7 @@ import {
   Trash2
 } from 'lucide-react';
 
-import { theme } from '@/styles/theme';
+import { theme } from '@/styles/styled-components';
 import styled from 'styled-components';
 
 // Professional styled components

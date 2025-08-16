@@ -1,6 +1,6 @@
 // src/components/dashboard/thrive/thriveStyles.tsx - Dashboard thrive styles using existing design system
 import styled from 'styled-components';
-import { theme } from '@/styles/theme';
+import { theme } from '@/styles/styled-components';
 import {
   Card,
   BaseButton,
@@ -45,7 +45,6 @@ export const ThriveStatsGrid = styled.div`
 
 export const ThriveStatCard = styled(Card)`
   ${glassEffect}
-  ${hoverLift}
   text-align: center;
   cursor: default;
 `;
@@ -125,7 +124,6 @@ export const ThriveViewAllLink = styled.a`
 // Challenge card styles
 export const ThriveChallengeCard = styled(Card)<{ $featured?: boolean }>`
   ${glassEffect}
-  ${hoverLift}
   cursor: pointer;
   position: relative;
   border: 2px solid ${({ $featured }) => 

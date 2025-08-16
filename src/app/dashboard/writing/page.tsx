@@ -1,66 +1,28 @@
 'use client'
-// src\app\dashboard\writing\page.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import styled from 'styled-components';
+// src/app/dashboard/writing/page.tsx
+import React, { useState } from 'react';
 import { 
-  BookOpen, 
-  PenTool, 
-  FileText, 
-  Users, 
-  TrendingUp, 
-  Award,
-  Plus,
-  Search,
-  Filter,
-  Grid,
-  List,
-  Eye,
-  Heart,
-  MessageSquare,
-  Share2,
-  Download,
-  Edit3,
-  Calendar,
-  Tag,
-  Star,
-  ChevronDown,
-  Upload,
-  Clock,
-  User,
-  BookMarked,
-  Loader2,
-  X,
-  RefreshCw
+  BookOpen, PenTool, FileText, Users, TrendingUp, Plus, Filter, Grid, List,
+  Eye, Heart, MessageSquare, Share2, Download, Edit3, Calendar, Tag, 
+  Clock, BookMarked, Loader2, X, RefreshCw, Upload, Search
 } from 'lucide-react';
 
-// Import your existing styled components
+// Use modular components from our main styled-components system
 import {
-  PageContainer,
-  ContentWrapper,
-  Card,
-  CardContent,
-  BaseButton,
-  Grid as StyledGrid,
-  FlexRow,
-  FlexColumn,
-  Badge,
-  TabContainer,
-  TabButton,
-  Input,
-  LoadingContainer,
-  EmptyState,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalTitle,
-  ModalBody,
-  ProgressBar,
-  ProgressFill
+  PageContainer, ContentWrapper, Card, BaseButton, Grid as StyledGrid, FlexRow, 
+  Badge, Input, EmptyState, Modal, ModalOverlay, ModalContent, ModalHeader, 
+  ModalTitle, ModalBody, ProgressBar, HeroSection, Container,
+  Heading2, BodyText
 } from '@/styles/styled-components';
 
-// Types that integrate with your existing portfolio system
-type WritingPieceType = 'essay' | 'guide' | 'tutorial' | 'poem' | 'story' | 'article' | 'lesson' | 'research';
+// Only import truly custom styles that we can't replace
+import {
+  WritingHeader, HeaderContent, HeaderTitle, HeaderSubtitle,
+  TagChip, WritingGrid, WritingCard, TypeBadge, ActionButton,
+  AuthorSection, AuthorAvatar, AuthorInfo, AuthorName, AuthorRole, ProgressFill
+} from './writing.styles';
+
+type WritingPieceType = 'guide' | 'tutorial' | 'essay' | 'article' | 'poem' | 'story' | 'lesson' | 'research';
 
 interface WritingPiece {
   id: string;
@@ -108,7 +70,6 @@ interface WritingStats {
   }>;
 }
 
-// Mock data that fits your educational and creative portfolio types
 const mockWritingPieces: WritingPiece[] = [
   {
     id: '1',
@@ -241,396 +202,6 @@ const mockStats: WritingStats = {
   ]
 };
 
-// Styled components specific to writing portfolio
-const WritingHeader = styled.div`
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 4rem 0;
-  text-align: center;
-  position: relative;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
-    opacity: 0.1;
-  }
-`;
-
-const HeaderContent = styled.div`
-  position: relative;
-  z-index: 1;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 0 2rem;
-`;
-
-const HeaderTitle = styled.h1`
-  font-size: 3.5rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  
-  @media (max-width: 768px) {
-    font-size: 2.5rem;
-  }
-`;
-
-const HeaderSubtitle = styled.p`
-  font-size: 1.25rem;
-  opacity: 0.9;
-  margin-bottom: 2rem;
-  line-height: 1.6;
-`;
-
-const StatsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin: 3rem 0;
-`;
-
-const StatCard = styled(Card)`
-  text-align: center;
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-  border: 1px solid #e2e8f0;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-  }
-`;
-
-const StatValue = styled.div`
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #1a202c;
-  margin-bottom: 0.5rem;
-`;
-
-const StatLabel = styled.div`
-  font-size: 0.875rem;
-  color: #718096;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-`;
-
-const StatChange = styled.div<{ $positive?: boolean }>`
-  font-size: 0.75rem;
-  margin-top: 0.5rem;
-  color: ${props => props.$positive ? '#38a169' : '#e53e3e'};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-`;
-
-const FilterSection = styled.div`
-  background: white;
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  border: 1px solid #e2e8f0;
-`;
-
-const FilterRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-  justify-content: space-between;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: stretch;
-  }
-`;
-
-const SearchContainer = styled.div`
-  position: relative;
-  flex: 1;
-  min-width: 300px;
-  max-width: 400px;
-`;
-
-const SearchInput = styled(Input)`
-  padding-left: 2.5rem;
-`;
-
-const SearchIcon = styled(Search)`
-  position: absolute;
-  left: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #a0aec0;
-  pointer-events: none;
-`;
-
-const FilterControls = styled.div`
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  flex-wrap: wrap;
-`;
-
-const FilterSelect = styled.select`
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  background: white;
-  color: #2d3748;
-  font-size: 0.875rem;
-  cursor: pointer;
-  
-  &:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-  }
-`;
-
-const ViewToggle = styled.div`
-  display: flex;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  overflow: hidden;
-`;
-
-const ViewButton = styled.button<{ $active?: boolean }>`
-  padding: 0.5rem;
-  background: ${props => props.$active ? '#667eea' : 'white'};
-  color: ${props => props.$active ? 'white' : '#718096'};
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: ${props => props.$active ? '#667eea' : '#f7fafc'};
-  }
-`;
-
-const TagsSection = styled.div`
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e2e8f0;
-`;
-
-const TagsLabel = styled.div`
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #4a5568;
-  margin-bottom: 0.75rem;
-`;
-
-const TagsContainer = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-`;
-
-const TagChip = styled.button<{ $selected?: boolean }>`
-  padding: 0.25rem 0.75rem;
-  background: ${props => props.$selected ? '#667eea' : '#f7fafc'};
-  color: ${props => props.$selected ? 'white' : '#4a5568'};
-  border: 1px solid ${props => props.$selected ? '#667eea' : '#e2e8f0'};
-  border-radius: 999px;
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: ${props => props.$selected ? '#5a67d8' : '#edf2f7'};
-  }
-`;
-
-const WritingGrid = styled.div<{ $viewMode: 'grid' | 'list' }>`
-  display: ${props => props.$viewMode === 'grid' ? 'grid' : 'flex'};
-  grid-template-columns: ${props => props.$viewMode === 'grid' ? 'repeat(auto-fill, minmax(350px, 1fr))' : 'none'};
-  flex-direction: ${props => props.$viewMode === 'list' ? 'column' : 'row'};
-  gap: 1.5rem;
-  
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const WritingCard = styled(Card)<{ $featured?: boolean }>`
-  position: relative;
-  border: ${props => props.$featured ? '2px solid #ffd700' : '1px solid #e2e8f0'};
-  transition: all 0.3s ease;
-  
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.15);
-  }
-  
-  ${props => props.$featured && `
-    &::before {
-      content: '⭐ Featured';
-      position: absolute;
-      top: -1px;
-      right: 1rem;
-      background: linear-gradient(135deg, #ffd700, #ffed4e);
-      color: #744210;
-      padding: 0.25rem 0.75rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      border-radius: 0 0 6px 6px;
-      z-index: 1;
-    }
-  `}
-`;
-
-const CardHeader = styled.div`
-  padding: 1.5rem 1.5rem 1rem 1.5rem;
-`;
-
-const TypeBadge = styled(Badge)<{ $type: WritingPieceType }>`
-  background: ${props => {
-    const typeColors: Record<WritingPieceType, string> = {
-      guide: '#e6fffa',
-      tutorial: '#f0fff4',
-      essay: '#faf5ff',
-      poem: '#fff5f5',
-      story: '#f7fafc',
-      article: '#fffbeb',
-      lesson: '#f0f9ff',
-      research: '#fef5e7'
-    };
-    return typeColors[props.$type] || '#f7fafc';
-  }};
-  color: ${props => {
-    const typeColors: Record<WritingPieceType, string> = {
-      guide: '#319795',
-      tutorial: '#38a169',
-      essay: '#805ad5',
-      poem: '#e53e3e',
-      story: '#4a5568',
-      article: '#d69e2e',
-      lesson: '#3182ce',
-      research: '#dd6b20'
-    };
-    return typeColors[props.$type] || '#4a5568';
-  }};
-`;
-
-const CardTitle = styled.h3`
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1a202c;
-  margin: 0.75rem 0 0.5rem 0;
-  line-height: 1.4;
-  cursor: pointer;
-  
-  &:hover {
-    color: #667eea;
-  }
-`;
-
-const CardExcerpt = styled.p`
-  color: #4a5568;
-  font-size: 0.875rem;
-  line-height: 1.6;
-  margin-bottom: 1rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-`;
-
-const CardMeta = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-size: 0.75rem;
-  color: #718096;
-  margin-bottom: 1rem;
-`;
-
-const MetaItem = styled.span`
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-`;
-
-const CardStats = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem;
-  background: #f7fafc;
-  border-top: 1px solid #e2e8f0;
-`;
-
-const StatsLeft = styled.div`
-  display: flex;
-  gap: 1rem;
-  font-size: 0.75rem;
-  color: #718096;
-`;
-
-const StatsRight = styled.div`
-  display: flex;
-  gap: 0.5rem;
-`;
-
-const ActionButton = styled.button`
-  padding: 0.25rem;
-  background: transparent;
-  border: none;
-  color: #718096;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: #edf2f7;
-    color: #4a5568;
-  }
-`;
-
-const AuthorSection = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0 1.5rem 1rem 1.5rem;
-`;
-
-const AuthorAvatar = styled.div`
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 0.875rem;
-`;
-
-const AuthorInfo = styled.div`
-  flex: 1;
-`;
-
-const AuthorName = styled.div`
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #2d3748;
-`;
-
-const AuthorRole = styled.div`
-  font-size: 0.75rem;
-  color: #718096;
-`;
-
 export default function WritingPortfolioSystem() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filterType, setFilterType] = useState<string>('all');
@@ -640,8 +211,8 @@ export default function WritingPortfolioSystem() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<'newest' | 'popular' | 'title' | 'reads'>('newest');
-  const [writingPieces, setWritingPieces] = useState<WritingPiece[]>(mockWritingPieces);
-  const [stats, setStats] = useState<WritingStats>(mockStats);
+  const [writingPieces] = useState<WritingPiece[]>(mockWritingPieces);
+  const [stats] = useState<WritingStats>(mockStats);
   const [loading, setLoading] = useState(false);
   const [selectedPiece, setSelectedPiece] = useState<WritingPiece | null>(null);
 
@@ -655,33 +226,24 @@ export default function WritingPortfolioSystem() {
     const matchesType = filterType === 'all' || piece.type === filterType;
     const matchesCategory = filterCategory === 'all' || piece.category === filterCategory;
     const matchesDifficulty = filterDifficulty === 'all' || piece.difficulty === filterDifficulty;
-    
-    const matchesTags = selectedTags.length === 0 || 
-                       selectedTags.some(tag => piece.tags.includes(tag));
+    const matchesTags = selectedTags.length === 0 || selectedTags.some(tag => piece.tags.includes(tag));
     
     return matchesSearch && matchesType && matchesCategory && matchesDifficulty && matchesTags;
   }).sort((a, b) => {
     switch (sortBy) {
-      case 'popular':
-        return b.stats.views - a.stats.views;
-      case 'title':
-        return a.title.localeCompare(b.title);
-      case 'reads':
-        return b.stats.views - a.stats.views;
-      default: // newest
-        return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+      case 'popular': return b.stats.views - a.stats.views;
+      case 'title': return a.title.localeCompare(b.title);
+      case 'reads': return b.stats.views - a.stats.views;
+      default: return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
     }
   });
 
-  // Get all available tags and categories
   const allTags = Array.from(new Set(writingPieces.flatMap(piece => piece.tags)));
   const allCategories = Array.from(new Set(writingPieces.map(piece => piece.category)));
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => 
-      prev.includes(tag) 
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     );
   };
 
@@ -695,14 +257,8 @@ export default function WritingPortfolioSystem() {
 
   const getTypeIcon = (type: WritingPieceType) => {
     const iconMap: Record<WritingPieceType, React.ComponentType<any>> = {
-      guide: BookOpen,
-      tutorial: PenTool,
-      essay: FileText,
-      article: FileText,
-      poem: Edit3,
-      story: BookMarked,
-      lesson: Users,
-      research: TrendingUp
+      guide: BookOpen, tutorial: PenTool, essay: FileText, article: FileText,
+      poem: Edit3, story: BookMarked, lesson: Users, research: TrendingUp
     };
     const Icon = iconMap[type] || FileText;
     return <Icon size={14} />;
@@ -710,38 +266,41 @@ export default function WritingPortfolioSystem() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+      year: 'numeric', month: 'short', day: 'numeric'
     });
   };
 
   const formatNumber = (num: number) => {
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'k';
-    }
-    return num.toString();
+    return num >= 1000 ? (num / 1000).toFixed(1) + 'k' : num.toString();
   };
 
   const getDifficultyColor = (difficulty?: string) => {
-    switch (difficulty) {
-      case 'beginner': return '#38a169';
-      case 'intermediate': return '#d69e2e';
-      case 'advanced': return '#e53e3e';
-      default: return '#718096';
-    }
+    const colors = {
+      beginner: '#38a169', intermediate: '#d69e2e', advanced: '#e53e3e'
+    };
+    return colors[difficulty as keyof typeof colors] || '#718096';
   };
 
-  const openPieceModal = (piece: WritingPiece) => {
-    setSelectedPiece(piece);
-  };
-
-  const closePieceModal = () => {
-    setSelectedPiece(null);
-  };
+  const FilterSelect = ({ value, onChange, children }: any) => (
+    <select 
+      value={value} 
+      onChange={onChange}
+      style={{
+        padding: '0.5rem 0.75rem',
+        borderRadius: '0.5rem',
+        border: '1px solid #e2e8f0',
+        background: 'white',
+        fontSize: '0.875rem',
+        color: '#2d3748'
+      }}
+    >
+      {children}
+    </select>
+  );
 
   return (
     <PageContainer>
+      {/* Hero Header */}
       <WritingHeader>
         <HeaderContent>
           <HeaderTitle>Writing Portfolio</HeaderTitle>
@@ -756,60 +315,47 @@ export default function WritingPortfolioSystem() {
       </WritingHeader>
 
       <ContentWrapper>
-        {/* Stats Section */}
-        <StatsGrid>
-          <StatCard>
-            <StatValue>{stats.totalPieces}</StatValue>
-            <StatLabel>Total Pieces</StatLabel>
-            <StatChange $positive={true}>
-              <TrendingUp size={12} />
-              +{stats.publishedThisMonth} this month
-            </StatChange>
-          </StatCard>
-          
-          <StatCard>
-            <StatValue>{formatNumber(stats.totalViews)}</StatValue>
-            <StatLabel>Total Views</StatLabel>
-            <StatChange $positive={true}>
-              <Eye size={12} />
-              +{stats.engagementRate}% engagement
-            </StatChange>
-          </StatCard>
-          
-          <StatCard>
-            <StatValue>{formatNumber(stats.totalLikes)}</StatValue>
-            <StatLabel>Total Likes</StatLabel>
-            <StatChange $positive={true}>
-              <Heart size={12} />
-              {((stats.totalLikes / stats.totalViews) * 100).toFixed(1)}% rate
-            </StatChange>
-          </StatCard>
-          
-          <StatCard>
-            <StatValue>{stats.averageReadTime}m</StatValue>
-            <StatLabel>Avg Read Time</StatLabel>
-            <StatChange>
-              <Clock size={12} />
-              Per piece
-            </StatChange>
-          </StatCard>
-        </StatsGrid>
+        {/* Stats Section - Using modular Grid */}
+        <StyledGrid $columns={4} $gap="1.5rem" style={{ margin: '3rem 0' }}>
+          {[
+            { value: stats.totalPieces, label: 'Total Pieces', icon: TrendingUp, change: `+${stats.publishedThisMonth} this month` },
+            { value: formatNumber(stats.totalViews), label: 'Total Views', icon: Eye, change: `+${stats.engagementRate}% engagement` },
+            { value: formatNumber(stats.totalLikes), label: 'Total Likes', icon: Heart, change: `${((stats.totalLikes / stats.totalViews) * 100).toFixed(1)}% rate` },
+            { value: `${stats.averageReadTime}m`, label: 'Avg Read Time', icon: Clock, change: 'Per piece' }
+          ].map((stat, index) => (
+            <Card key={index} $hover $padding="lg" style={{ textAlign: 'center', background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' }}>
+              <div style={{ fontSize: '2.5rem', fontWeight: '700', color: '#1a202c', marginBottom: '0.5rem' }}>
+                {stat.value}
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#718096', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {stat.label}
+              </div>
+              <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', color: '#38a169', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}>
+                <stat.icon size={12} />
+                {stat.change}
+              </div>
+            </Card>
+          ))}
+        </StyledGrid>
 
-        {/* Filters Section */}
-        <FilterSection>
-          <FilterRow>
-            <SearchContainer>
-              <SearchIcon />
-              <SearchInput
+        {/* Filters Section - Using modular Card */}
+        <Card $padding="lg" style={{ marginBottom: '2rem' }}>
+          <FlexRow $gap="1rem" $justify="space-between">
+            {/* Search */}
+            <div style={{ position: 'relative', flex: 1, minWidth: '300px', maxWidth: '400px' }}>
+              <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#a0aec0', pointerEvents: 'none' }} size={20} />
+              <Input
                 type="text"
                 placeholder="Search writing pieces..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ paddingLeft: '2.5rem' }}
               />
-            </SearchContainer>
+            </div>
 
-            <FilterControls>
-              <FilterSelect value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+            {/* Controls */}
+            <FlexRow $gap="1rem" $responsive={false}>
+              <FilterSelect value={filterType} onChange={(e: any) => setFilterType(e.target.value)}>
                 <option value="all">All Types</option>
                 <option value="guide">Guides</option>
                 <option value="tutorial">Tutorials</option>
@@ -820,56 +366,54 @@ export default function WritingPortfolioSystem() {
                 <option value="research">Research</option>
               </FilterSelect>
 
-              <FilterSelect value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+              <FilterSelect value={filterCategory} onChange={(e: any) => setFilterCategory(e.target.value)}>
                 <option value="all">All Categories</option>
                 {allCategories.map(category => (
                   <option key={category} value={category}>{category}</option>
                 ))}
               </FilterSelect>
 
-              <FilterSelect value={filterDifficulty} onChange={(e) => setFilterDifficulty(e.target.value)}>
-                <option value="all">All Levels</option>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-              </FilterSelect>
-
-              <FilterSelect value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+              <FilterSelect value={sortBy} onChange={(e: any) => setSortBy(e.target.value)}>
                 <option value="newest">Newest</option>
                 <option value="popular">Most Popular</option>
                 <option value="title">Alphabetical</option>
                 <option value="reads">Most Read</option>
               </FilterSelect>
 
-              <BaseButton 
-                $variant="ghost" 
-                onClick={() => setShowFilters(!showFilters)}
-                style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
-              >
+              <BaseButton $variant="ghost" onClick={() => setShowFilters(!showFilters)} $size="sm">
                 <Filter size={16} />
                 Filters
-                {selectedTags.length > 0 && (
-                  <Badge style={{ marginLeft: '0.5rem' }}>
-                    {selectedTags.length}
-                  </Badge>
-                )}
+                {selectedTags.length > 0 && <Badge style={{ marginLeft: '0.5rem' }}>{selectedTags.length}</Badge>}
               </BaseButton>
 
-              <ViewToggle>
-                <ViewButton $active={viewMode === 'grid'} onClick={() => setViewMode('grid')}>
-                  <Grid size={16} />
-                </ViewButton>
-                <ViewButton $active={viewMode === 'list'} onClick={() => setViewMode('list')}>
-                  <List size={16} />
-                </ViewButton>
-              </ViewToggle>
-            </FilterControls>
-          </FilterRow>
+              {/* View Toggle */}
+              <div style={{ display: 'flex', border: '1px solid #e2e8f0', borderRadius: '6px', overflow: 'hidden' }}>
+                {['grid', 'list'].map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode as 'grid' | 'list')}
+                    style={{
+                      padding: '0.5rem',
+                      background: viewMode === mode ? '#667eea' : 'white',
+                      color: viewMode === mode ? 'white' : '#718096',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {mode === 'grid' ? <Grid size={16} /> : <List size={16} />}
+                  </button>
+                ))}
+              </div>
+            </FlexRow>
+          </FlexRow>
 
+          {/* Tag Filters */}
           {showFilters && (
-            <TagsSection>
-              <TagsLabel>Filter by Tags:</TagsLabel>
-              <TagsContainer>
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: '600', color: '#4a5568', marginBottom: '0.75rem' }}>
+                Filter by Tags:
+              </div>
+              <FlexRow $gap="0.5rem">
                 {allTags.map(tag => (
                   <TagChip
                     key={tag}
@@ -879,30 +423,26 @@ export default function WritingPortfolioSystem() {
                     {tag}
                   </TagChip>
                 ))}
-              </TagsContainer>
+              </FlexRow>
               {(selectedTags.length > 0 || filterType !== 'all' || filterCategory !== 'all' || filterDifficulty !== 'all') && (
-                <BaseButton 
-                  $variant="ghost" 
-                  onClick={clearFilters}
-                  style={{ marginTop: '1rem', fontSize: '0.75rem', padding: '0.5rem 1rem' }}
-                >
+                <BaseButton $variant="ghost" onClick={clearFilters} $size="sm" style={{ marginTop: '1rem' }}>
                   Clear All Filters
                 </BaseButton>
               )}
-            </TagsSection>
+            </div>
           )}
-        </FilterSection>
+        </Card>
 
         {/* Results Info */}
-        <FlexRow style={{ marginBottom: '1.5rem', justifyContent: 'space-between' }}>
-          <div style={{ color: '#718096', fontSize: '0.875rem' }}>
+        <FlexRow $justify="space-between" style={{ marginBottom: '1.5rem' }}>
+          <BodyText $size="sm" style={{ color: '#718096', margin: 0 }}>
             Showing {filteredPieces.length} of {writingPieces.length} pieces
-          </div>
+          </BodyText>
           {loading && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#718096' }}>
+            <FlexRow $gap="0.5rem" $responsive={false}>
               <Loader2 size={16} className="animate-spin" />
-              Loading...
-            </div>
+              <span style={{ color: '#718096' }}>Loading...</span>
+            </FlexRow>
           )}
         </FlexRow>
 
@@ -918,17 +458,16 @@ export default function WritingPortfolioSystem() {
               }
             </p>
             {(searchQuery || selectedTags.length > 0 || filterType !== 'all' || filterCategory !== 'all' || filterDifficulty !== 'all') && (
-              <BaseButton onClick={clearFilters} $variant="secondary">
-                Clear Filters
-              </BaseButton>
+              <BaseButton onClick={clearFilters} $variant="secondary">Clear Filters</BaseButton>
             )}
           </EmptyState>
         ) : (
           <WritingGrid $viewMode={viewMode}>
             {filteredPieces.map(piece => (
-              <WritingCard key={piece.id} $featured={piece.featured} $hover>
-                <CardHeader>
-                  <FlexRow style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+              <WritingCard key={piece.id} $featured={piece.featured}>
+                {/* Card Header */}
+                <div style={{ padding: '1.5rem 1.5rem 1rem 1.5rem' }}>
+                  <FlexRow $justify="space-between" $responsive={false} style={{ marginBottom: '0.75rem' }}>
                     <TypeBadge $type={piece.type}>
                       {getTypeIcon(piece.type)}
                       {piece.type.charAt(0).toUpperCase() + piece.type.slice(1)}
@@ -944,29 +483,41 @@ export default function WritingPortfolioSystem() {
                     )}
                   </FlexRow>
 
-                  <CardTitle onClick={() => openPieceModal(piece)}>
+                  <h3 
+                    onClick={() => setSelectedPiece(piece)}
+                    style={{
+                      fontSize: '1.25rem', fontWeight: '600', color: '#1a202c',
+                      margin: '0.75rem 0 0.5rem 0', lineHeight: '1.4', cursor: 'pointer',
+                      transition: 'color 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.color = '#667eea'}
+                    onMouseOut={(e) => e.currentTarget.style.color = '#1a202c'}
+                  >
                     {piece.title}
-                  </CardTitle>
+                  </h3>
 
-                  <CardExcerpt>{piece.excerpt}</CardExcerpt>
+                  <p style={{ color: '#4a5568', fontSize: '0.875rem', lineHeight: '1.6', marginBottom: '1rem' }}>
+                    {piece.excerpt}
+                  </p>
 
-                  <CardMeta>
-                    <MetaItem>
+                  {/* Meta Info */}
+                  <FlexRow $gap="1rem" $responsive={false} style={{ fontSize: '0.75rem', color: '#718096', marginBottom: '1rem' }}>
+                    <FlexRow $gap="0.25rem" $responsive={false}>
                       <Calendar size={12} />
                       {formatDate(piece.publishedAt)}
-                    </MetaItem>
-                    <MetaItem>
+                    </FlexRow>
+                    <FlexRow $gap="0.25rem" $responsive={false}>
                       <Clock size={12} />
                       {piece.readTime} min read
-                    </MetaItem>
-                    <MetaItem>
+                    </FlexRow>
+                    <FlexRow $gap="0.25rem" $responsive={false}>
                       <Tag size={12} />
                       {piece.category}
-                    </MetaItem>
-                  </CardMeta>
+                    </FlexRow>
+                  </FlexRow>
 
                   {/* Tags */}
-                  <TagsContainer style={{ marginBottom: '1rem' }}>
+                  <FlexRow $gap="0.5rem" style={{ marginBottom: '1rem' }}>
                     {piece.tags.slice(0, 3).map(tag => (
                       <TagChip key={tag} style={{ fontSize: '0.625rem', padding: '0.125rem 0.5rem' }}>
                         {tag}
@@ -977,57 +528,39 @@ export default function WritingPortfolioSystem() {
                         +{piece.tags.length - 3} more
                       </span>
                     )}
-                  </TagsContainer>
-                </CardHeader>
+                  </FlexRow>
+                </div>
 
+                {/* Author Section */}
                 <AuthorSection>
-                  <AuthorAvatar>
-                    {piece.author.name.charAt(0)}
-                  </AuthorAvatar>
+                  <AuthorAvatar>{piece.author.name.charAt(0)}</AuthorAvatar>
                   <AuthorInfo>
                     <AuthorName>{piece.author.name}</AuthorName>
                     <AuthorRole>{piece.author.role}</AuthorRole>
                   </AuthorInfo>
                 </AuthorSection>
 
-                <CardStats>
-                  <StatsLeft>
-                    <MetaItem>
-                      <Eye size={12} />
-                      {formatNumber(piece.stats.views)}
-                    </MetaItem>
-                    <MetaItem>
-                      <Heart size={12} />
-                      {piece.stats.likes}
-                    </MetaItem>
-                    <MetaItem>
-                      <MessageSquare size={12} />
-                      {piece.stats.comments}
-                    </MetaItem>
-                    <MetaItem>
-                      <Download size={12} />
-                      {piece.stats.downloads}
-                    </MetaItem>
-                  </StatsLeft>
+                {/* Stats Footer */}
+                <FlexRow $justify="space-between" style={{ padding: '1rem 1.5rem', background: '#f7fafc', borderTop: '1px solid #e2e8f0' }}>
+                  <FlexRow $gap="1rem" $responsive={false} style={{ fontSize: '0.75rem', color: '#718096' }}>
+                    <FlexRow $gap="0.25rem" $responsive={false}><Eye size={12} />{formatNumber(piece.stats.views)}</FlexRow>
+                    <FlexRow $gap="0.25rem" $responsive={false}><Heart size={12} />{piece.stats.likes}</FlexRow>
+                    <FlexRow $gap="0.25rem" $responsive={false}><MessageSquare size={12} />{piece.stats.comments}</FlexRow>
+                    <FlexRow $gap="0.25rem" $responsive={false}><Download size={12} />{piece.stats.downloads}</FlexRow>
+                  </FlexRow>
                   
-                  <StatsRight>
-                    <ActionButton title="Share">
-                      <Share2 size={14} />
-                    </ActionButton>
-                    <ActionButton title="Download">
-                      <Download size={14} />
-                    </ActionButton>
-                    <ActionButton title="Like">
-                      <Heart size={14} />
-                    </ActionButton>
-                  </StatsRight>
-                </CardStats>
+                  <FlexRow $gap="0.5rem" $responsive={false}>
+                    <ActionButton title="Share"><Share2 size={14} /></ActionButton>
+                    <ActionButton title="Download"><Download size={14} /></ActionButton>
+                    <ActionButton title="Like"><Heart size={14} /></ActionButton>
+                  </FlexRow>
+                </FlexRow>
               </WritingCard>
             ))}
           </WritingGrid>
         )}
 
-        {/* Load More Button */}
+        {/* Load More */}
         {filteredPieces.length > 0 && filteredPieces.length >= 12 && (
           <div style={{ textAlign: 'center', marginTop: '3rem' }}>
             <BaseButton $variant="secondary" onClick={() => setLoading(true)}>
@@ -1046,14 +579,12 @@ export default function WritingPortfolioSystem() {
           </div>
         )}
 
-        {/* Top Categories Section */}
+        {/* Top Categories */}
         <div style={{ marginTop: '4rem' }}>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: '600', marginBottom: '1.5rem', color: '#1a202c' }}>
-            Popular Categories
-          </h2>
+          <Heading2>Popular Categories</Heading2>
           <StyledGrid $minWidth="200px" $gap="1rem">
             {stats.topCategories.map(category => (
-              <Card key={category.name} $hover style={{ padding: '1.5rem', textAlign: 'center' }}>
+              <Card key={category.name} $padding="lg" style={{ textAlign: 'center' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '0.5rem', color: '#2d3748' }}>
                   {category.name}
                 </h3>
@@ -1071,44 +602,29 @@ export default function WritingPortfolioSystem() {
           </StyledGrid>
         </div>
 
-        {/* Recent Activity Section */}
+        {/* Recent Activity */}
         <div style={{ marginTop: '4rem', marginBottom: '4rem' }}>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: '600', marginBottom: '1.5rem', color: '#1a202c' }}>
-            Recent Activity
-          </h2>
-          <Card style={{ padding: '1.5rem' }}>
+          <Heading2>Recent Activity</Heading2>
+          <Card $padding="lg">
             {stats.recentActivity.map((activity, index) => (
-              <div key={index} style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '1rem', 
+              <FlexRow key={index} $gap="1rem" style={{ 
                 padding: '0.75rem 0',
                 borderBottom: index < stats.recentActivity.length - 1 ? '1px solid #e2e8f0' : 'none'
               }}>
                 <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
+                  width: '32px', height: '32px', borderRadius: '50%',
                   background: (() => {
-                    switch (activity.type) {
-                      case 'published': return '#e6fffa';
-                      case 'updated': return '#f0fff4';
-                      case 'liked': return '#fff5f5';
-                      case 'commented': return '#faf5ff';
-                      default: return '#f7fafc';
-                    }
+                    const backgrounds = {
+                      published: '#e6fffa', updated: '#f0fff4', liked: '#fff5f5', commented: '#faf5ff'
+                    };
+                    return backgrounds[activity.type as keyof typeof backgrounds] || '#f7fafc';
                   })(),
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: (() => {
-                    switch (activity.type) {
-                      case 'published': return '#319795';
-                      case 'updated': return '#38a169';
-                      case 'liked': return '#e53e3e';
-                      case 'commented': return '#805ad5';
-                      default: return '#4a5568';
-                    }
+                    const colors = {
+                      published: '#319795', updated: '#38a169', liked: '#e53e3e', commented: '#805ad5'
+                    };
+                    return colors[activity.type as keyof typeof colors] || '#4a5568';
                   })()
                 }}>
                   {activity.type === 'published' && <Upload size={16} />}
@@ -1124,21 +640,21 @@ export default function WritingPortfolioSystem() {
                     {formatDate(activity.date)}
                   </div>
                 </div>
-              </div>
+              </FlexRow>
             ))}
           </Card>
         </div>
       </ContentWrapper>
 
-      {/* Piece Detail Modal */}
+      {/* Modal */}
       {selectedPiece && (
         <Modal $isOpen={true}>
-          <ModalOverlay onClick={closePieceModal} />
+          <ModalOverlay $isOpen={true} onClick={() => setSelectedPiece(null)} />
           <ModalContent style={{ maxWidth: '800px', maxHeight: '90vh' }}>
             <ModalHeader>
               <div>
                 <ModalTitle>{selectedPiece.title}</ModalTitle>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                <FlexRow $gap="1rem" $responsive={false} style={{ marginTop: '0.5rem' }}>
                   <TypeBadge $type={selectedPiece.type}>
                     {getTypeIcon(selectedPiece.type)}
                     {selectedPiece.type.charAt(0).toUpperCase() + selectedPiece.type.slice(1)}
@@ -1154,17 +670,13 @@ export default function WritingPortfolioSystem() {
                   <span style={{ fontSize: '0.875rem', color: '#718096' }}>
                     {selectedPiece.readTime} min read
                   </span>
-                </div>
+                </FlexRow>
               </div>
               <button 
-                onClick={closePieceModal}
+                onClick={() => setSelectedPiece(null)}
                 style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  cursor: 'pointer',
-                  padding: '0.5rem',
-                  borderRadius: '4px',
-                  color: '#718096'
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '0.5rem', borderRadius: '4px', color: '#718096'
                 }}
               >
                 <X size={24} />
@@ -1172,83 +684,44 @@ export default function WritingPortfolioSystem() {
             </ModalHeader>
             
             <ModalBody>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <AuthorSection style={{ padding: 0, marginBottom: '1rem' }}>
-                  <AuthorAvatar>
-                    {selectedPiece.author.name.charAt(0)}
-                  </AuthorAvatar>
-                  <AuthorInfo>
-                    <AuthorName>{selectedPiece.author.name}</AuthorName>
-                    <AuthorRole>{selectedPiece.author.role}</AuthorRole>
-                  </AuthorInfo>
-                  <div style={{ fontSize: '0.75rem', color: '#718096' }}>
-                    {formatDate(selectedPiece.publishedAt)}
-                  </div>
-                </AuthorSection>
-                
-                <p style={{ color: '#4a5568', lineHeight: '1.6', marginBottom: '1.5rem' }}>
-                  {selectedPiece.excerpt}
-                </p>
-                
-                <TagsContainer style={{ marginBottom: '1.5rem' }}>
-                  {selectedPiece.tags.map(tag => (
-                    <TagChip key={tag} style={{ fontSize: '0.75rem' }}>
-                      {tag}
-                    </TagChip>
+              <AuthorSection style={{ padding: 0, marginBottom: '1rem' }}>
+                <AuthorAvatar>{selectedPiece.author.name.charAt(0)}</AuthorAvatar>
+                <AuthorInfo>
+                  <AuthorName>{selectedPiece.author.name}</AuthorName>
+                  <AuthorRole>{selectedPiece.author.role}</AuthorRole>
+                </AuthorInfo>
+                <div style={{ fontSize: '0.75rem', color: '#718096' }}>
+                  {formatDate(selectedPiece.publishedAt)}
+                </div>
+              </AuthorSection>
+              
+              <BodyText style={{ marginBottom: '1.5rem' }}>{selectedPiece.excerpt}</BodyText>
+              
+              <FlexRow $gap="0.5rem" style={{ marginBottom: '1.5rem' }}>
+                {selectedPiece.tags.map(tag => (
+                  <TagChip key={tag} style={{ fontSize: '0.75rem' }}>{tag}</TagChip>
+                ))}
+              </FlexRow>
+              
+              <Card $padding="md" style={{ background: '#f7fafc', marginBottom: '1.5rem' }}>
+                <StyledGrid $columns={4} $gap="1rem" style={{ fontSize: '0.875rem' }}>
+                  {[
+                    { label: 'Views', value: formatNumber(selectedPiece.stats.views) },
+                    { label: 'Likes', value: selectedPiece.stats.likes },
+                    { label: 'Comments', value: selectedPiece.stats.comments },
+                    { label: 'Downloads', value: selectedPiece.stats.downloads }
+                  ].map(stat => (
+                    <div key={stat.label} style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: '600', color: '#2d3748' }}>{stat.value}</div>
+                      <div style={{ color: '#718096' }}>{stat.label}</div>
+                    </div>
                   ))}
-                </TagsContainer>
-                
-                <div style={{ 
-                  background: '#f7fafc', 
-                  padding: '1rem', 
-                  borderRadius: '8px',
-                  marginBottom: '1.5rem'
-                }}>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', 
-                    gap: '1rem',
-                    fontSize: '0.875rem'
-                  }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: '600', color: '#2d3748' }}>
-                        {formatNumber(selectedPiece.stats.views)}
-                      </div>
-                      <div style={{ color: '#718096' }}>Views</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: '600', color: '#2d3748' }}>
-                        {selectedPiece.stats.likes}
-                      </div>
-                      <div style={{ color: '#718096' }}>Likes</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: '600', color: '#2d3748' }}>
-                        {selectedPiece.stats.comments}
-                      </div>
-                      <div style={{ color: '#718096' }}>Comments</div>
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontWeight: '600', color: '#2d3748' }}>
-                        {selectedPiece.stats.downloads}
-                      </div>
-                      <div style={{ color: '#718096' }}>Downloads</div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div style={{ 
-                  color: '#4a5568', 
-                  lineHeight: '1.7',
-                  fontSize: '1rem'
-                }}>
-                  <p>This is where the full content of the piece would be displayed. The content would be rendered from the piece's content field, which could include formatted text, images, code blocks, and other rich media depending on the type of writing piece.</p>
-                  
-                  <p>For educational content, this might include step-by-step instructions, examples, exercises, and additional resources. For creative writing, it would display the full story, poem, or essay with proper formatting.</p>
-                  
-                  <p>The modal provides a focused reading experience while maintaining easy access to piece metadata, author information, and engagement statistics.</p>
-                </div>
-              </div>
+                </StyledGrid>
+              </Card>
+              
+              <BodyText style={{ lineHeight: '1.7' }}>
+                This is where the full content of the piece would be displayed. The content would be rendered from the piece's content field, which could include formatted text, images, code blocks, and other rich media depending on the type of writing piece.
+              </BodyText>
             </ModalBody>
           </ModalContent>
         </Modal>

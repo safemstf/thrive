@@ -1,4 +1,4 @@
-// src/app/dashboard/layout.tsx - Polished & Professional
+// src/app/dashboard/layout.tsx - Lean & Reusable
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -9,31 +9,204 @@ import { ProtectedRoute } from '@/components/auth/protectedRoute';
 import { useAuth } from '@/providers/authProvider';
 import { useApiClient } from '@/lib/api-client';
 import type { Portfolio } from '@/types/portfolio.types';
-import { theme } from '@/styles/theme';
+
+// Import existing styled components - no duplication!
+import {
+  PageContainer,
+  FlexRow,
+  FlexColumn,
+  Card,
+  BaseButton,
+  DevBadge,
+  responsive,
+  focusRing,
+  hoverLift
+} from '@/styles/styled-components';
+
+// Import utilities for logic
+import { utils } from '@/utils';
+
 import { 
-  User,
-  Target, 
-  Home,
-  Settings,
-  Shield,
-  Palette,
-  BarChart3,
-  ChevronLeft,
-  Menu,
-  X,
-  Plus,
-  ArrowLeft,
-  GraduationCap,
-  Camera,
-  FolderOpen,
-  Briefcase,
-  Code,
-  BookOpen,
-  Brush,
-  Circle
+  User, Target, Home, Settings, Shield, ChevronLeft, Menu, X, Plus, ArrowLeft,
+  GraduationCap, FolderOpen, Code, Brush, Circle
 } from 'lucide-react';
 
-interface NavItem {
+// ===========================================
+// DASHBOARD-SPECIFIC COMPONENTS ONLY
+// ===========================================
+
+const DashboardContainer = styled(PageContainer)`
+  display: flex;
+  min-height: 100vh;
+`;
+
+const MobileHeader = styled.header`
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background: var(--color-background-secondary);
+  border-bottom: 1px solid var(--color-border-medium);
+  padding: 0 var(--spacing-lg);
+  align-items: center;
+  justify-content: space-between;
+  z-index: 50;
+  
+  ${responsive.below.md} {
+    display: flex;
+  }
+`;
+
+const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
+  width: ${props => props.$collapsed ? '72px' : '280px'};
+  background: var(--color-background-secondary);
+  border-right: 1px solid var(--color-border-medium);
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  transition: width var(--transition-normal);
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  
+  ${responsive.below.md} {
+    width: 280px;
+    transform: ${props => props.$mobileOpen ? 'translateX(0)' : 'translateX(-100%)'};
+    top: 60px;
+    height: calc(100vh - 60px);
+  }
+`;
+
+const SidebarSection = styled.div<{ $collapsed?: boolean }>`
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+`;
+
+const CollapseButton = styled(BaseButton).attrs({ $variant: 'ghost', $size: 'sm' })<{ $collapsed: boolean }>`
+  position: absolute;
+  top: var(--spacing-lg);
+  right: var(--spacing-lg);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  transform: ${props => props.$collapsed ? 'rotate(180deg)' : 'rotate(0deg)'};
+  
+  ${responsive.below.md} {
+    display: none;
+  }
+`;
+
+const UserInfo = styled(FlexRow).attrs({ $gap: 'var(--spacing-md)', $align: 'center' })``;
+
+const Avatar = styled.div`
+  width: 44px;
+  height: 44px;
+  background: var(--color-background-tertiary);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+`;
+
+const PortfolioIndicator = styled.div<{ $color: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: ${props => props.$color};
+  flex-shrink: 0;
+  margin-top: 2px;
+`;
+
+const NavItem = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  color: ${props => props.$active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'};
+  background: ${props => props.$active ? 'var(--color-background-tertiary)' : 'transparent'};
+  border: 1px solid ${props => props.$active ? 'var(--color-border-medium)' : 'transparent'};
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: var(--transition-fast);
+  justify-content: ${props => props.$collapsed ? 'center' : 'flex-start'};
+  min-height: 44px;
+
+  ${focusRing}
+  
+  &:hover {
+    background: var(--color-background-tertiary);
+    border-color: var(--color-border-medium);
+    color: var(--color-text-primary);
+  }
+`;
+
+const Badge = styled.span`
+  font-size: var(--font-size-xs);
+  padding: 2px var(--spacing-xs);
+  background: var(--color-accent-blue);
+  color: white;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: var(--font-weight-medium);
+  flex-shrink: 0;
+`;
+
+const MainContent = styled.main<{ $sidebarCollapsed: boolean }>`
+  flex: 1;
+  margin-left: ${props => props.$sidebarCollapsed ? '72px' : '280px'};
+  min-height: 100vh;
+  transition: margin-left var(--transition-normal);
+  background: var(--color-background-primary);
+  
+  ${responsive.below.md} {
+    margin-left: 0;
+    padding-top: 60px;
+  }
+`;
+
+const MobileOverlay = styled.div`
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 40;
+  backdrop-filter: blur(4px);
+  
+  ${responsive.below.md} {
+    display: block;
+  }
+`;
+
+// ===========================================
+// DEV MODE TOGGLE - Easy Auth Bypass
+// ===========================================
+
+// 🚨 DEVELOPMENT MODE SETTINGS 🚨
+// Set SKIP_AUTH to true to bypass authentication during development
+// Set to false for production builds
+const SKIP_AUTH = process.env.NODE_ENV === 'development' && true;
+
+// Quick toggle: Change 'true' to 'false' above to enable auth
+// Or use environment variable: SKIP_AUTH=false npm run dev
+
+// ===========================================
+// COMPONENT LOGIC
+// ===========================================
+
+interface NavItemConfig {
   href: string;
   label: string;
   icon: React.ReactNode;
@@ -44,7 +217,7 @@ interface NavItem {
   badge?: string;
 }
 
-const navItems: NavItem[] = [
+const NAV_ITEMS: NavItemConfig[] = [
   {
     href: '/dashboard',
     label: 'Overview',
@@ -103,26 +276,39 @@ const navItems: NavItem[] = [
   }
 ];
 
-export default function DashboardLayout({ 
-  children 
-}: { 
-  children: React.ReactNode 
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const apiClient = useApiClient();
+  
+  // Mock user data for dev mode
+  const currentUser = SKIP_AUTH ? {
+    name: 'Dev User',
+    email: 'dev@example.com',
+    role: 'admin'
+  } : user;
   
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [portfolioLoading, setPortfolioLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Fetch portfolio on mount
+  // Use utilities for data fetching
   useEffect(() => {
     const fetchPortfolio = async () => {
-      if (!user) return;
+      if (!currentUser) return;
       
       try {
+        // Skip API call in dev mode
+        if (SKIP_AUTH) {
+          setPortfolio({
+            kind: 'hybrid',
+            // Add other mock portfolio properties as needed
+          } as Portfolio);
+          setPortfolioLoading(false);
+          return;
+        }
+        
         const portfolioData = await apiClient.portfolio.getMyPortfolio();
         setPortfolio(portfolioData);
       } catch (error: any) {
@@ -135,79 +321,98 @@ export default function DashboardLayout({
     };
 
     fetchPortfolio();
-  }, [user, apiClient]);
+  }, [currentUser, apiClient]);
 
-  // Filter navigation items based on user state
-  const getVisibleNavItems = (): NavItem[] => {
-    return navItems.filter(item => {
+  // Use utility functions for logic
+  const getVisibleNavItems = () => {
+    return NAV_ITEMS.filter(item => {
       if (item.requiresPortfolio && !portfolio) return false;
       if (item.portfolioTypes && portfolio) {
         return item.portfolioTypes.includes(portfolio.kind);
       }
-      if (item.isAdmin && user?.role !== 'admin') return false;
+      if (item.isAdmin && currentUser?.role !== 'admin') return false;
       return true;
     });
   };
 
-  const visibleNavItems = getVisibleNavItems();
-
   const getPortfolioTypeInfo = (type?: string) => {
-    switch (type) {
-      case 'creative':
-        return { 
-          color: '#8b5cf6', 
-          label: 'Creative Portfolio',
-          icon: <Brush size={14} />,
-          description: 'Art • Photography • Design'
-        };
-      case 'educational':
-        return { 
-          color: '#3b82f6', 
-          label: 'Teaching Portfolio',
-          icon: <GraduationCap size={14} />,
-          description: 'Education • Curriculum • Training'
-        };
-      case 'professional':
-        return { 
-          color: '#059669', 
-          label: 'Tech Portfolio',
-          icon: <Code size={14} />,
-          description: 'Software • Development • Engineering'
-        };
-      case 'hybrid':
-        return { 
-          color: '#10b981', 
-          label: 'Multi-Portfolio',
-          icon: <FolderOpen size={14} />,
-          description: 'Creative • Teaching • Professional'
-        };
-      default:
-        return { 
-          color: '#666666', 
-          label: 'Portfolio',
-          icon: <User size={14} />,
-          description: 'Professional Portfolio'
-        };
-    }
+    const portfolioTypes = {
+      creative: { 
+        color: '#8b5cf6', 
+        label: 'Creative Portfolio',
+        icon: <Brush size={14} />,
+        description: 'Art • Photography • Design'
+      },
+      educational: { 
+        color: '#3b82f6', 
+        label: 'Teaching Portfolio',
+        icon: <GraduationCap size={14} />,
+        description: 'Education • Curriculum • Training'
+      },
+      professional: { 
+        color: '#059669', 
+        label: 'Tech Portfolio',
+        icon: <Code size={14} />,
+        description: 'Software • Development • Engineering'
+      },
+      hybrid: { 
+        color: '#10b981', 
+        label: 'Multi-Portfolio',
+        icon: <FolderOpen size={14} />,
+        description: 'Creative • Teaching • Professional'
+      }
+    };
+
+    return portfolioTypes[type as keyof typeof portfolioTypes] || {
+      color: '#666666', 
+      label: 'Portfolio',
+      icon: <User size={14} />,
+      description: 'Professional Portfolio'
+    };
   };
 
-  const handleLogout = async () => {
+  const handleLogout = utils.performance.debounce(async () => {
     try {
+      if (SKIP_AUTH) {
+        console.log('Dev mode: Logout bypassed');
+        return;
+      }
       await logout();
     } catch (error) {
       console.error('Logout failed:', error);
     }
-  };
+  }, 300);
+
+  const visibleNavItems = getVisibleNavItems();
+
+  // Conditional auth wrapper based on dev mode
+  const AuthWrapper = SKIP_AUTH ? 
+    ({ children }: { children: React.ReactNode }) => <>{children}</> : 
+    ProtectedRoute;
 
   return (
-    <ProtectedRoute>
-      <LayoutWrapper>
+    <AuthWrapper>
+      <DashboardContainer>
         {/* Mobile Header */}
         <MobileHeader>
-          <MobileMenuButton onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          <BaseButton 
+            $variant="ghost" 
+            $size="sm"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-          </MobileMenuButton>
-          <MobileTitle>Dashboard</MobileTitle>
+          </BaseButton>
+          
+          <h1 style={{ 
+            fontSize: 'var(--font-size-lg)', 
+            fontWeight: 'var(--font-weight-normal)', 
+            color: 'var(--color-text-primary)', 
+            margin: 0,
+            fontFamily: 'var(--font-display)'
+          }}>
+            Dashboard {SKIP_AUTH && <DevBadge>[DEV]</DevBadge>}
+          </h1>
+          
           {portfolio && (
             <PortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color}>
               <Circle size={8} fill="currentColor" />
@@ -217,114 +422,213 @@ export default function DashboardLayout({
 
         {/* Sidebar */}
         <Sidebar $collapsed={sidebarCollapsed} $mobileOpen={mobileMenuOpen}>
-          <SidebarContent>
-            {/* Header Section */}
-            <SidebarHeader>
-              <CollapseButton 
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                $collapsed={sidebarCollapsed}
-                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                <ChevronLeft size={14} />
-              </CollapseButton>
-              
-              {!sidebarCollapsed && (
-                <ProfileSection>
-                  <UserAvatar>
-                    <User size={20} />
-                  </UserAvatar>
-                  <UserInfo>
-                    <UserName>{user?.name || 'User'}</UserName>
-                    <UserEmail>{user?.email || user?.role || 'member'}</UserEmail>
-                  </UserInfo>
-                </ProfileSection>
-              )}
-            </SidebarHeader>
-
-            {/* Portfolio Status */}
-            {!portfolioLoading && (
-              <PortfolioSection $collapsed={sidebarCollapsed}>
-                {portfolio ? (
-                  <PortfolioCard>
-                    <PortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color}>
-                      <Circle size={6} fill="currentColor" />
-                    </PortfolioIndicator>
-                    {!sidebarCollapsed && (
-                      <PortfolioDetails>
-                        <PortfolioStatus>Active Portfolio</PortfolioStatus>
-                        <PortfolioType>
-                          {getPortfolioTypeInfo(portfolio.kind).icon}
-                          <PortfolioInfo>
-                            <PortfolioName>
-                              {getPortfolioTypeInfo(portfolio.kind).label}
-                            </PortfolioName>
-                            <PortfolioDesc>
-                              {getPortfolioTypeInfo(portfolio.kind).description}
-                            </PortfolioDesc>
-                          </PortfolioInfo>
-                        </PortfolioType>
-                      </PortfolioDetails>
-                    )}
-                  </PortfolioCard>
-                ) : (
-                  !sidebarCollapsed && (
-                    <CreatePortfolioCard>
-                      <CreatePortfolioIcon>
-                        <Plus size={14} />
-                      </CreatePortfolioIcon>
-                      <CreatePortfolioContent>
-                        <CreatePortfolioTitle>Create Portfolio</CreatePortfolioTitle>
-                        <CreatePortfolioSubtitle>Choose your focus</CreatePortfolioSubtitle>
-                        <CreatePortfolioButton href="/dashboard/profile">
-                          Get Started
-                        </CreatePortfolioButton>
-                      </CreatePortfolioContent>
-                    </CreatePortfolioCard>
-                  )
-                )}
-              </PortfolioSection>
+          {/* Header Section */}
+          <SidebarSection>
+            <CollapseButton 
+              $collapsed={sidebarCollapsed}
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <ChevronLeft size={14} />
+            </CollapseButton>
+            
+            {!sidebarCollapsed && (
+              <UserInfo>
+                <Avatar>
+                  <User size={20} />
+                </Avatar>
+                <FlexColumn $gap="var(--spacing-xs)">
+                  <div style={{ 
+                    fontSize: 'var(--font-size-base)', 
+                    fontWeight: 'var(--font-weight-medium)', 
+                    color: 'var(--color-text-primary)',
+                    fontFamily: 'var(--font-display)' 
+                  }}>
+                    {currentUser?.name || 'User'}
+                  </div>
+                  <div style={{ 
+                    fontSize: 'var(--font-size-sm)', 
+                    color: 'var(--color-text-secondary)' 
+                  }}>
+                    {currentUser?.email || currentUser?.role || 'member'}
+                  </div>
+                </FlexColumn>
+              </UserInfo>
             )}
+          </SidebarSection>
 
-            {/* Navigation */}
-            <NavigationSection>
-              <NavList>
-                {visibleNavItems.map((item) => (
-                  <NavItemWrapper key={item.href}>
-                    <NavItemLink
-                      href={item.href}
-                      $active={pathname === item.href}
-                      $collapsed={sidebarCollapsed}
-                      title={sidebarCollapsed ? `${item.label} - ${item.description}` : undefined}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <NavIcon>{item.icon}</NavIcon>
-                      {!sidebarCollapsed && (
-                        <NavContent>
-                          <NavLabelRow>
-                            <NavLabel>{item.label}</NavLabel>
-                            {item.badge && <NavBadge>{item.badge}</NavBadge>}
-                          </NavLabelRow>
-                          <NavDescription>{item.description}</NavDescription>
-                        </NavContent>
-                      )}
-                    </NavItemLink>
-                  </NavItemWrapper>
-                ))}
-              </NavList>
-            </NavigationSection>
-          </SidebarContent>
+          {/* Portfolio Status */}
+          {!portfolioLoading && (
+            <SidebarSection>
+              {portfolio ? (
+                <FlexRow $gap="var(--spacing-md)" $align="flex-start">
+                  <PortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color}>
+                    <Circle size={6} fill="currentColor" />
+                  </PortfolioIndicator>
+                  {!sidebarCollapsed && (
+                    <FlexColumn $gap="var(--spacing-sm)">
+                      <div style={{ 
+                        fontSize: 'var(--font-size-xs)', 
+                        color: 'var(--color-text-secondary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        fontWeight: 'var(--font-weight-medium)'
+                      }}>
+                        Active Portfolio
+                      </div>
+                      <FlexRow $gap="var(--spacing-sm)" $align="flex-start">
+                        {getPortfolioTypeInfo(portfolio.kind).icon}
+                        <FlexColumn $gap="var(--spacing-xs)">
+                          <div style={{ 
+                            fontSize: 'var(--font-size-sm)', 
+                            fontWeight: 'var(--font-weight-medium)', 
+                            color: 'var(--color-text-primary)',
+                            fontFamily: 'var(--font-display)' 
+                          }}>
+                            {getPortfolioTypeInfo(portfolio.kind).label}
+                          </div>
+                          <div style={{ 
+                            fontSize: 'var(--font-size-xs)', 
+                            color: 'var(--color-text-secondary)',
+                            lineHeight: 1.4 
+                          }}>
+                            {getPortfolioTypeInfo(portfolio.kind).description}
+                          </div>
+                        </FlexColumn>
+                      </FlexRow>
+                    </FlexColumn>
+                  )}
+                </FlexRow>
+              ) : (
+                !sidebarCollapsed && (
+                  <Card $padding="md" $hover>
+                    <FlexRow $gap="var(--spacing-md)" $align="flex-start">
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '28px',
+                        height: '28px',
+                        background: 'var(--color-background-secondary)',
+                        color: 'var(--color-text-secondary)',
+                        border: '1px solid var(--color-border-medium)',
+                        borderRadius: 'var(--radius-sm)',
+                        flexShrink: 0
+                      }}>
+                        <Plus size={14} />
+                      </div>
+                      <FlexColumn $gap="var(--spacing-sm)">
+                        <div style={{ 
+                          fontSize: 'var(--font-size-sm)', 
+                          fontWeight: 'var(--font-weight-medium)', 
+                          color: 'var(--color-text-primary)',
+                          fontFamily: 'var(--font-display)' 
+                        }}>
+                          Create Portfolio
+                        </div>
+                        <div style={{ 
+                          fontSize: 'var(--font-size-xs)', 
+                          color: 'var(--color-text-secondary)' 
+                        }}>
+                          Choose your focus
+                        </div>
+                        <Link href="/dashboard/profile" style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          fontSize: 'var(--font-size-xs)',
+                          color: 'var(--color-text-primary)',
+                          textDecoration: 'none',
+                          fontWeight: 'var(--font-weight-medium)',
+                          background: 'var(--color-background-secondary)',
+                          border: '1px solid var(--color-primary-600)',
+                          padding: 'var(--spacing-sm) var(--spacing-md)',
+                          borderRadius: 'var(--radius-sm)',
+                          transition: 'var(--transition-fast)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em'
+                        }}>
+                          Get Started
+                        </Link>
+                      </FlexColumn>
+                    </FlexRow>
+                  </Card>
+                )
+              )}
+            </SidebarSection>
+          )}
+
+          {/* Navigation */}
+          <div style={{ flex: 1, padding: 'var(--spacing-lg) 0' }}>
+            <FlexColumn $gap="var(--spacing-xs)" style={{ padding: '0 var(--spacing-md)' }}>
+              {visibleNavItems.map((item) => (
+                <NavItem
+                  key={item.href}
+                  href={item.href}
+                  $active={pathname === item.href}
+                  $collapsed={sidebarCollapsed}
+                  title={sidebarCollapsed ? `${item.label} - ${item.description}` : undefined}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', flexShrink: 0 }}>
+                    {item.icon}
+                  </div>
+                  {!sidebarCollapsed && (
+                    <FlexColumn $gap="2px" style={{ flex: 1, minWidth: 0 }}>
+                      <FlexRow $justify="space-between" $align="center">
+                        <div style={{ 
+                          fontWeight: 'var(--font-weight-medium)', 
+                          fontSize: 'var(--font-size-sm)',
+                          fontFamily: 'var(--font-display)' 
+                        }}>
+                          {item.label}
+                        </div>
+                        {item.badge && <Badge>{item.badge}</Badge>}
+                      </FlexRow>
+                      <div style={{ 
+                        fontSize: 'var(--font-size-xs)', 
+                        color: 'var(--color-text-tertiary)',
+                        lineHeight: 1.2 
+                      }}>
+                        {item.description}
+                      </div>
+                    </FlexColumn>
+                  )}
+                </NavItem>
+              ))}
+            </FlexColumn>
+          </div>
 
           {/* Footer */}
-          <SidebarFooter $collapsed={sidebarCollapsed}>
-            <FooterButton href="/dashboard/settings">
-              <Settings size={16} />
-              {!sidebarCollapsed && <span>Settings</span>}
-            </FooterButton>
-            <LogoutButton onClick={handleLogout}>
-              <ArrowLeft size={16} />
-              {!sidebarCollapsed && <span>Sign Out</span>}
-            </LogoutButton>
-          </SidebarFooter>
+          <SidebarSection>
+            <FlexColumn $gap="var(--spacing-xs)">
+              <Link href="/dashboard/settings" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-md)',
+                padding: 'var(--spacing-md)',
+                color: 'var(--color-text-secondary)',
+                textDecoration: 'none',
+                fontSize: 'var(--font-size-sm)',
+                border: '1px solid transparent',
+                borderRadius: 'var(--radius-sm)',
+                transition: 'var(--transition-fast)',
+                minHeight: '40px'
+              }}>
+                <Settings size={16} />
+                {!sidebarCollapsed && <span>Settings</span>}
+              </Link>
+              <BaseButton 
+                $variant="secondary" 
+                $size="sm" 
+                $fullWidth 
+                onClick={handleLogout}
+                style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', gap: 'var(--spacing-md)' }}
+              >
+                <ArrowLeft size={16} />
+                {!sidebarCollapsed && <span>Sign Out</span>}
+              </BaseButton>
+            </FlexColumn>
+          </SidebarSection>
         </Sidebar>
 
         {/* Mobile Overlay */}
@@ -334,497 +638,7 @@ export default function DashboardLayout({
         <MainContent $sidebarCollapsed={sidebarCollapsed}>
           {children}
         </MainContent>
-      </LayoutWrapper>
-    </ProtectedRoute>
+      </DashboardContainer>
+    </AuthWrapper>
   );
 }
-
-// ===========================================
-// STYLED COMPONENTS - POLISHED & CONSISTENT
-// ===========================================
-
-const LayoutWrapper = styled.div`
-  display: flex;
-  min-height: 100vh;
-  background: ${theme.colors.background.primary};
-  font-family: ${theme.typography.fonts.body};
-`;
-
-const MobileHeader = styled.header`
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: ${theme.colors.background.secondary};
-  border-bottom: 1px solid ${theme.colors.border.medium};
-  padding: 0 ${theme.spacing.lg};
-  align-items: center;
-  justify-content: space-between;
-  z-index: 50;
-  
-  @media (max-width: ${theme.breakpoints.md}) {
-    display: flex;
-  }
-`;
-
-const MobileMenuButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid ${theme.colors.border.medium};
-  background: ${theme.colors.background.secondary};
-  color: ${theme.colors.text.primary};
-  cursor: pointer;
-  border-radius: ${theme.borderRadius.xs};
-  transition: all ${theme.transitions.fast};
-  
-  &:hover {
-    background: ${theme.colors.background.tertiary};
-    border-color: ${theme.colors.primary[600]};
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
-  }
-`;
-
-const MobileTitle = styled.h1`
-  font-size: ${theme.typography.sizes.lg};
-  font-weight: ${theme.typography.weights.normal};
-  color: ${theme.colors.text.primary};
-  margin: 0;
-  font-family: ${theme.typography.fonts.display};
-`;
-
-const MobileOverlay = styled.div`
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 40;
-  backdrop-filter: blur(4px);
-  
-  @media (max-width: ${theme.breakpoints.md}) {
-    display: block;
-  }
-`;
-
-const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
-  width: ${props => props.$collapsed ? '72px' : '280px'};
-  background: ${theme.colors.background.secondary};
-  border-right: 1px solid ${theme.colors.border.medium};
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  transition: width ${theme.transitions.normal};
-  z-index: 45;
-  display: flex;
-  flex-direction: column;
-  
-  @media (max-width: ${theme.breakpoints.md}) {
-    width: 280px;
-    transform: ${props => props.$mobileOpen ? 'translateX(0)' : 'translateX(-100%)'};
-    top: 60px;
-    height: calc(100vh - 60px);
-  }
-`;
-
-const SidebarContent = styled.div`
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  
-  /* Custom scrollbar */
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: ${theme.colors.border.medium};
-    border-radius: 3px;
-    
-    &:hover {
-      background: ${theme.colors.border.dark};
-    }
-  }
-`;
-
-const SidebarHeader = styled.div`
-  padding: ${theme.spacing.xl};
-  border-bottom: 1px solid ${theme.colors.border.light};
-  position: relative;
-  flex-shrink: 0;
-`;
-
-const CollapseButton = styled.button<{ $collapsed: boolean }>`
-  position: absolute;
-  top: ${theme.spacing.lg};
-  right: ${theme.spacing.lg};
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: ${theme.colors.background.tertiary};
-  border: 1px solid ${theme.colors.border.medium};
-  border-radius: ${theme.borderRadius.xs};
-  cursor: pointer;
-  transition: all ${theme.transitions.fast};
-  transform: ${props => props.$collapsed ? 'rotate(180deg)' : 'rotate(0deg)'};
-  color: ${theme.colors.text.secondary};
-  
-  &:hover {
-    background: ${theme.colors.background.secondary};
-    border-color: ${theme.colors.primary[600]};
-    color: ${theme.colors.text.primary};
-    transform: ${props => props.$collapsed ? 'rotate(180deg) translateY(-1px)' : 'rotate(0deg) translateY(-1px)'};
-    box-shadow: ${theme.shadows.sm};
-  }
-  
-  @media (max-width: ${theme.breakpoints.md}) {
-    display: none;
-  }
-`;
-
-const ProfileSection = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.md};
-`;
-
-const UserAvatar = styled.div`
-  width: 44px;
-  height: 44px;
-  background: ${theme.colors.background.tertiary};
-  border: 1px solid ${theme.colors.border.medium};
-  border-radius: ${theme.borderRadius.xs};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: ${theme.colors.text.secondary};
-  flex-shrink: 0;
-`;
-
-const UserInfo = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const UserName = styled.h3`
-  font-size: ${theme.typography.sizes.base};
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
-  margin: 0 0 ${theme.spacing.xs} 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: ${theme.typography.fonts.display};
-`;
-
-const UserEmail = styled.p`
-  font-size: ${theme.typography.sizes.sm};
-  color: ${theme.colors.text.secondary};
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const PortfolioSection = styled.div<{ $collapsed: boolean }>`
-  padding: ${theme.spacing.lg};
-  border-bottom: 1px solid ${theme.colors.border.light};
-  flex-shrink: 0;
-`;
-
-const PortfolioCard = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: ${theme.spacing.md};
-`;
-
-const PortfolioIndicator = styled.div<{ $color: string }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  color: ${props => props.$color};
-  flex-shrink: 0;
-  margin-top: 2px;
-`;
-
-const PortfolioDetails = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const PortfolioStatus = styled.div`
-  font-size: ${theme.typography.sizes.xs};
-  color: ${theme.colors.text.secondary};
-  margin-bottom: ${theme.spacing.sm};
-  text-transform: uppercase;
-  letter-spacing: ${theme.typography.letterSpacing.wide};
-  font-weight: ${theme.typography.weights.medium};
-`;
-
-const PortfolioType = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: ${theme.spacing.sm};
-`;
-
-const PortfolioInfo = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const PortfolioName = styled.div`
-  font-size: ${theme.typography.sizes.sm};
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
-  margin-bottom: ${theme.spacing.xs};
-  font-family: ${theme.typography.fonts.display};
-`;
-
-const PortfolioDesc = styled.div`
-  font-size: ${theme.typography.sizes.xs};
-  color: ${theme.colors.text.secondary};
-  line-height: 1.4;
-`;
-
-const CreatePortfolioCard = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.lg};
-  background: ${theme.colors.background.tertiary};
-  border: 1px solid ${theme.colors.border.medium};
-  border-radius: ${theme.borderRadius.sm};
-`;
-
-const CreatePortfolioIcon = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: ${theme.colors.background.secondary};
-  color: ${theme.colors.text.secondary};
-  border: 1px solid ${theme.colors.border.medium};
-  border-radius: ${theme.borderRadius.xs};
-  flex-shrink: 0;
-`;
-
-const CreatePortfolioContent = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const CreatePortfolioTitle = styled.div`
-  font-size: ${theme.typography.sizes.sm};
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
-  margin-bottom: ${theme.spacing.xs};
-  font-family: ${theme.typography.fonts.display};
-`;
-
-const CreatePortfolioSubtitle = styled.div`
-  font-size: ${theme.typography.sizes.xs};
-  color: ${theme.colors.text.secondary};
-  margin-bottom: ${theme.spacing.md};
-`;
-
-const CreatePortfolioButton = styled(Link)`
-  display: inline-flex;
-  align-items: center;
-  font-size: ${theme.typography.sizes.xs};
-  color: ${theme.colors.text.primary};
-  text-decoration: none;
-  font-weight: ${theme.typography.weights.medium};
-  background: ${theme.colors.background.secondary};
-  border: 1px solid ${theme.colors.primary[600]};
-  padding: ${theme.spacing.sm} ${theme.spacing.md};
-  border-radius: ${theme.borderRadius.xs};
-  transition: all ${theme.transitions.fast};
-  text-transform: uppercase;
-  letter-spacing: ${theme.typography.letterSpacing.wide};
-  
-  &:hover {
-    background: ${theme.colors.primary[600]};
-    color: white;
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
-  }
-`;
-
-const NavigationSection = styled.nav`
-  flex: 1;
-  padding: ${theme.spacing.lg} 0;
-`;
-
-const NavList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.xs};
-  padding: 0 ${theme.spacing.md};
-`;
-
-const NavItemWrapper = styled.div`
-  /* Consistent wrapper for navigation items */
-`;
-
-const NavItemLink = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.md};
-  color: ${props => props.$active ? theme.colors.text.primary : theme.colors.text.secondary};
-  background: ${props => props.$active ? theme.colors.background.tertiary : 'transparent'};
-  border: 1px solid ${props => props.$active ? theme.colors.border.medium : 'transparent'};
-  border-radius: ${theme.borderRadius.xs};
-  text-decoration: none;
-  transition: all ${theme.transitions.fast};
-  justify-content: ${props => props.$collapsed ? 'center' : 'flex-start'};
-  min-height: 44px; /* Consistent touch target */
-
-  &:hover {
-    background: ${props => props.$active ? theme.colors.background.tertiary : theme.colors.background.quaternary};
-    border-color: ${theme.colors.border.medium};
-    color: ${theme.colors.text.primary};
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-`;
-
-const NavIcon = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-`;
-
-const NavContent = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const NavLabelRow = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 2px;
-`;
-
-const NavLabel = styled.div`
-  font-weight: ${theme.typography.weights.medium};
-  font-size: ${theme.typography.sizes.sm};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: ${theme.typography.fonts.display};
-`;
-
-const NavBadge = styled.span`
-  font-size: ${theme.typography.sizes.xs};
-  padding: 2px ${theme.spacing.xs};
-  background: ${theme.colors.accent.blue};
-  color: white;
-  border-radius: ${theme.borderRadius.xs};
-  text-transform: uppercase;
-  letter-spacing: ${theme.typography.letterSpacing.wide};
-  font-weight: ${theme.typography.weights.medium};
-  flex-shrink: 0;
-`;
-
-const NavDescription = styled.div`
-  font-size: ${theme.typography.sizes.xs};
-  color: ${theme.colors.text.tertiary};
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.2;
-`;
-
-const SidebarFooter = styled.div<{ $collapsed: boolean }>`
-  padding: ${theme.spacing.lg};
-  border-top: 1px solid ${theme.colors.border.light};
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.xs};
-  flex-shrink: 0;
-`;
-
-const FooterButton = styled(Link)`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.md};
-  color: ${theme.colors.text.secondary};
-  text-decoration: none;
-  font-size: ${theme.typography.sizes.sm};
-  border: 1px solid transparent;
-  border-radius: ${theme.borderRadius.xs};
-  transition: all ${theme.transitions.fast};
-  min-height: 40px;
-  
-  &:hover {
-    background: ${theme.colors.background.tertiary};
-    border-color: ${theme.colors.border.medium};
-    color: ${theme.colors.text.primary};
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
-  }
-`;
-
-const LogoutButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.md};
-  padding: ${theme.spacing.md};
-  background: transparent;
-  border: 1px solid ${theme.colors.border.medium};
-  color: ${theme.colors.text.secondary};
-  font-size: ${theme.typography.sizes.sm};
-  border-radius: ${theme.borderRadius.xs};
-  transition: all ${theme.transitions.fast};
-  cursor: pointer;
-  font-family: ${theme.typography.fonts.body};
-  min-height: 40px;
-  
-  &:hover {
-    background: ${theme.colors.background.tertiary};
-    border-color: ${theme.colors.primary[600]};
-    color: ${theme.colors.text.primary};
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
-  }
-`;
-
-const MainContent = styled.main<{ $sidebarCollapsed: boolean }>`
-  flex: 1;
-  margin-left: ${props => props.$sidebarCollapsed ? '72px' : '280px'};
-  min-height: 100vh;
-  transition: margin-left ${theme.transitions.normal};
-  background: ${theme.colors.background.primary};
-  
-  @media (max-width: ${theme.breakpoints.md}) {
-    margin-left: 0;
-    padding-top: 60px;
-  }
-`;

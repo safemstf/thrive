@@ -964,7 +964,7 @@ function EditArtworkModal({ piece, onSave, onClose, isSaving }: EditModalProps) 
 
   return (
     <Modal $isOpen={true}>
-      <ModalOverlay onClick={onClose} />
+      <ModalOverlay $isOpen={true} />
       <ModalContent>
         <ModalHeader>
           <FlexRow $justify="space-between">

@@ -1,301 +1,303 @@
-// src/styles/theme.ts - Modern Glassmorphism Design System (Matching Taskbar)
-export const theme = {
+// src/styles/theme.ts - Just remove the React Context part
+import { createGlobalStyle } from 'styled-components';
+
+// ==============================================
+// 1. DESIGN TOKENS (Single Source of Truth)
+// ==============================================
+
+export const designTokens = {
   colors: {
-    // Primary brand colors - matching taskbar's minimal aesthetic
     primary: {
       50: '#fafafa',
-      100: '#f8f8f8',
-      200: '#f0f0f0',
-      300: '#e0e0e0',
-      400: '#999999',
-      500: '#666666',
-      600: '#2c2c2c',
-      700: '#1a1a1a',
-      800: '#0f0f0f',
-      900: '#000000'
+      100: '#f4f4f5',
+      200: '#e4e4e7',
+      300: '#d4d4d8',
+      400: '#a1a1aa',
+      500: '#71717a',
+      600: '#52525b',
+      700: '#3f3f46',
+      800: '#27272a',
+      900: '#18181b',
+      950: '#09090b'
     },
-    
-    // Accent colors - GREYSCALE ONLY (matching taskbar aesthetic)
     accent: {
-      blue: '#666666',       // Medium grey
-      purple: '#555555',     // Darker grey  
-      emerald: '#777777',    // Light grey
-      amber: '#888888',      // Lighter grey
-      rose: '#999999',       // Very light grey
-      cyan: '#444444',       // Dark grey
-      indigo: '#333333',     // Very dark grey
-      pink: '#aaaaaa',       // Pale grey
-      red: '#2c2c2c'         // Primary dark (matching logout button)
+      blue: '#3b82f6',
+      purple: '#8b5cf6',
+      emerald: '#10b981',
+      amber: '#f59e0b',
+      rose: '#f43f5e',
+      cyan: '#06b6d4',
+      indigo: '#6366f1',
+      pink: '#ec4899',
+      red: '#ef4444'
     },
-    
-    // State colors - GREYSCALE ONLY
-    states: {
-      hover: '#f8f8f8',      // Hover backgrounds
-      active: '#2c2c2c',     // Active backgrounds (matching taskbar)
-      focus: '#666666',      // Focus outlines (greyscale)
-      disabled: '#f5f5f5',   // Disabled backgrounds
-      error: '#2c2c2c',      // Error states (dark grey)
-      success: '#666666',    // Success states (medium grey)
-      warning: '#888888'     // Warning states (light grey)
-    },
-    
-    // Glass morphism system
-    glass: {
-      primary: 'rgba(255, 255, 255, 0.95)',
-      secondary: 'rgba(255, 255, 255, 0.85)',
-      tertiary: 'rgba(255, 255, 255, 0.75)',
-      dark: 'rgba(44, 44, 44, 0.9)',
-      subtle: 'rgba(248, 248, 248, 0.8)',
-      card: 'rgba(255, 255, 255, 0.9)',
-      overlay: 'rgba(0, 0, 0, 0.4)',
-      border: 'rgba(255, 255, 255, 0.3)'
-    },
-    
-    // Background system - matching taskbar
-    background: {
-      primary: '#fafafa',    // Main page background
-      secondary: '#ffffff',  // Card backgrounds
-      tertiary: '#f8f8f8',   // Subtle backgrounds (like user info)
-      quaternary: '#f5f5f5', // Even more subtle
-      glass: 'rgba(255, 255, 255, 0.9)', // Glass backgrounds
-      glassDark: 'rgba(44, 44, 44, 0.05)' // Very subtle dark glass
-    },
-    
-    // Text system - matching taskbar typography
-    text: {
-      primary: '#2c2c2c',    // Main text (matching taskbar buttons)
-      secondary: '#666666',  // Secondary text (matching user info)
-      tertiary: '#999999',   // Muted text
-      quaternary: '#bbbbbb', // Very muted
-      inverse: '#f8f8f8',    // Light text on dark backgrounds
-      white: '#ffffff',      // Pure white text
-      light: '#627d98',      // Alias for lighter text
-      muted: '#999999'       // Alias for tertiary
-    },
-    
-    // Border system - matching taskbar's clean borders
-    border: {
-      light: '#f0f0f0',      // Very light borders
-      medium: '#e0e0e0',     // Standard borders (matching taskbar)
-      dark: '#d0d0d0',       // Darker borders
-      primary: '#2c2c2c',    // Primary color borders
-      glass: 'rgba(224, 224, 224, 0.6)', // Glass borders
-      subtle: 'rgba(44, 44, 44, 0.1)'    // Very subtle borders
-    },
-    
-  },
-  
-  // Typography system - matching taskbar's Work Sans usage
-  typography: {
-    fonts: {
-      primary: "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      secondary: "'Cormorant Garamond', 'Times New Roman', serif",
-      mono: "'JetBrains Mono', 'Fira Code', 'Monaco', monospace",
-      display: "'Cormorant Garamond', serif", // For special headings
-      body: "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" // Alias for primary
-    },
-    sizes: {
-      xs: '0.75rem',    // 12px
-      sm: '0.875rem',   // 14px
-      base: '1rem',     // 16px - taskbar button size
-      lg: '1.125rem',   // 18px
-      xl: '1.25rem',    // 20px
-      '2xl': '1.5rem',  // 24px
-      '3xl': '1.875rem', // 30px
-      '4xl': '2.25rem', // 36px
-      '5xl': '3rem'     // 48px
-    },
-    weights: {
-      thin: 100,
-      light: 300,     // Matching taskbar's light weight
-      normal: 400,
-      medium: 500,
-      semibold: 600,
-      bold: 700,
-      extrabold: 800,
-      black: 900
-    },
-    lineHeights: {
-      tight: 1.25,
-      normal: 1.5,
-      relaxed: 1.75,
-      loose: 2
-    },
-    letterSpacing: {
-      tight: '-0.025em',
-      normal: '0',
-      wide: '0.025em',
-      wider: '0.05em',
-      widest: '0.1em',
-      uppercase: '1px'  // Matching taskbar's letter spacing
+    semantic: {
+      success: '#22c55e',
+      warning: '#f59e0b',
+      error: '#ef4444',
+      info: '#3b82f6'
     }
   },
-  
-  // Spacing system - matching taskbar's compact spacing
+  typography: {
+    fonts: {
+      display: 'Cormorant Garamond, serif',
+      body: 'Work Sans, system-ui, sans-serif',
+      mono: 'JetBrains Mono, monospace'
+    },
+    sizes: {
+      xs: '0.75rem',
+      sm: '0.875rem',
+      base: '1rem',
+      lg: '1.125rem',
+      xl: '1.25rem',
+      '2xl': '1.5rem',
+      '3xl': '1.875rem',
+      '4xl': '2.25rem',
+      '5xl': '3rem'
+    },
+    weights: {
+      light: '300',
+      normal: '400',
+      medium: '500',
+      semibold: '600',
+      bold: '700'
+    }
+  },
   spacing: {
-    px: '1px',
-    xs: '0.25rem',    // 4px
-    sm: '0.5rem',     // 8px
-    md: '0.75rem',    // 12px - taskbar gap
-    lg: '1rem',       // 16px
-    xl: '1.5rem',     // 24px
-    '2xl': '2rem',    // 32px
-    '3xl': '3rem',    // 48px
-    '4xl': '4rem',    // 64px
-    '5xl': '6rem',    // 96px
-    '6xl': '8rem'     // 128px
+    xs: '0.25rem',
+    sm: '0.5rem',
+    md: '0.75rem',
+    lg: '1rem',
+    xl: '1.5rem',
+    '2xl': '2rem',
+    '3xl': '3rem',
+    '4xl': '4rem'
   },
-  
-  // Border radius - clean and minimal like taskbar
   borderRadius: {
-    none: '0',
-    xs: '2px',        // Matching taskbar's subtle radius
-    sm: '4px',
-    md: '8px',        // Mobile elements
-    lg: '12px',
-    xl: '16px',
-    '2xl': '20px',
-    '3xl': '24px',
-    full: '9999px'    // Circular elements like user avatar
+    sm: '0.25rem',
+    md: '0.375rem',
+    lg: '0.5rem',
+    xl: '0.75rem',
+    '2xl': '1rem',
+    full: '9999px'
   },
-  
-  // Shadow system - subtle like taskbar hovers
   shadows: {
-    none: 'none',
-    xs: '0 1px 2px rgba(0, 0, 0, 0.05)',
-    sm: '0 2px 4px rgba(44, 44, 44, 0.1)',  // Matching taskbar hover
-    md: '0 4px 6px rgba(0, 0, 0, 0.07)',
-    lg: '0 8px 15px rgba(0, 0, 0, 0.1)',
-    xl: '0 20px 25px rgba(0, 0, 0, 0.1)',
-    '2xl': '0 25px 50px rgba(0, 0, 0, 0.15)',
-    inner: 'inset 0 2px 4px rgba(0, 0, 0, 0.06)',
-    glass: '0 8px 32px rgba(0, 0, 0, 0.1)',
-    glassSubtle: '0 4px 16px rgba(0, 0, 0, 0.05)',
-    taskbarHover: '0 2px 4px rgba(44, 44, 44, 0.1)' // Exact taskbar hover shadow
+    sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+    md: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+    lg: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+    xl: '0 20px 25px -5px rgb(0 0 0 / 0.1)'
   },
-  
-  // Transition system - matching taskbar's smooth animations
   transitions: {
-    fast: '0.15s ease',
-    normal: '0.3s ease',    // Matching taskbar transitions
-    slow: '0.5s ease',
-    spring: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    bounce: '0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
-  },
-  
-  // Glass morphism effects
-  glass: {
-    background: 'rgba(255, 255, 255, 0.9)',
-    backgroundDark: 'rgba(44, 44, 44, 0.9)',
-    border: 'rgba(255, 255, 255, 0.3)',
-    borderDark: 'rgba(255, 255, 255, 0.1)',
-    blur: '20px',
-    blurSubtle: '10px',
-    shadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-  },
-  
-  // Layout breakpoints
-  breakpoints: {
-    xs: '480px',
-    sm: '640px',
-    md: '768px',
-    lg: '1024px',   // Taskbar responsive breakpoint
-    xl: '1280px',
-    '2xl': '1536px'
-  },
-  
-  // Z-index scale
-  zIndex: {
-    hide: -1,
-    auto: 'auto',
-    base: 0,
-    docked: 10,
-    dropdown: 1000,
-    sticky: 1020,
-    banner: 1030,
-    overlay: 1040,
-    modal: 1050,
-    popover: 1060,
-    skipLink: 1070,
-    toast: 1080,
-    tooltip: 1090
-  },
-  
-  // Animation system
-  animations: {
-    fadeIn: 'fadeIn 0.3s ease',
-    fadeOut: 'fadeOut 0.3s ease',
-    slideUp: 'slideUp 0.3s ease',
-    slideDown: 'slideDown 0.3s ease',
-    scaleIn: 'scaleIn 0.2s ease',
-    scaleOut: 'scaleOut 0.2s ease',
-    spin: 'spin 1s linear infinite',
-    pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-    bounce: 'bounce 1s infinite'
+    fast: '150ms ease',
+    normal: '300ms ease',
+    slow: '500ms ease'
   }
 };
 
-// CSS Custom Properties for dynamic theming
-export const cssVariables = `
-  :root {
-    --color-primary-50: ${theme.colors.primary[50]};
-    --color-primary-500: ${theme.colors.primary[500]};
-    --color-primary-600: ${theme.colors.primary[600]};
-    --color-background-primary: ${theme.colors.background.primary};
-    --color-background-secondary: ${theme.colors.background.secondary};
-    --color-text-primary: ${theme.colors.text.primary};
-    --color-text-secondary: ${theme.colors.text.secondary};
-    --color-border-medium: ${theme.colors.border.medium};
-    --shadow-taskbar-hover: ${theme.shadows.taskbarHover};
-    --transition-normal: ${theme.transitions.normal};
-    --font-primary: ${theme.typography.fonts.primary};
-    --spacing-md: ${theme.spacing.md};
-    --border-radius-xs: ${theme.borderRadius.xs};
+// ==============================================
+// 2. THEME GENERATOR 
+// ==============================================
+
+export function generateTheme(mode: 'light' | 'dark') {
+  const isLight = mode === 'light';
+  
+  return {
+    // Colors object that matches your styled.d.ts exactly
+    colors: {
+      // Primary colors as Record<string, string>
+      primary: designTokens.colors.primary,
+      
+      // Accent colors - match your styled.d.ts exactly
+      accent: {
+        blue: designTokens.colors.accent.blue,
+        lightBlue: designTokens.colors.accent.cyan, // Map cyan to lightBlue
+        muted: isLight ? designTokens.colors.primary[400] : designTokens.colors.primary[500]
+      },
+      
+      // Background colors
+      background: {
+        primary: isLight ? designTokens.colors.primary[50] : designTokens.colors.primary[950],
+        secondary: isLight ? '#ffffff' : designTokens.colors.primary[900],
+        tertiary: isLight ? designTokens.colors.primary[100] : designTokens.colors.primary[800]
+      },
+      
+      // Text colors
+      text: {
+        primary: isLight ? designTokens.colors.primary[900] : designTokens.colors.primary[50],
+        secondary: isLight ? designTokens.colors.primary[700] : designTokens.colors.primary[300],
+        muted: isLight ? designTokens.colors.primary[400] : designTokens.colors.primary[500],
+        light: isLight ? designTokens.colors.primary[300] : designTokens.colors.primary[200]
+      },
+      
+      // Border colors
+      border: {
+        light: isLight ? designTokens.colors.primary[200] : designTokens.colors.primary[800],
+        medium: isLight ? designTokens.colors.primary[300] : designTokens.colors.primary[700],
+        dark: isLight ? designTokens.colors.primary[400] : designTokens.colors.primary[600]
+      }
+    },
+    
+    // Typography - match your styled.d.ts exactly
+    typography: {
+      fonts: {
+        display: designTokens.typography.fonts.display,
+        body: designTokens.typography.fonts.body,
+        accent: designTokens.typography.fonts.display // Add missing 'accent' font
+      },
+      sizes: designTokens.typography.sizes,
+      weights: {
+        light: 300,
+        normal: 400,
+        medium: 500,
+        semibold: 600,
+        bold: 700
+      }
+    },
+    
+    // Spacing - match your styled.d.ts exactly
+    spacing: {
+      xs: designTokens.spacing.xs,
+      sm: designTokens.spacing.sm,
+      md: designTokens.spacing.md,
+      lg: designTokens.spacing.lg,
+      xl: designTokens.spacing.xl,
+      '2xl': designTokens.spacing['2xl'],
+      '3xl': designTokens.spacing['3xl']
+    },
+    
+    // Border radius - match your styled.d.ts exactly
+    borderRadius: {
+      sm: designTokens.borderRadius.sm,
+      md: designTokens.borderRadius.md,
+      lg: designTokens.borderRadius.lg,
+      xl: designTokens.borderRadius.xl,
+      full: designTokens.borderRadius.full
+    },
+    
+    // Shadows - match your styled.d.ts exactly
+    shadows: {
+      sm: designTokens.shadows.sm,
+      md: designTokens.shadows.md,
+      lg: designTokens.shadows.lg,
+      glass: isLight ? '0 8px 32px rgba(0, 0, 0, 0.1)' : '0 8px 32px rgba(0, 0, 0, 0.5)'
+    },
+    
+    // Transitions - match your styled.d.ts exactly
+    transitions: {
+      fast: designTokens.transitions.fast,
+      normal: designTokens.transitions.normal,
+      slow: designTokens.transitions.slow
+    },
+    
+    // Glass effects - match your styled.d.ts exactly
+    glass: {
+      background: isLight ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.9)',
+      border: isLight ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+      blur: '20px'
+    }
+  };
+}
+
+// ==============================================
+// 3. CSS CUSTOM PROPERTIES GENERATOR
+// ==============================================
+
+export function generateCSSVariables(theme: ReturnType<typeof generateTheme>) {
+  return `
+    :root {
+      /* Background colors - match your existing variable names */
+      --color-background-primary: ${theme.colors.background.primary};
+      --color-background-secondary: ${theme.colors.background.secondary};
+      --color-background-tertiary: ${theme.colors.background.tertiary};
+      
+      /* Text colors - match your existing variable names */
+      --color-text-primary: ${theme.colors.text.primary};
+      --color-text-secondary: ${theme.colors.text.secondary};
+      --color-text-muted: ${theme.colors.text.muted};
+      
+      /* Border colors - match your existing variable names */
+      --color-border-light: ${theme.colors.border.light};
+      --color-border-medium: ${theme.colors.border.medium};
+      --color-border-dark: ${theme.colors.border.dark};
+      
+      /* Primary colors - match your existing variable names */
+      --color-primary-500: ${theme.colors.primary[500]};
+      --color-primary-600: ${theme.colors.primary[600]};
+      
+      /* Typography - match your existing variable names */
+      --font-display: ${theme.typography.fonts.display};
+      --font-body: ${theme.typography.fonts.body};
+      --font-mono: ${theme.typography.fonts.accent};
+      
+      /* Spacing - match your existing variable names */
+      --spacing-xs: ${theme.spacing.xs};
+      --spacing-sm: ${theme.spacing.sm};
+      --spacing-md: ${theme.spacing.md};
+      --spacing-lg: ${theme.spacing.lg};
+      --spacing-xl: ${theme.spacing.xl};
+      --spacing-2xl: ${theme.spacing['2xl']};
+      --spacing-3xl: ${theme.spacing['3xl']};
+      
+      /* Border Radius - match your existing variable names */
+      --radius-sm: ${theme.borderRadius.sm};
+      --radius-md: ${theme.borderRadius.md};
+      --radius-lg: ${theme.borderRadius.lg};
+      
+      /* Shadows - match your existing variable names */
+      --shadow-sm: ${theme.shadows.sm};
+      --shadow-md: ${theme.shadows.md};
+      --shadow-lg: ${theme.shadows.lg};
+      
+      /* Transitions - match your existing variable names */
+      --transition-fast: ${theme.transitions.fast};
+      --transition-normal: ${theme.transitions.normal};
+      --transition-slow: ${theme.transitions.slow};
+      
+      /* Glass effects - match your existing variable names */
+      --glass-background: ${theme.glass.background};
+      --glass-border: ${theme.glass.border};
+      --glass-blur: ${theme.glass.blur};
+    }
+  `;
+}
+
+// ==============================================
+// 4. GLOBAL STYLES
+// ==============================================
+
+export const GlobalStyles = createGlobalStyle<{ $isDark: boolean }>`
+  ${({ $isDark }) => generateCSSVariables(generateTheme($isDark ? 'dark' : 'light'))}
+  
+  /* Your existing global styles go here */
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    font-size: 16px;
+    height: 100%;
+    overflow-x: hidden;
+  }
+  
+  body {
+    font-family: var(--font-body);
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 `;
 
-// Utility functions for common theme operations
-export const themeUtils = {
-  // Get color with opacity
-  alpha: (color: string, opacity: number) => {
-    if (color.startsWith('rgba')) {
-      return color.replace(/[\d.]+\)$/g, `${opacity})`);
-    }
-    if (color.startsWith('#')) {
-      const hex = color.replace('#', '');
-      const r = parseInt(hex.substr(0, 2), 16);
-      const g = parseInt(hex.substr(2, 2), 16);
-      const b = parseInt(hex.substr(4, 2), 16);
-      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    }
-    return color;
-  },
-  
-  // Get responsive value
-  responsive: (mobile: string, desktop: string) => `
-    ${mobile};
-    @media (min-width: ${theme.breakpoints.lg}) {
-      ${desktop};
-    }
-  `,
-  
-  // Glass effect mixin
-  glass: (opacity = 0.9) => `
-    background: ${themeUtils.alpha(theme.glass.background, opacity)};
-    backdrop-filter: blur(${theme.glass.blur});
-    border: 1px solid ${theme.glass.border};
-    box-shadow: ${theme.shadows.glass};
-  `,
-  
-  // Hover lift effect (like taskbar buttons)
-  hoverLift: `
-    transition: ${theme.transitions.normal};
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: ${theme.shadows.taskbarHover};
-    }
-    &:active {
-      transform: translateY(0);
-    }
-  `
-};
+// ==============================================
+// 5. EXPORTS
+// ==============================================
+
+export { designTokens as tokens };
+export const lightTheme = generateTheme('light');
+export const darkTheme = generateTheme('dark');

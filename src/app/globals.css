@@ -1,385 +1,64 @@
-/* Font Imports - Must be first */
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Work+Sans:wght@300;400;500;600;700&family=Great+Vibes&display=swap');
+/* globals.css - Simplified for Unified Theme System */
 
 /* Tailwind Directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 2) CSS Reset & Base Styles */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* 
+  NOTE: All theme variables are now injected by GlobalStyles component
+  All typography and base styles are handled by the theme system
+*/
 
-html {
-  scroll-behavior: smooth;
-  font-size: 16px;
-}
+/* ==============================================
+   TAILWIND LAYER OVERRIDES
+   ============================================== */
 
-body {
-  font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #fafafa;
-  color: #2c2c2c;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* 3) Design System CSS Variables */
-:root {
-  /* Colors */
-  --color-primary-50: #f0f4f8;
-  --color-primary-100: #d9e2ec;
-  --color-primary-500: #2c2c2c;
-  --color-primary-600: #1a1a1a;
-  --color-primary-900: #102a43;
-  
-  --color-accent-blue: #2196f3;
-  --color-accent-light-blue: #64b5f6;
-  --color-accent-muted: #486581;
-  
-  --color-background-primary: #fafafa;
-  --color-background-secondary: #ffffff;
-  --color-background-tertiary: #f8f9fa;
-  
-  --color-text-primary: #2c2c2c;
-  --color-text-secondary: #666666;
-  --color-text-muted: #999999;
-  --color-text-light: #627d98;
-  
-  --color-border-light: #f0f0f0;
-  --color-border-medium: #e0e0e0;
-  --color-border-dark: #d9e2ec;
-  
-  /* Typography */
-  --font-display: 'Cormorant Garamond', serif;
-  --font-body: 'Work Sans', sans-serif;
-  --font-accent: 'Great Vibes', cursive;
-  
-  /* Spacing */
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
-  --spacing-2xl: 3rem;
-  --spacing-3xl: 4rem;
-  
-  /* Border Radius */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-full: 9999px;
-  
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.15);
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.1);
-  
-  /* Transitions */
-  --transition-fast: 0.15s ease;
-  --transition-normal: 0.3s ease;
-  --transition-slow: 0.5s ease;
-  
-  /* Glass Effect */
-  --glass-background: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.3);
-  --glass-blur: 15px;
-}
-
-/* 4) Typography Base */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display);
-  color: var(--color-text-primary);
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-h1 { font-size: 3rem; }
-h2 { font-size: 2.25rem; }
-h3 { font-size: 1.875rem; }
-h4 { font-size: 1.5rem; }
-h5 { font-size: 1.25rem; }
-h6 { font-size: 1.125rem; }
-
-p, li, span {
-  font-family: var(--font-body);
-  line-height: 1.6;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-  transition: var(--transition-normal);
-}
-
-/* 5) Utility Classes */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 var(--spacing-md);
-}
-
-.text-center { text-align: center; }
-.text-left { text-align: left; }
-.text-right { text-align: right; }
-
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.items-center { align-items: center; }
-.justify-center { justify-content: center; }
-.justify-between { justify-content: space-between; }
-
-.grid { display: grid; }
-.gap-sm { gap: var(--spacing-sm); }
-.gap-md { gap: var(--spacing-md); }
-.gap-lg { gap: var(--spacing-lg); }
-.gap-xl { gap: var(--spacing-xl); }
-
-.p-sm { padding: var(--spacing-sm); }
-.p-md { padding: var(--spacing-md); }
-.p-lg { padding: var(--spacing-lg); }
-.p-xl { padding: var(--spacing-xl); }
-
-.m-sm { margin: var(--spacing-sm); }
-.m-md { margin: var(--spacing-md); }
-.m-lg { margin: var(--spacing-lg); }
-.m-xl { margin: var(--spacing-xl); }
-
-.mb-sm { margin-bottom: var(--spacing-sm); }
-.mb-md { margin-bottom: var(--spacing-md); }
-.mb-lg { margin-bottom: var(--spacing-lg); }
-.mb-xl { margin-bottom: var(--spacing-xl); }
-
-.rounded-sm { border-radius: var(--radius-sm); }
-.rounded-md { border-radius: var(--radius-md); }
-.rounded-lg { border-radius: var(--radius-lg); }
-.rounded-full { border-radius: var(--radius-full); }
-
-/* 6) Glass Effect Utility */
-.glass {
-  background: var(--glass-background);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--shadow-sm);
-}
-
-/* 7) Button Base Styles */
-.btn {
-  font-family: var(--font-body);
-  font-weight: 600;
-  font-size: 0.875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: var(--spacing-md) var(--spacing-xl);
-  border-radius: var(--radius-sm);
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: var(--transition-normal);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-sm);
-  text-decoration: none;
-}
-
-.btn-primary {
-  background: var(--color-primary-500);
-  color: white;
-  border-color: var(--color-primary-500);
-}
-
-.btn-primary:hover {
-  background: var(--color-primary-600);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.btn-secondary {
-  background: transparent;
-  color: var(--color-primary-500);
-  border-color: var(--color-primary-500);
-}
-
-.btn-secondary:hover {
-  background: var(--color-primary-500);
-  color: white;
-  transform: translateY(-2px);
-}
-
-/* 8) Card Styles */
-.card {
-  background: var(--color-background-secondary);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border-light);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  transition: var(--transition-normal);
-}
-
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-md);
-}
-
-.card-content {
-  padding: var(--spacing-xl);
-}
-
-/* 9) Form Styles */
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-lg);
-}
-
-.form-label {
-  font-family: var(--font-body);
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.form-input {
-  font-family: var(--font-body);
-  font-size: 1rem;
-  padding: var(--spacing-md);
-  border: 1px solid var(--color-border-medium);
-  border-radius: var(--radius-sm);
-  background: var(--color-background-secondary);
-  color: var(--color-text-primary);
-  transition: var(--transition-fast);
-  width: 100%;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
-}
-
-.form-input::placeholder {
-  color: var(--color-text-muted);
-}
-
-/* 10) Animation Classes */
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.fade-in {
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.slide-up {
-  animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-/* 11) Responsive Utilities */
-@media (max-width: 768px) {
-  .container {
-    padding: 0 var(--spacing-sm);
-  }
-  
-  h1 { font-size: 2.5rem; }
-  h2 { font-size: 2rem; }
-  h3 { font-size: 1.5rem; }
-  
-  .btn {
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: 0.8rem;
-  }
-  
-  .card-content {
-    padding: var(--spacing-lg);
-  }
-}
-
-@media (max-width: 480px) {
-  h1 { font-size: 2rem; }
-  h2 { font-size: 1.75rem; }
-  
-  .card-content {
-    padding: var(--spacing-md);
-  }
-}
-
-/* 12) Tailwind Layer Overrides */
 @layer base {
+  /* Tailwind's CSS variables for shadcn/ui compatibility */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --background: 250 250 250;
+    --foreground: 20 20 20;
+    --card: 255 255 255;
+    --card-foreground: 20 20 20;
+    --popover: 255 255 255;
+    --popover-foreground: 20 20 20;
+    --primary: 20 20 20;
+    --primary-foreground: 250 250 250;
+    --secondary: 245 245 245;
+    --secondary-foreground: 20 20 20;
+    --muted: 245 245 245;
+    --muted-foreground: 115 115 115;
+    --accent: 245 245 245;
+    --accent-foreground: 20 20 20;
+    --destructive: 239 68 68;
+    --destructive-foreground: 250 250 250;
+    --border: 230 230 230;
+    --input: 230 230 230;
+    --ring: 20 20 20;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --background: 10 10 10;
+    --foreground: 250 250 250;
+    --card: 20 20 20;
+    --card-foreground: 250 250 250;
+    --popover: 20 20 20;
+    --popover-foreground: 250 250 250;
+    --primary: 250 250 250;
+    --primary-foreground: 20 20 20;
+    --secondary: 40 40 40;
+    --secondary-foreground: 250 250 250;
+    --muted: 40 40 40;
+    --muted-foreground: 160 160 160;
+    --accent: 40 40 40;
+    --accent-foreground: 250 250 250;
+    --destructive: 220 38 38;
+    --destructive-foreground: 250 250 250;
+    --border: 40 40 40;
+    --input: 40 40 40;
+    --ring: 200 200 200;
   }
 }
 
@@ -387,7 +66,174 @@ a {
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground;
+}
+
+/* ==============================================
+   UTILITY CLASSES FOR THEME SYSTEM
+   ============================================== */
+
+@layer utilities {
+  /* Theme-aware utilities that use CSS variables */
+  .text-theme-primary { color: var(--color-text-primary); }
+  .text-theme-secondary { color: var(--color-text-secondary); }
+  .text-theme-muted { color: var(--color-text-muted); }
+  
+  .bg-theme-primary { background-color: var(--color-bg-primary); }
+  .bg-theme-secondary { background-color: var(--color-bg-secondary); }
+  .bg-theme-tertiary { background-color: var(--color-bg-tertiary); }
+  
+  .border-theme-light { border-color: var(--color-border-light); }
+  .border-theme-medium { border-color: var(--color-border-medium); }
+  
+  .glass-effect {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+  }
+  
+  /* Interactive states */
+  .hover-lift {
+    transition: var(--transition-normal);
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  
+  /* Focus styles */
+  .focus-theme:focus-visible {
+    outline: 2px solid var(--color-interactive-focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* ==============================================
+   COMPONENT CLASSES
+   ============================================== */
+
+@layer components {
+  /* Button components using theme variables */
+  .btn-theme {
+    @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+    @apply focus-theme hover-lift;
+    font-family: var(--font-body);
+  }
+  
+  .btn-theme-primary {
+    @apply btn-theme;
+    background-color: var(--color-interactive-focus);
+    color: white;
+  }
+  
+  .btn-theme-primary:hover {
+    filter: brightness(0.9);
+  }
+  
+  .btn-theme-secondary {
+    @apply btn-theme;
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border-medium);
+  }
+  
+  .btn-theme-secondary:hover {
+    background-color: var(--color-interactive-hover);
+  }
+  
+  /* Card components */
+  .card-theme {
+    background-color: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-normal);
+  }
+  
+  .card-theme:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  
+  /* Input components */
+  .input-theme {
+    @apply w-full px-3 py-2 rounded-md border;
+    background-color: var(--color-bg-secondary);
+    border-color: var(--color-border-medium);
+    color: var(--color-text-primary);
+    font-family: var(--font-body);
+    transition: var(--transition-fast);
+  }
+  
+  .input-theme:focus {
+    outline: none;
+    border-color: var(--color-interactive-focus);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .input-theme::placeholder {
+    color: var(--color-text-muted);
+  }
+}
+
+/* ==============================================
+   ACCESSIBILITY IMPROVEMENTS
+   ============================================== */
+
+/* Ensure proper focus indicators */
+*:focus-visible {
+  outline: 2px solid var(--color-interactive-focus) !important;
+  outline-offset: 2px !important;
+}
+
+/* Improve text selection */
+::selection {
+  background-color: var(--color-interactive-focus);
+  color: white;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==============================================
+   MOBILE OPTIMIZATIONS
+   ============================================== */
+
+@media (max-width: 768px) {
+  /* Prevent zoom on iOS */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Improve touch targets */
+  .btn-theme {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ==============================================
+   PRINT STYLES
+   ============================================== */
+
+@media print {
+  * {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
+  
+  .glass-effect {
+    background: white !important;
+    border: 1px solid #ccc !important;
+    backdrop-filter: none !important;
   }
 }

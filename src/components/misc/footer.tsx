@@ -6,14 +6,18 @@ import Link from 'next/link';
 import Image from 'next/image';
 import styled from 'styled-components';
 import { ArrowUp, Heart, Github, Twitter, Mail } from 'lucide-react';
+import { useDarkMode } from '@/providers/darkModeProvider';
 import logo from '../../../public/assets/logo2.png';
 
 const FooterContainer = styled.footer<{ $elevated: boolean }>`
-  background: white;
-  border-top: 1px solid #e0e0e0;
-  margin-top: auto;
+  background: var(--color-background-secondary); /* Use CSS variable */
+  border-top: 1px solid var(--color-border-medium); /* Use CSS variable */
+  margin-top: auto; /* This pushes footer to bottom in flex layout */
   transition: all 0.3s ease;
-  box-shadow: ${props => props.$elevated ? '0 -1px 3px rgba(0, 0, 0, 0.05)' : 'none'};
+  box-shadow: ${props => props.$elevated ? 'var(--shadow-sm)' : 'none'};
+  /* Ensure footer stays at bottom and can't be scrolled past */
+  position: relative;
+  z-index: 1;
 `;
 
 const FooterContent = styled.div`
@@ -81,7 +85,7 @@ const BrandTitle = styled.h3`
   font-size: 1.5rem;
   font-family: 'Cormorant Garamond', serif;
   font-weight: 400;
-  color: #2c2c2c;
+  color: var(--color-text-primary); /* Use CSS variable */
   margin: 0;
   letter-spacing: 1px;
   
@@ -92,7 +96,7 @@ const BrandTitle = styled.h3`
 
 const BrandTagline = styled.p`
   font-size: 0.9rem;
-  color: #666;
+  color: var(--color-text-secondary); /* Use CSS variable */
   margin: 0;
   font-family: 'Work Sans', sans-serif;
   font-weight: 300;
@@ -101,7 +105,7 @@ const BrandTagline = styled.p`
 
 const BrandDescription = styled.p`
   font-size: 0.85rem;
-  color: #666;
+  color: var(--color-text-secondary); /* Use CSS variable */
   margin: 0.5rem 0 0 0;
   font-family: 'Work Sans', sans-serif;
   font-weight: 300;
@@ -142,14 +146,14 @@ const LinkTitle = styled.h4`
   font-size: 0.85rem;
   font-family: 'Work Sans', sans-serif;
   font-weight: 500;
-  color: #2c2c2c;
+  color: var(--color-text-primary); /* Use CSS variable */
   margin: 0 0 0.75rem 0;
   text-transform: uppercase;
   letter-spacing: 1px;
 `;
 
 const FooterLink = styled(Link)`
-  color: #666;
+  color: var(--color-text-secondary); /* Use CSS variable */
   text-decoration: none;
   font-size: 0.9rem;
   font-family: 'Work Sans', sans-serif;
@@ -158,12 +162,12 @@ const FooterLink = styled(Link)`
   padding: 0.25rem 0;
   
   &:hover {
-    color: #2c2c2c;
+    color: var(--color-text-primary); /* Use CSS variable */
   }
 `;
 
 const FooterBottom = styled.div`
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--color-border-light); /* Use CSS variable */
   padding-top: 1.5rem;
   display: flex;
   justify-content: space-between;
@@ -190,7 +194,7 @@ const BottomLeft = styled.div`
 
 const Copyright = styled.p`
   margin: 0;
-  color: #666;
+  color: var(--color-text-secondary); /* Use CSS variable */
   font-size: 0.85rem;
   font-family: 'Work Sans', sans-serif;
   font-weight: 300;
@@ -212,15 +216,15 @@ const SocialLink = styled.a`
   width: 36px;
   height: 36px;
   background: transparent;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--color-border-medium); /* Use CSS variable */
   border-radius: 6px;
-  color: #666;
+  color: var(--color-text-secondary); /* Use CSS variable */
   text-decoration: none;
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: #2c2c2c;
-    color: #2c2c2c;
+    border-color: var(--color-primary-500); /* Use CSS variable */
+    color: var(--color-primary-500); /* Use CSS variable */
     transform: translateY(-1px);
   }
 
@@ -231,9 +235,9 @@ const SocialLink = styled.a`
 `;
 
 const BackToTopButton = styled.button<{ $visible: boolean }>`
-  background: white;
-  border: 1px solid #e0e0e0;
-  color: #666;
+  background: var(--color-background-secondary); /* Use CSS variable */
+  border: 1px solid var(--color-border-medium); /* Use CSS variable */
+  color: var(--color-text-secondary); /* Use CSS variable */
   padding: 0.5rem 1rem;
   font-size: 0.8rem;
   font-family: 'Work Sans', sans-serif;
@@ -247,10 +251,11 @@ const BackToTopButton = styled.button<{ $visible: boolean }>`
   gap: 0.5rem;
   opacity: ${props => props.$visible ? '1' : '0'};
   pointer-events: ${props => props.$visible ? 'auto' : 'none'};
+  border-radius: 4px;
 
   &:hover {
-    border-color: #2c2c2c;
-    color: #2c2c2c;
+    border-color: var(--color-primary-500); /* Use CSS variable */
+    color: var(--color-primary-500); /* Use CSS variable */
     transform: translateY(-1px);
   }
 `;
@@ -258,6 +263,7 @@ const BackToTopButton = styled.button<{ $visible: boolean }>`
 export function Footer() {
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isElevated, setIsElevated] = useState(false);
+  const { isDarkMode } = useDarkMode(); // Add dark mode hook
 
   useEffect(() => {
     const handleScroll = () => {
@@ -306,30 +312,32 @@ export function Footer() {
               <BrandTitle>LearnMorra</BrandTitle>
               <BrandTagline>Brag Responsibly</BrandTagline>
               <BrandDescription>
-                Where your skills shine, your work speaks, and bragging is encouraged.              </BrandDescription>
+                Where your skills shine, your work speaks, and bragging is encouraged.
+              </BrandDescription>
             </BrandInfo>
           </BrandSection>
 
-          {/* Links Grid */}
+          {/* Updated Links Grid with actual pages */}
           <LinksGrid>
             <LinkColumn>
-              <LinkTitle>Product</LinkTitle>
+              <LinkTitle>Explore</LinkTitle>
               <FooterLink href="/thrive">Thrive</FooterLink>
+              <FooterLink href="/simulations">Simulations</FooterLink>
               <FooterLink href="/dashboard">Dashboard</FooterLink>
-              <FooterLink href="/features">Features</FooterLink>
-              <FooterLink href="/pricing">Pricing</FooterLink>
+              <FooterLink href="/portfolio">Portfolios</FooterLink>
             </LinkColumn>
             
             <LinkColumn>
-              <LinkTitle>Resources</LinkTitle>
-              <FooterLink href="/help">Help Center</FooterLink>
-              <FooterLink href="/blog">Blog</FooterLink>
-              <FooterLink href="/guides">Guides</FooterLink>
-              <FooterLink href="/api">API Docs</FooterLink>
+              <LinkTitle>Dashboard</LinkTitle>
+              <FooterLink href="/dashboard/profile">Profile</FooterLink>
+              <FooterLink href="/dashboard/projects">Projects</FooterLink>
+              <FooterLink href="/dashboard/thrive">Skills Arena</FooterLink>
+              <FooterLink href="/dashboard/gallery">Gallery</FooterLink>
+              <FooterLink href="/dashboard/writing">Writing</FooterLink>
             </LinkColumn>
             
             <LinkColumn>
-              <LinkTitle>Company</LinkTitle>
+              <LinkTitle>Support</LinkTitle>
               <FooterLink href="/about">About</FooterLink>
               <FooterLink href="/contact">Contact</FooterLink>
               <FooterLink href="/privacy">Privacy</FooterLink>

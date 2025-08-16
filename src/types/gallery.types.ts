@@ -4,10 +4,10 @@ import { BackendGalleryPiece, BaseEntity } from './base.types';
 // === Core Unions & Types ===
 export type GalleryVisibility = 'public' | 'private' | 'unlisted';
 export type GalleryLayout     = 'grid' | 'masonry' | 'list';
-export type GalleryStatus     = 'available' | 'sold' | 'exhibition' | 'not-for-sale';
+export type GalleryStatus     = 'available' | 'sold' | 'exhibition' | 'not-for-sale' | "published";
 
 export type ArtworkSize     = 'tiny' | 'small' | 'medium' | 'large';
-export type ArtworkCategory = 'portrait' | 'landscape' | 'abstract' | 'series' | 'mixed-media';
+export type ArtworkCategory = 'portrait' | 'landscape' | 'abstract' | 'series' | 'mixed-media' | 'Brand Design' | 'Architecture' | 'Learning Project' | 'Design' | 'Digital';
 export type ArtworkStatus   = GalleryStatus;
 
 // Local component types

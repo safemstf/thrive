@@ -1,323 +1,213 @@
-// src/components/dashboard/dashboardStyles.tsx - Greyscale Refined & Elegant Version
-import styled, { css, keyframes } from 'styled-components';
-import { theme, themeUtils } from '@/styles/theme';
+// src/components/dashboard/dashboardStyles.tsx - Lean & Reusable
+import styled, { css } from 'styled-components';
 
+// Import existing components - no duplication!
+import {
+  Grid,
+  Card,
+  CardContent,
+  Badge,
+  BaseButton,
+  PageContainer,
+  Container,
+  FlexRow,
+  FlexColumn,
+  Heading1,
+  Heading2,
+  Heading3,
+  BodyText,
+  LoadingSpinner,
+  LoadingContainer,
+  ErrorContainer,
+  fadeIn,
+  float,
+  responsive
+} from '@/styles/styled-components';
 
-export const ToolGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: ${theme.spacing.xl};
-  width: 100%;
-`;
+// ===========================================
+// DASHBOARD-SPECIFIC COMPONENTS ONLY
+// ===========================================
 
-export const ToolIcon = styled.div<{ status?: 'active' | 'pending' | 'inactive' }>`
+// Tool Components
+export const ToolGrid = styled(Grid).attrs({ 
+  $minWidth: '300px', 
+  $gap: 'var(--spacing-xl)' 
+})``;
+
+export const ToolCard = styled(Card).attrs({ $hover: true, $padding: 'lg' })``;
+
+export const ToolIcon = styled.div<{ $status?: 'active' | 'pending' | 'inactive' }>`
   display: flex;
   align-items: center;
   justify-content: center;
   width: 48px;
   height: 48px;
-  border-radius: ${theme.borderRadius.md};
-  background: ${({ status }) => 
-    status === 'active' ? theme.colors.accent.cyan : 
-    status === 'pending' ? theme.colors.accent.amber : 
-    theme.colors.background.tertiary};
-  color: ${({ status }) => 
-    status === 'active' ? theme.colors.text.inverse : 
-    status === 'pending' ? theme.colors.text.primary : 
-    theme.colors.text.tertiary};
-`;
-
-export const ToolTitle = styled.h3`
-  margin: 0;
-  font-size: ${theme.typography.sizes.lg};
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
-`;
-
-export const ToolDescription = styled.p`
-  margin: 0;
-  font-size: ${theme.typography.sizes.sm};
-  color: ${theme.colors.text.secondary};
-  line-height: ${theme.typography.lineHeights.relaxed};
-`;
-
-export const ToolActionButton = styled.button<{ status?: 'active' | 'pending' | 'inactive' }>`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  padding: ${theme.spacing.xs} ${theme.spacing.sm};
-  background: none;
-  border: none;
-  color: ${({ status }) => 
-    status === 'active' ? theme.colors.primary[600] : 
-    status === 'pending' ? theme.colors.accent.amber : 
-    theme.colors.text.tertiary};
-  font-family: ${theme.typography.fonts.primary};
-  font-size: ${theme.typography.sizes.sm};
-  font-weight: ${theme.typography.weights.medium};
-  cursor: ${({ status }) => status !== 'inactive' ? 'pointer' : 'not-allowed'};
-  transition: ${theme.transitions.normal};
-  border-radius: ${theme.borderRadius.xs};
-
-  &:hover {
-    background: ${({ status }) => 
-      status !== 'inactive' ? themeUtils.alpha(theme.colors.primary[600], 0.1) : 'none'};
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.7;
-  }
-
-  ${({ status }) => status === 'pending' && css`
-    &:hover {
-      background: ${themeUtils.alpha(theme.colors.accent.amber, 0.1)};
+  border-radius: var(--radius-md);
+  transition: var(--transition-normal);
+  
+  ${({ $status = 'inactive' }) => {
+    switch ($status) {
+      case 'active':
+        return css`
+          background: var(--color-primary-500);
+          color: white;
+        `;
+      case 'pending':
+        return css`
+          background: #f59e0b;
+          color: white;
+        `;
+      default:
+        return css`
+          background: var(--color-background-tertiary);
+          color: var(--color-text-secondary);
+        `;
     }
-  `}
+  }}
 `;
 
-export const FilterContainer = styled.div`
-  display: flex;
-  justify-content: space-between;
-  padding: ${theme.spacing.lg} 0;
-  margin-bottom: ${theme.spacing.lg};
-  border-bottom: 1px solid ${theme.colors.border.subtle};
-
-  .filter-group {
-    display: flex;
-    gap: ${theme.spacing.md};
-    align-items: center;
-  }
+export const ToolActionButton = styled(BaseButton).attrs({ $variant: 'ghost', $size: 'sm' })<{ 
+  $status?: 'active' | 'pending' | 'inactive' 
+}>`
+  ${({ $status = 'inactive' }) => {
+    switch ($status) {
+      case 'active':
+        return css`
+          color: var(--color-primary-600);
+          &:hover { background: rgba(59, 130, 246, 0.1); }
+        `;
+      case 'pending':
+        return css`
+          color: #f59e0b;
+          &:hover { background: rgba(245, 158, 11, 0.1); }
+        `;
+      default:
+        return css`
+          color: var(--color-text-secondary);
+          cursor: not-allowed;
+          opacity: 0.7;
+        `;
+    }
+  }}
 `;
 
-export const FilterLabel = styled.span`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  color: ${theme.colors.text.secondary};
-  font-size: ${theme.typography.sizes.sm};
+// Filter Components
+export const FilterContainer = styled(FlexRow).attrs({ 
+  $justify: 'space-between', 
+  $gap: 'var(--spacing-md)' 
+})`
+  padding: var(--spacing-lg) 0;
+  margin-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border-light);
 `;
 
 export const FilterSelect = styled.select`
-  padding: ${theme.spacing.xs} ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.xs};
-  border: 1px solid ${theme.colors.border.medium};
-  background: ${theme.colors.background.secondary};
-  color: ${theme.colors.text.primary};
-  font-family: ${theme.typography.fonts.primary};
-  font-size: ${theme.typography.sizes.sm};
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-medium);
+  background: var(--color-background-secondary);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: ${theme.transitions.normal};
+  transition: var(--transition-fast);
 
   &:hover {
-    border-color: ${theme.colors.border.dark};
+    border-color: var(--color-border-dark);
   }
 
   &:focus {
     outline: none;
-    box-shadow: 0 0 0 2px ${theme.colors.states.focus};
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 `;
 
-export const Card = styled.div`
-  border-radius: ${theme.borderRadius.md};
-  box-shadow: ${theme.shadows.glassSubtle};
-  border: 1px solid ${theme.colors.glass.border};
-  overflow: hidden;
-  transition: ${theme.transitions.normal};
-  
-  &:hover {
-    box-shadow: ${theme.shadows.md};
-  }
-`;
-
-export const CardHeader = styled.div`
-  padding: ${theme.spacing.md} ${theme.spacing.lg};
-  border-bottom: 1px solid ${theme.colors.border.subtle};
-  background: ${theme.colors.glass.subtle};
-`;
-
-export const CardTitle = styled.h3`
-  margin: 0;
-  font-size: ${theme.typography.sizes.lg};
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
-`;
-
-export const CardContent = styled.div`
-  padding: ${theme.spacing.lg};
-  height: 300px;
-`;
-
-export const CardFooter = styled.div`
-  padding: ${theme.spacing.md} ${theme.spacing.lg};
-  border-top: 1px solid ${theme.colors.border.subtle};
-  background: ${theme.colors.glass.subtle};
-`;
-
-export const MetricCard = styled.div`
-  padding: ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.md};
-  box-shadow: ${theme.shadows.glassSubtle};
-  border: 1px solid ${theme.colors.glass.border};
-`;
+// Metric Components
+export const MetricCard = styled(Card).attrs({ $padding: 'lg' })``;
 
 export const MetricLabel = styled.div`
-  font-size: ${theme.typography.sizes.sm};
-  color: ${theme.colors.text.secondary};
-  margin-bottom: ${theme.spacing.xs};
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  margin-bottom: var(--spacing-xs);
 `;
 
 export const MetricValue = styled.div`
-  font-size: ${theme.typography.sizes['3xl']};
-  font-weight: ${theme.typography.weights.bold};
-  color: ${theme.colors.text.primary};
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
   line-height: 1.2;
 `;
 
-export const MetricChange = styled.div<{ positive?: boolean }>`
+export const MetricChange = styled.div<{ $positive?: boolean }>`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.xs};
-  font-size: ${theme.typography.sizes.sm};
-  color: ${({ positive }) => 
-    positive ? theme.colors.accent.emerald : theme.colors.accent.rose};
-  margin-top: ${theme.spacing.sm};
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: ${({ $positive }) => $positive ? '#10b981' : '#ef4444'};
+  margin-top: var(--spacing-sm);
 `;
 
 export const ChartContainer = styled.div`
   position: relative;
   height: 100%;
   width: 100%;
+  min-height: 300px;
 `;
 
-
-// Refined animations - subtler and more elegant
-export const fadeInUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+// Dashboard Header Components
+export const DashboardHeader = styled(Card).attrs({ $glass: true, $padding: 'lg' })`
+  margin-bottom: var(--spacing-2xl);
+  background: var(--glass-background);
+  backdrop-filter: blur(var(--glass-blur));
+  animation: ${fadeIn} 0.4s ease-out;
 `;
 
-export const gentleFloat = keyframes`
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-2px);
-  }
-`;
-
-// Layout Components - Cleaner, more spacious
-export const PageWrapper = styled.div`
-  min-height: 100vh;
-  background: linear-gradient(135deg, ${theme.colors.background.primary} 0%, ${theme.colors.primary[100]} 100%);
-  position: relative;
-`;
-
-export const Container = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: ${theme.spacing['2xl']};
-  position: relative;
-  
-  @media (max-width: 768px) { 
-    padding: ${theme.spacing.md}; 
-  }
-`;
-
-// Refined Header - No avatar clutter
-export const Header = styled.div`
-  background: ${theme.glass.background};
-  backdrop-filter: blur(${theme.glass.blur});
-  border-radius: ${theme.borderRadius.lg};
-  padding: ${theme.spacing['2xl']} ${theme.spacing['2xl']} ${theme.spacing.xl} ${theme.spacing['2xl']};
-  margin-bottom: ${theme.spacing['2xl']};
-  box-shadow: ${theme.shadows.sm};
-  border: 1px solid ${theme.glass.border};
-  animation: ${fadeInUp} 0.4s ease-out;
-`;
-
-export const HeaderContent = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    gap: ${theme.spacing.lg};
-    align-items: stretch;
-  }
-`;
-
-// Simplified welcome section - no avatar
-export const WelcomeSection = styled.div`
+export const WelcomeSection = styled(FlexColumn).attrs({ $gap: 'var(--spacing-sm)' })`
   flex: 1;
 `;
 
-export const WelcomeTitle = styled.h1`
-  font-family: ${theme.typography.fonts.display};
-  font-size: ${theme.typography.sizes['3xl']};
-  color: ${theme.colors.text.primary};
-  margin: 0 0 ${theme.spacing.xs} 0;
-  font-weight: ${theme.typography.weights.semibold};
-  line-height: 1.2;
+export const WelcomeTitle = styled(Heading1)`
+  margin: 0 0 var(--spacing-xs) 0;
   
-  @media (max-width: 768px) { 
-    font-size: ${theme.typography.sizes['2xl']}; 
+  ${responsive.below.md} {
+    font-size: var(--font-size-2xl);
   }
 `;
 
-export const WelcomeSubtitle = styled.p`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.base};
-  color: ${theme.colors.text.secondary};
+export const WelcomeSubtitle = styled(BodyText)`
   margin: 0;
   line-height: 1.4;
 `;
 
-// Cleaner view toggle - GREYSCALE
-export const ViewToggle = styled.div`
-  display: flex;
+// View Toggle
+export const ViewToggle = styled(FlexRow).attrs({ $gap: '4px' })`
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(8px);
-  border-radius: ${theme.borderRadius.md};
+  border-radius: var(--radius-md);
   padding: 4px;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.4);
   
-  @media (max-width: 768px) {
+  ${responsive.below.md} {
     width: 100%;
   }
 `;
 
-export const ViewButton = styled.button<{ $active: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
+export const ViewButton = styled(BaseButton).attrs({ $size: 'sm' })<{ $active: boolean }>`
   padding: 0.5rem 0.875rem;
-  border: none;
   border-radius: 6px;
   background: ${({ $active }) => 
     $active 
       ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' 
       : 'transparent'
   };
-  color: ${({ $active }) => $active ? theme.colors.primary[600] : theme.colors.text.secondary};
-  font-weight: ${({ $active }) => $active ? theme.typography.weights.medium : theme.typography.weights.normal};
-  font-size: ${theme.typography.sizes.sm};
-  cursor: pointer;
-  transition: all ${theme.transitions.fast};
-  box-shadow: ${({ $active }) => 
-    $active 
-      ? '0 1px 3px rgba(0, 0, 0, 0.1)' 
-      : 'none'
-  };
+  color: ${({ $active }) => $active ? 'var(--color-primary-600)' : 'var(--color-text-secondary)'};
+  font-weight: ${({ $active }) => $active ? 'var(--font-weight-medium)' : 'var(--font-weight-normal)'};
+  box-shadow: ${({ $active }) => $active ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none'};
   
   &:hover {
     background: ${({ $active }) => 
@@ -325,357 +215,49 @@ export const ViewButton = styled.button<{ $active: boolean }>`
         ? 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' 
         : 'rgba(255, 255, 255, 0.5)'
     };
-    color: ${({ $active }) => $active ? theme.colors.primary[600] : theme.colors.text.primary};
   }
   
-  @media (max-width: 768px) {
+  ${responsive.below.md} {
     flex: 1;
     justify-content: center;
   }
 `;
 
-// Refined badge - GREYSCALE
-export const Badge = styled.span<{ $variant?: 'primary' | 'secondary' | 'success' | 'warning' }>`
-  display: inline-flex;
-  align-items: center;
-  padding: 0.125rem 0.5rem;
-  border-radius: ${theme.borderRadius.full};
-  font-size: 0.625rem;
-  font-weight: ${theme.typography.weights.medium};
-  font-family: ${theme.typography.fonts.body};
-  margin-left: ${theme.spacing.xs};
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-  
-  ${({ $variant = 'primary' }) => {
-    switch ($variant) {
-      case 'success':
-        return css`
-          background: ${theme.colors.primary[200]};
-          color: ${theme.colors.primary[700]};
-        `;
-      case 'warning':
-        return css`
-          background: ${theme.colors.primary[300]};
-          color: ${theme.colors.primary[800]};
-        `;
-      case 'secondary':
-        return css`
-          background: ${theme.colors.primary[100]};
-          color: ${theme.colors.primary[600]};
-        `;
-      default:
-        return css`
-          background: ${theme.colors.primary[200]};
-          color: ${theme.colors.primary[700]};
-        `;
-    }
-  }}
-`;
-
-// Loading states - GREYSCALE
-export const LoadingContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  gap: ${theme.spacing.md};
-  animation: ${fadeInUp} 0.4s ease-out;
-`;
-
-export const LoadingSpinner = styled.div`
-  width: 40px;
-  height: 40px;
-  border: 3px solid ${theme.colors.border.light};
-  border-top: 3px solid ${theme.colors.primary[600]};
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`;
-
-export const LoadingText = styled.h3`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.lg};
-  color: ${theme.colors.text.primary};
-  font-weight: ${theme.typography.weights.medium};
-  margin: 0;
-`;
-
-export const LoadingSubtext = styled.p`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.sm};
-  color: ${theme.colors.text.secondary};
-  margin: 0;
-  text-align: center;
-`;
-
-// Error components - GREYSCALE
-export const ErrorContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
-  gap: ${theme.spacing.md};
-  text-align: center;
-  animation: ${fadeInUp} 0.4s ease-out;
-`;
-
-export const ErrorIcon = styled.div`
-  font-size: 2.5rem;
-  margin-bottom: ${theme.spacing.sm};
-`;
-
-export const ErrorTitle = styled.h2`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.lg};
-  color: ${theme.colors.primary[700]};
-  margin: 0;
-  font-weight: ${theme.typography.weights.medium};
-`;
-
-export const ErrorMessage = styled.p`
-  color: ${theme.colors.text.secondary};
-  margin: 0;
-  line-height: 1.5;
-  max-width: 400px;
-`;
-
-export const RetryButton = styled.button`
-  background: linear-gradient(135deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%);
-  color: white;
-  border: none;
-  padding: 0.625rem ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.sm};
-  font-weight: ${theme.typography.weights.medium};
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.sm};
-  cursor: pointer;
-  transition: all ${theme.transitions.fast};
-  
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
-  }
-`;
-
-// Create Portfolio - GREYSCALE
-export const CreatePortfolioSection = styled.div`
-  background: ${theme.glass.background};
-  backdrop-filter: blur(${theme.glass.blur});
-  border-radius: ${theme.borderRadius.xl};
-  padding: ${theme.spacing['3xl']};
-  box-shadow: ${theme.shadows.sm};
-  border: 1px solid ${theme.glass.border};
-  animation: ${fadeInUp} 0.6s ease-out;
-  
-  @media (max-width: 768px) {
-    padding: ${theme.spacing['2xl']};
-  }
-`;
-
-export const CreateHeader = styled.div`
-  text-align: center;
-  margin-bottom: ${theme.spacing['3xl']};
-`;
-
-export const CreateIcon = styled.div`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(135deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%);
-  border-radius: 50%;
-  color: white;
-  margin-bottom: ${theme.spacing.lg};
-  box-shadow: ${theme.shadows.sm};
-  animation: ${gentleFloat} 4s ease-in-out infinite;
-`;
-
-export const CreateTitle = styled.h2`
-  font-family: ${theme.typography.fonts.display};
-  font-size: ${theme.typography.sizes['3xl']};
-  font-weight: ${theme.typography.weights.semibold};
-  margin: 0 0 ${theme.spacing.md} 0;
-  color: ${theme.colors.text.primary};
-`;
-
-export const CreateDescription = styled.p`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.base};
-  color: ${theme.colors.text.secondary};
-  max-width: 500px;
-  margin: 0 auto;
-  line-height: 1.6;
-`;
-
-export const PortfolioTypes = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: ${theme.spacing.lg};
-  
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-export const PortfolioTypeCard = styled.div`
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(226, 232, 240, 0.6);
-  border-radius: ${theme.borderRadius.lg};
-  padding: ${theme.spacing.xl};
-  transition: all 0.3s ease;
-  cursor: pointer;
-  
-  &:hover {
-    border-color: ${theme.colors.primary[600]};
-    box-shadow: ${theme.shadows.md};
-    transform: translateY(-2px);
-  }
-`;
-
-export const TypeHeader = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: ${theme.spacing.lg};
-`;
-
-export const TypeIcon = styled.div<{ $gradient: string }>`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 60px;
-  height: 60px;
-  background: ${props => props.$gradient};
-  border-radius: ${theme.borderRadius.md};
-  color: white;
-  margin-bottom: ${theme.spacing.md};
-  box-shadow: ${theme.shadows.sm};
-`;
-
-export const TypeTitle = styled.h3`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.lg};
-  font-weight: ${theme.typography.weights.semibold};
-  color: ${theme.colors.text.primary};
-  margin: 0;
-  text-align: center;
-`;
-
-export const TypeDescription = styled.p`
-  color: ${theme.colors.text.secondary};
-  line-height: 1.5;
-  margin: 0 0 ${theme.spacing.lg} 0;
-  text-align: center;
-  font-size: ${theme.typography.sizes.sm};
-`;
-
-export const TypeFeatures = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: ${theme.spacing.lg};
-`;
-
-export const Feature = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: ${theme.typography.sizes.xs};
-  color: ${theme.colors.text.light};
-  
-  svg {
-    color: ${theme.colors.primary[600]};
-  }
-`;
-
-export const CreateButton = styled.button<{ $gradient: string }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: ${theme.spacing.xs};
-  width: 100%;
-  padding: 0.75rem ${theme.spacing.md};
-  background: ${props => props.$gradient};
-  color: white;
-  border: none;
-  border-radius: ${theme.borderRadius.sm};
-  font-weight: ${theme.typography.weights.medium};
-  font-size: ${theme.typography.sizes.sm};
-  font-family: ${theme.typography.fonts.body};
-  cursor: pointer;
-  transition: all ${theme.transitions.fast};
-  
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
-  }
-`;
-
-// Dashboard Content
-export const DashboardContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.xl};
-  animation: ${fadeInUp} 0.4s ease-out 0.1s both;
-`;
-
-// Stats Grid - more refined
-export const StatsGrid = styled.div`
-  display: grid;
+// Stats Components
+export const StatsGrid = styled(Grid).attrs({ $responsive: true })`
   grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: ${theme.spacing.md};
-  margin-bottom: ${theme.spacing.xl};
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
   
-  @media (max-width: 1024px) {
+  ${responsive.below.lg} {
     grid-template-columns: 1fr 1fr;
   }
   
-  @media (max-width: 768px) {
+  ${responsive.below.md} {
     grid-template-columns: 1fr;
   }
 `;
 
-export const MainStatCard = styled.div`
-  background: ${theme.glass.background};
-  backdrop-filter: blur(${theme.glass.blur});
-  border-radius: ${theme.borderRadius.md};
-  padding: ${theme.spacing.lg};
-  box-shadow: ${theme.shadows.sm};
-  border: 1px solid ${theme.glass.border};
+export const MainStatCard = styled(Card).attrs({ $glass: true, $padding: 'lg' })`
+  background: var(--glass-background);
+  backdrop-filter: blur(var(--glass-blur));
 `;
 
-export const StatCard = styled.div`
-  background: ${theme.glass.background};
-  backdrop-filter: blur(${theme.glass.blur});
-  border-radius: ${theme.borderRadius.md};
-  padding: ${theme.spacing.md};
-  box-shadow: ${theme.shadows.sm};
-  border: 1px solid ${theme.glass.border};
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.sm};
-  transition: all ${theme.transitions.fast};
+export const StatCard = styled(Card).attrs({ $padding: 'md', $hover: true })`
+  background: var(--glass-background);
+  backdrop-filter: blur(var(--glass-blur));
   
   &:hover {
     transform: translateY(-1px);
-    box-shadow: ${theme.shadows.md};
+    box-shadow: var(--shadow-md);
   }
 `;
 
-export const StatHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.sm};
-  margin-bottom: ${theme.spacing.md};
+export const StatHeader = styled(FlexRow).attrs({ 
+  $gap: 'var(--spacing-sm)', 
+  $align: 'center' 
+})`
+  margin-bottom: var(--spacing-md);
 `;
 
 export const StatIcon = styled.div<{ $color?: string; $gradient?: string }>`
@@ -684,198 +266,128 @@ export const StatIcon = styled.div<{ $color?: string; $gradient?: string }>`
   justify-content: center;
   width: 40px;
   height: 40px;
-  background: ${props => {
-    if (props.$gradient) return props.$gradient;
-    if (props.$color) return `${props.$color}20`;
-    return `${theme.colors.primary[600]}20`;
-  }};
-  color: ${props => {
-    if (props.$gradient) return 'white';
-    if (props.$color) return props.$color;
-    return theme.colors.primary[600];
-  }};
-  border-radius: ${theme.borderRadius.sm};
-  box-shadow: ${props => props.$gradient ? theme.shadows.sm : 'none'};
+  border-radius: var(--radius-sm);
+  
+  ${({ $gradient, $color }) => {
+    if ($gradient) {
+      return css`
+        background: ${$gradient};
+        color: white;
+        box-shadow: var(--shadow-sm);
+      `;
+    }
+    return css`
+      background: ${$color ? `${$color}20` : 'rgba(59, 130, 246, 0.1)'};
+      color: ${$color || 'var(--color-primary-600)'};
+    `;
+  }}
 `;
 
-export const StatContent = styled.div`
-  flex: 1;
-`;
-
-export const StatTitle = styled.h4`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.xs};
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.secondary};
-  margin: 0 0 ${theme.spacing.xs} 0;
+export const StatTitle = styled.div`
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.025em;
-`;
-
-export const StatValue = styled.div`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.xl};
-  font-weight: ${theme.typography.weights.bold};
-  color: ${theme.colors.text.primary};
-  margin-bottom: 2px;
-  
-  @media (max-width: 768px) {
-    font-size: ${theme.typography.sizes.lg};
-  }
-`;
-
-export const StatLabel = styled.div`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.xs};
-  color: ${theme.colors.text.secondary};
-  font-weight: ${theme.typography.weights.medium};
-`;
-
-export const StatChange = styled.div<{ $positive?: boolean }>`
-  font-size: 0.625rem;
-  color: ${props => props.$positive ? theme.colors.primary[600] : theme.colors.primary[700]};
-  font-weight: ${theme.typography.weights.medium};
-  margin-top: 2px;
+  margin-bottom: var(--spacing-xs);
 `;
 
 export const StatProgress = styled.div`
-  margin-top: ${theme.spacing.sm};
+  margin-top: var(--spacing-sm);
 `;
 
 export const ProgressBar = styled.div`
   height: 6px;
-  background: ${theme.colors.border.light};
+  background: var(--color-border-light);
   border-radius: 3px;
   overflow: hidden;
-  margin-bottom: ${theme.spacing.xs};
+  margin-bottom: var(--spacing-xs);
 `;
 
 export const ProgressFill = styled.div<{ $percentage: number }>`
   height: 100%;
   width: ${props => Math.min(props.$percentage, 100)}%;
-  background: linear-gradient(90deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%);
+  background: linear-gradient(90deg, var(--color-primary-500), var(--color-primary-600));
   transition: width 0.6s ease;
 `;
 
 export const ProgressText = styled.div`
-  font-size: 0.625rem;
-  color: ${theme.colors.text.secondary};
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
   text-align: right;
-  font-weight: ${theme.typography.weights.medium};
+  font-weight: var(--font-weight-medium);
 `;
 
-// Content Grid
-export const ContentGrid = styled.div`
-  display: grid;
+// Content Layout
+export const ContentGrid = styled(Grid).attrs({ 
+  $columns: 2, 
+  $gap: 'var(--spacing-lg)' 
+})`
   grid-template-columns: 1.2fr 0.8fr;
-  gap: ${theme.spacing.lg};
   
-  @media (max-width: 1024px) {
+  ${responsive.below.lg} {
     grid-template-columns: 1fr;
   }
 `;
 
+export const DashboardContent = styled(FlexColumn).attrs({ $gap: 'var(--spacing-xl)' })`
+  animation: ${fadeIn} 0.4s ease-out 0.1s both;
+`;
+
 // Section Components
-export const Section = styled.div`
-  background: ${theme.glass.background};
-  backdrop-filter: blur(${theme.glass.blur});
-  border-radius: ${theme.borderRadius.md};
-  padding: ${theme.spacing.lg};
-  box-shadow: ${theme.shadows.sm};
-  border: 1px solid ${theme.glass.border};
+export const Section = styled(Card).attrs({ $glass: true, $padding: 'lg' })`
+  background: var(--glass-background);
+  backdrop-filter: blur(var(--glass-blur));
 `;
 
-export const SectionHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: ${theme.spacing.md};
-  padding-bottom: ${theme.spacing.sm};
-  border-bottom: 1px solid ${theme.colors.border.light};
+export const SectionHeader = styled(FlexRow).attrs({ 
+  $justify: 'space-between', 
+  $align: 'center' 
+})`
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border-light);
 `;
 
-export const SectionTitle = styled.h3`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.base};
-  font-weight: ${theme.typography.weights.semibold};
-  color: ${theme.colors.text.primary};
+export const SectionTitle = styled(Heading3)`
   margin: 0;
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.xs};
+  gap: var(--spacing-xs);
 `;
 
-export const SectionActions = styled.div`
-  display: flex;
-  gap: ${theme.spacing.xs};
-`;
+export const SectionActions = styled(FlexRow).attrs({ $gap: 'var(--spacing-xs)' })``;
 
-export const ActionButton = styled.button<{ $primary?: boolean; $variant?: 'primary' | 'secondary' | 'ghost' }>`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.xs};
-  padding: 0.5rem 0.75rem;
-  background: ${props => {
-    if (props.$primary || props.$variant === 'primary') {
-      return `linear-gradient(135deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%)`;
-    }
-    if (props.$variant === 'ghost') {
-      return 'transparent';
-    }
-    return 'rgba(243, 244, 246, 0.8)';
-  }};
-  color: ${props => {
-    if (props.$primary || props.$variant === 'primary') {
-      return 'white';
-    }
-    return theme.colors.text.primary;
-  }};
-  border: 1px solid ${props => {
-    if (props.$primary || props.$variant === 'primary') {
-      return 'transparent';
-    }
-    return theme.colors.border.light;
-  }};
-  border-radius: ${theme.borderRadius.sm};
-  font-size: ${theme.typography.sizes.xs};
-  font-weight: ${theme.typography.weights.medium};
-  font-family: ${theme.typography.fonts.body};
-  cursor: pointer;
-  transition: all ${theme.transitions.fast};
-  
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.sm};
-  }
+export const ActionButton = styled(BaseButton)<{ $primary?: boolean }>`
+  ${({ $primary }) => $primary && css`
+    background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+    color: white;
+  `}
 `;
 
 export const ViewAllLink = styled.a`
-  font-size: ${theme.typography.sizes.xs};
-  color: ${theme.colors.primary[600]};
+  font-size: var(--font-size-xs);
+  color: var(--color-primary-600);
   text-decoration: none;
-  font-weight: ${theme.typography.weights.medium};
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: color ${theme.transitions.fast};
+  transition: color var(--transition-fast);
   
   &:hover {
-    color: ${theme.colors.primary[700]};
+    color: var(--color-primary-700);
   }
 `;
 
-// Activity Components - GREYSCALE
-export const ActivityList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.sm};
-`;
+// Activity Components
+export const ActivityList = styled(FlexColumn).attrs({ $gap: 'var(--spacing-sm)' })``;
 
 export const ActivityItem = styled.div`
   display: flex;
   align-items: flex-start;
-  gap: ${theme.spacing.sm};
-  padding: ${theme.spacing.sm};
-  border-radius: ${theme.borderRadius.sm};
-  transition: all ${theme.transitions.fast};
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
   
   &:hover {
     background: rgba(248, 250, 252, 0.6);
@@ -889,18 +401,19 @@ export const ActivityIcon = styled.div<{ $type: string }>`
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: ${theme.borderRadius.sm};
-  background: ${props => {
-    switch (props.$type) {
-      case 'gallery_upload': return `linear-gradient(135deg, ${theme.colors.primary[500]} 0%, ${theme.colors.primary[600]} 100%)`;
-      case 'concept_complete': return `linear-gradient(135deg, ${theme.colors.primary[600]} 0%, ${theme.colors.primary[700]} 100%)`;
-      case 'project_create': return `linear-gradient(135deg, ${theme.colors.primary[400]} 0%, ${theme.colors.primary[500]} 100%)`;
-      case 'achievement_unlock': return `linear-gradient(135deg, ${theme.colors.primary[300]} 0%, ${theme.colors.primary[400]} 100%)`;
-      default: return `linear-gradient(135deg, ${theme.colors.primary[500]} 0%, ${theme.colors.primary[600]} 100%)`;
+  border-radius: var(--radius-sm);
+  color: white;
+  box-shadow: var(--shadow-sm);
+  
+  background: ${({ $type }) => {
+    switch ($type) {
+      case 'gallery_upload': return 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600))';
+      case 'concept_complete': return 'linear-gradient(135deg, #10b981, #059669)';
+      case 'project_create': return 'linear-gradient(135deg, #8b5cf6, #7c3aed)';
+      case 'achievement_unlock': return 'linear-gradient(135deg, #f59e0b, #d97706)';
+      default: return 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600))';
     }
   }};
-  color: white;
-  box-shadow: ${theme.shadows.sm};
 `;
 
 export const ActivityContent = styled.div`
@@ -909,80 +422,73 @@ export const ActivityContent = styled.div`
 `;
 
 export const ActivityTitle = styled.div`
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
   margin-bottom: 2px;
-  font-size: ${theme.typography.sizes.xs};
+  font-size: var(--font-size-xs);
 `;
 
 export const ActivityDescription = styled.div`
-  font-size: 0.625rem;
-  color: ${theme.colors.text.secondary};
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
   line-height: 1.3;
-  margin-bottom: ${theme.spacing.xs};
+  margin-bottom: var(--spacing-xs);
 `;
 
-export const ActivityMetadata = styled.div`
-  display: flex;
-  gap: ${theme.spacing.xs};
-  flex-wrap: wrap;
-`;
+export const ActivityMetadata = styled(FlexRow).attrs({ 
+  $gap: 'var(--spacing-xs)', 
+  $wrap: true 
+})``;
 
-export const MetadataTag = styled.span`
-  background: ${theme.colors.primary[200]};
-  color: ${theme.colors.primary[700]};
-  font-size: 0.5rem;
+export const MetadataTag = styled(Badge)`
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary-600);
+  font-size: var(--font-size-xs);
   padding: 0.125rem 0.375rem;
-  border-radius: 4px;
-  font-weight: ${theme.typography.weights.medium};
 `;
 
 export const ActivityTime = styled.div`
-  font-size: 0.5rem;
-  color: ${theme.colors.text.tertiary};
-  font-weight: ${theme.typography.weights.medium};
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
   flex-shrink: 0;
 `;
 
-// Quick Actions - GREYSCALE
-export const QuickActionGrid = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-`;
+// Quick Actions
+export const QuickActionGrid = styled(FlexColumn).attrs({ $gap: '0.5rem' })``;
 
 export const QuickAction = styled.div`
   display: flex;
   align-items: center;
-  gap: ${theme.spacing.sm};
+  gap: var(--spacing-sm);
   padding: 0.75rem;
-  border: 1px solid ${theme.colors.border.light};
-  border-radius: ${theme.borderRadius.sm};
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
   text-decoration: none;
-  transition: all ${theme.transitions.fast};
+  transition: var(--transition-fast);
   cursor: pointer;
   background: rgba(255, 255, 255, 0.3);
   
   &:hover {
-    border-color: ${theme.colors.primary[600]};
+    border-color: var(--color-primary-500);
     background: rgba(248, 250, 252, 0.6);
     transform: translateY(-1px);
   }
 `;
 
-export const QuickActionIcon = styled.div<{ $color: string }>`
+export const QuickActionIcon = styled.div<{ $color?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: ${theme.colors.primary[200]};
-  color: ${theme.colors.primary[700]};
-  border-radius: ${theme.borderRadius.sm};
-  transition: all ${theme.transitions.fast};
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary-600);
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
   
   ${QuickAction}:hover & {
-    background: ${theme.colors.primary[300]};
+    background: rgba(59, 130, 246, 0.2);
   }
 `;
 
@@ -991,60 +497,178 @@ export const QuickActionContent = styled.div`
 `;
 
 export const QuickActionTitle = styled.div`
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
   margin-bottom: 2px;
-  font-size: ${theme.typography.sizes.xs};
+  font-size: var(--font-size-xs);
 `;
 
 export const QuickActionDescription = styled.div`
-  font-size: 0.625rem;
-  color: ${theme.colors.text.secondary};
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
   line-height: 1.3;
 `;
 
 export const QuickActionArrow = styled.div`
-  color: ${theme.colors.text.tertiary};
-  transition: all ${theme.transitions.fast};
+  color: var(--color-text-secondary);
+  transition: var(--transition-fast);
   
   ${QuickAction}:hover & {
-    color: ${theme.colors.primary[600]};
+    color: var(--color-primary-600);
     transform: translateX(2px);
   }
 `;
 
-// Empty State - minimal
-export const EmptyStateCard = styled.div`
+// Portfolio Creation Components  
+export const CreatePortfolioSection = styled(Card).attrs({ $glass: true, $padding: 'lg' })`
+  background: var(--glass-background);
+  backdrop-filter: blur(var(--glass-blur));
+  border-radius: var(--radius-lg);
+  animation: ${fadeIn} 0.6s ease-out;
+`;
+
+export const CreateHeader = styled.div`
+  text-align: center;
+  margin-bottom: var(--spacing-3lg);
+`;
+
+export const CreateIcon = styled.div`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+  border-radius: 50%;
+  color: white;
+  margin-bottom: var(--spacing-lg);
+  box-shadow: var(--shadow-sm);
+  animation: ${float} 4s ease-in-out infinite;
+`;
+
+export const CreateTitle = styled(Heading2)`
+  margin: 0 0 var(--spacing-md) 0;
+`;
+
+export const CreateDescription = styled(BodyText)`
+  max-width: 500px;
+  margin: 0 auto;
+`;
+
+export const PortfolioTypes = styled(Grid).attrs({ 
+  $minWidth: '280px', 
+  $gap: 'var(--spacing-lg)' 
+})``;
+
+export const PortfolioTypeCard = styled(Card).attrs({ $hover: true, $padding: 'lg' })`
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  cursor: pointer;
+  
+  &:hover {
+    border-color: var(--color-primary-500);
+    transform: translateY(-2px);
+  }
+`;
+
+export const TypeHeader = styled(FlexColumn).attrs({ 
+  $gap: 'var(--spacing-md)', 
+  $align: 'center' 
+})`
+  margin-bottom: var(--spacing-lg);
+`;
+
+export const TypeIcon = styled.div<{ $gradient: string }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  background: ${props => props.$gradient};
+  border-radius: var(--radius-md);
+  color: white;
+  box-shadow: var(--shadow-sm);
+`;
+
+export const TypeTitle = styled(Heading3)`
+  margin: 0;
+  text-align: center;
+`;
+
+export const TypeDescription = styled(BodyText)`
+  text-align: center;
+  margin: 0 0 var(--spacing-lg) 0;
+`;
+
+export const TypeFeatures = styled(FlexColumn).attrs({ $gap: '0.5rem' })`
+  margin-bottom: var(--spacing-lg);
+`;
+
+export const Feature = styled(FlexRow).attrs({ 
+  $gap: '0.5rem', 
+  $align: 'center' 
+})`
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  
+  svg {
+    color: var(--color-primary-600);
+  }
+`;
+
+export const CreateButton = styled(BaseButton).attrs({ 
+  $variant: 'primary', 
+  $fullWidth: true 
+})<{ $gradient?: string }>`
+  ${({ $gradient }) => $gradient && css`
+    background: ${$gradient};
+  `}
+`;
+
+// Empty State
+export const EmptyStateCard = styled(Card).attrs({ $padding: 'lg' })`
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: ${theme.spacing['2xl']};
   text-align: center;
   background: rgba(248, 250, 252, 0.6);
-  border-radius: ${theme.borderRadius.md};
-  border: 2px dashed ${theme.colors.border.light};
+  border: 2px dashed var(--color-border-light);
 `;
 
 export const EmptyIcon = styled.div`
-  color: ${theme.colors.text.tertiary};
-  margin-bottom: ${theme.spacing.sm};
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
   opacity: 0.6;
 `;
 
-export const EmptyTitle = styled.h3`
-  font-family: ${theme.typography.fonts.body};
-  font-size: ${theme.typography.sizes.base};
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
-  margin: 0 0 ${theme.spacing.xs} 0;
+export const EmptyTitle = styled(Heading3)`
+  margin: 0 0 var(--spacing-xs) 0;
 `;
 
-export const EmptyMessage = styled.p`
-  color: ${theme.colors.text.secondary};
-  margin: 0 0 ${theme.spacing.md} 0;
-  line-height: 1.4;
+export const EmptyMessage = styled(BodyText)`
+  margin: 0 0 var(--spacing-md) 0;
   max-width: 300px;
-  font-size: ${theme.typography.sizes.sm};
 `;
+
+// Re-export existing components for convenience
+export {
+  Grid,
+  Card, 
+  CardContent,
+  Badge,
+  BaseButton,
+  PageContainer,
+  Container,
+  FlexRow,
+  FlexColumn,
+  Heading1,
+  Heading2, 
+  Heading3,
+  BodyText,
+  LoadingSpinner,
+  LoadingContainer,
+  ErrorContainer
+} from '@/styles/styled-components';

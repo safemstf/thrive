@@ -1,16 +1,19 @@
-// app/layout.tsx - Optimized version
+// app/layout.tsx - Server-Safe Layout
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import ogImage from '../../public/assets/og-preview.png';
 import './globals.css';
 
+// Import client components
 import { ApiConnectionManager } from '@/components/apiConnectionManager';
 import { ApiProvider } from '@/providers/apiProvider';
 import { Providers } from '@/providers/providers';
 import { AuthProvider } from '@/providers/authProvider';
 import { ConditionalLayout } from '@/components/layout/conditionalLayout';
+import { DarkModeProvider } from '@/providers/darkModeProvider';
+import { ClientThemeProvider } from '@/providers/clientThemeProvider';
 
-// Optimize font loading with display swap and preload
+// Font setup (unchanged)
 const geistSans = Geist({ 
   variable: '--font-geist-sans', 
   subsets: ['latin'],
@@ -22,10 +25,13 @@ const geistMono = Geist_Mono({
   variable: '--font-geist-mono', 
   subsets: ['latin'],
   display: 'swap',
-  preload: false // Secondary font doesn't need preload
+  preload: false
 });
 
-// Enhanced metadata with better SEO
+// ==============================================
+// METADATA (Server Component)
+// ==============================================
+
 export const metadata: Metadata = {
   title: {
     default: 'Accessible Portfolio Hub | learnmorra.com',
@@ -78,24 +84,20 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
-  verification: {
-    // Add your verification codes here when available
-    // google: 'your-google-verification-code',
-    // yandex: 'your-yandex-verification-code',
-  },
 };
 
-// Enhanced viewport configuration
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 5, // Allow users to zoom for accessibility
-  userScalable: true,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
     { media: '(prefers-color-scheme: dark)', color: '#000000' },
   ],
 };
+
+// ==============================================
+// Root Layout (Server Component)
+// ==============================================
 
 export default function RootLayout({ 
   children 
@@ -105,7 +107,7 @@ export default function RootLayout({
   return (
     <html 
       lang="en" 
-      suppressHydrationWarning // Prevent hydration warnings for theme switching
+      suppressHydrationWarning
     >
       <head>
         {/* Preconnect to external domains for faster loading */}
@@ -120,33 +122,57 @@ export default function RootLayout({
         
         {/* Performance hints */}
         <link rel="dns-prefetch" href="https://api.learnmorra.com" />
+        
+        {/* Security headers */}
+        <meta httpEquiv="X-Content-Type-Options" content="nosniff" />
+        
+        {/* Dark mode script - MUST run before body renders to prevent flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var darkMode = localStorage.getItem('dark-mode');
+                  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  var shouldBeDark = darkMode ? darkMode === 'true' : prefersDark;
+                  
+                  if (shouldBeDark) {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (e) {
+                  console.warn('Error setting initial dark mode:', e);
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body 
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        {/* Skip to main content for accessibility */}
-        <a 
-          href="#main-content" 
-          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-md"
-        >
-          Skip to main content
-        </a>
         
-        <Providers>
-          <ApiProvider>
-            <AuthProvider>
-              <ApiConnectionManager>
-                <ConditionalLayout>
-                  <main id="main-content">
-                    {children}
-                  </main>
-                </ConditionalLayout>
-              </ApiConnectionManager>
-            </AuthProvider>
-          </ApiProvider>
-        </Providers>
-        
+        {/* Use your existing DarkModeProvider with the new ClientThemeProvider */}
+        <DarkModeProvider>
+          <ClientThemeProvider>
+            <Providers>
+              <ApiProvider>
+                <AuthProvider>
+                  <ApiConnectionManager>
+                    <ConditionalLayout>
+                      <main id="main-content">
+                        {children}
+                      </main>
+                    </ConditionalLayout>
+                  </ApiConnectionManager>
+                </AuthProvider>
+              </ApiProvider>
+            </Providers>
+          </ClientThemeProvider>
+        </DarkModeProvider>
+
         {/* Analytics scripts would go here */}
         {process.env.NODE_ENV === 'production' && (
           <>

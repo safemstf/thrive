@@ -2,6 +2,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/misc/header';
 import { Footer } from '@/components/misc/footer';
 
@@ -11,22 +12,41 @@ interface ConditionalLayoutProps {
 
 export function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const pathname = usePathname();
-  const isDashboard = pathname?.startsWith('/dashboard');
-  const isAdmin = pathname?.startsWith('/admin');
-  const isApiTest = pathname?.startsWith('/dashboard/api-test');
+  const [isMounted, setIsMounted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // Pages that shouldn't have header/footer (full app pages)
-  const isFullscreen = isDashboard || isAdmin || isApiTest;
-
-  if (isFullscreen) {
-    return <>{children}</>;
-  }
+  useEffect(() => {
+    const isDashboard = pathname?.startsWith('/dashboard');
+    const isAdmin = pathname?.startsWith('/admin');
+    const isApiTest = pathname?.startsWith('/dashboard/api-test');
+    setIsFullscreen(!!(isDashboard || isAdmin || isApiTest));
+    setIsMounted(true);
+  }, [pathname]);
 
   return (
-    <>
-      <Header title="LearnMorra" subtitle="Brag Responsibly" />
-      <main className="flex-grow">{children}</main>
-      <Footer />
-    </>
+    <div className="flex flex-col min-h-screen">
+      {/* Header section */}
+      {!isFullscreen && (
+        isMounted ? (
+          <Header title="LearnMorra" subtitle="Brag Responsibly" />
+        ) : (
+          <div className="h-[80px] bg-transparent" />
+        )
+      )}
+      
+      {/* Main content - flex-grow ensures it takes available space */}
+      <main className="flex-grow">
+        {children}
+      </main>
+      
+      {/* Footer section */}
+      {!isFullscreen && (
+        isMounted ? (
+          <Footer />
+        ) : (
+          <div className="h-[60px] bg-transparent" />
+        )
+      )}
+    </div>
   );
 }

@@ -1,81 +1,88 @@
+// app/login/page.tsx - Refactored to use central styled-components hub
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import styled from 'styled-components';
 import Link from 'next/link';
+import styled from 'styled-components';
 import { useAuth } from '@/providers/authProvider';
 import { Eye, EyeOff, Loader2, AlertCircle, ChevronLeft, User, Mail, Lock } from 'lucide-react';
+import { useDarkMode } from '@/providers/darkModeProvider';
 
-const PageWrapper = styled.div`
-  min-height: 100vh;
-  display: flex;
-  background: #fafafa;
-  font-family: 'Work Sans', sans-serif;
-`;
+// Import everything from the central hub!
+import {
+  AuthPageWrapper,
+  Card,
+  BaseButton,
+  Input,
+  FormGroup,
+  Label,
+  MessageContainer,
+  TabContainer,
+  TabButton,
+  FlexRow,
+  FlexColumn,
+  Heading1,
+  BodyText
+} from '@/styles/styled-components';
 
+// Only create custom components that are specific to login page
 const LeftPanel = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 3rem;
-  background: white;
-  border-right: 1px solid #f0f0f0;
+  padding: var(--spacing-3xl);
+  border-right: 1px solid var(--color-border-light);
   
   @media (max-width: 968px) {
     display: none;
   }
 `;
 
+const RightPanel = styled.div`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  
+  @media (max-width: 968px) {
+    flex: none;
+    width: 100%;
+    min-height: 100vh;
+  }
+`;
+
 const BrandSection = styled.div`
   text-align: center;
-  margin-bottom: 3rem;
+  margin-bottom: var(--spacing-3xl);
 `;
 
-const BrandTitle = styled.h1`
-  font-size: 3rem;
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 400;
-  margin-bottom: 1rem;
-  color: #2c2c2c;
-  letter-spacing: 1px;
-`;
-
-const BrandSubtitle = styled.p`
-  font-size: 1.2rem;
-  color: #666;
-  margin-bottom: 2rem;
-  line-height: 1.5;
-`;
-
-const FeatureList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+const FeatureList = styled(FlexColumn)`
+  gap: var(--spacing-xl);
   max-width: 400px;
 `;
 
-const FeatureItem = styled.div`
+const FeatureItem = styled(Card)`
+  padding: var(--spacing-lg);
+  background: var(--color-background-tertiary);
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-  background: #f8f9fa;
-  border-radius: 12px;
-  border: 1px solid #f0f0f0;
+  gap: var(--spacing-lg);
 `;
 
 const FeatureIcon = styled.div`
   width: 40px;
   height: 40px;
-  border-radius: 8px;
-  background: #2c2c2c;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-500);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  flex-shrink: 0;
 `;
 
 const FeatureText = styled.div`
@@ -85,107 +92,39 @@ const FeatureText = styled.div`
 const FeatureTitle = styled.h3`
   font-size: 1rem;
   font-weight: 600;
-  margin-bottom: 0.25rem;
-  color: #2c2c2c;
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
 `;
 
-const FeatureDescription = styled.p`
+const FeatureDescription = styled(BodyText)`
   font-size: 0.9rem;
-  color: #666;
   margin: 0;
-`;
-
-const RightPanel = styled.div`
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  
-  @media (max-width: 968px) {
-    flex: none;
-    width: 100%;
-    min-height: 100vh;
-    background: white;
-  }
-`;
-
-const LoginCard = styled.div`
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  padding: 3rem;
-  width: 100%;
-  max-width: 420px;
-  border: 1px solid #f0f0f0;
-  
-  @media (max-width: 968px) {
-    box-shadow: none;
-    border: none;
-  }
 `;
 
 const CardHeader = styled.div`
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: var(--spacing-xl);
 `;
 
 const Title = styled.h2`
   font-size: 2rem;
   font-weight: 600;
-  color: #2c2c2c;
-  margin-bottom: 0.5rem;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+  font-family: var(--font-body);
 `;
 
-const Subtitle = styled.p`
-  color: #666;
+const Subtitle = styled(BodyText)`
+  color: var(--color-text-secondary);
   font-size: 1rem;
-`;
-
-const TabContainer = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 2rem;
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 0.25rem;
-`;
-
-const TabButton = styled.button<{ $active: boolean }>`
-  flex: 1;
-  padding: 0.75rem 1rem;
-  border: none;
-  background: ${props => props.$active ? 'white' : 'transparent'};
-  color: ${props => props.$active ? '#2c2c2c' : '#666'};
-  border-radius: 6px;
-  font-family: 'Work Sans', sans-serif;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: ${props => props.$active ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none'};
-
-  &:hover {
-    background: ${props => props.$active ? 'white' : '#f0f0f0'};
-  }
+  margin: 0;
 `;
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-`;
-
-const FormGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-`;
-
-const Label = styled.label`
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #4b5563;
-  font-family: 'Work Sans', sans-serif;
+  gap: var(--spacing-lg);
 `;
 
 const InputWrapper = styled.div`
@@ -194,134 +133,58 @@ const InputWrapper = styled.div`
 
 const InputIcon = styled.div`
   position: absolute;
-  left: 1rem;
+  left: var(--spacing-lg);
   top: 50%;
   transform: translateY(-50%);
-  color: #9ca3af;
+  color: var(--color-text-secondary);
+  z-index: 2;
 `;
 
-const Input = styled.input`
-  width: 100%;
-  padding: 1rem 1rem 1rem 3rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-family: 'Work Sans', sans-serif;
-  transition: all 0.2s ease;
-  background: white;
-
-  &:focus {
-    outline: none;
-    border-color: #2c2c2c;
-    box-shadow: 0 0 0 3px rgba(44, 44, 44, 0.1);
-  }
-
-  &::placeholder {
-    color: #9ca3af;
-  }
+const StyledInput = styled(Input)`
+  padding-left: 3rem;
 `;
 
 const PasswordToggle = styled.button`
   position: absolute;
-  right: 1rem;
+  right: var(--spacing-lg);
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: #6b7280;
   cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 4px;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
   transition: all 0.2s ease;
+  color: var(--color-text-secondary);
+  z-index: 2;
 
   &:hover {
-    color: #2c2c2c;
-    background: #f3f4f6;
-  }
-`;
-
-const SubmitButton = styled.button`
-  padding: 1rem 2rem;
-  background: #2c2c2c;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  font-family: 'Work Sans', sans-serif;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-
-  &:hover:not(:disabled) {
-    background: #1a1a1a;
-    transform: translateY(-1px);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-
-  &:disabled {
-    background: #e5e7eb;
-    color: #9ca3af;
-    cursor: not-allowed;
-    transform: none;
-  }
-`;
-
-const MessageContainer = styled.div<{ $type: 'error' | 'success' }>`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1.25rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-family: 'Work Sans', sans-serif;
-  font-weight: 500;
-  
-  ${({ $type }) => $type === 'error' 
-    ? `
-      background: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-    `
-    : `
-      background: #f0fdf4;
-      color: #16a34a;
-      border: 1px solid #bbf7d0;
-    `
-  }
-
-  svg {
-    flex-shrink: 0;
+    color: var(--color-text-primary);
+    background: var(--color-background-tertiary);
   }
 `;
 
 const BackLink = styled(Link)`
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  color: #6b7280;
+  gap: var(--spacing-sm);
+  color: var(--color-text-secondary);
   text-decoration: none;
   font-size: 0.9rem;
-  font-family: 'Work Sans', sans-serif;
-  margin-top: 1.5rem;
+  font-family: var(--font-body);
+  margin-top: var(--spacing-xl);
   justify-content: center;
   font-weight: 500;
+  transition: color 0.2s ease;
 
   &:hover {
-    color: #2c2c2c;
+    color: var(--color-text-primary);
   }
 `;
 
 export default function LoginPage() {
   const router = useRouter();
+  const { isDarkMode } = useDarkMode();
   const { login, signup, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -396,13 +259,15 @@ export default function LoginPage() {
   };
 
   return (
-    <PageWrapper>
+    <AuthPageWrapper $variant="login">
       <LeftPanel>
         <BrandSection>
-          <BrandTitle>Welcome</BrandTitle>
-          <BrandSubtitle>
+          <Heading1 $responsive={false} style={{ fontSize: '3rem', marginBottom: 'var(--spacing-lg)' }}>
+            Welcome
+          </Heading1>
+          <BodyText $size="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
             Join our community of creators, educators, and professionals
-          </BrandSubtitle>
+          </BodyText>
         </BrandSection>
         
         <FeatureList>
@@ -431,7 +296,7 @@ export default function LoginPage() {
       </LeftPanel>
 
       <RightPanel>
-        <LoginCard>
+        <Card $padding="lg" style={{ width: '100%', maxWidth: '420px' }}>
           <CardHeader>
             <Title>{activeTab === 'login' ? 'Welcome Back' : 'Create Account'}</Title>
             <Subtitle>
@@ -466,7 +331,7 @@ export default function LoginPage() {
                   <Label htmlFor="username">Username</Label>
                   <InputWrapper>
                     <InputIcon><User size={18} /></InputIcon>
-                    <Input
+                    <StyledInput
                       id="username"
                       name="username"
                       type="text"
@@ -482,7 +347,7 @@ export default function LoginPage() {
                   <Label htmlFor="name">Full Name</Label>
                   <InputWrapper>
                     <InputIcon><User size={18} /></InputIcon>
-                    <Input
+                    <StyledInput
                       id="name"
                       name="name"
                       type="text"
@@ -500,7 +365,7 @@ export default function LoginPage() {
               <Label htmlFor="email">Email Address</Label>
               <InputWrapper>
                 <InputIcon><Mail size={18} /></InputIcon>
-                <Input
+                <StyledInput
                   id="email"
                   name="email"
                   type="email"
@@ -516,7 +381,7 @@ export default function LoginPage() {
               <Label htmlFor="password">Password</Label>
               <InputWrapper>
                 <InputIcon><Lock size={18} /></InputIcon>
-                <Input
+                <StyledInput
                   id="password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
@@ -539,7 +404,7 @@ export default function LoginPage() {
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <InputWrapper>
                   <InputIcon><Lock size={18} /></InputIcon>
-                  <Input
+                  <StyledInput
                     id="confirmPassword"
                     name="confirmPassword"
                     type={showPassword ? 'text' : 'password'}
@@ -566,7 +431,13 @@ export default function LoginPage() {
               </MessageContainer>
             )}
 
-            <SubmitButton type="submit" disabled={loading}>
+            <BaseButton 
+              $variant="primary" 
+              $fullWidth 
+              $size="lg"
+              type="submit" 
+              disabled={loading}
+            >
               {loading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
@@ -575,15 +446,15 @@ export default function LoginPage() {
               ) : (
                 activeTab === 'login' ? 'Sign In' : 'Create Account'
               )}
-            </SubmitButton>
+            </BaseButton>
           </Form>
 
           <BackLink href="/">
             <ChevronLeft size={16} />
             Back to Home
           </BackLink>
-        </LoginCard>
+        </Card>
       </RightPanel>
-    </PageWrapper>
+    </AuthPageWrapper>
   );
 }

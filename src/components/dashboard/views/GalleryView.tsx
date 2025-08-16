@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Upload, Settings, ExternalLink, Image as GalleryIcon } from 'lucide-react';
 import type { GalleryPiece } from '@/types/gallery.types';
-import { theme } from '@/styles/theme';
+import { theme } from '@/styles/styled-components';
 
 import {
   Section,

@@ -8,14 +8,12 @@ import { BarChart2, Timer, ChevronLeft, ChevronRight, Send, Shield } from 'lucid
 
 // Import shared dashboard components
 import {
-  PageWrapper,
   Container,
-  Header,
-  HeaderContent,
   WelcomeTitle,
   WelcomeSubtitle,
   Section,
 } from '@/components/dashboard/dashboardStyles';
+
 
 // Import shared assessment components
 import {
@@ -51,7 +49,9 @@ import { Assessment,
   AssessmentQuestion, } from '@/types/thrive.types';
 
 // Import theme
-import { theme } from '@/styles/theme';
+import { theme, PageWrapper,
+    Header,
+  HeaderContent, } from '@/styles/styled-components';
 
 export default function DataAnalysisInterpretationAssessment() {
   const router = useRouter();

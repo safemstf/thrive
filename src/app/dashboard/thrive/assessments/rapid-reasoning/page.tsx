@@ -8,10 +8,7 @@ import { Zap, Timer, ChevronLeft, ChevronRight, Send, Shield } from 'lucide-reac
 
 // Import shared dashboard components
 import {
-  PageWrapper,
-  Container,
-  Header,
-  HeaderContent,
+  Container,  
   WelcomeTitle,
   WelcomeSubtitle,
   Section,
@@ -51,7 +48,9 @@ import {   Assessment,
   AssessmentQuestion, } from '@/types/thrive.types';
 
 // Import theme
-import { theme } from '@/styles/theme';
+import { theme, Header,
+  HeaderContent,   PageWrapper,
+} from '@/styles/styled-components';
 
 
 export default function RapidReasoningAssessment() {

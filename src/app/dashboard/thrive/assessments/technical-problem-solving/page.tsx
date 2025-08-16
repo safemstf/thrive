@@ -49,7 +49,7 @@ import {   Assessment,
   AssessmentQuestion, } from '@/types/thrive.types';
 
 // Import theme
-import { theme } from '@/styles/theme';
+import { theme } from '@/styles/styled-components';
 import { frameSteps } from 'framer-motion';
 
 export default function TechnicalProblemSolvingChallenge() {

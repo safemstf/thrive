@@ -8,14 +8,12 @@ import { Brain, Timer, ChevronLeft, ChevronRight, Send, Shield } from 'lucide-re
 
 // Import shared dashboard components
 import {
-  PageWrapper,
-  Container,
-  Header,
-  HeaderContent,
+  Container, 
   WelcomeTitle,
   WelcomeSubtitle,
   Section,
 } from '@/components/dashboard/dashboardStyles';
+
 
 // Import shared assessment components
 import {
@@ -51,7 +49,9 @@ import { Assessment,
   AssessmentQuestion,  SkillType, 
   DifficultyLevel  } from '@/types/thrive.types';
 // Import theme
-import { theme } from '@/styles/theme';
+import { theme,  Header,
+  HeaderContent,   PageWrapper,
+ } from '@/styles/styled-components';
 
 export default function AdvancedCriticalThinkingAssessment() {
   const router = useRouter();

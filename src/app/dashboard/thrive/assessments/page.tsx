@@ -5,15 +5,13 @@
 import React from 'react';
 import Link from 'next/link';
 import {
-  PageWrapper,
   Container,
-  Header,
-  HeaderContent,
   WelcomeTitle,
   WelcomeSubtitle,
   Section,
 } from '@/components/dashboard/dashboardStyles';
-import { theme } from '@/styles/theme';
+import { theme,   Header,
+  HeaderContent, PageWrapper } from '@/styles/styled-components';
 
 // Centralized metadata for the 6 assessments
 const assessments = [

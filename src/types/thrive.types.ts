@@ -164,3 +164,43 @@ export interface ChallengeRendererProps {
   isDisabled: boolean;
   currentProgress?: ChallengeResult;
 }
+
+// Add these types to your existing assessment types file (e.g., src/types/thrive.types.ts)
+
+export interface TopPerformer {
+  id: string;
+  rank: number;
+  name: string;
+  username: string;
+  profileImage: string;
+  totalScore: number;
+  assessmentsCompleted: number;
+  averageScore: number;
+  specialization: string;
+  verified: boolean;
+  monthlyGain: number;
+  lastActive: Date;
+}
+
+export interface AssessmentLeaderboard {
+  assessmentId: string;
+  title: string;
+  category: string;
+  leaders: AssessmentLeader[];
+}
+
+export interface AssessmentLeader {
+  rank: number;
+  name: string;
+  username: string;
+  score: number;
+  completedAt: Date;
+  timeSpent: number;
+}
+
+export interface RankingPlatformStats {
+  totalParticipants: number;
+  activeThisWeek: number;
+  averageScore: number;
+  completionsToday: number;
+}

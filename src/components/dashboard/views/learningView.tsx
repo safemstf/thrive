@@ -1,11 +1,9 @@
-// src/components/dashboard/views/LearningView.tsx - Modern Glassmorphism Design
+// src/components/dashboard/views/LearningView.tsx - Lean & Efficient
 import React from 'react';
-import styled from 'styled-components';
 import { Brain, BookOpen, CheckCircle, Clock, TrendingUp, Zap } from 'lucide-react';
 import type { ConceptProgress, QuickStats } from '../dashboardLogic';
-import { theme, themeUtils } from '@/styles/theme';
 
-// Import unified view styles
+// Reuse existing styled components - no duplication!
 import {
   ViewContainer,
   ViewStatsGrid,
@@ -28,14 +26,87 @@ import {
   ProgressText,
   ViewActionGroup,
   ViewAction,
-  EmptyStateCard,
-  EmptyIcon,
-  EmptyTitle,
-  EmptyMessage,
-  GlassCard,
-  PrimaryButton,
-  SecondaryButton
+  EmptyState,
+  Card,
+  FlexRow,
+  FlexColumn,
+  Heading2,
+  Heading3,
+  BaseButton,
+  Badge
 } from './viewStyles';
+
+import styled from 'styled-components';
+
+import { responsive } from '@/styles/styled-components';
+// ===========================================
+// LEARNING-SPECIFIC COMPONENTS ONLY
+// ===========================================
+
+const LearningSection = styled(Card).attrs({ $glass: true, $padding: 'none' })`
+  overflow: hidden;
+  background: var(--glass-background);
+  backdrop-filter: blur(var(--glass-blur));
+`;
+
+const SectionHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-2xl);
+  border-bottom: 1px solid var(--color-border-light);
+  background: rgba(255, 255, 255, 0.8);
+  
+  ${responsive.below.md} {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-xl);
+  }
+`;
+
+const SectionTitle = styled(FlexRow).attrs({ $gap: 'var(--spacing-lg)', $align: 'center' })``;
+
+const TitleIcon = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--radius-md);
+  color: var(--color-primary-600);
+  backdrop-filter: blur(4px);
+`;
+
+const TitleContent = styled(FlexColumn).attrs({ $gap: 'var(--spacing-xs)' })``;
+
+const MainTitle = styled(Heading2)`
+  margin: 0;
+  font-family: var(--font-display);
+  letter-spacing: 0.025em;
+`;
+
+const SectionActions = styled(FlexRow).attrs({ $gap: 'var(--spacing-sm)' })``;
+
+const SectionContent = styled.div`
+  padding: var(--spacing-2xl);
+  
+  ${responsive.below.md} {
+    padding: var(--spacing-xl);
+  }
+`;
+
+const ConceptsSection = styled.div`
+  margin-top: var(--spacing-2xl);
+`;
+
+const SubSectionTitle = styled(Heading3)`
+  margin: 0 0 var(--spacing-xl) 0;
+  font-family: var(--font-display);
+  letter-spacing: 0.025em;
+`;
 
 interface LearningViewProps {
   conceptProgress: ConceptProgress[];
@@ -50,7 +121,7 @@ export const LearningView: React.FC<LearningViewProps> = ({ conceptProgress, sta
 
   return (
     <ViewContainer>
-      <ModernSection>
+      <LearningSection>
         <SectionHeader>
           <SectionTitle>
             <TitleIcon>
@@ -58,14 +129,14 @@ export const LearningView: React.FC<LearningViewProps> = ({ conceptProgress, sta
             </TitleIcon>
             <TitleContent>
               <MainTitle>Learning Dashboard</MainTitle>
-              <Badge>{completedConcepts} completed</Badge>
+              <Badge $variant="success">{completedConcepts} completed</Badge>
             </TitleContent>
           </SectionTitle>
           <SectionActions>
-            <ModernActionButton $primary>
+            <BaseButton $variant="primary">
               <BookOpen size={16} />
               Explore Concepts
-            </ModernActionButton>
+            </BaseButton>
           </SectionActions>
         </SectionHeader>
 
@@ -73,7 +144,7 @@ export const LearningView: React.FC<LearningViewProps> = ({ conceptProgress, sta
           {/* Learning Statistics */}
           <ViewStatsGrid>
             <ViewStatCard>
-              <ViewStatIcon>
+              <ViewStatIcon $color="#3b82f6">
                 <BookOpen size={20} />
               </ViewStatIcon>
               <ViewStatContent>
@@ -83,7 +154,7 @@ export const LearningView: React.FC<LearningViewProps> = ({ conceptProgress, sta
             </ViewStatCard>
             
             <ViewStatCard>
-              <ViewStatIcon>
+              <ViewStatIcon $color="#10b981">
                 <CheckCircle size={20} />
               </ViewStatIcon>
               <ViewStatContent>
@@ -93,7 +164,7 @@ export const LearningView: React.FC<LearningViewProps> = ({ conceptProgress, sta
             </ViewStatCard>
             
             <ViewStatCard>
-              <ViewStatIcon>
+              <ViewStatIcon $color="#8b5cf6">
                 <TrendingUp size={20} />
               </ViewStatIcon>
               <ViewStatContent>
@@ -103,7 +174,7 @@ export const LearningView: React.FC<LearningViewProps> = ({ conceptProgress, sta
             </ViewStatCard>
             
             <ViewStatCard>
-              <ViewStatIcon>
+              <ViewStatIcon $color="#f59e0b">
                 <Zap size={20} />
               </ViewStatIcon>
               <ViewStatContent>
@@ -160,152 +231,20 @@ export const LearningView: React.FC<LearningViewProps> = ({ conceptProgress, sta
                   </ViewCard>
                 ))
               ) : (
-                <EmptyStateCard>
-                  <EmptyIcon>
-                    <Brain size={48} />
-                  </EmptyIcon>
-                  <EmptyTitle>Ready to learn?</EmptyTitle>
-                  <EmptyMessage>
-                    Explore our library of concepts and start your learning journey
-                  </EmptyMessage>
-                  <ModernActionButton $primary>
+                <EmptyState $minHeight="400px">
+                  <Brain size={48} />
+                  <h3>Ready to learn?</h3>
+                  <p>Explore our library of concepts and start your learning journey</p>
+                  <BaseButton $variant="primary">
                     <BookOpen size={16} />
                     Browse concepts
-                  </ModernActionButton>
-                </EmptyStateCard>
+                  </BaseButton>
+                </EmptyState>
               )}
             </ViewGrid>
           </ConceptsSection>
         </SectionContent>
-      </ModernSection>
+      </LearningSection>
     </ViewContainer>
   );
 };
-
-// Modern styled components matching the new theme
-const ModernSection = styled.section`
-  ${themeUtils.glass(0.9)}
-  border-radius: ${theme.borderRadius.lg};
-  overflow: hidden;
-  backdrop-filter: blur(${theme.glass.blur});
-`;
-
-const SectionHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: ${theme.spacing['2xl']};
-  border-bottom: 1px solid ${theme.colors.border.glass};
-  background: ${themeUtils.alpha(theme.colors.background.secondary, 0.8)};
-  
-  @media (max-width: ${theme.breakpoints.md}) {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: ${theme.spacing.lg};
-    padding: ${theme.spacing.xl};
-  }
-`;
-
-const SectionTitle = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.lg};
-`;
-
-const TitleIcon = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  background: ${themeUtils.alpha(theme.colors.primary[600], 0.1)};
-  border: 1px solid ${themeUtils.alpha(theme.colors.primary[600], 0.2)};
-  border-radius: ${theme.borderRadius.md};
-  color: ${theme.colors.primary[600]};
-  backdrop-filter: blur(${theme.glass.blurSubtle});
-`;
-
-const TitleContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing.xs};
-`;
-
-const MainTitle = styled.h2`
-  font-size: ${theme.typography.sizes['2xl']};
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
-  margin: 0;
-  font-family: ${theme.typography.fonts.secondary};
-  letter-spacing: ${theme.typography.letterSpacing.wide};
-`;
-
-const SectionActions = styled.div`
-  display: flex;
-  gap: ${theme.spacing.sm};
-`;
-
-const ModernActionButton = styled.button<{ $primary?: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${theme.spacing.sm};
-  padding: ${theme.spacing.sm} ${theme.spacing.lg};
-  font-size: ${theme.typography.sizes.sm};
-  background: ${props => props.$primary ? theme.colors.primary[600] : themeUtils.alpha(theme.colors.background.secondary, 0.8)};
-  color: ${props => props.$primary ? theme.colors.text.inverse : theme.colors.text.secondary};
-  border: 1px solid ${props => props.$primary ? theme.colors.primary[600] : theme.colors.border.glass};
-  border-radius: ${theme.borderRadius.sm};
-  cursor: pointer;
-  transition: ${theme.transitions.normal};
-  text-transform: uppercase;
-  letter-spacing: ${theme.typography.letterSpacing.uppercase};
-  font-weight: ${theme.typography.weights.medium};
-  font-family: ${theme.typography.fonts.primary};
-  backdrop-filter: blur(${theme.glass.blurSubtle});
-  
-  &:hover {
-    background: ${props => props.$primary ? theme.colors.primary[700] : theme.colors.background.tertiary};
-    border-color: ${theme.colors.primary[600]};
-    transform: translateY(-1px);
-    box-shadow: ${theme.shadows.glassSubtle};
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-`;
-
-const SectionContent = styled.div`
-  padding: ${theme.spacing['2xl']};
-  
-  @media (max-width: ${theme.breakpoints.md}) {
-    padding: ${theme.spacing.xl};
-  }
-`;
-
-const ConceptsSection = styled.div`
-  margin-top: ${theme.spacing['2xl']};
-`;
-
-const SubSectionTitle = styled.h3`
-  font-size: ${theme.typography.sizes.xl};
-  font-weight: ${theme.typography.weights.medium};
-  color: ${theme.colors.text.primary};
-  margin: 0 0 ${theme.spacing.xl} 0;
-  font-family: ${theme.typography.fonts.secondary};
-  letter-spacing: ${theme.typography.letterSpacing.wide};
-`;
-
-const Badge = styled.span`
-  padding: ${theme.spacing.xs} ${theme.spacing.sm};
-  font-size: ${theme.typography.sizes.xs};
-  background: ${themeUtils.alpha(theme.colors.background.tertiary, 0.8)};
-  color: ${theme.colors.text.secondary};
-  border: 1px solid ${theme.colors.border.glass};
-  border-radius: ${theme.borderRadius.md};
-  font-weight: ${theme.typography.weights.medium};
-  text-transform: lowercase;
-  letter-spacing: ${theme.typography.letterSpacing.normal};
-  font-family: ${theme.typography.fonts.primary};
-  backdrop-filter: blur(${theme.glass.blurSubtle});
-`;

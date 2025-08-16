@@ -6,7 +6,8 @@ import {
   ArrowUp, ArrowDown, Minus
 } from 'lucide-react';
 import styled from 'styled-components';
-import { theme, themeUtils } from '@/styles/theme';
+import { theme } from '@/styles/styled-components';
+import { themeUtils } from '@/utils';
 
 interface AnalyticsStats {
   portfolioType?: string;

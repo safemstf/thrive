@@ -1,4 +1,4 @@
-// src/app/dashboard/thrive/page.tsx
+// src/app/dashboard/thrive/page.tsx - Fixed offline-compatible version
 'use client';
 
 import React, { Suspense, useState } from 'react';
@@ -8,18 +8,18 @@ import styled from 'styled-components';
 import { useAuth } from '@/providers/authProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Target, Trophy, BarChart3, Eye, Sparkles, CheckCircle, Timer } from 'lucide-react';
-import { 
-  PageWrapper, 
+
+// Import from styled-components hub
+import {  
   Container, 
   Header, 
-  HeaderContent, 
-  WelcomeSection, 
-  WelcomeTitle, 
-  WelcomeSubtitle, 
-  ViewToggle, 
-  ViewButton, 
-  DashboardContent 
-} from '@/components/dashboard/dashboardStyles';
+  HeaderContent,
+  PageWrapper,
+  Card,
+  CardContent
+} from '@/styles/styled-components';
+
+// Import from thrive styles
 import { 
   WelcomeBanner, 
   WelcomeContent, 
@@ -28,24 +28,23 @@ import {
   WelcomeActions, 
   AssessmentButton 
 } from '@/components/thrive/styles';
-import { useThriveStats, useThriveLeaderboard } from '@/hooks/useThrive';
-import { theme } from '@/styles/theme';
 
-import type { RankingsPageProps } from './ranking/page';
-import type { EmployerToolsPageProps } from './employerTools/page';
+import {
+  WelcomeSection, 
+  WelcomeTitle, 
+  WelcomeSubtitle, 
+  ViewToggle, 
+  ViewButton, 
+  DashboardContent,
+} from '@/components/dashboard/dashboardStyles'
 
+// Import mock data directly for offline compatibility
+import { MOCK_TOP_PERFORMERS } from '@/data/mockData';
 
-
-// dynamic imports
+// Dynamic imports without props (for offline compatibility)
 const AnalyticsPage = dynamic(() => import('./analytics/page'), { ssr: false });
-const RankingsPage = dynamic<RankingsPageProps>(
-  () => import('./ranking/page').then(mod => mod.default),
-  { ssr: false }
-);
-const EmployerToolsPage = dynamic<EmployerToolsPageProps>(
-  () => import('./employerTools/page').then(mod => mod.default),
-  { ssr: false }
-);
+const RankingsPage = dynamic(() => import('./ranking/page'), { ssr: false });
+const EmployerToolsPage = dynamic(() => import('./employerTools/page'), { ssr: false });
 
 // Centralized metadata for the 6 assessments
 const ASSESSMENTS = [
@@ -81,52 +80,139 @@ const ASSESSMENTS = [
   }
 ];
 
-// Create a styled component for the assessment card
+// Create a styled component for the assessment card using hub components
 const AssessmentCard = styled(Link)`
   display: block;
-  padding: ${theme.spacing.lg};
-  border-radius: ${theme.borderRadius.lg};
-  background: ${theme.colors.background.secondary};
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  background: var(--color-background-secondary);
   text-decoration: none;
-  color: ${theme.colors.text.primary};
-  box-shadow: ${theme.shadows.sm};
-  transition: ${theme.transitions.normal};
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-normal);
+  border: 1px solid var(--color-border-light);
   
   &:hover {
     transform: translateY(-2px);
-    box-shadow: ${theme.shadows.md};
-    background: ${theme.colors.background.tertiary};
+    box-shadow: var(--shadow-md);
+    background: var(--color-background-tertiary);
+    border-color: var(--color-primary-500);
   }
   
   h3 {
-    margin-bottom: ${theme.spacing.sm};
-    font-size: ${theme.typography.sizes.base};
-    font-weight: ${theme.typography.weights.semibold};
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
   }
   
   p {
-    color: ${theme.colors.text.secondary};
-    font-size: ${theme.typography.sizes.sm};
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    margin: 0;
   }
 `;
 
+const AssessmentGrid = styled.div`
+  display: grid;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-xl);
+  
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+`;
+
+const StatsOverview = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-lg);
+  margin: var(--spacing-xl) 0;
+`;
+
+const StatCard = styled(Card)`
+  text-align: center;
+  background: var(--glass-background);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  transition: var(--transition-normal);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+`;
+
+const StatNumber = styled.div`
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: var(--spacing-xs);
+`;
+
+const StatLabel = styled.div`
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+`;
+
 const AssessmentsList = () => (
-  <div style={{
-    display: 'grid',
-    gap: theme.spacing.lg,
-    marginTop: theme.spacing.lg
-  }}>
-    {ASSESSMENTS.map((a) => (
+  <AssessmentGrid>
+    {ASSESSMENTS.map((assessment) => (
       <AssessmentCard
-        key={a.id}
-        href={`/dashboard/thrive/assessments/${a.id}`}
+        key={assessment.id}
+        href={`/dashboard/thrive/assessments/${assessment.id}`}
       >
-        <h3>{a.title}</h3>
-        <p>{a.description}</p>
+        <h3>{assessment.title}</h3>
+        <p>{assessment.description}</p>
       </AssessmentCard>
     ))}
-  </div>
+  </AssessmentGrid>
 );
+
+// Offline-compatible stats (using mock data)
+const PlatformStatsOverview = () => {
+  const totalUsers = MOCK_TOP_PERFORMERS.length * 100; // Simulate platform size
+  const activeToday = Math.floor(totalUsers * 0.15);
+  const assessmentsCompleted = MOCK_TOP_PERFORMERS.reduce((sum, p) => sum + p.assessmentsCompleted, 0);
+  const avgScore = Math.round(MOCK_TOP_PERFORMERS.reduce((sum, p) => sum + p.averageScore, 0) / MOCK_TOP_PERFORMERS.length);
+
+  return (
+    <StatsOverview>
+      <StatCard>
+        <CardContent>
+          <StatNumber>{totalUsers.toLocaleString()}</StatNumber>
+          <StatLabel>Total Users</StatLabel>
+        </CardContent>
+      </StatCard>
+      <StatCard>
+        <CardContent>
+          <StatNumber>{activeToday}</StatNumber>
+          <StatLabel>Active Today</StatLabel>
+        </CardContent>
+      </StatCard>
+      <StatCard>
+        <CardContent>
+          <StatNumber>{assessmentsCompleted}</StatNumber>
+          <StatLabel>Assessments Completed</StatLabel>
+        </CardContent>
+      </StatCard>
+      <StatCard>
+        <CardContent>
+          <StatNumber>{avgScore}%</StatNumber>
+          <StatLabel>Average Score</StatLabel>
+        </CardContent>
+      </StatCard>
+    </StatsOverview>
+  );
+};
 
 export default function ThriveShell() {
   const { user } = useAuth();
@@ -137,15 +223,14 @@ export default function ThriveShell() {
   const requestedAssessment = searchParams.get('assessment');
   const fromPublic = searchParams.get('from') === 'public';
 
-  // use your hooks
-  const platformStats = useThriveStats();
-  const leaderboard = useThriveLeaderboard();
-
   const handleStartAssessment = (route: string) => {
     if (route) router.push(route);
   };
 
-  const handleEmployerToolAction = (toolId: string) => console.log('employer tool', toolId);
+  const handleEmployerToolAction = (toolId: string) => {
+    console.log('Employer tool action:', toolId);
+    // Handle offline tool actions
+  };
 
   return (
     <PageWrapper>
@@ -180,6 +265,7 @@ export default function ThriveShell() {
         </Header>
 
         <DashboardContent>
+          {/* Welcome Banner for new users */}
           {(fromPublic || requestedAssessment) && (
             <WelcomeBanner>
               <WelcomeContent>
@@ -197,8 +283,8 @@ export default function ThriveShell() {
               <WelcomeActions>
                 {requestedAssessment && (
                   <AssessmentButton $variant="primary" onClick={() => {
-                    const a = ASSESSMENTS.find(s => s.title === requestedAssessment);
-                    if (a) handleStartAssessment(`/dashboard/thrive/assessments/${a.id}`);
+                    const assessment = ASSESSMENTS.find(a => a.title === requestedAssessment);
+                    if (assessment) handleStartAssessment(`/dashboard/thrive/assessments/${assessment.id}`);
                   }}>
                     <Timer size={16} /> Start Assessment
                   </AssessmentButton>
@@ -207,30 +293,38 @@ export default function ThriveShell() {
             </WelcomeBanner>
           )}
 
+          {/* Platform Stats */}
+          {activeView === 'assessments' && <PlatformStatsOverview />}
+
+          {/* Main Content */}
           {activeView === 'assessments' && (
             <>
               <WelcomeSection>
                 <WelcomeTitle>Available Assessments</WelcomeTitle>
                 <WelcomeSubtitle>
-                  Choose an assessment to start your journey
+                  Choose an assessment to start your professional certification journey
                 </WelcomeSubtitle>
               </WelcomeSection>
               <AssessmentsList />
             </>
           )}
 
-          <Suspense fallback={<div>Loading…</div>}>
-            {activeView === 'rankings' && (
-              <RankingsPage topPerformers={leaderboard} />
-            )}
-
+          {/* Dynamic content wrapped in Suspense for offline compatibility */}
+          <Suspense fallback={
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 'var(--spacing-3xl)',
+              color: 'var(--color-text-secondary)'
+            }}>
+              Loading...
+            </div>
+          }>
+            {activeView === 'rankings' && <RankingsPage />}
             {activeView === 'analytics' && <AnalyticsPage />}
-
-            {activeView === 'employer-tools' && (
-              <EmployerToolsPage onToolAction={handleEmployerToolAction} />
-            )}
-        </Suspense>
-
+            {activeView === 'employer-tools' && <EmployerToolsPage />}
+          </Suspense>
         </DashboardContent>
       </Container>
     </PageWrapper>
