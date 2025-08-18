@@ -1,39 +1,109 @@
-// src/components/cs/ants/ants.tsx
-'use client';
+// src\components\cs\ants\ants.tsx
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Play, Pause } from 'lucide-react';
-import {
-  SimulationCanvas,
-  Card,
-  CardContent,
-  BaseButton,
-  FlexRow,
-  BodyText
-} from '@/styles/styled-components';
+import { Play, Pause, RotateCcw, Settings, BarChart3, Zap, Users, Trophy, Crown, Star, Shield, Activity } from 'lucide-react';
 
-// IMPORTANT: point this to your pathfinding module (the file you posted).
-// It must export `runAlgorithm` and `AlgorithmType` types.
-import { runAlgorithm, AlgorithmType } from '../mazesolver/algorithms';
+// ============================================================================
+// USER-INTEGRATED ANT COLONY SIMULATION
+// Each user becomes a special ant with unique behaviors and stats
+// ============================================================================
 
-////////////////////////////////////////////////////////////////////////////////
-// Types
-////////////////////////////////////////////////////////////////////////////////
-type Strategy = 'random' | 'pheromone' | 'greedy' | 'dijkstra';
-
-interface Ant {
-  id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  hasFood: boolean;
-  colonyId: number;
-  // optional path plan for dijkstra/aStar
-  plan?: { x: number; y: number }[];
-  planIndex?: number;
-  lastPlanAlgorithm?: AlgorithmType | 'AStar' | 'Dijkstra' | undefined;
+// Import mock user data types
+interface UserProfile {
+  id: string;
+  name: string;
+  username: string;
+  profileImage?: string;
+  specialization?: string;
+  score?: number;
+  verified?: boolean;
+  kind?: 'creative' | 'professional' | 'educational';
+  stats?: {
+    totalViews?: number;
+    averageRating?: number;
+    totalPieces?: number;
+  };
 }
+
+// Mock user profiles from your data
+const USER_PROFILES: UserProfile[] = [
+  {
+    id: '1',
+    name: 'Alice Johnson',
+    username: 'alice_creates',
+    specialization: 'Creative Director',
+    score: 125000,
+    verified: true,
+    kind: 'creative',
+    stats: { totalViews: 125000, averageRating: 4.9, totalPieces: 42 }
+  },
+  {
+    id: '2',
+    name: 'Robert Chen',
+    username: 'bob_codes',
+    specialization: 'Software Architect',
+    score: 67000,
+    verified: true,
+    kind: 'professional',
+    stats: { totalViews: 67000, averageRating: 4.8, totalPieces: 28 }
+  },
+  {
+    id: '3',
+    name: 'Charlie Davis',
+    username: 'charlie_learns',
+    specialization: 'Full-Stack Developer',
+    score: 28000,
+    verified: false,
+    kind: 'educational',
+    stats: { totalViews: 28000, averageRating: 4.6, totalPieces: 15 }
+  },
+  {
+    id: '4',
+    name: 'Sarah Chen',
+    username: 'sarah_codes',
+    specialization: 'Full-Stack Development',
+    score: 12450,
+    verified: true,
+    kind: 'professional'
+  },
+  {
+    id: '5',
+    name: 'Alex Rodriguez',
+    username: 'alex_designs',
+    specialization: 'UI/UX Design',
+    score: 11920,
+    verified: true,
+    kind: 'creative'
+  },
+  {
+    id: '6',
+    name: 'Maria Santos',
+    username: 'maria_data',
+    specialization: 'Data Science',
+    score: 11680,
+    verified: false,
+    kind: 'professional'
+  }
+];
+
+// Constants
+const CANVAS_W = 900;
+const CANVAS_H = 600;
+const GRID_SIZE = 15;
+const PHEROMONE_DECAY = 0.995;
+const MAX_REGULAR_ANTS = 100;
+const MAX_USER_ANTS = USER_PROFILES.length;
+const SPATIAL_GRID_SIZE = 30;
+const USER_ANT_SIZE = 6; // Larger than regular ants
+
+// Grid dimensions
+const GRID_COLS = Math.ceil(CANVAS_W / GRID_SIZE);
+const GRID_ROWS = Math.ceil(CANVAS_H / GRID_SIZE);
+const PHEROMONE_GRID_SIZE = GRID_COLS * GRID_ROWS;
+
+// Types
+type Strategy = 'random' | 'pheromone' | 'greedy' | 'smart' | 'leader';
+type AntType = 'regular' | 'user' | 'vip';
 
 interface Colony {
   id: number;
@@ -42,686 +112,1172 @@ interface Colony {
   baseX: number;
   baseY: number;
   foodCollected: number;
-  antsCount: number;
   strategy: Strategy;
-  alive: boolean;
+  r: number;
+  g: number;
+  b: number;
+  userAnts: number[];
 }
 
 interface FoodSource {
   x: number;
   y: number;
   amount: number;
+  quality: number; // 1-5, affects ant behavior
 }
 
-interface Pheromone {
-  x: number;
-  y: number;
-  strength: number;
-  colonyId: number;
+interface UserAnt {
+  userId: string;
+  antIndex: number;
+  profile: UserProfile;
+  personalBest: number;
+  currentStreak: number;
+  achievements: string[];
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Constants & configuration
-////////////////////////////////////////////////////////////////////////////////
-const CANVAS_W = 900;
-const CANVAS_H = 600;
-
-const GRID_SIZE = 12; // cell size for grid-based planners
-const MAX_PHEROMONES = 1.0;
-const PHEROMONE_DECAY = 0.992;
-
-const DEFAULT_ANTS_PER_COLONY = 18;
-
-////////////////////////////////////////////////////////////////////////////////
-// Utility helpers
-////////////////////////////////////////////////////////////////////////////////
-const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
-
-const toGrid = (x: number, y: number) => {
-  return [Math.floor(x / GRID_SIZE), Math.floor(y / GRID_SIZE)] as [number, number];
-};
-const fromGrid = (gx: number, gy: number) => {
-  return [gx * GRID_SIZE + GRID_SIZE / 2, gy * GRID_SIZE + GRID_SIZE / 2];
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// Props - controlled by the parent page (app/simulations/page.tsx)
-////////////////////////////////////////////////////////////////////////////////
-export type AntsSimulationProps = {
-  isRunning: boolean;
-  speed?: number; // multiplier
+// Props
+interface Props {
+  isRunning?: boolean;
+  speed?: number;
   isDark?: boolean;
+}
+
+// Professional color scheme based on user types
+const getUserColor = (kind?: string, verified?: boolean): string => {
+  if (verified) {
+    switch (kind) {
+      case 'creative': return '#f59e0b'; // Gold for verified creative
+      case 'professional': return '#3b82f6'; // Blue for verified professional
+      case 'educational': return '#10b981'; // Green for verified educational
+      default: return '#8b5cf6'; // Purple for verified unknown
+    }
+  }
+  switch (kind) {
+    case 'creative': return '#fbbf24';
+    case 'professional': return '#60a5fa';
+    case 'educational': return '#34d399';
+    default: return '#a78bfa';
+  }
 };
 
-////////////////////////////////////////////////////////////////////////////////
-// Component
-////////////////////////////////////////////////////////////////////////////////
-const AntsSimulation: React.FC<AntsSimulationProps> = ({ isRunning, speed = 1, isDark = false }) => {
-  // Canvas ref
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  // Refs for simulation state to avoid frequent React updates
-  const antsRef = useRef<Map<number, Ant>>(new Map());
-  const coloniesRef = useRef<Map<number, Colony>>(new Map());
+export default function UserIntegratedAntsSimulation({ 
+  isRunning = false, 
+  speed = 1, 
+  isDark = false 
+}: Props) {
+  // Canvas refs
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  
+  // Typed arrays for performance
+  const antPositionsRef = useRef<Float32Array>(new Float32Array((MAX_REGULAR_ANTS + MAX_USER_ANTS) * 2));
+  const antVelocitiesRef = useRef<Float32Array>(new Float32Array((MAX_REGULAR_ANTS + MAX_USER_ANTS) * 2));
+  const antStatesRef = useRef<Uint8Array>(new Uint8Array((MAX_REGULAR_ANTS + MAX_USER_ANTS) * 5)); // hasFood, colonyId, targetFood, active, antType
+  const antScoresRef = useRef<Float32Array>(new Float32Array(MAX_REGULAR_ANTS + MAX_USER_ANTS)); // Performance scores
+  
+  // User ant mapping
+  const userAntsRef = useRef<Map<number, UserAnt>>(new Map());
+  
+  // Pheromone grids
+  const pheromoneGridsRef = useRef<Float32Array[]>([]);
+  
+  // Entity refs
+  const coloniesRef = useRef<Colony[]>([]);
   const foodRef = useRef<FoodSource[]>([]);
-  const pherRef = useRef<Pheromone[]>([]);
-  const animRef = useRef<number | null>(null);
-  const idCounter = useRef(1);
-  const lastTimeRef = useRef<number | null>(null);
-
-  // UI state (coarse updates)
-  const [, setTick] = useState(0);
-  const [showDebug] = useState(false);
-
-  // Initialize simulation once
-  useEffect(() => {
-    initSimulation();
-    return () => stopLoop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Start / stop based on prop
-  useEffect(() => {
-    if (isRunning) startLoop();
-    else stopLoop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, speed]);
-
-  // ---------- Initialization ----------
-  const initSimulation = () => {
-    // Reset containers
-    antsRef.current.clear();
-    coloniesRef.current.clear();
-    pherRef.current = [];
-
-    // Create colonies with strategies (Dijkstra included)
+  const activeAntsRef = useRef<number>(0);
+  
+  // Animation
+  const animationRef = useRef<number>(0);
+  const lastTimeRef = useRef<number>(0);
+  const frameCountRef = useRef<number>(0);
+  const fpsRef = useRef<number>(0);
+  
+  // State
+  const [stats, setStats] = useState({
+    fps: 0,
+    regularAnts: 0,
+    userAnts: 0,
+    totalFood: 0,
+    topPerformer: null as UserProfile | null,
+    colonies: [] as { name: string; food: number; color: string; userCount: number }[]
+  });
+  const [showUserLabels, setShowUserLabels] = useState(true);
+  const [showLeaderboard, setShowLeaderboard] = useState(true);
+  const [quality, setQuality] = useState<'performance' | 'balanced' | 'quality'>('balanced');
+  
+  // Initialize simulation with user ants
+  const initSimulation = useCallback(() => {
+    // Reset arrays
+    antPositionsRef.current.fill(0);
+    antVelocitiesRef.current.fill(0);
+    antStatesRef.current.fill(0);
+    antScoresRef.current.fill(0);
+    userAntsRef.current.clear();
+    
+    // Initialize colonies with better positioning
     const colonies: Colony[] = [
-      { id: 1, name: 'Red Army', color: '#ef4444', baseX: 80, baseY: 80, foodCollected: 0, antsCount: DEFAULT_ANTS_PER_COLONY, strategy: 'random', alive: true },
-      { id: 2, name: 'Blue Hive', color: '#3b82f6', baseX: CANVAS_W - 80, baseY: 80, foodCollected: 0, antsCount: DEFAULT_ANTS_PER_COLONY, strategy: 'pheromone', alive: true },
-      { id: 3, name: 'Green Force', color: '#10b981', baseX: 80, baseY: CANVAS_H - 80, foodCollected: 0, antsCount: DEFAULT_ANTS_PER_COLONY, strategy: 'greedy', alive: true },
-      { id: 4, name: 'Gold Swarm', color: '#f59e0b', baseX: CANVAS_W - 80, baseY: CANVAS_H - 80, foodCollected: 0, antsCount: DEFAULT_ANTS_PER_COLONY, strategy: 'dijkstra', alive: true },
+      { 
+        id: 0, 
+        name: 'Creative Hive', 
+        color: '#f59e0b', 
+        baseX: 150, 
+        baseY: 150, 
+        foodCollected: 0, 
+        strategy: 'smart',
+        r: 245, g: 158, b: 11,
+        userAnts: []
+      },
+      { 
+        id: 1, 
+        name: 'Tech Colony', 
+        color: '#3b82f6', 
+        baseX: CANVAS_W - 150, 
+        baseY: 150, 
+        foodCollected: 0, 
+        strategy: 'leader',
+        r: 59, g: 130, b: 246,
+        userAnts: []
+      },
+      { 
+        id: 2, 
+        name: 'Learning Nest', 
+        color: '#10b981', 
+        baseX: CANVAS_W / 2, 
+        baseY: CANVAS_H - 100, 
+        foodCollected: 0, 
+        strategy: 'pheromone',
+        r: 16, g: 185, b: 129,
+        userAnts: []
+      }
     ];
-    for (const c of colonies) coloniesRef.current.set(c.id, { ...c });
-
-    // Create ants clustered at their bases
-    idCounter.current = 1;
-    for (const c of colonies) {
-      for (let i = 0; i < c.antsCount; i++) {
-        spawnAnt(c.id, c.baseX + (Math.random() - 0.5) * 10, c.baseY + (Math.random() - 0.5) * 10);
+    
+    coloniesRef.current = colonies;
+    
+    // Initialize pheromone grids
+    pheromoneGridsRef.current = colonies.map(() => 
+      new Float32Array(PHEROMONE_GRID_SIZE)
+    );
+    
+    // Spawn ants
+    let antIndex = 0;
+    const positions = antPositionsRef.current;
+    const velocities = antVelocitiesRef.current;
+    const states = antStatesRef.current;
+    const scores = antScoresRef.current;
+    
+    // First, spawn USER ANTS - one per user profile
+    USER_PROFILES.forEach((profile, profileIndex) => {
+      if (antIndex >= MAX_REGULAR_ANTS + MAX_USER_ANTS) return;
+      
+      // Assign user to colony based on their type
+      let colonyId = 0;
+      if (profile.kind === 'professional') colonyId = 1;
+      else if (profile.kind === 'educational') colonyId = 2;
+      
+      const colony = colonies[colonyId];
+      colony.userAnts.push(antIndex);
+      
+      // Position near colony base
+      const angle = (profileIndex / USER_PROFILES.length) * Math.PI * 2;
+      const dist = 30 + Math.random() * 20;
+      positions[antIndex * 2] = colony.baseX + Math.cos(angle) * dist;
+      positions[antIndex * 2 + 1] = colony.baseY + Math.sin(angle) * dist;
+      
+      // Initial velocity
+      velocities[antIndex * 2] = (Math.random() - 0.5) * 3;
+      velocities[antIndex * 2 + 1] = (Math.random() - 0.5) * 3;
+      
+      // State: [hasFood, colonyId, targetFood, active, antType]
+      states[antIndex * 5] = 0; // hasFood
+      states[antIndex * 5 + 1] = colonyId; // colonyId
+      states[antIndex * 5 + 2] = 255; // no target
+      states[antIndex * 5 + 3] = 1; // active
+      states[antIndex * 5 + 4] = 2; // antType: 2 = user ant
+      
+      // Initialize score based on user stats
+      scores[antIndex] = (profile.score || 0) / 1000;
+      
+      // Map user ant
+      userAntsRef.current.set(antIndex, {
+        userId: profile.id,
+        antIndex,
+        profile,
+        personalBest: 0,
+        currentStreak: 0,
+        achievements: []
+      });
+      
+      antIndex++;
+    });
+    
+    // Then spawn regular ants
+    const regularAntsPerColony = Math.floor((MAX_REGULAR_ANTS - antIndex) / colonies.length);
+    
+    for (let colonyId = 0; colonyId < colonies.length; colonyId++) {
+      const colony = colonies[colonyId];
+      for (let i = 0; i < regularAntsPerColony; i++) {
+        if (antIndex >= MAX_REGULAR_ANTS) break;
+        
+        // Position near base
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * 25;
+        positions[antIndex * 2] = colony.baseX + Math.cos(angle) * dist;
+        positions[antIndex * 2 + 1] = colony.baseY + Math.sin(angle) * dist;
+        
+        // Random initial velocity
+        velocities[antIndex * 2] = (Math.random() - 0.5) * 2;
+        velocities[antIndex * 2 + 1] = (Math.random() - 0.5) * 2;
+        
+        // State
+        states[antIndex * 5] = 0; // hasFood
+        states[antIndex * 5 + 1] = colonyId; // colonyId
+        states[antIndex * 5 + 2] = 255; // no target
+        states[antIndex * 5 + 3] = 1; // active
+        states[antIndex * 5 + 4] = 0; // antType: 0 = regular ant
+        
+        antIndex++;
       }
     }
-
-    // Food sources
+    
+    activeAntsRef.current = antIndex;
+    
+    // Initialize high-quality food sources
     foodRef.current = [
-      { x: CANVAS_W * 0.45, y: CANVAS_H * 0.25, amount: 70 },
-      { x: CANVAS_W * 0.25, y: CANVAS_H * 0.6, amount: 50 },
-      { x: CANVAS_W * 0.72, y: CANVAS_H * 0.55, amount: 70 },
+      { x: CANVAS_W * 0.5, y: CANVAS_H * 0.25, amount: 120, quality: 5 },
+      { x: CANVAS_W * 0.25, y: CANVAS_H * 0.5, amount: 100, quality: 4 },
+      { x: CANVAS_W * 0.75, y: CANVAS_H * 0.5, amount: 100, quality: 4 },
+      { x: CANVAS_W * 0.2, y: CANVAS_H * 0.8, amount: 80, quality: 3 },
+      { x: CANVAS_W * 0.8, y: CANVAS_H * 0.8, amount: 80, quality: 3 },
+      { x: CANVAS_W * 0.5, y: CANVAS_H * 0.6, amount: 60, quality: 2 }
     ];
-
-    // tick UI
-    setTick(t => t + 1);
-  };
-
-  const spawnAnt = (colonyId: number, x: number, y: number) => {
-    const id = idCounter.current++;
-    const ant: Ant = {
-      id,
-      x,
-      y,
-      vx: (Math.random() - 0.5) * 0.6,
-      vy: (Math.random() - 0.5) * 0.6,
-      hasFood: false,
-      colonyId,
-    };
-    antsRef.current.set(id, ant);
-    return ant;
-  };
-
-  // ---------- Loop control ----------
-  const startLoop = () => {
-    if (animRef.current !== null) return;
-    lastTimeRef.current = performance.now();
-    animRef.current = requestAnimationFrame(loop);
-  };
-
-  const stopLoop = () => {
-    if (animRef.current !== null) {
-      cancelAnimationFrame(animRef.current);
-      animRef.current = null;
+    
+    updateStats();
+  }, []);
+  
+  // Update pheromone
+  const addPheromone = useCallback((x: number, y: number, colonyId: number, strength: number) => {
+    const gridX = Math.floor(x / GRID_SIZE);
+    const gridY = Math.floor(y / GRID_SIZE);
+    
+    if (gridX >= 0 && gridX < GRID_COLS && gridY >= 0 && gridY < GRID_ROWS) {
+      const index = gridY * GRID_COLS + gridX;
+      const grid = pheromoneGridsRef.current[colonyId];
+      if (grid) {
+        grid[index] = Math.min(1, grid[index] + strength);
+      }
     }
-    lastTimeRef.current = null;
-  };
-
-  // ---------- Main loop ----------
-  const loop = (time: number) => {
-    const last = lastTimeRef.current ?? time;
-    const dt = (time - last) * 0.001 * speed; // seconds scaled by speed
-    update(dt);
-    render();
-    lastTimeRef.current = time;
-    animRef.current = requestAnimationFrame(loop);
-  };
-
-  // ---------- Update ----------
-  const update = (dt: number) => {
-    const ants = antsRef.current;
-    const food = foodRef.current;
-    const pher = pherRef.current;
-    const colonies = coloniesRef.current;
-
-    // Update each ant
-    for (const ant of ants.values()) {
-      const colony = colonies.get(ant.colonyId);
-      if (!colony || !colony.alive) continue;
-
-      // If ant has a plan (grid path), follow it
-      if (ant.plan && typeof ant.planIndex === 'number' && ant.planIndex < ant.plan.length) {
-        const cell = ant.plan[ant.planIndex];
-        const [tx, ty] = fromGrid(cell.x, cell.y);
-        steerTo(ant, tx, ty, 0.32);
-        if (dist(ant.x, ant.y, tx, ty) < GRID_SIZE * 0.6) ant.planIndex!++;
-      } else if (ant.hasFood) {
-        // return to base
-        steerTo(ant, colony.baseX, colony.baseY, 0.36);
-        if (Math.random() < 0.25) {
-          pher.push({ x: ant.x, y: ant.y, strength: MAX_PHEROMONES, colonyId: colony.id });
-        }
-      } else {
-        // Behavior by strategy
-        switch (colony.strategy) {
-          case 'random':
-            randomBehavior(ant);
-            break;
-          case 'pheromone':
-            pheromoneBehavior(ant, pher);
-            break;
-          case 'greedy':
-            greedyBehavior(ant, food);
-            break;
-          case 'dijkstra':
-            // occasionally request a path plan; cheap window-based planning
-            if (!ant.plan || Math.random() < 0.025) {
-              requestPlan(ant, food);
-            } else {
-              // fallback to greedy if no plan
-              greedyBehavior(ant, food);
-            }
-            break;
-          default:
-            randomBehavior(ant);
+  }, []);
+  
+  // Get pheromone gradient
+  const getPheromonGradient = useCallback((x: number, y: number, colonyId: number): [number, number] => {
+    let maxStrength = 0;
+    let bestDx = 0;
+    let bestDy = 0;
+    
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -2; dy <= 2; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        
+        const testX = x + dx * GRID_SIZE;
+        const testY = y + dy * GRID_SIZE;
+        const gridX = Math.floor(testX / GRID_SIZE);
+        const gridY = Math.floor(testY / GRID_SIZE);
+        
+        if (gridX >= 0 && gridX < GRID_COLS && gridY >= 0 && gridY < GRID_ROWS) {
+          const index = gridY * GRID_COLS + gridX;
+          const strength = pheromoneGridsRef.current[colonyId]?.[index] || 0;
+          
+          if (strength > maxStrength) {
+            maxStrength = strength;
+            bestDx = dx;
+            bestDy = dy;
+          }
         }
       }
-
-      // Integrate velocity with damping
-      ant.vx *= 0.92;
-      ant.vy *= 0.92;
-      ant.x += ant.vx;
-      ant.y += ant.vy;
-
-      // bounds
-      ant.x = clamp(ant.x, 4, CANVAS_W - 4);
-      ant.y = clamp(ant.y, 4, CANVAS_H - 4);
-
-      // slight jitter
-      ant.x += (Math.random() - 0.5) * 0.1;
-      ant.y += (Math.random() - 0.5) * 0.1;
-
-      // Pickup food
-      if (!ant.hasFood) {
-        for (const f of food) {
-          if (f.amount <= 0) continue;
-          if (dist(ant.x, ant.y, f.x, f.y) < 9) {
-            ant.hasFood = true;
-            f.amount = Math.max(0, f.amount - 1);
-            pher.push({ x: ant.x, y: ant.y, strength: MAX_PHEROMONES, colonyId: ant.colonyId });
-            break;
+    }
+    
+    const mag = Math.sqrt(bestDx * bestDx + bestDy * bestDy) || 1;
+    return [bestDx / mag, bestDy / mag];
+  }, []);
+  
+  // Update ant behavior with user ant special behaviors
+  const updateAnts = useCallback((dt: number) => {
+    const positions = antPositionsRef.current;
+    const velocities = antVelocitiesRef.current;
+    const states = antStatesRef.current;
+    const scores = antScoresRef.current;
+    const colonies = coloniesRef.current;
+    const foods = foodRef.current;
+    
+    for (let i = 0; i < activeAntsRef.current; i++) {
+      if (states[i * 5 + 3] === 0) continue; // Skip inactive
+      
+      const x = positions[i * 2];
+      const y = positions[i * 2 + 1];
+      let vx = velocities[i * 2];
+      let vy = velocities[i * 2 + 1];
+      
+      const hasFood = states[i * 5] === 1;
+      const colonyId = states[i * 5 + 1];
+      const antType = states[i * 5 + 4];
+      const colony = colonies[colonyId];
+      
+      if (!colony) continue;
+      
+      // Special behavior for user ants
+      const isUserAnt = antType === 2;
+      const userAnt = isUserAnt ? userAntsRef.current.get(i) : null;
+      
+      // Base speed multiplier for user ants based on their stats
+      const speedMultiplier = isUserAnt ? 1.2 + (scores[i] / 1000) : 1.0;
+      
+      if (hasFood) {
+        // Return to base
+        const dx = colony.baseX - x;
+        const dy = colony.baseY - y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 1) {
+          const returnSpeed = isUserAnt ? 0.6 : 0.5;
+          vx += (dx / dist) * returnSpeed * speedMultiplier;
+          vy += (dy / dist) * returnSpeed * speedMultiplier;
+          
+          // User ants drop stronger pheromones
+          if (i % 3 === 0) {
+            addPheromone(x, y, colonyId, isUserAnt ? 1.0 : 0.8);
+          }
+        }
+        
+        // Check if reached base
+        if (dist < 20) {
+          states[i * 5] = 0; // Drop food
+          colony.foodCollected++;
+          
+          // User ants get bonus points
+          if (userAnt) {
+            scores[i] += 10;
+            userAnt.personalBest = Math.max(userAnt.personalBest, scores[i]);
+            userAnt.currentStreak++;
+            
+            // Achievement check
+            if (userAnt.currentStreak === 10 && !userAnt.achievements.includes('streak10')) {
+              userAnt.achievements.push('streak10');
+            }
           }
         }
       } else {
-        // deliver to base
-        if (dist(ant.x, ant.y, colony.baseX, colony.baseY) < 12) {
-          ant.hasFood = false;
-          colony.foodCollected += 1;
-        }
-      }
-    }
-
-    // Pheromone decay
-    for (let i = pher.length - 1; i >= 0; i--) {
-      pher[i].strength *= PHEROMONE_DECAY;
-      if (pher[i].strength < 0.05) pher.splice(i, 1);
-    }
-
-    // occasionally compact pheromones (keep memory bounded)
-    if (pher.length > 1200) compactPheromones();
-
-    // small UI ping occasionally
-    if (Math.random() < 0.02) setTick(t => t + 1);
-  };
-
-  // ---------- Steering and behaviors ----------
-  function steerTo(ant: Ant, tx: number, ty: number, strength = 0.2) {
-    const dx = tx - ant.x;
-    const dy = ty - ant.y;
-    const d = Math.hypot(dx, dy) || 1;
-    ant.vx += (dx / d) * strength;
-    ant.vy += (dy / d) * strength;
-    // clamp speed
-    const speedMag = Math.hypot(ant.vx, ant.vy);
-    const max = 2.4;
-    if (speedMag > max) {
-      ant.vx = (ant.vx / speedMag) * max;
-      ant.vy = (ant.vy / speedMag) * max;
-    }
-  }
-  function randomBehavior(ant: Ant) {
-    // slightly stronger random kicks + occasional longer glide
-    const angle = Math.random() * Math.PI * 2;
-    ant.vx += Math.cos(angle) * 0.18;
-    ant.vy += Math.sin(angle) * 0.18;
-
-    // bias away from own base occasionally to encourage exploration
-    if (Math.random() < 0.06) {
-        const col = coloniesRef.current.get(ant.colonyId);
-        if (col) steerTo(ant, ant.x + (ant.x - col.baseX) * 0.12, ant.y + (ant.y - col.baseY) * 0.12, 0.18);
-    }
-    }
-
-  function pheromoneBehavior(ant: Ant, pheromones: Pheromone[]) {
-    let best: Pheromone | null = null;
-    let bestScore = 0;
-    for (const p of pheromones) {
-      const d = dist(ant.x, ant.y, p.x, p.y);
-      if (d > 140) continue;
-      const score = p.strength / (1 + d * 0.02);
-      if (score > bestScore) {
-        bestScore = score;
-        best = p;
-      }
-    }
-    if (best) {
-        // blend towards pheromone plus a random wander factor
-        steerTo(ant, best.x + (Math.random() - 0.5) * 12, best.y + (Math.random() - 0.5) * 12, 0.32);
-    } else randomBehavior(ant);
-    }
-
-  function greedyBehavior(ant: Ant, foods: FoodSource[]) {
-    let nearest: FoodSource | null = null;
-    let md = Infinity;
-    for (const f of foods) {
-      if (f.amount <= 0) continue;
-      const d = dist(ant.x, ant.y, f.x, f.y);
-      if (d < md) {
-        md = d;
-        nearest = f;
-      }
-    }
-    if (nearest) steerTo(ant, nearest.x, nearest.y, 0.42);
-    else randomBehavior(ant);
-  }
-
-    // ---------- Path planning integration ----------
-  const requestPlan = useCallback((ant: Ant, foods: FoodSource[]) => {
-    // no foods -> nothing to plan
-    if (!foods || foods.length === 0) return;
-
-    // 1) choose nearest available food
-    let best: FoodSource | null = null;
-    let bestD = Infinity;
-    for (const f of foods) {
-        if (f.amount <= 0) continue;
-        const d = dist(ant.x, ant.y, f.x, f.y);
-        if (d < bestD) {
-        bestD = d;
-        best = f;
-        }
-    }
-    if (!best) return;
-
-    // 2) map to grid coordinates (global)
-    const [agx, agy] = toGrid(ant.x, ant.y);
-    const [tgx, tgy] = toGrid(best.x, best.y);
-
-    // 3) build a window that includes both ant and target (prevents OOB goals)
-    const margin = 16; // cells radius around the bbox between ant and goal
-    const minGridX = Math.min(agx, tgx);
-    const minGridY = Math.min(agy, tgy);
-    const maxGridX = Math.max(agx, tgx);
-    const maxGridY = Math.max(agy, tgy);
-
-    const gridCols = Math.floor(CANVAS_W / GRID_SIZE);
-    const gridRows = Math.floor(CANVAS_H / GRID_SIZE);
-
-    const minX = clamp(minGridX - margin, 0, gridCols - 1);
-    const minY = clamp(minGridY - margin, 0, gridRows - 1);
-    const maxX = clamp(maxGridX + margin, 0, gridCols - 1);
-    const maxY = clamp(maxGridY + margin, 0, gridRows - 1);
-
-    const width = maxX - minX + 1;
-    const height = maxY - minY + 1;
-
-    // Safety: degenerate window -> bail out
-    if (width <= 0 || height <= 0) {
-        ant.plan = undefined;
-        ant.planIndex = undefined;
-        ant.lastPlanAlgorithm = undefined;
-        return;
-    }
-
-    // 4) build local maze (0 = walkable). If you later add obstacles, map them here.
-    const maze: number[][] = new Array(height);
-    for (let gy = 0; gy < height; gy++) {
-        const row: number[] = new Array(width);
-        for (let gx = 0; gx < width; gx++) {
-        row[gx] = 0; // walkable
-        }
-        maze[gy] = row;
-    }
-
-    // 5) compute local start/goal inside the local maze
-    const localStart: [number, number] = [agx - minX, agy - minY];
-    const localGoal: [number, number] = [tgx - minX, tgy - minY];
-
-    // Defensive check: ensure start/goal inside window
-    if (
-        localStart[0] < 0 || localStart[1] < 0 ||
-        localStart[0] >= width || localStart[1] >= height ||
-        localGoal[0] < 0 || localGoal[1] < 0 ||
-        localGoal[0] >= width || localGoal[1] >= height
-    ) {
-        ant.plan = undefined;
-        ant.planIndex = undefined;
-        ant.lastPlanAlgorithm = undefined;
-        return;
-    }
-
-    // 6) select algorithm based on colony strategy
-    const colony = coloniesRef.current.get(ant.colonyId);
-    const algorithm: AlgorithmType = colony?.strategy === 'dijkstra' ? 'Dijkstra' : 'AStar';
-
-    // 7) run pathfinder safely (timeLimit + maxSteps) and convert path back to global grid coordinates
-    try {
-        const result = runAlgorithm(algorithm, maze, localStart, localGoal, {
-        allowDiagonal: false,
-        timeLimit: 180,    // ms - tune as needed
-        maxSteps: 20000,
-        });
-
-        if (result && result.success && result.path && result.path.length > 0) {
-        // convert local path [gx,gy] -> global grid coords (and cap length)
-        const MAX_PLAN_LENGTH = 400;
-        const plan = result.path.slice(0, MAX_PLAN_LENGTH).map(([gx, gy]) => ({
-            x: gx + minX,
-            y: gy + minY
-        }));
-
-        // Assign plan to ant and mark which algorithm produced it
-        ant.plan = plan;
-        ant.planIndex = 0;
-        ant.lastPlanAlgorithm = algorithm;
-
-        // Optional: if plan is very short, optionally clear and let greedy behavior handle it next tick
-        if (plan.length <= 1) {
-            // too trivial to follow a plan
-            ant.plan = undefined;
-            ant.planIndex = undefined;
-            ant.lastPlanAlgorithm = undefined;
-        }
+        // Look for food - user ants are smarter
+        if (isUserAnt && userAnt) {
+          // User ants can sense high-quality food from farther away
+          let bestFood = -1;
+          let bestScore = 0;
+          
+          for (let f = 0; f < foods.length; f++) {
+            if (foods[f].amount <= 0) continue;
+            const dx = foods[f].x - x;
+            const dy = foods[f].y - y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const score = foods[f].quality / (1 + dist * 0.01);
+            
+            if (score > bestScore) {
+              bestScore = score;
+              bestFood = f;
+            }
+          }
+          
+          if (bestFood >= 0) {
+            const food = foods[bestFood];
+            const dx = food.x - x;
+            const dy = food.y - y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            vx += (dx / dist) * 0.5 * speedMultiplier;
+            vy += (dy / dist) * 0.5 * speedMultiplier;
+          } else {
+            // Follow pheromones
+            const [gdx, gdy] = getPheromonGradient(x, y, colonyId);
+            if (gdx !== 0 || gdy !== 0) {
+              vx += gdx * 0.4 * speedMultiplier;
+              vy += gdy * 0.4 * speedMultiplier;
+            } else {
+              // Explorer behavior
+              vx += (Math.random() - 0.5) * 0.6;
+              vy += (Math.random() - 0.5) * 0.6;
+            }
+          }
         } else {
-        // planner did not find a path -> clear plan and fallback
-        ant.plan = undefined;
-        ant.planIndex = undefined;
-        ant.lastPlanAlgorithm = undefined;
+          // Regular ant behavior
+          switch (colony.strategy) {
+            case 'pheromone': {
+              const [gdx, gdy] = getPheromonGradient(x, y, colonyId);
+              if (gdx !== 0 || gdy !== 0) {
+                vx += gdx * 0.3;
+                vy += gdy * 0.3;
+              } else {
+                vx += (Math.random() - 0.5) * 0.5;
+                vy += (Math.random() - 0.5) * 0.5;
+              }
+              break;
+            }
+            case 'smart': {
+              // Check for nearby food
+              let foundFood = false;
+              for (const food of foods) {
+                if (food.amount <= 0) continue;
+                const dx = food.x - x;
+                const dy = food.y - y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 60) {
+                  vx += (dx / dist) * 0.5;
+                  vy += (dy / dist) * 0.5;
+                  foundFood = true;
+                  break;
+                }
+              }
+              
+              if (!foundFood) {
+                const [gdx, gdy] = getPheromonGradient(x, y, colonyId);
+                if (gdx !== 0 || gdy !== 0) {
+                  vx += gdx * 0.35;
+                  vy += gdy * 0.35;
+                } else {
+                  vx += (Math.random() - 0.5) * 0.4;
+                  vy += (Math.random() - 0.5) * 0.4;
+                }
+              }
+              break;
+            }
+            default:
+              vx += (Math.random() - 0.5) * 0.5;
+              vy += (Math.random() - 0.5) * 0.5;
+          }
         }
-    } catch (err) {
-        // planner threw — swallow and fallback
-        ant.plan = undefined;
-        ant.planIndex = undefined;
-        ant.lastPlanAlgorithm = undefined;
+        
+        // Check for food pickup
+        for (let f = 0; f < foods.length; f++) {
+          const food = foods[f];
+          if (food.amount <= 0) continue;
+          
+          const dx = food.x - x;
+          const dy = food.y - y;
+          const pickupDist = isUserAnt ? 15 : 10; // User ants can pick up from slightly farther
+          
+          if (dx * dx + dy * dy < pickupDist * pickupDist) {
+            states[i * 5] = 1; // Pick up food
+            food.amount--;
+            
+            // Bonus for high-quality food
+            if (userAnt) {
+              scores[i] += food.quality * 2;
+            }
+            
+            addPheromone(x, y, colonyId, 1.0);
+            break;
+          }
+        }
+      }
+      
+      // Apply velocity with user ant advantages
+      const maxSpeed = isUserAnt ? 4.5 : (hasFood ? 2.5 : 3.5);
+      const speed = Math.sqrt(vx * vx + vy * vy);
+      if (speed > maxSpeed) {
+        vx = (vx / speed) * maxSpeed;
+        vy = (vy / speed) * maxSpeed;
+      }
+      
+      vx *= 0.95;
+      vy *= 0.95;
+      
+      // Update position
+      positions[i * 2] = Math.max(5, Math.min(CANVAS_W - 5, x + vx * dt));
+      positions[i * 2 + 1] = Math.max(5, Math.min(CANVAS_H - 5, y + vy * dt));
+      
+      velocities[i * 2] = vx;
+      velocities[i * 2 + 1] = vy;
     }
-    }, []);
-
-
-  // ---------- Pheromone maintenance ----------
-  function compactPheromones() {
-    const store = pherRef.current;
-    const cell = 10;
-    const map = new Map<string, Pheromone>();
-    for (const p of store) {
-      const kx = Math.round(p.x / cell);
-      const ky = Math.round(p.y / cell);
-      const key = `${kx},${ky},${p.colonyId}`;
-      const existing = map.get(key);
-      if (existing) {
-        existing.x = (existing.x + p.x) / 2;
-        existing.y = (existing.y + p.y) / 2;
-        existing.strength = Math.min(MAX_PHEROMONES, (existing.strength + p.strength) / 2);
-      } else {
-        map.set(key, { ...p });
+    
+    // Decay pheromones
+    for (const grid of pheromoneGridsRef.current) {
+      for (let i = 0; i < grid.length; i++) {
+        grid[i] *= PHEROMONE_DECAY;
+        if (grid[i] < 0.01) grid[i] = 0;
       }
     }
-    pherRef.current = Array.from(map.values());
-  }
-
-
-  // ---------- Rendering ----------
-  function hexToRgba(hex: string, alpha = 1) {
-    // support '#rrggbb' or 'rgb(...)' fallback
-    if (hex.startsWith('rgb')) {
-        // assume input like 'rgb(59,130,246)' or 'rgb(59,130,246,0.8)'
-        return hex.includes('(') ? hex : `${hex}`;
+  }, [addPheromone, getPheromonGradient]);
+  
+  // Professional rendering with user ant highlights
+  const render = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+    if (!canvas || !ctx) return;
+    
+    // Clear with gradient background
+    const gradient = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
+    if (isDark) {
+      gradient.addColorStop(0, '#0a0f1b');
+      gradient.addColorStop(0.5, '#0f1729');
+      gradient.addColorStop(1, '#0a0f1b');
+    } else {
+      gradient.addColorStop(0, '#f8fafc');
+      gradient.addColorStop(0.5, '#f1f5f9');
+      gradient.addColorStop(1, '#f8fafc');
     }
-    const h = hex.replace('#', '');
-    const r = parseInt(h.substring(0, 2), 16);
-    const g = parseInt(h.substring(2, 4), 16);
-    const b = parseInt(h.substring(4, 6), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    
+    const positions = antPositionsRef.current;
+    const states = antStatesRef.current;
+    const scores = antScoresRef.current;
+    const colonies = coloniesRef.current;
+    const foods = foodRef.current;
+    
+    // Render pheromones with quality settings
+    if (quality !== 'performance') {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      
+      for (let colonyId = 0; colonyId < colonies.length; colonyId++) {
+        const grid = pheromoneGridsRef.current[colonyId];
+        const colony = colonies[colonyId];
+        
+        for (let y = 0; y < GRID_ROWS; y++) {
+          for (let x = 0; x < GRID_COLS; x++) {
+            const strength = grid[y * GRID_COLS + x];
+            if (strength > 0.01) {
+              ctx.fillStyle = `rgba(${colony.r}, ${colony.g}, ${colony.b}, ${strength * 0.4})`;
+              ctx.fillRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+            }
+          }
+        }
+      }
+      
+      ctx.restore();
     }
-
-  const render = () => {
+    
+    // Render food sources with quality indicators
+    for (const food of foods) {
+      if (food.amount <= 0) continue;
+      
+      const size = 4 + Math.sqrt(food.amount) * 1.5;
+      
+      // Quality glow
+      if (quality === 'quality') {
+        const glowGradient = ctx.createRadialGradient(food.x, food.y, 0, food.x, food.y, size * 3);
+        const qualityColor = food.quality === 5 ? '#fbbf24' : food.quality >= 3 ? '#8b5cf6' : '#60a5fa';
+        glowGradient.addColorStop(0, qualityColor + '40');
+        glowGradient.addColorStop(1, qualityColor + '00');
+        ctx.fillStyle = glowGradient;
+        ctx.fillRect(food.x - size * 3, food.y - size * 3, size * 6, size * 6);
+      }
+      
+      // Food body with quality color
+      const foodColor = food.quality === 5 ? '#fbbf24' : food.quality >= 3 ? '#8b5cf6' : '#60a5fa';
+      ctx.fillStyle = foodColor;
+      ctx.beginPath();
+      ctx.arc(food.x, food.y, size, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Quality stars
+      if (food.quality === 5) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('★', food.x, food.y + 3);
+      }
+      
+      // Food amount
+      ctx.fillStyle = isDark ? '#e2e8f0' : '#1e293b';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(food.amount.toString(), food.x, food.y + size + 10);
+    }
+    
+    // Render colony bases with professional design
+    for (const colony of colonies) {
+      // Base glow
+      if (quality !== 'performance') {
+        const baseGradient = ctx.createRadialGradient(
+          colony.baseX, colony.baseY, 0,
+          colony.baseX, colony.baseY, 35
+        );
+        baseGradient.addColorStop(0, `rgba(${colony.r}, ${colony.g}, ${colony.b}, 0.4)`);
+        baseGradient.addColorStop(1, `rgba(${colony.r}, ${colony.g}, ${colony.b}, 0)`);
+        ctx.fillStyle = baseGradient;
+        ctx.fillRect(colony.baseX - 35, colony.baseY - 35, 70, 70);
+      }
+      
+      // Base circle
+      ctx.strokeStyle = colony.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(colony.baseX, colony.baseY, 18, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.fillStyle = colony.color + '20';
+      ctx.fill();
+      
+      // Colony icon
+      ctx.fillStyle = colony.color;
+      ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const icon = colony.id === 0 ? '🎨' : colony.id === 1 ? '💻' : '📚';
+      ctx.fillText(icon, colony.baseX, colony.baseY);
+      
+      // Colony info
+      ctx.fillStyle = isDark ? '#e2e8f0' : '#1e293b';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(colony.name, colony.baseX, colony.baseY + 32);
+      ctx.font = '9px sans-serif';
+      ctx.fillText(`Food: ${colony.foodCollected} | Users: ${colony.userAnts.length}`, colony.baseX, colony.baseY + 44);
+    }
+    
+    // Render ants with user ant special effects
+    for (let i = 0; i < activeAntsRef.current; i++) {
+      if (states[i * 5 + 3] === 0) continue; // Skip inactive
+      
+      const x = positions[i * 2];
+      const y = positions[i * 2 + 1];
+      const hasFood = states[i * 5] === 1;
+      const colonyId = states[i * 5 + 1];
+      const antType = states[i * 5 + 4];
+      const colony = colonies[colonyId];
+      
+      if (!colony) continue;
+      
+      const isUserAnt = antType === 2;
+      const userAnt = isUserAnt ? userAntsRef.current.get(i) : null;
+      
+      if (isUserAnt && userAnt) {
+        // USER ANT - Special rendering
+        const profile = userAnt.profile;
+        const antColor = getUserColor(profile.kind, profile.verified);
+        
+        // Verified glow
+        if (profile.verified && quality !== 'performance') {
+          const glowSize = hasFood ? 15 : 12;
+          const glowGradient = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
+          glowGradient.addColorStop(0, antColor + '60');
+          glowGradient.addColorStop(1, antColor + '00');
+          ctx.fillStyle = glowGradient;
+          ctx.fillRect(x - glowSize, y - glowSize, glowSize * 2, glowSize * 2);
+        }
+        
+        // User ant body (larger)
+        ctx.fillStyle = hasFood ? '#fbbf24' : antColor;
+        ctx.beginPath();
+        ctx.arc(x, y, USER_ANT_SIZE, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // White border for visibility
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Verification badge
+        if (profile.verified) {
+          ctx.fillStyle = '#3b82f6';
+          ctx.beginPath();
+          ctx.arc(x + 4, y - 4, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 5px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('✓', x + 4, y - 2);
+        }
+        
+        // Score indicator
+        if (scores[i] > 50) {
+          ctx.fillStyle = '#fbbf24';
+          ctx.font = 'bold 8px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('⭐', x, y - 10);
+        }
+        
+        // Username label
+        if (showUserLabels) {
+          ctx.save();
+          ctx.fillStyle = isDark ? '#f1f5f9' : '#1e293b';
+          ctx.font = 'bold 8px sans-serif';
+          ctx.textAlign = 'center';
+          
+          // Background for readability
+          const textWidth = ctx.measureText(profile.username).width;
+          ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+          ctx.fillRect(x - textWidth / 2 - 2, y + 10, textWidth + 4, 10);
+          
+          ctx.fillStyle = antColor;
+          ctx.fillText(profile.username, x, y + 18);
+          ctx.restore();
+        }
+      } else {
+        // REGULAR ANT - Simple rendering
+        ctx.fillStyle = hasFood ? '#fbbf24' : colony.color;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        if (quality === 'quality') {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+          ctx.beginPath();
+          ctx.arc(x - 1, y - 1, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    
+    // Update FPS
+    frameCountRef.current++;
+    const now = performance.now();
+    if (now - lastTimeRef.current > 1000) {
+      fpsRef.current = Math.round(frameCountRef.current * 1000 / (now - lastTimeRef.current));
+      frameCountRef.current = 0;
+      lastTimeRef.current = now;
+      updateStats();
+    }
+  }, [isDark, quality, showUserLabels]);
+  
+  // Update statistics
+  const updateStats = useCallback(() => {
+    const userAntsList = Array.from(userAntsRef.current.values());
+    const topPerformer = userAntsList.length > 0 
+      ? userAntsList.reduce((best, current) => 
+          antScoresRef.current[current.antIndex] > antScoresRef.current[best.antIndex] ? current : best
+        ).profile
+      : null;
+    
+    const totalFood = foodRef.current.reduce((sum, f) => sum + f.amount, 0);
+    
+    const colonyStats = coloniesRef.current.map(c => ({
+      name: c.name,
+      food: c.foodCollected,
+      color: c.color,
+      userCount: c.userAnts.length
+    }));
+    
+    setStats({
+      fps: fpsRef.current,
+      regularAnts: activeAntsRef.current - userAntsList.length,
+      userAnts: userAntsList.length,
+      totalFood,
+      topPerformer,
+      colonies: colonyStats
+    });
+  }, []);
+  
+  // Animation loop
+  const animate = useCallback((timestamp: number) => {
+    const dt = Math.min(0.1, (timestamp - lastTimeRef.current) / 1000) * speed;
+    lastTimeRef.current = timestamp;
+    
+    updateAnts(dt);
+    render();
+    
+    if (isRunning) {
+      animationRef.current = requestAnimationFrame(animate);
+    }
+  }, [updateAnts, render, speed, isRunning]);
+  
+  // Setup
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
-
-    // high-DPI crisp canvas setup
-    const dpr = window.devicePixelRatio || 1;
-    const cssW = CANVAS_W;
-    const cssH = CANVAS_H;
-    canvas.width = Math.floor(cssW * dpr);
-    canvas.height = Math.floor(cssH * dpr);
-    canvas.style.width = `${cssW}px`;
-    canvas.style.height = `${cssH}px`;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    // background gradient (subtle)
-    const g = ctx.createLinearGradient(0, 0, 0, cssH);
-    if (isDark) {
-        g.addColorStop(0, '#041122');
-        g.addColorStop(1, '#071226');
-    } else {
-        g.addColorStop(0, '#f8fafc');
-        g.addColorStop(1, '#eef2ff');
-    }
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, cssW, cssH);
-
-    // ---- pheromone render (additive, subtle heat map) ----
-    // using 'lighter' composite lets overlapping pheromones glow
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const p of pherRef.current) {
-        const col = coloniesRef.current.get(p.colonyId);
-        if (!col) continue;
-        const alpha = clamp(p.strength * 0.28, 0, 0.6);
-        const r = 10 + p.strength * 14;
-
-        // radial gradient for each pheromone
-        const rg = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
-        // center stronger + tinted by colony color
-        rg.addColorStop(0, hexToRgba(col.color, alpha));
-        rg.addColorStop(0.6, hexToRgba(col.color, alpha * 0.25));
-        rg.addColorStop(1, hexToRgba(col.color, 0));
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    ctx.restore();
-
-    // ---- food ----
-    ctx.save();
-    for (const f of foodRef.current) {
-        ctx.beginPath();
-        ctx.fillStyle = '#8b5cf6';
-        ctx.arc(f.x, f.y, 8, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = isDark ? '#fff' : '#06202a';
-        ctx.font = '11px Inter, Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(String(f.amount), f.x, f.y + 22);
-    }
-    ctx.restore();
-
-    // ---- colonies (bases) with subtle planner ring ----
-    for (const c of coloniesRef.current.values()) {
-        // base circle
-        ctx.beginPath();
-        ctx.fillStyle = c.color;
-        ctx.arc(c.baseX, c.baseY, 18, 0, Math.PI * 2);
-        ctx.fill();
-
-        // subtle planner ring if any ant of this colony has a plan
-        const anyPlanned = Array.from(antsRef.current.values()).some(a => a.colonyId === c.id && !!a.lastPlanAlgorithm);
-        if (anyPlanned) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = c.color;
-        ctx.globalAlpha = 0.12;
-        ctx.arc(c.baseX, c.baseY, 26, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
-        }
-
-        // label under base
-        ctx.fillStyle = isDark ? '#cfe9ff' : '#022627';
-        ctx.textAlign = 'center';
-        ctx.font = '12px Inter';
-        ctx.fillText(`${c.name} • ${c.foodCollected}`, c.baseX, c.baseY + 36);
-    }
-
-    // ---- ants with short ghost trail + orientation needle ----
-    // Use time for subtle per-frame exploration speck flicker
-    const now = performance.now();
-    for (const ant of antsRef.current.values()) {
-        const c = coloniesRef.current.get(ant.colonyId);
-        if (!c || !c.alive) continue;
-
-        // motion ghost: draw a short translucent line from previous approx -> current
-        // previous pos approximated by reversing a bit of velocity (gives quick 'trail' feel)
-        const prevX = ant.x - ant.vx * 2;
-        const prevY = ant.y - ant.vy * 2;
-
-        // ghost stroke
-        ctx.beginPath();
-        ctx.moveTo(prevX, prevY);
-        ctx.lineTo(ant.x, ant.y);
-        ctx.lineWidth = 2.2;
-        ctx.strokeStyle = hexToRgba(c.color, 0.22);
-        ctx.stroke();
-
-        // small exploration specks for roaming ants (not carrying and no plan)
-        if (!ant.hasFood && (!ant.plan || ant.plan.length === 0)) {
-        // flicker probability based on ant id + time for variety without extra state
-        const flick = (Math.abs((ant.id * 9973) ^ Math.floor(now * 0.001)) % 100) / 100;
-        if (flick < 0.08) {
-            ctx.beginPath();
-            ctx.fillStyle = hexToRgba(c.color, 0.12);
-            const rx = ant.x + (Math.random() - 0.5) * 8;
-            const ry = ant.y + (Math.random() - 0.5) * 8;
-            ctx.arc(rx, ry, 1.2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        }
-
-        // ant body (circle)
-        ctx.beginPath();
-        ctx.fillStyle = ant.hasFood ? '#ffe082' : c.color;
-        ctx.arc(ant.x, ant.y, 3.6, 0, Math.PI * 2);
-        ctx.fill();
-
-        // orientation needle: small line in direction of velocity (normalized)
-        const vmag = Math.hypot(ant.vx, ant.vy) || 1;
-        const nx = (ant.vx / vmag) * 6;
-        const ny = (ant.vy / vmag) * 6;
-        ctx.beginPath();
-        ctx.moveTo(ant.x, ant.y);
-        ctx.lineTo(ant.x + nx, ant.y + ny);
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-        ctx.stroke();
-
-        // subtle highlight inner
-        ctx.beginPath();
-        ctx.arc(ant.x - 0.6, ant.y - 0.6, 2.0, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.fill();
-    }
-
-    // debug overlay (keeps behaviour from before)
-    if (showDebug) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(255,0,0,0.6)';
-        ctx.font = '10px Inter';
-        ctx.fillText(`ants ${antsRef.current.size} pher ${pherRef.current.length}`, 10, 12);
-        ctx.restore();
-    }
-    };
-// ---------- end render ----------
-
-
-  // ---------- Public UI helpers ----------
-  const handleReset = () => {
-    stopLoop();
+    
+    ctxRef.current = ctx;
     initSimulation();
+    render();
+  }, [initSimulation, render]);
+  
+  // Control animation
+  useEffect(() => {
+    if (isRunning) {
+      lastTimeRef.current = performance.now();
+      animationRef.current = requestAnimationFrame(animate);
+    } else if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isRunning, animate]);
+  
+  // Professional container styles
+  const containerStyle = {
+    maxWidth: '100%',
+    margin: '0 auto',
+    backgroundColor: isDark ? '#0f172a' : '#ffffff',
+    borderRadius: '16px',
+    overflow: 'hidden',
+    boxShadow: isDark 
+      ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 100px rgba(59, 130, 246, 0.1)'
+      : '0 20px 60px rgba(0, 0, 0, 0.08), 0 0 100px rgba(59, 130, 246, 0.05)'
   };
-
-  // expose light controls for testing in this component (the parent page also controls start/pause)
+  
+  const headerStyle = {
+    background: isDark 
+      ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'
+      : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+    padding: '1.5rem',
+    borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+  };
+  
+  const buttonStyle = {
+    padding: '0.625rem 1.25rem',
+    borderRadius: '8px',
+    border: 'none',
+    fontWeight: '600',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    fontSize: '0.875rem'
+  };
+  
   return (
-    <Card style={{ padding: 12 }}>
-      <CardContent style={{ padding: 8 }}>
-        <FlexRow style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <BodyText style={{ fontWeight: 700 }}>Ant Colony — Professional</BodyText>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <BaseButton onClick={() => isRunning ? null : startLoop()} aria-label="Play">
-              <Play size={14} /> Run
-            </BaseButton>
-            <BaseButton onClick={() => stopLoop()} aria-label="Pause">
-              <Pause size={14} /> Pause
-            </BaseButton>
-            <BaseButton onClick={handleReset} aria-label="Reset">
-              Reset
-            </BaseButton>
+    <div style={containerStyle}>
+      {/* Professional Header */}
+      <div style={headerStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2 style={{ 
+              margin: '0 0 0.25rem 0',
+              fontSize: '1.5rem',
+              fontWeight: '700',
+              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <Users size={24} />
+              Community Ant Colony
+            </h2>
+            <p style={{ 
+              margin: 0, 
+              fontSize: '0.875rem',
+              color: isDark ? '#94a3b8' : '#64748b'
+            }}>
+              Watch your portfolio compete in real-time • {stats.userAnts} user ants active
+            </p>
           </div>
-        </FlexRow>
-
-        <SimulationCanvas ref={canvasRef} $isDark={isDark} style={{ width: CANVAS_W, height: CANVAS_H }} />
-
-        {/* small status block */}
-        <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-          {Array.from(coloniesRef.current.values()).map(c => (
-            <div key={c.id} style={{ padding: 6, borderRadius: 6, background: 'rgba(0,0,0,0.03)' }}>
-              <div style={{ color: c.color, fontWeight: 700 }}>{c.name}</div>
-              <div style={{ fontSize: 12 }}>{c.foodCollected} food • ants: {c.antsCount}</div>
-            </div>
-          ))}
+          
+          {/* Performance Badge */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.5rem 1rem',
+            background: 'linear-gradient(135deg, #10b981, #059669)',
+            borderRadius: '999px',
+            color: 'white',
+            fontSize: '0.75rem',
+            fontWeight: '700',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            <Zap size={14} />
+            Optimized • {stats.fps} FPS
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      
+      {/* Controls */}
+      <div style={{ 
+        padding: '1rem 1.5rem',
+        background: isDark ? '#0f172a' : '#f8fafc',
+        borderBottom: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}`,
+        display: 'flex', 
+        gap: '0.75rem', 
+        flexWrap: 'wrap',
+        alignItems: 'center'
+      }}>
+        <button
+          onClick={() => initSimulation()}
+          style={{
+            ...buttonStyle,
+            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+            color: 'white'
+          }}
+        >
+          <RotateCcw size={16} />
+          Reset Colony
+        </button>
+        
+        <button
+          onClick={() => setShowUserLabels(!showUserLabels)}
+          style={{
+            ...buttonStyle,
+            backgroundColor: showUserLabels ? '#10b981' : (isDark ? '#374151' : '#e5e7eb'),
+            color: showUserLabels ? 'white' : (isDark ? '#f9fafb' : '#374151')
+          }}
+        >
+          <Users size={16} />
+          User Labels
+        </button>
+        
+        <button
+          onClick={() => setShowLeaderboard(!showLeaderboard)}
+          style={{
+            ...buttonStyle,
+            backgroundColor: showLeaderboard ? '#8b5cf6' : (isDark ? '#374151' : '#e5e7eb'),
+            color: showLeaderboard ? 'white' : (isDark ? '#f9fafb' : '#374151')
+          }}
+        >
+          <Trophy size={16} />
+          Leaderboard
+        </button>
+        
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <label style={{ fontSize: '0.875rem', color: isDark ? '#94a3b8' : '#64748b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Settings size={14} />
+            Quality:
+          </label>
+          <select
+            value={quality}
+            onChange={(e) => setQuality(e.target.value as any)}
+            style={{
+              padding: '0.5rem',
+              borderRadius: '6px',
+              border: `1px solid ${isDark ? '#374151' : '#d1d5db'}`,
+              backgroundColor: isDark ? '#1e293b' : '#ffffff',
+              color: isDark ? '#f9fafb' : '#374151',
+              fontSize: '0.875rem',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="performance">Performance</option>
+            <option value="balanced">Balanced</option>
+            <option value="quality">Quality</option>
+          </select>
+        </div>
+      </div>
+      
+      {/* Main Content Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: showLeaderboard ? '1fr 320px' : '1fr', height: '600px' }}>
+        {/* Canvas */}
+        <div style={{ position: 'relative', background: isDark ? '#0a0f1b' : '#f8fafc' }}>
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_W}
+            height={CANVAS_H}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              imageRendering: quality === 'performance' ? 'pixelated' : 'auto'
+            }}
+          />
+          
+          {/* Top Performer Badge */}
+          {stats.topPerformer && (
+            <div style={{
+              position: 'absolute',
+              top: '1rem',
+              left: '1rem',
+              padding: '0.75rem 1rem',
+              background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.9), rgba(245, 158, 11, 0.9))',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '12px',
+              color: 'white',
+              boxShadow: '0 8px 32px rgba(251, 191, 36, 0.3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                <Crown size={16} />
+                <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>Top Performer</span>
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: '700' }}>
+                {stats.topPerformer.name}
+              </div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+                @{stats.topPerformer.username}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Leaderboard Sidebar */}
+        {showLeaderboard && (
+          <div style={{
+            background: isDark ? '#0f172a' : '#ffffff',
+            borderLeft: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}`,
+            padding: '1.5rem',
+            overflowY: 'auto'
+          }}>
+            <h3 style={{
+              margin: '0 0 1rem 0',
+              fontSize: '1.125rem',
+              fontWeight: '700',
+              color: isDark ? '#f1f5f9' : '#1e293b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <Trophy size={18} />
+              Live Rankings
+            </h3>
+            
+            {/* Colony Rankings */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h4 style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: isDark ? '#94a3b8' : '#64748b',
+                marginBottom: '0.75rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Colony Performance
+              </h4>
+              
+              {stats.colonies
+                .sort((a, b) => b.food - a.food)
+                .map((colony, index) => (
+                  <div key={colony.name} style={{
+                    padding: '0.75rem',
+                    marginBottom: '0.5rem',
+                    background: index === 0 
+                      ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.1))'
+                      : isDark ? '#1e293b' : '#f8fafc',
+                    borderRadius: '8px',
+                    border: index === 0
+                      ? '1px solid #fbbf24'
+                      : `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: colony.color
+                        }} />
+                        <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>
+                          {colony.name}
+                        </span>
+                        {index === 0 && <Crown size={14} color="#fbbf24" />}
+                      </div>
+                      <span style={{ fontWeight: '700', fontSize: '1rem' }}>
+                        {colony.food}
+                      </span>
+                    </div>
+                    <div style={{ 
+                      fontSize: '0.75rem', 
+                      color: isDark ? '#64748b' : '#94a3b8',
+                      marginTop: '0.25rem'
+                    }}>
+                      {colony.userCount} active users
+                    </div>
+                  </div>
+                ))}
+            </div>
+            
+            {/* User Rankings */}
+            <div>
+              <h4 style={{
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                color: isDark ? '#94a3b8' : '#64748b',
+                marginBottom: '0.75rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Top Users
+              </h4>
+              
+              {Array.from(userAntsRef.current.values())
+                .sort((a, b) => antScoresRef.current[b.antIndex] - antScoresRef.current[a.antIndex])
+                .slice(0, 5)
+                .map((userAnt, index) => (
+                  <div key={userAnt.userId} style={{
+                    padding: '0.75rem',
+                    marginBottom: '0.5rem',
+                    background: isDark ? '#1e293b' : '#f8fafc',
+                    borderRadius: '8px',
+                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontWeight: '700', fontSize: '0.875rem' }}>
+                            #{index + 1}
+                          </span>
+                          <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>
+                            {userAnt.profile.name}
+                          </span>
+                          {userAnt.profile.verified && (
+                            <Shield size={12} color="#3b82f6" />
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8' }}>
+                          @{userAnt.profile.username}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: '700', fontSize: '1rem' }}>
+                          {Math.round(antScoresRef.current[userAnt.antIndex])}
+                        </div>
+                        <div style={{ fontSize: '0.625rem', color: isDark ? '#64748b' : '#94a3b8' }}>
+                          points
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Statistics Bar */}
+      <div style={{
+        background: isDark ? '#0f172a' : '#f8fafc',
+        borderTop: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}`,
+        padding: '1rem 1.5rem',
+        display: 'flex',
+        justifyContent: 'space-around',
+        flexWrap: 'wrap',
+        gap: '1rem'
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8', marginBottom: '0.25rem' }}>
+            Total Ants
+          </div>
+          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: isDark ? '#f1f5f9' : '#1e293b' }}>
+            {stats.regularAnts + stats.userAnts}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8', marginBottom: '0.25rem' }}>
+            User Ants
+          </div>
+          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>
+            {stats.userAnts}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8', marginBottom: '0.25rem' }}>
+            Food Remaining
+          </div>
+          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>
+            {stats.totalFood}
+          </div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8', marginBottom: '0.25rem' }}>
+            Performance
+          </div>
+          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#10b981' }}>
+            {stats.fps} FPS
+          </div>
+        </div>
+      </div>
+    </div>
   );
-};
-
-export default AntsSimulation;
+}

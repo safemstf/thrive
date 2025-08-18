@@ -1,3 +1,4 @@
+// src\components\cs\mazesolver\mazeEnvironment.tsx
 // ============================================================================
 // MAZE ENVIRONMENT RENDERER - FIXED VERSION
 // ============================================================================
