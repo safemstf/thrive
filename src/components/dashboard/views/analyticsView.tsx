@@ -1,454 +1,52 @@
-// src/components/dashboard/views/AnalyticsView.tsx - Improved Integration
+// src/components/dashboard/views/AnalyticsView.tsx - Fixed Integration
 import React, { useState, useMemo } from 'react';
 import { 
   BarChart3, Eye, Users, TrendingUp, Clock, Activity,
   RefreshCw, Download, AlertCircle, Award, Sparkles,
   ArrowUp, ArrowDown, Minus
 } from 'lucide-react';
+
+// Use reusable styled components - no duplication!
+import {
+  ViewContainer,
+  ViewStatsGrid,
+  ViewStatCard,
+  ViewStatIcon,
+  ViewStatContent,
+  ViewStatValue,
+  ViewStatLabel,
+  ViewGrid,
+  ViewCard,
+  ViewCardHeader,
+  ViewCardContent,
+  ViewCardTitle,
+  ViewCardDescription,
+  ViewTag,
+  ViewActionGroup,
+  ViewAction,
+  ProgressContainer,
+  ProgressBar,
+  ProgressFill,
+  ProgressText,
+  Card,
+  CardContent,
+  FlexRow,
+  FlexColumn,
+  Heading2,
+  Heading3,
+  BaseButton,
+  Badge,
+  BodyText
+} from '../dashboardStyles';
+
 import styled from 'styled-components';
-import { theme } from '@/styles/styled-components';
-import { themeUtils } from '@/utils';
 
-interface AnalyticsStats {
-  portfolioType?: string;
-  totalItems?: number;
-  recentActivity?: number;
-  completionRate?: number;
-  weeklyGrowth?: number;
-  averageScore?: number;
-  // Enhanced analytics fields
-  totalViews?: number;
-  uniqueVisitors?: number;
-  engagementRate?: number;
-  averageSessionTime?: string;
-  monthlyGrowth?: number;
-  trafficSources?: Array<{ source: string; percentage: number }>;
-  contentPerformance?: Array<{
-    id: string;
-    title: string;
-    views: number;
-    likes: number;
-    shares: number;
-    engagementRate: number;
-  }>;
-  createdAt?: Date;
-  lastActivity?: Date;
-}
-
-interface Achievement {
-  id: string;
-  title: string;
-  description: string;
-  unlockedAt: Date;
-  type: 'milestone' | 'growth' | 'performance' | 'content';
-  icon: string;
-}
-
-interface AnalyticsViewProps {
-  stats: AnalyticsStats | null;
-  achievements: Achievement[];
-  formatTimeAgo: (date: Date) => string;
-}
-
-export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ 
-  stats, 
-  achievements, 
-  formatTimeAgo
-}) => {
-  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
-  const [selectedMetric, setSelectedMetric] = useState<'views' | 'engagement' | 'growth'>('views');
-
-  // Process and validate stats with fallbacks
-  const processedStats = useMemo(() => {
-    const defaultStats = {
-      totalViews: 0,
-      uniqueVisitors: 0,
-      engagementRate: 0,
-      averageSessionTime: '0:00',
-      totalItems: 0,
-      completionRate: 0,
-      averageScore: 0,
-      weeklyGrowth: 0,
-      monthlyGrowth: 0,
-      trafficSources: [
-        { source: 'Direct', percentage: 45 },
-        { source: 'Social Media', percentage: 28 },
-        { source: 'Search', percentage: 18 },
-        { source: 'Referral', percentage: 9 }
-      ],
-      contentPerformance: []
-    };
-
-    return {
-      ...defaultStats,
-      ...stats,
-      // Ensure we have valid numbers
-      totalViews: stats?.totalViews || defaultStats.totalViews,
-      uniqueVisitors: stats?.uniqueVisitors || defaultStats.uniqueVisitors,
-      engagementRate: stats?.engagementRate || defaultStats.engagementRate,
-      averageSessionTime: stats?.averageSessionTime || defaultStats.averageSessionTime,
-      totalItems: stats?.totalItems || defaultStats.totalItems,
-      completionRate: stats?.completionRate || defaultStats.completionRate,
-      averageScore: stats?.averageScore || defaultStats.averageScore,
-      weeklyGrowth: stats?.weeklyGrowth || defaultStats.weeklyGrowth,
-      monthlyGrowth: stats?.monthlyGrowth || defaultStats.monthlyGrowth,
-      trafficSources: stats?.trafficSources || defaultStats.trafficSources,
-      contentPerformance: stats?.contentPerformance || defaultStats.contentPerformance
-    };
-  }, [stats]);
-
-  // Growth indicator component
-  const GrowthIndicator = ({ value, suffix = '%' }: { value: number; suffix?: string }) => {
-    const isPositive = value > 0;
-    const isNeutral = value === 0;
-    const color = isNeutral ? '#6b7280' : isPositive ? '#10b981' : '#ef4444';
-    const Icon = isNeutral ? Minus : isPositive ? ArrowUp : ArrowDown;
-    
-    return (
-      <GrowthBadge $color={color}>
-        <Icon size={12} />
-        {isPositive ? '+' : ''}{value}{suffix}
-      </GrowthBadge>
-    );
-  };
-
-  // Time range specific data
-  const timeRangeData = useMemo(() => {
-    const multiplier = timeRange === 'week' ? 0.25 : timeRange === 'month' ? 1 : 12;
-    return {
-      views: Math.floor(processedStats.totalViews * multiplier),
-      visitors: Math.floor(processedStats.uniqueVisitors * multiplier),
-      growth: timeRange === 'week' ? processedStats.weeklyGrowth : 
-              timeRange === 'month' ? processedStats.monthlyGrowth :
-              processedStats.monthlyGrowth * 8 // Rough yearly estimate
-    };
-  }, [processedStats, timeRange]);
-
-  console.log('🔍 Enhanced Analytics Debug:', {
-    originalStats: stats,
-    processedStats,
-    achievements: achievements?.length || 0,
-    timeRange,
-    timeRangeData
-  });
-
-  return (
-    <AnalyticsContainer>
-      {/* Header with controls */}
-      <AnalyticsHeader>
-        <HeaderContent>
-          <Title>Portfolio Analytics</Title>
-          <Subtitle>
-            {stats ? `Insights for your ${processedStats.portfolioType || 'portfolio'}` : 'Demo analytics data'}
-          </Subtitle>
-        </HeaderContent>
-        
-        <HeaderControls>
-          <TimeRangeSelector>
-            {(['week', 'month', 'year'] as const).map((range) => (
-              <TimeButton
-                key={range}
-                $active={timeRange === range}
-                onClick={() => setTimeRange(range)}
-              >
-                {range.charAt(0).toUpperCase() + range.slice(1)}
-              </TimeButton>
-            ))}
-          </TimeRangeSelector>
-          
-          <MetricSelector>
-            {(['views', 'engagement', 'growth'] as const).map((metric) => (
-              <MetricButton
-                key={metric}
-                $active={selectedMetric === metric}
-                onClick={() => setSelectedMetric(metric)}
-              >
-                {metric.charAt(0).toUpperCase() + metric.slice(1)}
-              </MetricButton>
-            ))}
-          </MetricSelector>
-        </HeaderControls>
-      </AnalyticsHeader>
-
-      {/* Key Metrics Grid */}
-      <MetricsGrid>
-        <MetricCard>
-          <MetricIcon $color="#3b82f6"><Eye size={24} /></MetricIcon>
-          <MetricContent>
-            <MetricValue>{timeRangeData.views.toLocaleString()}</MetricValue>
-            <MetricLabel>Total Views</MetricLabel>
-            <GrowthIndicator value={timeRangeData.growth} />
-          </MetricContent>
-        </MetricCard>
-
-        <MetricCard>
-          <MetricIcon $color="#10b981"><Users size={24} /></MetricIcon>
-          <MetricContent>
-            <MetricValue>{timeRangeData.visitors.toLocaleString()}</MetricValue>
-            <MetricLabel>Unique Visitors</MetricLabel>
-            <GrowthIndicator value={Math.floor(timeRangeData.growth * 0.8)} />
-          </MetricContent>
-        </MetricCard>
-
-        <MetricCard>
-          <MetricIcon $color="#8b5cf6"><TrendingUp size={24} /></MetricIcon>
-          <MetricContent>
-            <MetricValue>{processedStats.engagementRate}%</MetricValue>
-            <MetricLabel>Engagement Rate</MetricLabel>
-            <GrowthIndicator value={Math.floor(processedStats.engagementRate - 75)} />
-          </MetricContent>
-        </MetricCard>
-
-        <MetricCard>
-          <MetricIcon $color="#f59e0b"><Clock size={24} /></MetricIcon>
-          <MetricContent>
-            <MetricValue>{processedStats.averageSessionTime}</MetricValue>
-            <MetricLabel>Avg Session Time</MetricLabel>
-            <GrowthIndicator value={15} suffix="s" />
-          </MetricContent>
-        </MetricCard>
-      </MetricsGrid>
-
-      {/* Content Grid */}
-      <ContentGrid>
-        {/* Performance Overview */}
-        <ContentCard>
-          <CardHeader>
-            <CardTitle>Performance Overview</CardTitle>
-            <CardSubtitle>Key metrics for the selected {timeRange}</CardSubtitle>
-          </CardHeader>
-          
-          <PerformanceList>
-            <PerformanceItem>
-              <PerformanceLabel>Portfolio Items</PerformanceLabel>
-              <PerformanceValue>{processedStats.totalItems}</PerformanceValue>
-            </PerformanceItem>
-            <PerformanceItem>
-              <PerformanceLabel>Completion Rate</PerformanceLabel>
-              <PerformanceValue>{processedStats.completionRate}%</PerformanceValue>
-            </PerformanceItem>
-            <PerformanceItem>
-              <PerformanceLabel>Average Score</PerformanceLabel>
-              <PerformanceValue>{processedStats.averageScore}%</PerformanceValue>
-            </PerformanceItem>
-            <PerformanceItem>
-              <PerformanceLabel>Growth Rate</PerformanceLabel>
-              <PerformanceValue>
-                <GrowthIndicator value={timeRangeData.growth} />
-              </PerformanceValue>
-            </PerformanceItem>
-          </PerformanceList>
-        </ContentCard>
-
-        {/* Traffic Sources */}
-        <ContentCard>
-          <CardHeader>
-            <CardTitle>Traffic Sources</CardTitle>
-            <CardSubtitle>Where your visitors come from</CardSubtitle>
-          </CardHeader>
-          
-          <TrafficList>
-            {processedStats.trafficSources.map((item) => (
-              <TrafficItem key={item.source}>
-                <TrafficInfo>
-                  <TrafficSource>{item.source}</TrafficSource>
-                  <TrafficPercentage>{item.percentage}%</TrafficPercentage>
-                </TrafficInfo>
-                <ProgressBar>
-                  <ProgressFill $percentage={item.percentage} />
-                </ProgressBar>
-              </TrafficItem>
-            ))}
-          </TrafficList>
-        </ContentCard>
-
-        {/* Recent Achievements */}
-        <ContentCard>
-          <CardHeader>
-            <CardTitle>Recent Achievements</CardTitle>
-            <CardSubtitle>
-              {achievements.length > 0 ? `${achievements.length} milestones unlocked` : 'Demo achievements'}
-            </CardSubtitle>
-          </CardHeader>
-          
-          <AchievementsList>
-            {(achievements.length > 0 ? achievements : [
-              {
-                id: '1',
-                title: 'Portfolio Created',
-                description: 'Successfully set up your portfolio',
-                unlockedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-                type: 'milestone' as const,
-                icon: '🎯'
-              },
-              {
-                id: '2',
-                title: 'First Views',
-                description: 'Your portfolio received its first views',
-                unlockedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-                type: 'growth' as const,
-                icon: '👁️'
-              },
-              {
-                id: '3',
-                title: 'High Engagement',
-                description: 'Achieved excellent engagement metrics',
-                unlockedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-                type: 'performance' as const,
-                icon: '📈'
-              }
-            ]).slice(0, 5).map((achievement) => (
-              <AchievementItem key={achievement.id}>
-                <AchievementIcon>{achievement.icon}</AchievementIcon>
-                <AchievementContent>
-                  <AchievementTitle>{achievement.title}</AchievementTitle>
-                  <AchievementDescription>{achievement.description}</AchievementDescription>
-                  <AchievementTime>
-                    {achievement.unlockedAt ? 
-                      formatTimeAgo(achievement.unlockedAt) : 
-                      'Recently'
-                    }
-                  </AchievementTime>
-                </AchievementContent>
-                <AchievementBadge $type={achievement.type}>
-                  {achievement.type}
-                </AchievementBadge>
-              </AchievementItem>
-            ))}
-          </AchievementsList>
-        </ContentCard>
-
-        {/* Content Performance */}
-        {processedStats.contentPerformance.length > 0 && (
-          <ContentCard>
-            <CardHeader>
-              <CardTitle>Top Performing Content</CardTitle>
-              <CardSubtitle>Your most engaging portfolio pieces</CardSubtitle>
-            </CardHeader>
-            
-            <ContentPerformanceList>
-              {processedStats.contentPerformance.slice(0, 5).map((content) => (
-                <ContentPerformanceItem key={content.id}>
-                  <ContentInfo>
-                    <ContentTitle>{content.title}</ContentTitle>
-                    <ContentStats>
-                      {content.views} views • {content.likes} likes • {content.engagementRate}% engagement
-                    </ContentStats>
-                  </ContentInfo>
-                  <ContentValue>{content.views}</ContentValue>
-                </ContentPerformanceItem>
-              ))}
-            </ContentPerformanceList>
-          </ContentCard>
-        )}
-
-        {/* Insights */}
-        <ContentCard>
-          <CardHeader>
-            <CardTitle>Key Insights</CardTitle>
-            <CardSubtitle>AI-powered portfolio recommendations</CardSubtitle>
-          </CardHeader>
-          
-          <InsightsList>
-            <InsightItem>
-              <InsightIcon><TrendingUp size={16} /></InsightIcon>
-              <InsightContent>
-                <InsightTitle>Growth Opportunity</InsightTitle>
-                <InsightText>
-                  Your portfolio has grown {timeRangeData.growth > 0 ? `${timeRangeData.growth}%` : 'steadily'} this {timeRange}. 
-                  Consider adding more content to maintain momentum.
-                </InsightText>
-              </InsightContent>
-            </InsightItem>
-
-            <InsightItem>
-              <InsightIcon><Users size={16} /></InsightIcon>
-              <InsightContent>
-                <InsightTitle>Audience Engagement</InsightTitle>
-                <InsightText>
-                  With {processedStats.engagementRate}% engagement rate, your content resonates well with visitors. 
-                  Focus on similar content types for better results.
-                </InsightText>
-              </InsightContent>
-            </InsightItem>
-
-            <InsightItem>
-              <InsightIcon><Activity size={16} /></InsightIcon>
-              <InsightContent>
-                <InsightTitle>Portfolio Health</InsightTitle>
-                <InsightText>
-                  Your {processedStats.completionRate}% completion rate shows good progress. 
-                  Aim for regular updates to keep your portfolio fresh.
-                </InsightText>
-              </InsightContent>
-            </InsightItem>
-          </InsightsList>
-        </ContentCard>
-      </ContentGrid>
-
-      {/* Debug Info (only in development) */}
-      {process.env.NODE_ENV === 'development' && (
-        <DebugPanel>
-          <DebugTitle>🔧 Debug Information</DebugTitle>
-          <DebugGrid>
-            <DebugItem>
-              <strong>Stats Object:</strong>
-              <pre>{JSON.stringify(stats, null, 2)}</pre>
-            </DebugItem>
-            <DebugItem>
-              <strong>Achievements:</strong>
-              <pre>{JSON.stringify(achievements.slice(0, 2), null, 2)}</pre>
-            </DebugItem>
-            <DebugItem>
-              <strong>Processed Stats:</strong>
-              <pre>{JSON.stringify(processedStats, null, 2)}</pre>
-            </DebugItem>
-          </DebugGrid>
-        </DebugPanel>
-      )}
-    </AnalyticsContainer>
-  );
-};
-
-// Styled Components
-const AnalyticsContainer = styled.div`
-  padding: 0;
-  max-width: 100%;
-`;
-
-const AnalyticsHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+// Analytics-specific components only
+const AnalyticsHeader = styled(Card).attrs({ $glass: true, $padding: 'lg' })`
   margin-bottom: 2rem;
-  gap: 2rem;
-
-  @media (max-width: 768px) {
-    flex-direction: column;
-    gap: 1rem;
-  }
 `;
 
-const HeaderContent = styled.div``;
-
-const Title = styled.h1`
-  margin: 0 0 0.5rem 0;
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: #1f2937;
-`;
-
-const Subtitle = styled.p`
-  margin: 0;
-  color: #6b7280;
-  font-size: 1rem;
-`;
-
-const HeaderControls = styled.div`
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-
+const HeaderControls = styled(FlexRow).attrs({ $gap: '1rem', $align: 'center' })`
   @media (max-width: 768px) {
     flex-direction: column;
     width: 100%;
@@ -499,60 +97,6 @@ const MetricButton = styled.button<{ $active: boolean }>`
   }
 `;
 
-const MetricsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-`;
-
-const MetricCard = styled.div`
-  background: white;
-  padding: 1.5rem;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s;
-  
-  &:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
-  }
-`;
-
-const MetricIcon = styled.div<{ $color: string }>`
-  width: 56px;
-  height: 56px;
-  background: ${props => props.$color};
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  flex-shrink: 0;
-`;
-
-const MetricContent = styled.div`
-  flex: 1;
-`;
-
-const MetricValue = styled.div`
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: #1f2937;
-  line-height: 1.2;
-  margin-bottom: 0.25rem;
-`;
-
-const MetricLabel = styled.div`
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin-bottom: 0.5rem;
-`;
-
 const GrowthBadge = styled.div<{ $color: string }>`
   display: inline-flex;
   align-items: center;
@@ -563,68 +107,6 @@ const GrowthBadge = styled.div<{ $color: string }>`
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
-`;
-
-const ContentGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1.5rem;
-`;
-
-const ContentCard = styled.div`
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-`;
-
-const CardHeader = styled.div`
-  padding: 1.5rem 1.5rem 1rem 1.5rem;
-  border-bottom: 1px solid #f3f4f6;
-`;
-
-const CardTitle = styled.h3`
-  margin: 0 0 0.25rem 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1f2937;
-`;
-
-const CardSubtitle = styled.p`
-  margin: 0;
-  font-size: 0.875rem;
-  color: #6b7280;
-`;
-
-const PerformanceList = styled.div`
-  padding: 1rem 1.5rem 1.5rem 1.5rem;
-`;
-
-const PerformanceItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid #f3f4f6;
-  
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const PerformanceLabel = styled.span`
-  color: #6b7280;
-  font-size: 0.875rem;
-`;
-
-const PerformanceValue = styled.span`
-  font-weight: 600;
-  color: #1f2937;
-`;
-
-const TrafficList = styled.div`
-  padding: 1rem 1.5rem 1.5rem 1.5rem;
 `;
 
 const TrafficItem = styled.div`
@@ -650,24 +132,6 @@ const TrafficSource = styled.span`
 const TrafficPercentage = styled.span`
   font-weight: 600;
   color: #1f2937;
-`;
-
-const ProgressBar = styled.div`
-  height: 8px;
-  background: #e5e7eb;
-  border-radius: 4px;
-  overflow: hidden;
-`;
-
-const ProgressFill = styled.div<{ $percentage: number }>`
-  height: 100%;
-  width: ${props => props.$percentage}%;
-  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-  transition: width 0.3s ease;
-`;
-
-const AchievementsList = styled.div`
-  padding: 1rem 1.5rem 1.5rem 1.5rem;
 `;
 
 const AchievementItem = styled.div`
@@ -734,10 +198,6 @@ const AchievementBadge = styled.div<{ $type: string }>`
   }};
 `;
 
-const ContentPerformanceList = styled.div`
-  padding: 1rem 1.5rem 1.5rem 1.5rem;
-`;
-
 const ContentPerformanceItem = styled.div`
   display: flex;
   justify-content: space-between;
@@ -768,10 +228,6 @@ const ContentStats = styled.div`
 const ContentValue = styled.div`
   font-weight: 600;
   color: #374151;
-`;
-
-const InsightsList = styled.div`
-  padding: 1rem 1.5rem 1.5rem 1.5rem;
 `;
 
 const InsightItem = styled.div`
@@ -816,30 +272,425 @@ const DebugPanel = styled.div`
   border-radius: 8px;
 `;
 
-const DebugTitle = styled.h4`
-  margin: 0 0 1rem 0;
-  color: #92400e;
-`;
+interface AnalyticsStats {
+  portfolioType?: string;
+  totalItems?: number;
+  recentActivity?: number;
+  completionRate?: number;
+  weeklyGrowth?: number;
+  averageScore?: number;
+  totalViews?: number;
+  uniqueVisitors?: number;
+  engagementRate?: number;
+  averageSessionTime?: string;
+  monthlyGrowth?: number;
+  trafficSources?: Array<{ source: string; percentage: number }>;
+  contentPerformance?: Array<{
+    id: string;
+    title: string;
+    views: number;
+    likes: number;
+    shares: number;
+    engagementRate: number;
+  }>;
+  createdAt?: Date;
+  lastActivity?: Date;
+}
 
-const DebugGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1rem;
-`;
+interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  unlockedAt: Date;
+  type: 'milestone' | 'growth' | 'performance' | 'content';
+  icon: string;
+}
 
-const DebugItem = styled.div`
-  pre {
-    background: white;
-    padding: 0.75rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    overflow-x: auto;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-  
-  strong {
-    color: #92400e;
-    font-size: 0.875rem;
-  }
-`;
+interface AnalyticsViewProps {
+  stats: AnalyticsStats | null;
+  achievements: Achievement[];
+  formatTimeAgo: (date: Date) => string;
+}
+
+export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ 
+  stats, 
+  achievements, 
+  formatTimeAgo
+}) => {
+  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year'>('month');
+  const [selectedMetric, setSelectedMetric] = useState<'views' | 'engagement' | 'growth'>('views');
+
+  // Process and validate stats with fallbacks
+  const processedStats = useMemo(() => {
+    const defaultStats = {
+      totalViews: 0,
+      uniqueVisitors: 0,
+      engagementRate: 0,
+      averageSessionTime: '0:00',
+      totalItems: 0,
+      completionRate: 0,
+      averageScore: 0,
+      weeklyGrowth: 0,
+      monthlyGrowth: 0,
+      trafficSources: [
+        { source: 'Direct', percentage: 45 },
+        { source: 'Social Media', percentage: 28 },
+        { source: 'Search', percentage: 18 },
+        { source: 'Referral', percentage: 9 }
+      ],
+      contentPerformance: []
+    };
+
+    return {
+      ...defaultStats,
+      ...stats,
+      totalViews: stats?.totalViews || defaultStats.totalViews,
+      uniqueVisitors: stats?.uniqueVisitors || defaultStats.uniqueVisitors,
+      engagementRate: stats?.engagementRate || defaultStats.engagementRate,
+      averageSessionTime: stats?.averageSessionTime || defaultStats.averageSessionTime,
+      totalItems: stats?.totalItems || defaultStats.totalItems,
+      completionRate: stats?.completionRate || defaultStats.completionRate,
+      averageScore: stats?.averageScore || defaultStats.averageScore,
+      weeklyGrowth: stats?.weeklyGrowth || defaultStats.weeklyGrowth,
+      monthlyGrowth: stats?.monthlyGrowth || defaultStats.monthlyGrowth,
+      trafficSources: stats?.trafficSources || defaultStats.trafficSources,
+      contentPerformance: stats?.contentPerformance || defaultStats.contentPerformance
+    };
+  }, [stats]);
+
+  // Growth indicator component
+  const GrowthIndicator = ({ value, suffix = '%' }: { value: number; suffix?: string }) => {
+    const isPositive = value > 0;
+    const isNeutral = value === 0;
+    const color = isNeutral ? '#6b7280' : isPositive ? '#10b981' : '#ef4444';
+    const Icon = isNeutral ? Minus : isPositive ? ArrowUp : ArrowDown;
+    
+    return (
+      <GrowthBadge $color={color}>
+        <Icon size={12} />
+        {isPositive ? '+' : ''}{value}{suffix}
+      </GrowthBadge>
+    );
+  };
+
+  // Time range specific data
+  const timeRangeData = useMemo(() => {
+    const multiplier = timeRange === 'week' ? 0.25 : timeRange === 'month' ? 1 : 12;
+    return {
+      views: Math.floor(processedStats.totalViews * multiplier),
+      visitors: Math.floor(processedStats.uniqueVisitors * multiplier),
+      growth: timeRange === 'week' ? processedStats.weeklyGrowth : 
+              timeRange === 'month' ? processedStats.monthlyGrowth :
+              processedStats.monthlyGrowth * 8
+    };
+  }, [processedStats, timeRange]);
+
+  return (
+    <ViewContainer>
+      {/* Header with controls */}
+      <AnalyticsHeader>
+        <FlexRow $justify="space-between" $align="flex-start" $gap="2rem">
+          <FlexColumn>
+            <Heading2>
+              {stats ? `Insights for your ${processedStats.portfolioType || 'portfolio'}` : 'Demo analytics data'}
+            </Heading2>
+          </FlexColumn>
+          
+          <HeaderControls>
+            <TimeRangeSelector>
+              {(['week', 'month', 'year'] as const).map((range) => (
+                <TimeButton
+                  key={range}
+                  $active={timeRange === range}
+                  onClick={() => setTimeRange(range)}
+                >
+                  {range.charAt(0).toUpperCase() + range.slice(1)}
+                </TimeButton>
+              ))}
+            </TimeRangeSelector>
+            
+            <MetricSelector>
+              {(['views', 'engagement', 'growth'] as const).map((metric) => (
+                <MetricButton
+                  key={metric}
+                  $active={selectedMetric === metric}
+                  onClick={() => setSelectedMetric(metric)}
+                >
+                  {metric.charAt(0).toUpperCase() + metric.slice(1)}
+                </MetricButton>
+              ))}
+            </MetricSelector>
+          </HeaderControls>
+        </FlexRow>
+      </AnalyticsHeader>
+
+      {/* Key Metrics Grid */}
+      <ViewStatsGrid>
+        <ViewStatCard>
+          <ViewStatIcon $color="#3b82f6">
+            <Eye size={20} />
+          </ViewStatIcon>
+          <ViewStatContent>
+            <ViewStatValue>{timeRangeData.views.toLocaleString()}</ViewStatValue>
+            <ViewStatLabel>Total Views</ViewStatLabel>
+            <GrowthIndicator value={timeRangeData.growth} />
+          </ViewStatContent>
+        </ViewStatCard>
+        
+        <ViewStatCard>
+          <ViewStatIcon $color="#10b981">
+            <Users size={20} />
+          </ViewStatIcon>
+          <ViewStatContent>
+            <ViewStatValue>{timeRangeData.visitors.toLocaleString()}</ViewStatValue>
+            <ViewStatLabel>Unique Visitors</ViewStatLabel>
+            <GrowthIndicator value={Math.floor(timeRangeData.growth * 0.7)} />
+          </ViewStatContent>
+        </ViewStatCard>
+        
+        <ViewStatCard>
+          <ViewStatIcon $color="#8b5cf6">
+            <TrendingUp size={20} />
+          </ViewStatIcon>
+          <ViewStatContent>
+            <ViewStatValue>{processedStats.engagementRate}%</ViewStatValue>
+            <ViewStatLabel>Engagement Rate</ViewStatLabel>
+            <GrowthIndicator value={Math.floor(Math.random() * 10) - 2} />
+          </ViewStatContent>
+        </ViewStatCard>
+        
+        <ViewStatCard>
+          <ViewStatIcon $color="#f59e0b">
+            <Clock size={20} />
+          </ViewStatIcon>
+          <ViewStatContent>
+            <ViewStatValue>{processedStats.averageSessionTime}</ViewStatValue>
+            <ViewStatLabel>Avg Session Time</ViewStatLabel>
+            <GrowthIndicator value={Math.floor(Math.random() * 15)} suffix="s" />
+          </ViewStatContent>
+        </ViewStatCard>
+      </ViewStatsGrid>
+
+      {/* Content Grid */}
+      <ViewGrid $minWidth="320px">
+        {/* Performance Overview */}
+        <ViewCard>
+          <ViewCardHeader>
+            <ViewCardTitle>Performance Overview</ViewCardTitle>
+            <ViewCardDescription>Key metrics for the selected {timeRange}</ViewCardDescription>
+          </ViewCardHeader>
+          <ViewCardContent>
+            <FlexColumn $gap="1rem">
+              <FlexRow $justify="space-between">
+                <span>Portfolio Items</span>
+                <strong>{processedStats.totalItems}</strong>
+              </FlexRow>
+              <FlexRow $justify="space-between">
+                <span>Completion Rate</span>
+                <strong>{processedStats.completionRate}%</strong>
+              </FlexRow>
+              <FlexRow $justify="space-between">
+                <span>Average Score</span>
+                <strong>{processedStats.averageScore}%</strong>
+              </FlexRow>
+              <FlexRow $justify="space-between">
+                <span>Growth Rate</span>
+                <GrowthIndicator value={timeRangeData.growth} />
+              </FlexRow>
+            </FlexColumn>
+          </ViewCardContent>
+        </ViewCard>
+
+        {/* Traffic Sources */}
+        <ViewCard>
+          <ViewCardHeader>
+            <ViewCardTitle>Traffic Sources</ViewCardTitle>
+            <ViewCardDescription>Where your visitors come from</ViewCardDescription>
+          </ViewCardHeader>
+          <ViewCardContent>
+            <FlexColumn $gap="1rem">
+              {processedStats.trafficSources.map((item) => (
+                <TrafficItem key={item.source}>
+                  <TrafficInfo>
+                    <TrafficSource>{item.source}</TrafficSource>
+                    <TrafficPercentage>{item.percentage}%</TrafficPercentage>
+                  </TrafficInfo>
+                  <ProgressBar>
+                    <ProgressFill $percentage={item.percentage} />
+                  </ProgressBar>
+                </TrafficItem>
+              ))}
+            </FlexColumn>
+          </ViewCardContent>
+        </ViewCard>
+
+        {/* Recent Achievements */}
+        <ViewCard>
+          <ViewCardHeader>
+            <ViewCardTitle>Recent Achievements</ViewCardTitle>
+            <ViewCardDescription>
+              {achievements.length > 0 ? `${achievements.length} milestones unlocked` : 'Demo achievements'}
+            </ViewCardDescription>
+          </ViewCardHeader>
+          <ViewCardContent>
+            <FlexColumn>
+              {(achievements.length > 0 ? achievements : [
+                {
+                  id: '1',
+                  title: 'Portfolio Created',
+                  description: 'Successfully set up your portfolio',
+                  unlockedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+                  type: 'milestone' as const,
+                  icon: '🎯'
+                },
+                {
+                  id: '2',
+                  title: 'First Views',
+                  description: 'Your portfolio received its first views',
+                  unlockedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+                  type: 'growth' as const,
+                  icon: '👁️'
+                },
+                {
+                  id: '3',
+                  title: 'High Engagement',
+                  description: 'Achieved excellent engagement metrics',
+                  unlockedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+                  type: 'performance' as const,
+                  icon: '📈'
+                }
+              ]).slice(0, 5).map((achievement) => (
+                <AchievementItem key={achievement.id}>
+                  <AchievementIcon>{achievement.icon}</AchievementIcon>
+                  <AchievementContent>
+                    <AchievementTitle>{achievement.title}</AchievementTitle>
+                    <AchievementDescription>{achievement.description}</AchievementDescription>
+                    <AchievementTime>
+                      {achievement.unlockedAt ? 
+                        formatTimeAgo(achievement.unlockedAt) : 
+                        'Recently'
+                      }
+                    </AchievementTime>
+                  </AchievementContent>
+                  <AchievementBadge $type={achievement.type}>
+                    {achievement.type}
+                  </AchievementBadge>
+                </AchievementItem>
+              ))}
+            </FlexColumn>
+          </ViewCardContent>
+        </ViewCard>
+
+        {/* Content Performance */}
+        {processedStats.contentPerformance.length > 0 && (
+          <ViewCard>
+            <ViewCardHeader>
+              <ViewCardTitle>Top Performing Content</ViewCardTitle>
+              <ViewCardDescription>Your most engaging portfolio pieces</ViewCardDescription>
+            </ViewCardHeader>
+            <ViewCardContent>
+              <FlexColumn>
+                {processedStats.contentPerformance.slice(0, 5).map((content) => (
+                  <ContentPerformanceItem key={content.id}>
+                    <ContentInfo>
+                      <ContentTitle>{content.title}</ContentTitle>
+                      <ContentStats>
+                        {content.views} views • {content.likes} likes • {content.engagementRate}% engagement
+                      </ContentStats>
+                    </ContentInfo>
+                    <ContentValue>{content.views}</ContentValue>
+                  </ContentPerformanceItem>
+                ))}
+              </FlexColumn>
+            </ViewCardContent>
+          </ViewCard>
+        )}
+
+        {/* Insights */}
+        <ViewCard>
+          <ViewCardHeader>
+            <ViewCardTitle>Key Insights</ViewCardTitle>
+            <ViewCardDescription>AI-powered portfolio recommendations</ViewCardDescription>
+          </ViewCardHeader>
+          <ViewCardContent>
+            <FlexColumn>
+              <InsightItem>
+                <InsightIcon>
+                  <TrendingUp size={16} />
+                </InsightIcon>
+                <InsightContent>
+                  <InsightTitle>Growth Opportunity</InsightTitle>
+                  <InsightText>
+                    Your portfolio has grown {timeRangeData.growth > 0 ? `${timeRangeData.growth}%` : 'steadily'} this {timeRange}. 
+                    Consider adding more content to maintain momentum.
+                  </InsightText>
+                </InsightContent>
+              </InsightItem>
+              
+              <InsightItem>
+                <InsightIcon>
+                  <Users size={16} />
+                </InsightIcon>
+                <InsightContent>
+                  <InsightTitle>Audience Engagement</InsightTitle>
+                  <InsightText>
+                    With {processedStats.engagementRate}% engagement rate, your content resonates well with visitors. 
+                    Focus on similar content types for better results.
+                  </InsightText>
+                </InsightContent>
+              </InsightItem>
+              
+              <InsightItem>
+                <InsightIcon>
+                  <Activity size={16} />
+                </InsightIcon>
+                <InsightContent>
+                  <InsightTitle>Portfolio Health</InsightTitle>
+                  <InsightText>
+                    Your {processedStats.completionRate}% completion rate shows good progress. 
+                    Aim for regular updates to keep your portfolio fresh.
+                  </InsightText>
+                </InsightContent>
+              </InsightItem>
+            </FlexColumn>
+          </ViewCardContent>
+        </ViewCard>
+      </ViewGrid>
+
+      {/* Debug Info (only in development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <DebugPanel>
+          <Heading3 style={{ margin: '0 0 1rem 0', color: '#92400e' }}>🔧 Debug Information</Heading3>
+          <ViewGrid $minWidth="300px">
+            <div>
+              <strong>Stats Object:</strong>
+              <pre style={{ 
+                background: 'white', 
+                padding: '0.75rem', 
+                borderRadius: '4px', 
+                fontSize: '0.75rem', 
+                overflow: 'auto', 
+                maxHeight: '200px' 
+              }}>
+                {JSON.stringify(stats, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <strong>Achievements:</strong>
+              <pre style={{ 
+                background: 'white', 
+                padding: '0.75rem', 
+                borderRadius: '4px', 
+                fontSize: '0.75rem', 
+                overflow: 'auto', 
+                maxHeight: '200px' 
+              }}>
+                {JSON.stringify(achievements.slice(0, 2), null, 2)}
+              </pre>
+            </div>
+          </ViewGrid>
+        </DebugPanel>
+      )}
+    </ViewContainer>
+  );
+};

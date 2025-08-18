@@ -29,7 +29,7 @@ const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
   const links: NavLink[] = [
     { href: '/', label: 'Home' },
     { href: '/thrive', label: 'Thrive' },
-    { href: '/simulations', label: 'Simulations' },
+    { href: '/simulations', label: 'The Matrix' },
   ];
 
   if (isAuthenticated) links.push({ href: '/dashboard', label: 'Dashboard', requiresAuth: true });

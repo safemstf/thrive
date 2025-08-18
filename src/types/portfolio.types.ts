@@ -307,6 +307,8 @@ export interface Portfolio extends BaseEntity {
   
   // Stats
   stats: PortfolioStats;
+  gradient?: string;
+  icon?: React.ReactNode;
   
   // Educational Content (for educational/hybrid portfolios)
   conceptProgress?: ConceptProgress[];
