@@ -1,11 +1,5 @@
 // src\components\cs\mazesolver\algorithms.tsx
-
-// ============================================================================
-// PATHFINDING ALGORITHMS MODULE - FIXED VERSION  
-// ============================================================================
-// Fixes performance issues, memory leaks, and infinite loop conditions
-// Optimized implementations with proper error handling and bounds checking
-
+import { AlgorithmClass } from "./mazeTypes";
 export interface AlgorithmResult {
   name: string;
   path: [number, number][];
@@ -206,7 +200,7 @@ function reconstructPath(
 }
 
 // ============================================================================
-// BREADTH-FIRST SEARCH - Fixed Implementation
+// BREADTH-FIRST SEARCH 
 // ============================================================================
 
 export function breadthFirstSearch(
@@ -307,7 +301,7 @@ export function breadthFirstSearch(
 }
 
 // ============================================================================
-// DEPTH-FIRST SEARCH - Fixed Implementation
+// DEPTH-FIRST SEARCH 
 // ============================================================================
 
 export function depthFirstSearch(
@@ -413,7 +407,7 @@ export function depthFirstSearch(
 }
 
 // ============================================================================
-// A* SEARCH - Fixed Implementation
+// A* SEARCH
 // ============================================================================
 
 export function aStarSearch(
@@ -541,7 +535,7 @@ export function aStarSearch(
 }
 
 // ============================================================================
-// DIJKSTRA'S ALGORITHM - Fixed Implementation
+// DIJKSTRA'S ALGORITHM 
 // ============================================================================
 
 export function dijkstraSearch(
@@ -673,10 +667,231 @@ export function dijkstraSearch(
 }
 
 // ============================================================================
-// ALGORITHM REGISTRY AND FACTORY - Fixed and Simplified
+// SIMPLIFIED ALGORITHM WRAPPERS
 // ============================================================================
 
-export type AlgorithmType = 'BFS' | 'DFS' | 'AStar' | 'Dijkstra';
+// Greedy Best-First Search implementation
+export function greedyBestFirstSearch(
+  maze: number[][],
+  start: [number, number],
+  goal: [number, number],
+  config?: AlgorithmConfig
+): AlgorithmResult {
+  const startTime = performance.now();
+  const height = maze.length;
+  const width = maze[0].length;
+  
+  const heuristic = (a: [number, number], b: [number, number]) => 
+    Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+  
+  const openSet: { pos: [number, number]; h: number }[] = [];
+  const visited = new Set<string>();
+  const cameFrom = new Map<string, [number, number] | null>();
+  const explored: [number, number][] = [];
+  
+  openSet.push({ pos: start, h: heuristic(start, goal) });
+  cameFrom.set(`${start[0]},${start[1]}`, null);
+  
+  let steps = 0;
+  const maxSteps = config?.maxSteps || 50000;
+  
+  while (openSet.length > 0 && steps < maxSteps) {
+    openSet.sort((a, b) => a.h - b.h);
+    const current = openSet.shift()!;
+    const currentKey = `${current.pos[0]},${current.pos[1]}`;
+    
+    if (visited.has(currentKey)) continue;
+    
+    visited.add(currentKey);
+    explored.push(current.pos);
+    steps++;
+    
+    if (current.pos[0] === goal[0] && current.pos[1] === goal[1]) {
+      const path: [number, number][] = [];
+      let curr: [number, number] | null = goal;
+      
+      while (curr) {
+        path.unshift(curr);
+        const parent = cameFrom.get(`${curr[0]},${curr[1]}`);
+        curr = parent || null;
+      }
+      
+      return {
+        name: 'Greedy',
+        path,
+        explored,
+        steps,
+        success: true,
+        executionTime: performance.now() - startTime
+      };
+    }
+    
+    const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+    for (const [dx, dy] of directions) {
+      const nx = current.pos[0] + dx;
+      const ny = current.pos[1] + dy;
+      
+      if (nx >= 0 && nx < width && ny >= 0 && ny < height && 
+          maze[ny][nx] === 0 && !visited.has(`${nx},${ny}`)) {
+        cameFrom.set(`${nx},${ny}`, current.pos);
+        openSet.push({ pos: [nx, ny], h: heuristic([nx, ny], goal) });
+      }
+    }
+  }
+  
+  return {
+    name: 'Greedy',
+    path: [],
+    explored,
+    steps,
+    success: false,
+    executionTime: performance.now() - startTime
+  };
+}
+
+// Bidirectional Search implementation
+export function bidirectionalSearch(
+  maze: number[][],
+  start: [number, number],
+  goal: [number, number],
+  config?: AlgorithmConfig
+): AlgorithmResult {
+  const startTime = performance.now();
+  const height = maze.length;
+  const width = maze[0].length;
+  
+  const forwardQueue: [number, number][] = [start];
+  const backwardQueue: [number, number][] = [goal];
+  const forwardVisited = new Set<string>();
+  const backwardVisited = new Set<string>();
+  const forwardCameFrom = new Map<string, [number, number] | null>();
+  const backwardCameFrom = new Map<string, [number, number] | null>();
+  const explored: [number, number][] = [];
+  
+  forwardVisited.add(`${start[0]},${start[1]}`);
+  backwardVisited.add(`${goal[0]},${goal[1]}`);
+  forwardCameFrom.set(`${start[0]},${start[1]}`, null);
+  backwardCameFrom.set(`${goal[0]},${goal[1]}`, null);
+  
+  let steps = 0;
+  const maxSteps = config?.maxSteps || 50000;
+  
+  while ((forwardQueue.length > 0 || backwardQueue.length > 0) && steps < maxSteps) {
+    // Forward search
+    if (forwardQueue.length > 0) {
+      const current = forwardQueue.shift()!;
+      const currentKey = `${current[0]},${current[1]}`;
+      explored.push(current);
+      steps++;
+      
+      if (backwardVisited.has(currentKey)) {
+        // Reconstruct path
+        const forwardPath: [number, number][] = [];
+        let curr: [number, number] | null = current;
+        while (curr) {
+          forwardPath.unshift(curr);
+          const parent = forwardCameFrom.get(`${curr[0]},${curr[1]}`);
+          curr = parent || null;
+        }
+        
+        const backwardPath: [number, number][] = [];
+        curr = backwardCameFrom.get(currentKey) || null;
+        while (curr) {
+          backwardPath.push(curr);
+          const parent = backwardCameFrom.get(`${curr[0]},${curr[1]}`);
+          curr = parent || null;
+        }
+        
+        return {
+          name: 'Bidirectional',
+          path: [...forwardPath.slice(0, -1), ...backwardPath],
+          explored,
+          steps,
+          success: true,
+          executionTime: performance.now() - startTime
+        };
+      }
+      
+      const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+      for (const [dx, dy] of directions) {
+        const nx = current[0] + dx;
+        const ny = current[1] + dy;
+        const neighborKey = `${nx},${ny}`;
+        
+        if (nx >= 0 && nx < width && ny >= 0 && ny < height && 
+            maze[ny][nx] === 0 && !forwardVisited.has(neighborKey)) {
+          forwardVisited.add(neighborKey);
+          forwardCameFrom.set(neighborKey, current);
+          forwardQueue.push([nx, ny]);
+        }
+      }
+    }
+    
+    // Backward search
+    if (backwardQueue.length > 0) {
+      const current = backwardQueue.shift()!;
+      const currentKey = `${current[0]},${current[1]}`;
+      explored.push(current);
+      steps++;
+      
+      if (forwardVisited.has(currentKey)) {
+        // Reconstruct path (similar to above)
+        const forwardPath: [number, number][] = [];
+        let curr: [number, number] | null = forwardCameFrom.get(currentKey) || current;
+        while (curr) {
+          forwardPath.unshift(curr);
+          const parent = forwardCameFrom.get(`${curr[0]},${curr[1]}`);
+          curr = parent || null;
+        }
+        
+        const backwardPath: [number, number][] = [];
+        curr = current;
+        while (curr) {
+          backwardPath.push(curr);
+          const parent = backwardCameFrom.get(`${curr[0]},${curr[1]}`);
+          curr = parent || null;
+        }
+        
+        return {
+          name: 'Bidirectional',
+          path: [...forwardPath, ...backwardPath.slice(1)],
+          explored,
+          steps,
+          success: true,
+          executionTime: performance.now() - startTime
+        };
+      }
+      
+      const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+      for (const [dx, dy] of directions) {
+        const nx = current[0] + dx;
+        const ny = current[1] + dy;
+        const neighborKey = `${nx},${ny}`;
+        
+        if (nx >= 0 && nx < width && ny >= 0 && ny < height && 
+            maze[ny][nx] === 0 && !backwardVisited.has(neighborKey)) {
+          backwardVisited.add(neighborKey);
+          backwardCameFrom.set(neighborKey, current);
+          backwardQueue.push([nx, ny]);
+        }
+      }
+    }
+  }
+  
+  return {
+    name: 'Bidirectional',
+    path: [],
+    explored,
+    steps,
+    success: false,
+    executionTime: performance.now() - startTime
+  };
+}
+
+// ============================================================================
+// ALGORITHM REGISTRY AND FACTORY 
+// ============================================================================
+
 
 export type AlgorithmFunction = (
   maze: number[][],
@@ -686,18 +901,20 @@ export type AlgorithmFunction = (
 ) => AlgorithmResult;
 
 // FIXED: Algorithm registry with type safety
-const algorithmRegistry: Record<AlgorithmType, AlgorithmFunction> = {
+const algorithmRegistry: Record<AlgorithmClass, AlgorithmFunction> = {
   'BFS': breadthFirstSearch,
   'DFS': depthFirstSearch,
   'AStar': aStarSearch,
   'Dijkstra': dijkstraSearch,
+  'Greedy': greedyBestFirstSearch,
+  'Bidirectional': bidirectionalSearch
 };
 
 /**
  * FIXED: Run algorithm with comprehensive error handling
  */
 export function runAlgorithm(
-  algorithmName: AlgorithmType,
+  algorithmName: AlgorithmClass,
   maze: number[][],
   start: [number, number],
   goal: [number, number],
@@ -729,8 +946,8 @@ export function runAlgorithm(
 /**
  * FIXED: Get available algorithms safely
  */
-export function getAvailableAlgorithms(): AlgorithmType[] {
-  return Object.keys(algorithmRegistry) as AlgorithmType[];
+export function getAvailableAlgorithms(): AlgorithmClass[] {
+  return Object.keys(algorithmRegistry) as AlgorithmClass[];
 }
 
 /**
@@ -740,7 +957,7 @@ export function compareAlgorithms(
   maze: number[][],
   start: [number, number],
   goal: [number, number],
-  algorithms: AlgorithmType[] = ['BFS', 'DFS', 'AStar', 'Dijkstra'],
+  algorithms: AlgorithmClass[] = ['BFS', 'DFS', 'AStar', 'Dijkstra', 'Greedy', 'Bidirectional'],
   config?: AlgorithmConfig
 ): AlgorithmResult[] {
   const results: AlgorithmResult[] = [];
