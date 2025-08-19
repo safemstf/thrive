@@ -445,7 +445,7 @@ export default function SimulationsPage() {
             <HeaderIcon $isDark={isDarkMode}>
               <Activity size={40} />
             </HeaderIcon>
-            <TitleText>Interactive Simulations</TitleText>
+            <TitleText>Welcome to the Matrix, which pill would you like?</TitleText>
             {isOptimized && (
               <PerformanceBadge $isDark={isDarkMode}>
                 <Zap size={14} />
