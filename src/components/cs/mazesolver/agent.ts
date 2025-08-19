@@ -11,7 +11,7 @@ export const RACING_TEAMS: Record<AlgorithmClass, RacingTeam> = {
     color: '#0ea5e9',
     accentColor: '#0284c7',
     strategy: 'Level-by-level • Shortest path',
-    topSpeed: 1, // Not used anymore - all algorithms have same speed
+    topSpeed: 1,
     acceleration: 1,
     handling: 1,
     stamina: 1000

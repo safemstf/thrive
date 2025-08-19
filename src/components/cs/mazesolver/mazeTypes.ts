@@ -1,4 +1,3 @@
-
 export type AlgorithmClass = 'BFS' | 'DFS' | 'AStar' | 'Dijkstra' | 'Greedy' | 'Bidirectional';
 export type RaceStatus = 'preparing' | 'starting' | 'racing' | 'finished';
 export type RaceMode = 'sprint' | 'flags';
