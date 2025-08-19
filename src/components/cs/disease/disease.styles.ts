@@ -1,3 +1,5 @@
+// src\components\cs\disease\disease.styles.ts
+
 import { fadeIn, pulse } from "@/styles/styled-components";
 import styled from "styled-components";
 

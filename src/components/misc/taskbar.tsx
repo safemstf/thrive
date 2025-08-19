@@ -8,6 +8,8 @@ import styled from 'styled-components';
 import { useAuth } from '@/providers/authProvider';
 import { LogOut, User, Moon, Sun, ArrowDownToLine } from 'lucide-react';
 import { useDarkMode as useDarkModeHook } from '@/providers/darkModeProvider';
+import { useMatrix } from '@/hooks/useMatrix';
+
 
 /* ---------- types ---------- */
 export interface NavLink {
@@ -412,6 +414,19 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
 
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
+  let setMatrixOn: (v: boolean) => void = () => {};
+  // optional read of current state if you need it:
+  // let isMatrixOn = false;
+
+  if (isMounted) {
+    try {
+      const matrixCtx = useMatrix();
+      setMatrixOn = matrixCtx.setMatrixOn;
+      // isMatrixOn = matrixCtx.isMatrixOn;
+    } catch (err) {
+      // provider not present — leave no-op setter
+    }
+  }
 
   const [debugOpen, setDebugOpen] = useState<boolean>(() => {
     try {
@@ -524,10 +539,15 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
                 key={link.href}
                 href={link.href}
                 $active={pathname === link.href || (link.href === '/dashboard' && pathname.startsWith('/dashboard'))}
-                onClick={handleNavClick}
+                onClick={() => {
+                  if (link.href === '/simulations') setMatrixOn(true);
+                  else setMatrixOn(false);
+                  handleNavClick();
+                }}
               >
                 {link.label}
               </MobileNavButton>
+
             );
           })}
           <MobileSkipButton onClick={handleSkipClick} ref={skipButtonRef} aria-label="Skip to main content">
@@ -610,14 +630,22 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
           if (link.hideWhenAuth && isAuthenticated) return null;
 
           return (
+
             <NavButton
               key={link.href}
               href={link.href}
               $active={pathname === link.href || (link.href === '/dashboard' && pathname.startsWith('/dashboard'))}
               $isScrolled={isScrolled}
+              onClick={() => {
+                // enable matrix styling only when navigating to /simulations
+                if (link.href === '/simulations') setMatrixOn(true);
+                else setMatrixOn(false);
+                handleNavClick();
+              }}
             >
               {link.label}
             </NavButton>
+
           );
         })}
 

@@ -1,1283 +1,1467 @@
 // src\components\cs\ants\ants.tsx
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Play, Pause, RotateCcw, Settings, BarChart3, Zap, Users, Trophy, Crown, Star, Shield, Activity } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import styled, { keyframes, css } from 'styled-components';
+import { 
+  Play, Pause, RotateCcw, Trophy, Zap, Activity, 
+  Radio, Users, DollarSign, TrendingUp, Flag,
+  Volume2, VolumeX, Gauge, Navigation, MapPin,
+  Timer, Award, Eye, Layers, Sparkles, ChevronUp,
+  ChevronDown, Info, Settings, Maximize2, Target,
+  CheckCircle2, Circle, Gamepad2, Brain, GitBranch,
+  Cpu, Route, Map as MapIcon, Globe, Shuffle, TrendingDown, Sliders
+} from 'lucide-react';
+
+// Import from the simulation hub!
+import {
+  SimulationContainer,
+  VideoSection,
+  CanvasContainer,
+  SimCanvas,
+  HUD,
+  DiseaseSelector,
+  PlaybackControls,
+  SpeedIndicator,
+  ControlsSection,
+  TabContainer,
+  Tab,
+  TabContent,
+  StatCard,
+  ParameterControl,
+  InterventionGrid,
+  InterventionCard,
+  GlowButton,
+  MatrixOverlay
+} from '../simulationHub.styles';
 
 // ============================================================================
-// USER-INTEGRATED ANT COLONY SIMULATION
-// Each user becomes a special ant with unique behaviors and stats
+// ADDITIONAL STYLED COMPONENTS FOR TSP
 // ============================================================================
 
-// Import mock user data types
-interface UserProfile {
-  id: string;
-  name: string;
-  username: string;
-  profileImage?: string;
-  specialization?: string;
-  score?: number;
-  verified?: boolean;
-  kind?: 'creative' | 'professional' | 'educational';
-  stats?: {
-    totalViews?: number;
-    averageRating?: number;
-    totalPieces?: number;
-  };
-}
+// Keyframes need to be defined first
+const dataFlow = keyframes`
+  0% { transform: translateX(-100%); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+`;
 
-// Mock user profiles from your data
-const USER_PROFILES: UserProfile[] = [
-  {
-    id: '1',
-    name: 'Alice Johnson',
-    username: 'alice_creates',
-    specialization: 'Creative Director',
-    score: 125000,
-    verified: true,
-    kind: 'creative',
-    stats: { totalViews: 125000, averageRating: 4.9, totalPieces: 42 }
-  },
-  {
-    id: '2',
-    name: 'Robert Chen',
-    username: 'bob_codes',
-    specialization: 'Software Architect',
-    score: 67000,
-    verified: true,
-    kind: 'professional',
-    stats: { totalViews: 67000, averageRating: 4.8, totalPieces: 28 }
-  },
-  {
-    id: '3',
-    name: 'Charlie Davis',
-    username: 'charlie_learns',
-    specialization: 'Full-Stack Developer',
-    score: 28000,
-    verified: false,
-    kind: 'educational',
-    stats: { totalViews: 28000, averageRating: 4.6, totalPieces: 15 }
-  },
-  {
-    id: '4',
-    name: 'Sarah Chen',
-    username: 'sarah_codes',
-    specialization: 'Full-Stack Development',
-    score: 12450,
-    verified: true,
-    kind: 'professional'
-  },
-  {
-    id: '5',
-    name: 'Alex Rodriguez',
-    username: 'alex_designs',
-    specialization: 'UI/UX Design',
-    score: 11920,
-    verified: true,
-    kind: 'creative'
-  },
-  {
-    id: '6',
-    name: 'Maria Santos',
-    username: 'maria_data',
-    specialization: 'Data Science',
-    score: 11680,
-    verified: false,
-    kind: 'professional'
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+`;
+
+const matrixGlow = keyframes`
+  0% {
+    box-shadow: 0 0 0px rgba(0,255,0,0.06);
+    transform: translateY(0);
+    opacity: 0.95;
   }
-];
+  50% {
+    box-shadow: 0 0 24px rgba(0,255,0,0.18);
+    transform: translateY(-2px);
+    opacity: 1;
+  }
+  100% {
+    box-shadow: 0 0 0px rgba(0,255,0,0.06);
+    transform: translateY(0);
+    opacity: 0.95;
+  }
+`;
 
-// Constants
-const CANVAS_W = 900;
-const CANVAS_H = 600;
-const GRID_SIZE = 15;
-const PHEROMONE_DECAY = 0.995;
-const MAX_REGULAR_ANTS = 100;
-const MAX_USER_ANTS = USER_PROFILES.length;
-const SPATIAL_GRID_SIZE = 30;
-const USER_ANT_SIZE = 6; // Larger than regular ants
+const shimmer = keyframes`
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+`;
 
-// Grid dimensions
-const GRID_COLS = Math.ceil(CANVAS_W / GRID_SIZE);
-const GRID_ROWS = Math.ceil(CANVAS_H / GRID_SIZE);
-const PHEROMONE_GRID_SIZE = GRID_COLS * GRID_ROWS;
+const Header = styled.header`
+  background: linear-gradient(90deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.85) 100%);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 1rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+`;
 
-// Types
-type Strategy = 'random' | 'pheromone' | 'greedy' | 'smart' | 'leader';
-type AntType = 'regular' | 'user' | 'vip';
+const MainGrid = styled.div`
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  gap: 2rem;
+  padding: 2rem;
+  
+  @media (max-width: 1400px) {
+    grid-template-columns: 1fr;
+  }
+`;
 
-interface Colony {
+const Panel = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+`;
+
+const Card = styled.div`
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+`;
+
+const CardHeader = styled.div<{ $color?: string }>`
+  padding: 1rem 1.25rem;
+  background: ${props => props.$color || 'linear-gradient(90deg, #1e293b 0%, #0f172a 100%)'};
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: 0.025em;
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 0 5px rgba(59, 130, 246, 0.3);
+`;
+
+const CardContent = styled.div`
+  padding: 1.25rem;
+`;
+
+const AlgorithmSelector = styled.label<{ $selected: boolean; $color: string }>`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: ${props => props.$selected ? `${props.$color}20` : 'transparent'};
+  border: 1px solid ${props => props.$selected ? props.$color : 'transparent'};
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 0.5rem;
+  
+  &:hover {
+    background: ${props => `${props.$color}15`};
+    border-color: ${props => props.$color};
+  }
+`;
+
+const LeaderboardItem = styled.div<{ $position: number; $color: string }>`
+  padding: 0.875rem;
+  background: ${props => props.$position === 0 ? 'rgba(251, 191, 36, 0.1)' : 'transparent'};
+  border-left: 3px solid ${props => props.$color};
+  display: flex;
+  align-items: center;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+`;
+
+const Commentary = styled.div<{ $type: 'normal' | 'exciting' | 'critical' }>`
+  padding: 0.5rem;
+  margin-bottom: 0.25rem;
+  background: ${props => 
+    props.$type === 'exciting' ? 'rgba(251, 191, 36, 0.1)' : 
+    props.$type === 'critical' ? 'rgba(239, 68, 68, 0.1)' : 
+    'rgba(255, 255, 255, 0.05)'
+  };
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-family: 'Courier New', monospace;
+  color: ${props => 
+    props.$type === 'exciting' ? '#fbbf24' : 
+    props.$type === 'critical' ? '#ef4444' : 
+    '#e2e8f0'
+  };
+`;
+
+const ModeButton = styled.button<{ $active: boolean }>`
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid ${props => props.$active ? '#3b82f6' : 'rgba(59, 130, 246, 0.3)'};
+  background: ${props => props.$active ? 'rgba(59, 130, 246, 0.2)' : 'transparent'};
+  color: ${props => props.$active ? '#3b82f6' : '#94a3b8'};
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Courier New', monospace;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+  }
+`;
+
+// ============================================================================
+// TYPES AND CONFIGURATION
+// ============================================================================
+
+const CANVAS_WIDTH = 820;
+const CANVAS_HEIGHT = 820;
+const INITIAL_CITY_COUNT = 20;
+
+type AlgorithmType = 'NearestNeighbor' | 'TwoOpt' | 'SimulatedAnnealing' | 'Genetic' | 'AntColony' | 'NeuralSOM';
+
+interface City {
   id: number;
-  name: string;
-  color: string;
-  baseX: number;
-  baseY: number;
-  foodCollected: number;
-  strategy: Strategy;
-  r: number;
-  g: number;
-  b: number;
-  userAnts: number[];
-}
-
-interface FoodSource {
   x: number;
   y: number;
-  amount: number;
-  quality: number; // 1-5, affects ant behavior
+  name: string;
 }
 
-interface UserAnt {
-  userId: string;
-  antIndex: number;
-  profile: UserProfile;
-  personalBest: number;
-  currentStreak: number;
-  achievements: string[];
+interface Tour {
+  path: number[];
+  distance: number;
+  improvements: number;
 }
 
-// Props
-interface Props {
-  isRunning?: boolean;
-  speed?: number;
+interface AlgorithmRacer {
+  id: AlgorithmType;
+  name: string;
+  color: string;
+  accentColor: string;
+  description: string;
+  currentTour: Tour;
+  bestTour: Tour;
+  iterations: number;
+  exploredPaths: number;
+  temperature?: number;
+  generation?: number;
+  pheromones?: number[][];
+  neurons?: SOMNeuron[];
+  population?: Tour[];
+  status: 'running' | 'converged' | 'finished';
+  convergenceTime?: number;
+  efficiency: number;
+}
+
+interface SOMNeuron {
+  x: number;
+  y: number;
+  weights: number[];
+}
+
+export type AntsSimulationProps = {
+  isRunning: boolean;
+  speed: number;
   isDark?: boolean;
-}
-
-// Professional color scheme based on user types
-const getUserColor = (kind?: string, verified?: boolean): string => {
-  if (verified) {
-    switch (kind) {
-      case 'creative': return '#f59e0b'; // Gold for verified creative
-      case 'professional': return '#3b82f6'; // Blue for verified professional
-      case 'educational': return '#10b981'; // Green for verified educational
-      default: return '#8b5cf6'; // Purple for verified unknown
-    }
-  }
-  switch (kind) {
-    case 'creative': return '#fbbf24';
-    case 'professional': return '#60a5fa';
-    case 'educational': return '#34d399';
-    default: return '#a78bfa';
-  }
 };
 
-export default function UserIntegratedAntsSimulation({ 
-  isRunning = false, 
-  speed = 1, 
-  isDark = false 
-}: Props) {
-  // Canvas refs
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-  
-  // Typed arrays for performance
-  const antPositionsRef = useRef<Float32Array>(new Float32Array((MAX_REGULAR_ANTS + MAX_USER_ANTS) * 2));
-  const antVelocitiesRef = useRef<Float32Array>(new Float32Array((MAX_REGULAR_ANTS + MAX_USER_ANTS) * 2));
-  const antStatesRef = useRef<Uint8Array>(new Uint8Array((MAX_REGULAR_ANTS + MAX_USER_ANTS) * 5)); // hasFood, colonyId, targetFood, active, antType
-  const antScoresRef = useRef<Float32Array>(new Float32Array(MAX_REGULAR_ANTS + MAX_USER_ANTS)); // Performance scores
-  
-  // User ant mapping
-  const userAntsRef = useRef<Map<number, UserAnt>>(new Map());
-  
-  // Pheromone grids
-  const pheromoneGridsRef = useRef<Float32Array[]>([]);
-  
-  // Entity refs
-  const coloniesRef = useRef<Colony[]>([]);
-  const foodRef = useRef<FoodSource[]>([]);
-  const activeAntsRef = useRef<number>(0);
-  
-  // Animation
-  const animationRef = useRef<number>(0);
-  const lastTimeRef = useRef<number>(0);
-  const frameCountRef = useRef<number>(0);
-  const fpsRef = useRef<number>(0);
-  
-  // State
-  const [stats, setStats] = useState({
-    fps: 0,
-    regularAnts: 0,
-    userAnts: 0,
-    totalFood: 0,
-    topPerformer: null as UserProfile | null,
-    colonies: [] as { name: string; food: number; color: string; userCount: number }[]
-  });
-  const [showUserLabels, setShowUserLabels] = useState(true);
-  const [showLeaderboard, setShowLeaderboard] = useState(true);
-  const [quality, setQuality] = useState<'performance' | 'balanced' | 'quality'>('balanced');
-  
-  // Initialize simulation with user ants
-  const initSimulation = useCallback(() => {
-    // Reset arrays
-    antPositionsRef.current.fill(0);
-    antVelocitiesRef.current.fill(0);
-    antStatesRef.current.fill(0);
-    antScoresRef.current.fill(0);
-    userAntsRef.current.clear();
-    
-    // Initialize colonies with better positioning
-    const colonies: Colony[] = [
-      { 
-        id: 0, 
-        name: 'Creative Hive', 
-        color: '#f59e0b', 
-        baseX: 150, 
-        baseY: 150, 
-        foodCollected: 0, 
-        strategy: 'smart',
-        r: 245, g: 158, b: 11,
-        userAnts: []
-      },
-      { 
-        id: 1, 
-        name: 'Tech Colony', 
-        color: '#3b82f6', 
-        baseX: CANVAS_W - 150, 
-        baseY: 150, 
-        foodCollected: 0, 
-        strategy: 'leader',
-        r: 59, g: 130, b: 246,
-        userAnts: []
-      },
-      { 
-        id: 2, 
-        name: 'Learning Nest', 
-        color: '#10b981', 
-        baseX: CANVAS_W / 2, 
-        baseY: CANVAS_H - 100, 
-        foodCollected: 0, 
-        strategy: 'pheromone',
-        r: 16, g: 185, b: 129,
-        userAnts: []
+// ============================================================================
+// ALGORITHM IMPLEMENTATIONS
+// ============================================================================
+
+class TSPAlgorithms {
+  static calculateDistance(cities: City[], tour: number[]): number {
+    let distance = 0;
+    for (let i = 0; i < tour.length; i++) {
+      const from = cities[tour[i]];
+      const to = cities[tour[(i + 1) % tour.length]];
+      distance += Math.hypot(to.x - from.x, to.y - from.y);
+    }
+    return distance;
+  }
+
+  static nearestNeighbor(cities: City[], startCity: number = 0): Tour {
+    const unvisited = new Set(cities.map((_, i) => i));
+    const path: number[] = [startCity];
+    unvisited.delete(startCity);
+    let current = startCity;
+
+    while (unvisited.size > 0) {
+      let nearest = -1;
+      let nearestDist = Infinity;
+
+      for (const city of unvisited) {
+        const dist = Math.hypot(cities[city].x - cities[current].x, cities[city].y - cities[current].y);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = city;
+        }
       }
-    ];
-    
-    coloniesRef.current = colonies;
-    
-    // Initialize pheromone grids
-    pheromoneGridsRef.current = colonies.map(() => 
-      new Float32Array(PHEROMONE_GRID_SIZE)
-    );
-    
-    // Spawn ants
-    let antIndex = 0;
-    const positions = antPositionsRef.current;
-    const velocities = antVelocitiesRef.current;
-    const states = antStatesRef.current;
-    const scores = antScoresRef.current;
-    
-    // First, spawn USER ANTS - one per user profile
-    USER_PROFILES.forEach((profile, profileIndex) => {
-      if (antIndex >= MAX_REGULAR_ANTS + MAX_USER_ANTS) return;
-      
-      // Assign user to colony based on their type
-      let colonyId = 0;
-      if (profile.kind === 'professional') colonyId = 1;
-      else if (profile.kind === 'educational') colonyId = 2;
-      
-      const colony = colonies[colonyId];
-      colony.userAnts.push(antIndex);
-      
-      // Position near colony base
-      const angle = (profileIndex / USER_PROFILES.length) * Math.PI * 2;
-      const dist = 30 + Math.random() * 20;
-      positions[antIndex * 2] = colony.baseX + Math.cos(angle) * dist;
-      positions[antIndex * 2 + 1] = colony.baseY + Math.sin(angle) * dist;
-      
-      // Initial velocity
-      velocities[antIndex * 2] = (Math.random() - 0.5) * 3;
-      velocities[antIndex * 2 + 1] = (Math.random() - 0.5) * 3;
-      
-      // State: [hasFood, colonyId, targetFood, active, antType]
-      states[antIndex * 5] = 0; // hasFood
-      states[antIndex * 5 + 1] = colonyId; // colonyId
-      states[antIndex * 5 + 2] = 255; // no target
-      states[antIndex * 5 + 3] = 1; // active
-      states[antIndex * 5 + 4] = 2; // antType: 2 = user ant
-      
-      // Initialize score based on user stats
-      scores[antIndex] = (profile.score || 0) / 1000;
-      
-      // Map user ant
-      userAntsRef.current.set(antIndex, {
-        userId: profile.id,
-        antIndex,
-        profile,
-        personalBest: 0,
-        currentStreak: 0,
-        achievements: []
-      });
-      
-      antIndex++;
-    });
-    
-    // Then spawn regular ants
-    const regularAntsPerColony = Math.floor((MAX_REGULAR_ANTS - antIndex) / colonies.length);
-    
-    for (let colonyId = 0; colonyId < colonies.length; colonyId++) {
-      const colony = colonies[colonyId];
-      for (let i = 0; i < regularAntsPerColony; i++) {
-        if (antIndex >= MAX_REGULAR_ANTS) break;
-        
-        // Position near base
-        const angle = Math.random() * Math.PI * 2;
-        const dist = Math.random() * 25;
-        positions[antIndex * 2] = colony.baseX + Math.cos(angle) * dist;
-        positions[antIndex * 2 + 1] = colony.baseY + Math.sin(angle) * dist;
-        
-        // Random initial velocity
-        velocities[antIndex * 2] = (Math.random() - 0.5) * 2;
-        velocities[antIndex * 2 + 1] = (Math.random() - 0.5) * 2;
-        
-        // State
-        states[antIndex * 5] = 0; // hasFood
-        states[antIndex * 5 + 1] = colonyId; // colonyId
-        states[antIndex * 5 + 2] = 255; // no target
-        states[antIndex * 5 + 3] = 1; // active
-        states[antIndex * 5 + 4] = 0; // antType: 0 = regular ant
-        
-        antIndex++;
+
+      if (nearest !== -1) {
+        path.push(nearest);
+        unvisited.delete(nearest);
+        current = nearest;
       }
     }
-    
-    activeAntsRef.current = antIndex;
-    
-    // Initialize high-quality food sources
-    foodRef.current = [
-      { x: CANVAS_W * 0.5, y: CANVAS_H * 0.25, amount: 120, quality: 5 },
-      { x: CANVAS_W * 0.25, y: CANVAS_H * 0.5, amount: 100, quality: 4 },
-      { x: CANVAS_W * 0.75, y: CANVAS_H * 0.5, amount: 100, quality: 4 },
-      { x: CANVAS_W * 0.2, y: CANVAS_H * 0.8, amount: 80, quality: 3 },
-      { x: CANVAS_W * 0.8, y: CANVAS_H * 0.8, amount: 80, quality: 3 },
-      { x: CANVAS_W * 0.5, y: CANVAS_H * 0.6, amount: 60, quality: 2 }
-    ];
-    
-    updateStats();
-  }, []);
-  
-  // Update pheromone
-  const addPheromone = useCallback((x: number, y: number, colonyId: number, strength: number) => {
-    const gridX = Math.floor(x / GRID_SIZE);
-    const gridY = Math.floor(y / GRID_SIZE);
-    
-    if (gridX >= 0 && gridX < GRID_COLS && gridY >= 0 && gridY < GRID_ROWS) {
-      const index = gridY * GRID_COLS + gridX;
-      const grid = pheromoneGridsRef.current[colonyId];
-      if (grid) {
-        grid[index] = Math.min(1, grid[index] + strength);
-      }
-    }
-  }, []);
-  
-  // Get pheromone gradient
-  const getPheromonGradient = useCallback((x: number, y: number, colonyId: number): [number, number] => {
-    let maxStrength = 0;
-    let bestDx = 0;
-    let bestDy = 0;
-    
-    for (let dx = -2; dx <= 2; dx++) {
-      for (let dy = -2; dy <= 2; dy++) {
-        if (dx === 0 && dy === 0) continue;
-        
-        const testX = x + dx * GRID_SIZE;
-        const testY = y + dy * GRID_SIZE;
-        const gridX = Math.floor(testX / GRID_SIZE);
-        const gridY = Math.floor(testY / GRID_SIZE);
-        
-        if (gridX >= 0 && gridX < GRID_COLS && gridY >= 0 && gridY < GRID_ROWS) {
-          const index = gridY * GRID_COLS + gridX;
-          const strength = pheromoneGridsRef.current[colonyId]?.[index] || 0;
-          
-          if (strength > maxStrength) {
-            maxStrength = strength;
-            bestDx = dx;
-            bestDy = dy;
-          }
-        }
-      }
-    }
-    
-    const mag = Math.sqrt(bestDx * bestDx + bestDy * bestDy) || 1;
-    return [bestDx / mag, bestDy / mag];
-  }, []);
-  
-  // Update ant behavior with user ant special behaviors
-  const updateAnts = useCallback((dt: number) => {
-    const positions = antPositionsRef.current;
-    const velocities = antVelocitiesRef.current;
-    const states = antStatesRef.current;
-    const scores = antScoresRef.current;
-    const colonies = coloniesRef.current;
-    const foods = foodRef.current;
-    
-    for (let i = 0; i < activeAntsRef.current; i++) {
-      if (states[i * 5 + 3] === 0) continue; // Skip inactive
+
+    return {
+      path,
+      distance: this.calculateDistance(cities, path),
+      improvements: 0
+    };
+  }
+
+  static twoOpt(cities: City[], tour: Tour, maxIterations: number = 1): Tour {
+    let improved = false;
+    let currentPath = [...tour.path];
+    let improvements = tour.improvements;
+
+    for (let iter = 0; iter < maxIterations; iter++) {
+      improved = false;
       
-      const x = positions[i * 2];
-      const y = positions[i * 2 + 1];
-      let vx = velocities[i * 2];
-      let vy = velocities[i * 2 + 1];
-      
-      const hasFood = states[i * 5] === 1;
-      const colonyId = states[i * 5 + 1];
-      const antType = states[i * 5 + 4];
-      const colony = colonies[colonyId];
-      
-      if (!colony) continue;
-      
-      // Special behavior for user ants
-      const isUserAnt = antType === 2;
-      const userAnt = isUserAnt ? userAntsRef.current.get(i) : null;
-      
-      // Base speed multiplier for user ants based on their stats
-      const speedMultiplier = isUserAnt ? 1.2 + (scores[i] / 1000) : 1.0;
-      
-      if (hasFood) {
-        // Return to base
-        const dx = colony.baseX - x;
-        const dy = colony.baseY - y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist > 1) {
-          const returnSpeed = isUserAnt ? 0.6 : 0.5;
-          vx += (dx / dist) * returnSpeed * speedMultiplier;
-          vy += (dy / dist) * returnSpeed * speedMultiplier;
-          
-          // User ants drop stronger pheromones
-          if (i % 3 === 0) {
-            addPheromone(x, y, colonyId, isUserAnt ? 1.0 : 0.8);
+      for (let i = 1; i < currentPath.length - 2; i++) {
+        for (let j = i + 1; j < currentPath.length; j++) {
+          if (j - i === 1) continue;
+
+          const newPath = [...currentPath];
+          for (let k = 0; k < (j - i) / 2; k++) {
+            const temp = newPath[i + k];
+            newPath[i + k] = newPath[j - k - 1];
+            newPath[j - k - 1] = temp;
           }
-        }
-        
-        // Check if reached base
-        if (dist < 20) {
-          states[i * 5] = 0; // Drop food
-          colony.foodCollected++;
-          
-          // User ants get bonus points
-          if (userAnt) {
-            scores[i] += 10;
-            userAnt.personalBest = Math.max(userAnt.personalBest, scores[i]);
-            userAnt.currentStreak++;
-            
-            // Achievement check
-            if (userAnt.currentStreak === 10 && !userAnt.achievements.includes('streak10')) {
-              userAnt.achievements.push('streak10');
-            }
-          }
-        }
-      } else {
-        // Look for food - user ants are smarter
-        if (isUserAnt && userAnt) {
-          // User ants can sense high-quality food from farther away
-          let bestFood = -1;
-          let bestScore = 0;
-          
-          for (let f = 0; f < foods.length; f++) {
-            if (foods[f].amount <= 0) continue;
-            const dx = foods[f].x - x;
-            const dy = foods[f].y - y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const score = foods[f].quality / (1 + dist * 0.01);
-            
-            if (score > bestScore) {
-              bestScore = score;
-              bestFood = f;
-            }
-          }
-          
-          if (bestFood >= 0) {
-            const food = foods[bestFood];
-            const dx = food.x - x;
-            const dy = food.y - y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            vx += (dx / dist) * 0.5 * speedMultiplier;
-            vy += (dy / dist) * 0.5 * speedMultiplier;
-          } else {
-            // Follow pheromones
-            const [gdx, gdy] = getPheromonGradient(x, y, colonyId);
-            if (gdx !== 0 || gdy !== 0) {
-              vx += gdx * 0.4 * speedMultiplier;
-              vy += gdy * 0.4 * speedMultiplier;
-            } else {
-              // Explorer behavior
-              vx += (Math.random() - 0.5) * 0.6;
-              vy += (Math.random() - 0.5) * 0.6;
-            }
-          }
-        } else {
-          // Regular ant behavior
-          switch (colony.strategy) {
-            case 'pheromone': {
-              const [gdx, gdy] = getPheromonGradient(x, y, colonyId);
-              if (gdx !== 0 || gdy !== 0) {
-                vx += gdx * 0.3;
-                vy += gdy * 0.3;
-              } else {
-                vx += (Math.random() - 0.5) * 0.5;
-                vy += (Math.random() - 0.5) * 0.5;
-              }
-              break;
-            }
-            case 'smart': {
-              // Check for nearby food
-              let foundFood = false;
-              for (const food of foods) {
-                if (food.amount <= 0) continue;
-                const dx = food.x - x;
-                const dy = food.y - y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 60) {
-                  vx += (dx / dist) * 0.5;
-                  vy += (dy / dist) * 0.5;
-                  foundFood = true;
-                  break;
-                }
-              }
-              
-              if (!foundFood) {
-                const [gdx, gdy] = getPheromonGradient(x, y, colonyId);
-                if (gdx !== 0 || gdy !== 0) {
-                  vx += gdx * 0.35;
-                  vy += gdy * 0.35;
-                } else {
-                  vx += (Math.random() - 0.5) * 0.4;
-                  vy += (Math.random() - 0.5) * 0.4;
-                }
-              }
-              break;
-            }
-            default:
-              vx += (Math.random() - 0.5) * 0.5;
-              vy += (Math.random() - 0.5) * 0.5;
-          }
-        }
-        
-        // Check for food pickup
-        for (let f = 0; f < foods.length; f++) {
-          const food = foods[f];
-          if (food.amount <= 0) continue;
-          
-          const dx = food.x - x;
-          const dy = food.y - y;
-          const pickupDist = isUserAnt ? 15 : 10; // User ants can pick up from slightly farther
-          
-          if (dx * dx + dy * dy < pickupDist * pickupDist) {
-            states[i * 5] = 1; // Pick up food
-            food.amount--;
-            
-            // Bonus for high-quality food
-            if (userAnt) {
-              scores[i] += food.quality * 2;
-            }
-            
-            addPheromone(x, y, colonyId, 1.0);
+
+          const newDistance = this.calculateDistance(cities, newPath);
+          const currentDistance = this.calculateDistance(cities, currentPath);
+
+          if (newDistance < currentDistance) {
+            currentPath = newPath;
+            improvements++;
+            improved = true;
             break;
           }
         }
+        if (improved) break;
       }
       
-      // Apply velocity with user ant advantages
-      const maxSpeed = isUserAnt ? 4.5 : (hasFood ? 2.5 : 3.5);
-      const speed = Math.sqrt(vx * vx + vy * vy);
-      if (speed > maxSpeed) {
-        vx = (vx / speed) * maxSpeed;
-        vy = (vy / speed) * maxSpeed;
+      if (!improved) break;
+    }
+
+    return {
+      path: currentPath,
+      distance: this.calculateDistance(cities, currentPath),
+      improvements
+    };
+  }
+
+  static simulatedAnnealing(cities: City[], tour: Tour, temperature: number, coolingRate: number = 0.995): { tour: Tour; temperature: number } {
+    const currentPath = [...tour.path];
+    const n = currentPath.length;
+
+    const i = Math.floor(Math.random() * (n - 1)) + 1;
+    const j = Math.floor(Math.random() * (n - 1)) + 1;
+    
+    if (i !== j) {
+      const newPath = [...currentPath];
+      [newPath[i], newPath[j]] = [newPath[j], newPath[i]];
+
+      const currentDistance = this.calculateDistance(cities, currentPath);
+      const newDistance = this.calculateDistance(cities, newPath);
+      const delta = newDistance - currentDistance;
+
+      if (delta < 0 || Math.random() < Math.exp(-delta / temperature)) {
+        return {
+          tour: {
+            path: newPath,
+            distance: newDistance,
+            improvements: tour.improvements + (delta < 0 ? 1 : 0)
+          },
+          temperature: temperature * coolingRate
+        };
       }
-      
-      vx *= 0.95;
-      vy *= 0.95;
-      
-      // Update position
-      positions[i * 2] = Math.max(5, Math.min(CANVAS_W - 5, x + vx * dt));
-      positions[i * 2 + 1] = Math.max(5, Math.min(CANVAS_H - 5, y + vy * dt));
-      
-      velocities[i * 2] = vx;
-      velocities[i * 2 + 1] = vy;
     }
-    
-    // Decay pheromones
-    for (const grid of pheromoneGridsRef.current) {
-      for (let i = 0; i < grid.length; i++) {
-        grid[i] *= PHEROMONE_DECAY;
-        if (grid[i] < 0.01) grid[i] = 0;
+
+    return {
+      tour: {
+        ...tour,
+        distance: this.calculateDistance(cities, tour.path)
+      },
+      temperature: temperature * coolingRate
+    };
+  }
+
+  static geneticAlgorithm(cities: City[], population: Tour[], generation: number): { population: Tour[]; best: Tour } {
+    const populationSize = 30;
+    const mutationRate = 0.02;
+    const eliteSize = 5;
+
+    if (population.length === 0) {
+      for (let i = 0; i < populationSize; i++) {
+        const path = cities.map((_, i) => i);
+        for (let j = path.length - 1; j > 0; j--) {
+          const k = Math.floor(Math.random() * (j + 1));
+          [path[j], path[k]] = [path[k], path[j]];
+        }
+        population.push({
+          path,
+          distance: this.calculateDistance(cities, path),
+          improvements: 0
+        });
       }
     }
-  }, [addPheromone, getPheromonGradient]);
-  
-  // Professional rendering with user ant highlights
-  const render = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
-    if (!canvas || !ctx) return;
-    
-    // Clear with gradient background
-    const gradient = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
-    if (isDark) {
-      gradient.addColorStop(0, '#0a0f1b');
-      gradient.addColorStop(0.5, '#0f1729');
-      gradient.addColorStop(1, '#0a0f1b');
-    } else {
-      gradient.addColorStop(0, '#f8fafc');
-      gradient.addColorStop(0.5, '#f1f5f9');
-      gradient.addColorStop(1, '#f8fafc');
+
+    population.sort((a, b) => a.distance - b.distance);
+    const newPopulation: Tour[] = population.slice(0, eliteSize);
+
+    while (newPopulation.length < populationSize) {
+      const parent1 = population[Math.floor(Math.random() * eliteSize)];
+      const parent2 = population[Math.floor(Math.random() * eliteSize)];
+      const child = this.crossover(parent1.path, parent2.path);
+
+      if (Math.random() < mutationRate) {
+        const i = Math.floor(Math.random() * child.length);
+        const j = Math.floor(Math.random() * child.length);
+        [child[i], child[j]] = [child[j], child[i]];
+      }
+
+      newPopulation.push({
+        path: child,
+        distance: this.calculateDistance(cities, child),
+        improvements: generation
+      });
     }
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    return {
+      population: newPopulation,
+      best: newPopulation[0]
+    };
+  }
+
+  static crossover(parent1: number[], parent2: number[]): number[] {
+    const size = parent1.length;
+    const child: number[] = new Array(size).fill(-1);
     
-    const positions = antPositionsRef.current;
-    const states = antStatesRef.current;
-    const scores = antScoresRef.current;
-    const colonies = coloniesRef.current;
-    const foods = foodRef.current;
+    const start = Math.floor(Math.random() * size);
+    const end = Math.floor(Math.random() * size);
     
-    // Render pheromones with quality settings
-    if (quality !== 'performance') {
-      ctx.save();
-      ctx.globalAlpha = 0.25;
+    const segStart = Math.min(start, end);
+    const segEnd = Math.max(start, end);
+    
+    for (let i = segStart; i <= segEnd; i++) {
+      child[i] = parent1[i];
+    }
+    
+    let currentPos = 0;
+    for (let i = 0; i < size; i++) {
+      if (!child.includes(parent2[i])) {
+        while (child[currentPos] !== -1) {
+          currentPos++;
+        }
+        child[currentPos] = parent2[i];
+      }
+    }
+    
+    return child;
+  }
+
+  static antColonyOptimization(cities: City[], pheromones: number[][], numAnts: number = 10): { tour: Tour; pheromones: number[][] } {
+    const n = cities.length;
+    const alpha = 1;
+    const beta = 2;
+    const evaporationRate = 0.1;
+    const Q = 100;
+
+    if (!pheromones || pheromones.length === 0) {
+      pheromones = Array(n).fill(null).map(() => Array(n).fill(1));
+    }
+
+    const tours: Tour[] = [];
+
+    for (let ant = 0; ant < numAnts; ant++) {
+      const visited = new Set<number>();
+      const tour: number[] = [];
+      let current = Math.floor(Math.random() * n);
       
-      for (let colonyId = 0; colonyId < colonies.length; colonyId++) {
-        const grid = pheromoneGridsRef.current[colonyId];
-        const colony = colonies[colonyId];
+      tour.push(current);
+      visited.add(current);
+
+      while (visited.size < n) {
+        const probabilities: number[] = [];
+        let sum = 0;
+
+        for (let city = 0; city < n; city++) {
+          if (!visited.has(city)) {
+            const distance = Math.hypot(cities[city].x - cities[current].x, cities[city].y - cities[current].y);
+            const pheromone = pheromones[current][city];
+            const probability = Math.pow(pheromone, alpha) * Math.pow(1 / distance, beta);
+            probabilities.push(probability);
+            sum += probability;
+          } else {
+            probabilities.push(0);
+          }
+        }
+
+        let random = Math.random() * sum;
+        let next = -1;
         
-        for (let y = 0; y < GRID_ROWS; y++) {
-          for (let x = 0; x < GRID_COLS; x++) {
-            const strength = grid[y * GRID_COLS + x];
-            if (strength > 0.01) {
-              ctx.fillStyle = `rgba(${colony.r}, ${colony.g}, ${colony.b}, ${strength * 0.4})`;
-              ctx.fillRect(x * GRID_SIZE, y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+        for (let city = 0; city < n; city++) {
+          if (!visited.has(city)) {
+            random -= probabilities[city];
+            if (random <= 0) {
+              next = city;
+              break;
             }
           }
         }
+
+        if (next === -1) {
+          for (let city = 0; city < n; city++) {
+            if (!visited.has(city)) {
+              next = city;
+              break;
+            }
+          }
+        }
+
+        if (next !== -1) {
+          tour.push(next);
+          visited.add(next);
+          current = next;
+        }
       }
-      
-      ctx.restore();
+
+      tours.push({
+        path: tour,
+        distance: this.calculateDistance(cities, tour),
+        improvements: 0
+      });
     }
+
+    const newPheromones = pheromones.map(row => row.map(p => p * (1 - evaporationRate)));
+
+    for (const tour of tours) {
+      const deposit = Q / tour.distance;
+      for (let i = 0; i < tour.path.length; i++) {
+        const from = tour.path[i];
+        const to = tour.path[(i + 1) % tour.path.length];
+        newPheromones[from][to] += deposit;
+        newPheromones[to][from] += deposit;
+      }
+    }
+
+    const bestTour = tours.reduce((best, current) => 
+      current.distance < best.distance ? current : best
+    );
+
+    return { tour: bestTour, pheromones: newPheromones };
+  }
+
+  static selfOrganizingMap(cities: City[], neurons: SOMNeuron[], tour: Tour, learningRate: number = 0.8): { neurons: SOMNeuron[]; tour: Tour } {
+    const n = cities.length;
     
-    // Render food sources with quality indicators
-    for (const food of foods) {
-      if (food.amount <= 0) continue;
-      
-      const size = 4 + Math.sqrt(food.amount) * 1.5;
-      
-      // Quality glow
-      if (quality === 'quality') {
-        const glowGradient = ctx.createRadialGradient(food.x, food.y, 0, food.x, food.y, size * 3);
-        const qualityColor = food.quality === 5 ? '#fbbf24' : food.quality >= 3 ? '#8b5cf6' : '#60a5fa';
-        glowGradient.addColorStop(0, qualityColor + '40');
-        glowGradient.addColorStop(1, qualityColor + '00');
-        ctx.fillStyle = glowGradient;
-        ctx.fillRect(food.x - size * 3, food.y - size * 3, size * 6, size * 6);
+    if (!neurons || neurons.length === 0) {
+      neurons = [];
+      const numNeurons = n * 2;
+      for (let i = 0; i < numNeurons; i++) {
+        const angle = (i / numNeurons) * Math.PI * 2;
+        const radius = 200;
+        neurons.push({
+          x: CANVAS_WIDTH / 2 + Math.cos(angle) * radius,
+          y: CANVAS_HEIGHT / 2 + Math.sin(angle) * radius,
+          weights: [CANVAS_WIDTH / 2 + Math.cos(angle) * radius, CANVAS_HEIGHT / 2 + Math.sin(angle) * radius]
+        });
       }
-      
-      // Food body with quality color
-      const foodColor = food.quality === 5 ? '#fbbf24' : food.quality >= 3 ? '#8b5cf6' : '#60a5fa';
-      ctx.fillStyle = foodColor;
-      ctx.beginPath();
-      ctx.arc(food.x, food.y, size, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Quality stars
-      if (food.quality === 5) {
-        ctx.fillStyle = '#fff';
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('★', food.x, food.y + 3);
-      }
-      
-      // Food amount
-      ctx.fillStyle = isDark ? '#e2e8f0' : '#1e293b';
-      ctx.font = '9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(food.amount.toString(), food.x, food.y + size + 10);
     }
+
+    const city = cities[Math.floor(Math.random() * n)];
     
-    // Render colony bases with professional design
-    for (const colony of colonies) {
-      // Base glow
-      if (quality !== 'performance') {
-        const baseGradient = ctx.createRadialGradient(
-          colony.baseX, colony.baseY, 0,
-          colony.baseX, colony.baseY, 35
-        );
-        baseGradient.addColorStop(0, `rgba(${colony.r}, ${colony.g}, ${colony.b}, 0.4)`);
-        baseGradient.addColorStop(1, `rgba(${colony.r}, ${colony.g}, ${colony.b}, 0)`);
-        ctx.fillStyle = baseGradient;
-        ctx.fillRect(colony.baseX - 35, colony.baseY - 35, 70, 70);
-      }
-      
-      // Base circle
-      ctx.strokeStyle = colony.color;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(colony.baseX, colony.baseY, 18, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      ctx.fillStyle = colony.color + '20';
-      ctx.fill();
-      
-      // Colony icon
-      ctx.fillStyle = colony.color;
-      ctx.font = 'bold 20px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const icon = colony.id === 0 ? '🎨' : colony.id === 1 ? '💻' : '📚';
-      ctx.fillText(icon, colony.baseX, colony.baseY);
-      
-      // Colony info
-      ctx.fillStyle = isDark ? '#e2e8f0' : '#1e293b';
-      ctx.font = 'bold 10px sans-serif';
-      ctx.fillText(colony.name, colony.baseX, colony.baseY + 32);
-      ctx.font = '9px sans-serif';
-      ctx.fillText(`Food: ${colony.foodCollected} | Users: ${colony.userAnts.length}`, colony.baseX, colony.baseY + 44);
-    }
+    let bmuIndex = 0;
+    let minDist = Infinity;
     
-    // Render ants with user ant special effects
-    for (let i = 0; i < activeAntsRef.current; i++) {
-      if (states[i * 5 + 3] === 0) continue; // Skip inactive
-      
-      const x = positions[i * 2];
-      const y = positions[i * 2 + 1];
-      const hasFood = states[i * 5] === 1;
-      const colonyId = states[i * 5 + 1];
-      const antType = states[i * 5 + 4];
-      const colony = colonies[colonyId];
-      
-      if (!colony) continue;
-      
-      const isUserAnt = antType === 2;
-      const userAnt = isUserAnt ? userAntsRef.current.get(i) : null;
-      
-      if (isUserAnt && userAnt) {
-        // USER ANT - Special rendering
-        const profile = userAnt.profile;
-        const antColor = getUserColor(profile.kind, profile.verified);
-        
-        // Verified glow
-        if (profile.verified && quality !== 'performance') {
-          const glowSize = hasFood ? 15 : 12;
-          const glowGradient = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
-          glowGradient.addColorStop(0, antColor + '60');
-          glowGradient.addColorStop(1, antColor + '00');
-          ctx.fillStyle = glowGradient;
-          ctx.fillRect(x - glowSize, y - glowSize, glowSize * 2, glowSize * 2);
-        }
-        
-        // User ant body (larger)
-        ctx.fillStyle = hasFood ? '#fbbf24' : antColor;
-        ctx.beginPath();
-        ctx.arc(x, y, USER_ANT_SIZE, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // White border for visibility
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // Verification badge
-        if (profile.verified) {
-          ctx.fillStyle = '#3b82f6';
-          ctx.beginPath();
-          ctx.arc(x + 4, y - 4, 3, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#fff';
-          ctx.font = 'bold 5px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('✓', x + 4, y - 2);
-        }
-        
-        // Score indicator
-        if (scores[i] > 50) {
-          ctx.fillStyle = '#fbbf24';
-          ctx.font = 'bold 8px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('⭐', x, y - 10);
-        }
-        
-        // Username label
-        if (showUserLabels) {
-          ctx.save();
-          ctx.fillStyle = isDark ? '#f1f5f9' : '#1e293b';
-          ctx.font = 'bold 8px sans-serif';
-          ctx.textAlign = 'center';
-          
-          // Background for readability
-          const textWidth = ctx.measureText(profile.username).width;
-          ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
-          ctx.fillRect(x - textWidth / 2 - 2, y + 10, textWidth + 4, 10);
-          
-          ctx.fillStyle = antColor;
-          ctx.fillText(profile.username, x, y + 18);
-          ctx.restore();
-        }
-      } else {
-        // REGULAR ANT - Simple rendering
-        ctx.fillStyle = hasFood ? '#fbbf24' : colony.color;
-        ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.fill();
-        
-        if (quality === 'quality') {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-          ctx.beginPath();
-          ctx.arc(x - 1, y - 1, 1.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
+    for (let i = 0; i < neurons.length; i++) {
+      const dist = Math.hypot(neurons[i].weights[0] - city.x, neurons[i].weights[1] - city.y);
+      if (dist < minDist) {
+        minDist = dist;
+        bmuIndex = i;
       }
     }
-    
-    // Update FPS
-    frameCountRef.current++;
-    const now = performance.now();
-    if (now - lastTimeRef.current > 1000) {
-      fpsRef.current = Math.round(frameCountRef.current * 1000 / (now - lastTimeRef.current));
-      frameCountRef.current = 0;
-      lastTimeRef.current = now;
-      updateStats();
+
+    const neighborhoodRadius = neurons.length / 4;
+    for (let i = 0; i < neurons.length; i++) {
+      const circularDist = Math.min(
+        Math.abs(i - bmuIndex),
+        neurons.length - Math.abs(i - bmuIndex)
+      );
+      
+      if (circularDist < neighborhoodRadius) {
+        const influence = Math.exp(-circularDist * circularDist / (2 * neighborhoodRadius * neighborhoodRadius));
+        const lr = learningRate * influence;
+        
+        neurons[i].weights[0] += lr * (city.x - neurons[i].weights[0]);
+        neurons[i].weights[1] += lr * (city.y - neurons[i].weights[1]);
+        neurons[i].x = neurons[i].weights[0];
+        neurons[i].y = neurons[i].weights[1];
+      }
     }
-  }, [isDark, quality, showUserLabels]);
+
+    const cityToNeuron: Map<number, number> = new Map();
+    
+    for (let c = 0; c < cities.length; c++) {
+      let nearest = 0;
+      let nearestDist = Infinity;
+      
+      for (let n = 0; n < neurons.length; n++) {
+        const dist = Math.hypot(neurons[n].x - cities[c].x, neurons[n].y - cities[c].y);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = n;
+        }
+      }
+      
+      cityToNeuron.set(c, nearest);
+    }
+
+    const sortedCities = Array.from(cityToNeuron.entries())
+      .sort((a, b) => a[1] - b[1])
+      .map(entry => entry[0]);
+
+    return {
+      neurons,
+      tour: {
+        path: sortedCities,
+        distance: this.calculateDistance(cities, sortedCities),
+        improvements: tour.improvements + 1
+      }
+    };
+  }
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export default function TSPAlgorithmChampionship({
+  isRunning,
+  isDark = true,
+}: AntsSimulationProps){
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number>(0);
   
-  // Update statistics
-  const updateStats = useCallback(() => {
-    const userAntsList = Array.from(userAntsRef.current.values());
-    const topPerformer = userAntsList.length > 0 
-      ? userAntsList.reduce((best, current) => 
-          antScoresRef.current[current.antIndex] > antScoresRef.current[best.antIndex] ? current : best
-        ).profile
-      : null;
-    
-    const totalFood = foodRef.current.reduce((sum, f) => sum + f.amount, 0);
-    
-    const colonyStats = coloniesRef.current.map(c => ({
-      name: c.name,
-      food: c.foodCollected,
-      color: c.color,
-      userCount: c.userAnts.length
-    }));
-    
-    setStats({
-      fps: fpsRef.current,
-      regularAnts: activeAntsRef.current - userAntsList.length,
-      userAnts: userAntsList.length,
-      totalFood,
-      topPerformer,
-      colonies: colonyStats
-    });
+  const [cities, setCities] = useState<City[]>([]);
+  const [cityCount, setCityCount] = useState(INITIAL_CITY_COUNT);
+  const [racers, setRacers] = useState<AlgorithmRacer[]>([]);
+  const [raceStatus, setRaceStatus] = useState<'preparing' | 'starting' | 'racing' | 'finished'>('preparing');
+  const [raceTime, setRaceTime] = useState(0);
+  const [selectedAlgorithms, setSelectedAlgorithms] = useState<AlgorithmType[]>(['NearestNeighbor', 'TwoOpt', 'SimulatedAnnealing']);
+  const [raceMode, setRaceMode] = useState<'sprint' | 'quality' | 'exploration'>('quality');
+  const [commentary, setCommentary] = useState<{ time: number; message: string; type: 'normal' | 'exciting' | 'critical' }[]>([]);
+  const [showPaths, setShowPaths] = useState(true);
+  const [showNeurons, setShowNeurons] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [activeTab, setActiveTab] = useState<'settings' | 'metrics' | 'history'>('settings');
+
+  const algorithmDefinitions: Record<AlgorithmType, Omit<AlgorithmRacer, 'currentTour' | 'bestTour' | 'iterations' | 'exploredPaths' | 'status' | 'efficiency'>> = {
+    NearestNeighbor: {
+      id: 'NearestNeighbor',
+      name: 'Nearest Neighbor',
+      color: '#10b981',
+      accentColor: '#34d399',
+      description: 'Greedy approach'
+    },
+    TwoOpt: {
+      id: 'TwoOpt',
+      name: '2-Opt Local Search',
+      color: '#3b82f6',
+      accentColor: '#60a5fa',
+      description: 'Edge swapping'
+    },
+    SimulatedAnnealing: {
+      id: 'SimulatedAnnealing',
+      name: 'Simulated Annealing',
+      color: '#ef4444',
+      accentColor: '#f87171',
+      description: 'Probabilistic optimization',
+      temperature: 1000
+    },
+    Genetic: {
+      id: 'Genetic',
+      name: 'Genetic Algorithm',
+      color: '#8b5cf6',
+      accentColor: '#a78bfa',
+      description: 'Evolution-based',
+      generation: 0,
+      population: []
+    },
+    AntColony: {
+      id: 'AntColony',
+      name: 'Ant Colony',
+      color: '#f59e0b',
+      accentColor: '#fbbf24',
+      description: 'Swarm intelligence',
+      pheromones: []
+    },
+    NeuralSOM: {
+      id: 'NeuralSOM',
+      name: 'Neural SOM',
+      color: '#14b8a6',
+      accentColor: '#2dd4bf',
+      description: 'Self-organizing map',
+      neurons: []
+    }
+  };
+
+  const generateCities = useCallback((count: number) => {
+    const newCities: City[] = [];
+    const margin = 50;
+    const cityNames = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta', 'Iota', 'Kappa'];
+
+    for (let i = 0; i < count; i++) {
+  let x: number = 0;
+  let y: number = 0;
+  let attempts = 0;
+
+  do {
+    x = margin + Math.random() * (CANVAS_WIDTH - 2 * margin);
+    y = margin + Math.random() * (CANVAS_HEIGHT - 2 * margin);
+    attempts++;
+
+    const tooClose = newCities.some((city: City) =>
+      Math.hypot(city.x - x, city.y - y) < 40
+    );
+
+    if (!tooClose || attempts > 100) break;
+  } while (true);
+
+  newCities.push({
+    id: i,
+    x,
+    y,
+    name: cityNames[i] || `City-${i}`
+  });
+      }
+
+    return newCities;
   }, []);
-  
-  // Animation loop
-  const animate = useCallback((timestamp: number) => {
-    const dt = Math.min(0.1, (timestamp - lastTimeRef.current) / 1000) * speed;
-    lastTimeRef.current = timestamp;
-    
-    updateAnts(dt);
-    render();
-    
-    if (isRunning) {
-      animationRef.current = requestAnimationFrame(animate);
-    }
-  }, [updateAnts, render, speed, isRunning]);
-  
-  // Setup
-  useEffect(() => {
+
+  const initializeRace = useCallback(() => {
+    const newCities = generateCities(cityCount);
+    setCities(newCities);
+
+    const newRacers: AlgorithmRacer[] = selectedAlgorithms.map(algType => {
+      const def = algorithmDefinitions[algType];
+      const initialTour = TSPAlgorithms.nearestNeighbor(newCities, 0);
+      
+      return {
+        ...def,
+        currentTour: initialTour,
+        bestTour: initialTour,
+        iterations: 0,
+        exploredPaths: 1,
+        status: 'running',
+        efficiency: 100
+      };
+    });
+
+    setRacers(newRacers);
+    setRaceStatus('preparing');
+    setRaceTime(0);
+    setCommentary([{
+      time: 0,
+      message: `Welcome to the TSP Championship! ${cityCount} cities to optimize!`,
+      type: 'normal'
+    }]);
+  }, [cityCount, selectedAlgorithms]);
+
+  const updateRacers = useCallback(() => {
+    if (raceStatus !== 'racing') return;
+
+    setRacers(prevRacers => {
+      const updated = prevRacers.map(racer => {
+        if (racer.status !== 'running') return racer;
+
+        let newRacer = { ...racer };
+        newRacer.iterations++;
+
+        // Update each algorithm based on its type
+        switch (racer.id) {
+          case 'NearestNeighbor':
+            if (newRacer.iterations === 1) {
+              newRacer.status = 'converged';
+              newRacer.convergenceTime = raceTime;
+            }
+            break;
+
+          case 'TwoOpt':
+            const improved = TSPAlgorithms.twoOpt(cities, newRacer.currentTour, 5);
+            newRacer.currentTour = improved;
+            newRacer.exploredPaths += 5;
+            
+            if (improved.distance < newRacer.bestTour.distance) {
+              newRacer.bestTour = improved;
+            }
+            
+            if (improved.improvements === newRacer.currentTour.improvements && newRacer.iterations > 10) {
+              newRacer.status = 'converged';
+              newRacer.convergenceTime = raceTime;
+            }
+            break;
+
+          case 'SimulatedAnnealing':
+            const result = TSPAlgorithms.simulatedAnnealing(
+              cities, 
+              newRacer.currentTour, 
+              newRacer.temperature || 1000
+            );
+            newRacer.currentTour = result.tour;
+            newRacer.temperature = result.temperature;
+            newRacer.exploredPaths++;
+            
+            if (result.tour.distance < newRacer.bestTour.distance) {
+              newRacer.bestTour = result.tour;
+            }
+            
+            if (newRacer.temperature! < 0.1) {
+              newRacer.status = 'converged';
+              newRacer.convergenceTime = raceTime;
+            }
+            break;
+
+          case 'Genetic':
+            const genResult = TSPAlgorithms.geneticAlgorithm(cities, newRacer.population || [], newRacer.generation || 0);
+            newRacer.currentTour = genResult.best;
+            newRacer.population = genResult.population;
+            newRacer.generation = (newRacer.generation || 0) + 1;
+            newRacer.exploredPaths += 30;
+            
+            if (genResult.best.distance < newRacer.bestTour.distance) {
+              newRacer.bestTour = genResult.best;
+            }
+            
+            if (newRacer.generation > 50) {
+              newRacer.status = 'converged';
+              newRacer.convergenceTime = raceTime;
+            }
+            break;
+
+          case 'AntColony':
+            const acoResult = TSPAlgorithms.antColonyOptimization(
+              cities,
+              newRacer.pheromones || [],
+              10
+            );
+            newRacer.currentTour = acoResult.tour;
+            newRacer.pheromones = acoResult.pheromones;
+            newRacer.exploredPaths += 10;
+            
+            if (acoResult.tour.distance < newRacer.bestTour.distance) {
+              newRacer.bestTour = acoResult.tour;
+            }
+            
+            if (newRacer.iterations > 30) {
+              newRacer.status = 'converged';
+              newRacer.convergenceTime = raceTime;
+            }
+            break;
+
+          case 'NeuralSOM':
+            const somResult = TSPAlgorithms.selfOrganizingMap(
+              cities,
+              newRacer.neurons || [],
+              newRacer.currentTour,
+              Math.max(0.1, 0.8 - newRacer.iterations * 0.01)
+            );
+            newRacer.currentTour = somResult.tour;
+            newRacer.neurons = somResult.neurons;
+            newRacer.exploredPaths++;
+            
+            if (somResult.tour.distance < newRacer.bestTour.distance) {
+              newRacer.bestTour = somResult.tour;
+            }
+            
+            if (newRacer.iterations > 80) {
+              newRacer.status = 'converged';
+              newRacer.convergenceTime = raceTime;
+            }
+            break;
+        }
+
+        const optimalEstimate = cities.length * 100;
+        newRacer.efficiency = Math.round((optimalEstimate / newRacer.bestTour.distance) * 100);
+
+        return newRacer;
+      });
+
+      if (updated.every(r => r.status !== 'running')) {
+        setRaceStatus('finished');
+        
+        const winner = updated.reduce((best, current) => 
+          current.bestTour.distance < best.bestTour.distance ? current : best
+        );
+        
+        setCommentary(prev => [...prev, {
+          time: raceTime,
+          message: `Race complete! ${winner.name} wins with distance ${winner.bestTour.distance.toFixed(2)}!`,
+          type: 'exciting'
+        }]);
+      }
+
+      return updated;
+    });
+
+    setRaceTime(prev => prev + 16);
+  }, [cities, raceStatus, raceTime]);
+
+  const renderVisualization = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    const ctx = canvas.getContext('2d', { alpha: false });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
-    ctxRef.current = ctx;
-    initSimulation();
-    render();
-  }, [initSimulation, render]);
-  
-  // Control animation
-  useEffect(() => {
-    if (isRunning) {
-      lastTimeRef.current = performance.now();
-      animationRef.current = requestAnimationFrame(animate);
-    } else if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
+
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Grid background
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.03)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < CANVAS_WIDTH; x += 50) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, CANVAS_HEIGHT);
+      ctx.stroke();
     }
-    
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+    for (let y = 0; y < CANVAS_HEIGHT; y += 50) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(CANVAS_WIDTH, y);
+      ctx.stroke();
+    }
+
+    // Draw neurons if enabled and available
+    if (showNeurons) {
+      racers.forEach(racer => {
+        if (racer.neurons && racer.neurons.length > 0) {
+          ctx.fillStyle = `${racer.color}20`;
+          racer.neurons.forEach(neuron => {
+            ctx.beginPath();
+            ctx.arc(neuron.x, neuron.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        }
+      });
+    }
+
+    // Draw paths
+    if (showPaths) {
+      racers.forEach((racer, index) => {
+        const tour = racer.currentTour.path;
+        if (tour.length === 0) return;
+
+        ctx.strokeStyle = racer.color;
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.6 - index * 0.1;
+        
+        ctx.beginPath();
+        for (let i = 0; i < tour.length; i++) {
+          const city = cities[tour[i]];
+          const nextCity = cities[tour[(i + 1) % tour.length]];
+          
+          if (i === 0) {
+            ctx.moveTo(city.x, city.y);
+          }
+          ctx.lineTo(nextCity.x, nextCity.y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        
+        ctx.globalAlpha = 1;
+      });
+    }
+
+    // Draw cities
+    cities.forEach((city) => {
+      const gradient = ctx.createRadialGradient(city.x, city.y, 0, city.x, city.y, 15);
+      gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
+      gradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(city.x - 15, city.y - 15, 30, 30);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(city.x, city.y, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#0a0a0a';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(city.id.toString(), city.x, city.y);
+    });
+
+    // Highlight best tour
+    if (racers.length > 0) {
+      const bestRacer = racers.reduce((best, current) => 
+        current.bestTour.distance < best.bestTour.distance ? current : best
+      );
+      
+      const tour = bestRacer.bestTour.path;
+      ctx.strokeStyle = bestRacer.accentColor;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([5, 5]);
+      ctx.globalAlpha = 0.8;
+      
+      ctx.beginPath();
+      for (let i = 0; i < tour.length; i++) {
+        const city = cities[tour[i]];
+        if (i === 0) {
+          ctx.moveTo(city.x, city.y);
+        } else {
+          ctx.lineTo(city.x, city.y);
+        }
       }
+      ctx.closePath();
+      ctx.stroke();
+      
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+
+    if (raceStatus === 'starting') {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      
+      const lights = 3 - Math.floor((Date.now() % 3000) / 1000);
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = i < lights ? '#ef4444' : '#374151';
+        ctx.beginPath();
+        ctx.arc(CANVAS_WIDTH/2 + (i - 1) * 40, CANVAS_HEIGHT/2, 15, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }, [cities, racers, showPaths, showNeurons, raceStatus]);
+
+  useEffect(() => {
+    let frameId: number;
+    
+    const animate = () => {
+      for (let i = 0; i < speed; i++) {
+        updateRacers();
+      }
+      renderVisualization();
+      frameId = requestAnimationFrame(animate);
     };
-  }, [isRunning, animate]);
-  
-  // Professional container styles
-  const containerStyle = {
-    maxWidth: '100%',
-    margin: '0 auto',
-    backgroundColor: isDark ? '#0f172a' : '#ffffff',
-    borderRadius: '16px',
-    overflow: 'hidden',
-    boxShadow: isDark 
-      ? '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 100px rgba(59, 130, 246, 0.1)'
-      : '0 20px 60px rgba(0, 0, 0, 0.08), 0 0 100px rgba(59, 130, 246, 0.05)'
+
+    if (raceStatus === 'racing') {
+      frameId = requestAnimationFrame(animate);
+    } else {
+      renderVisualization();
+    }
+
+    return () => {
+      if (frameId) cancelAnimationFrame(frameId);
+    };
+  }, [raceStatus, speed, updateRacers, renderVisualization]);
+
+  useEffect(() => {
+    initializeRace();
+  }, [initializeRace]);
+
+  const startRace = () => {
+    setRaceStatus('starting');
+    setCommentary(prev => [...prev, {
+      time: raceTime,
+      message: 'Algorithms initializing optimization strategies!',
+      type: 'exciting'
+    }]);
+    
+    setTimeout(() => {
+      setRaceStatus('racing');
+      setCommentary(prev => [...prev, {
+        time: raceTime,
+        message: "THE RACE BEGINS! Who will find the optimal tour?",
+        type: 'exciting'
+      }]);
+    }, 2000);
   };
-  
-  const headerStyle = {
-    background: isDark 
-      ? 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)'
-      : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-    padding: '1.5rem',
-    borderBottom: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+
+  const formatTime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const milliseconds = Math.floor((ms % 1000) / 10);
+    return `${seconds}.${milliseconds.toString().padStart(2, '0')}`;
   };
-  
-  const buttonStyle = {
-    padding: '0.625rem 1.25rem',
-    borderRadius: '8px',
-    border: 'none',
-    fontWeight: '600',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    transition: 'all 0.2s ease',
-    fontSize: '0.875rem'
+
+  const toggleFullscreen = () => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
   };
-  
+
   return (
-    <div style={containerStyle}>
-      {/* Professional Header */}
-      <div style={headerStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h2 style={{ 
-              margin: '0 0 0.25rem 0',
-              fontSize: '1.5rem',
-              fontWeight: '700',
-              background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <Users size={24} />
-              Community Ant Colony
-            </h2>
-            <p style={{ 
-              margin: 0, 
-              fontSize: '0.875rem',
-              color: isDark ? '#94a3b8' : '#64748b'
-            }}>
-              Watch your portfolio compete in real-time • {stats.userAnts} user ants active
-            </p>
-          </div>
-          
-          {/* Performance Badge */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            borderRadius: '999px',
-            color: 'white',
-            fontSize: '0.75rem',
-            fontWeight: '700',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
-          }}>
-            <Zap size={14} />
-            Optimized • {stats.fps} FPS
-          </div>
-        </div>
-      </div>
+    <SimulationContainer $isDark={true} ref={wrapperRef}>
+      <MatrixOverlay />
       
-      {/* Controls */}
-      <div style={{ 
-        padding: '1rem 1.5rem',
-        background: isDark ? '#0f172a' : '#f8fafc',
-        borderBottom: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}`,
-        display: 'flex', 
-        gap: '0.75rem', 
-        flexWrap: 'wrap',
-        alignItems: 'center'
-      }}>
-        <button
-          onClick={() => initSimulation()}
-          style={{
-            ...buttonStyle,
-            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-            color: 'white'
-          }}
-        >
-          <RotateCcw size={16} />
-          Reset Colony
-        </button>
-        
-        <button
-          onClick={() => setShowUserLabels(!showUserLabels)}
-          style={{
-            ...buttonStyle,
-            backgroundColor: showUserLabels ? '#10b981' : (isDark ? '#374151' : '#e5e7eb'),
-            color: showUserLabels ? 'white' : (isDark ? '#f9fafb' : '#374151')
-          }}
-        >
-          <Users size={16} />
-          User Labels
-        </button>
-        
-        <button
-          onClick={() => setShowLeaderboard(!showLeaderboard)}
-          style={{
-            ...buttonStyle,
-            backgroundColor: showLeaderboard ? '#8b5cf6' : (isDark ? '#374151' : '#e5e7eb'),
-            color: showLeaderboard ? 'white' : (isDark ? '#f9fafb' : '#374151')
-          }}
-        >
-          <Trophy size={16} />
-          Leaderboard
-        </button>
-        
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <label style={{ fontSize: '0.875rem', color: isDark ? '#94a3b8' : '#64748b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Settings size={14} />
-            Quality:
-          </label>
-          <select
-            value={quality}
-            onChange={(e) => setQuality(e.target.value as any)}
-            style={{
-              padding: '0.5rem',
-              borderRadius: '6px',
-              border: `1px solid ${isDark ? '#374151' : '#d1d5db'}`,
-              backgroundColor: isDark ? '#1e293b' : '#ffffff',
-              color: isDark ? '#f9fafb' : '#374151',
-              fontSize: '0.875rem',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="performance">Performance</option>
-            <option value="balanced">Balanced</option>
-            <option value="quality">Quality</option>
-          </select>
-        </div>
-      </div>
-      
-      {/* Main Content Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: showLeaderboard ? '1fr 320px' : '1fr', height: '600px' }}>
-        {/* Canvas */}
-        <div style={{ position: 'relative', background: isDark ? '#0a0f1b' : '#f8fafc' }}>
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_W}
-            height={CANVAS_H}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              imageRendering: quality === 'performance' ? 'pixelated' : 'auto'
-            }}
-          />
-          
-          {/* Top Performer Badge */}
-          {stats.topPerformer && (
-            <div style={{
-              position: 'absolute',
-              top: '1rem',
-              left: '1rem',
-              padding: '0.75rem 1rem',
-              background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.9), rgba(245, 158, 11, 0.9))',
-              backdropFilter: 'blur(10px)',
-              borderRadius: '12px',
-              color: 'white',
-              boxShadow: '0 8px 32px rgba(251, 191, 36, 0.3)'
+      <Header>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Radio size={24} />
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, fontFamily: 'Courier New', textShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }}>
+              TSP Algorithm Championship
+            </h1>
+            <span style={{ 
+              padding: '0.25rem 0.75rem', 
+              background: 'rgba(59, 130, 246, 0.2)', 
+              borderRadius: '9999px',
+              fontSize: '0.75rem',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              fontFamily: 'Courier New'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                <Crown size={16} />
-                <span style={{ fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase' }}>Top Performer</span>
-              </div>
-              <div style={{ fontSize: '1rem', fontWeight: '700' }}>
-                {stats.topPerformer.name}
-              </div>
-              <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
-                @{stats.topPerformer.username}
-              </div>
+              {cityCount} Cities • {selectedAlgorithms.length} Algorithms
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button
+              onClick={() => setAudioEnabled(!audioEnabled)}
+              style={{ 
+                background: 'rgba(0, 0, 0, 0.2)', 
+                border: 'none', 
+                padding: '0.5rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                color: 'white'
+              }}
+            >
+              {audioEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </button>
+            <div style={{ 
+              fontFamily: 'Courier New', 
+              fontSize: '1.25rem', 
+              fontWeight: 700,
+              color: '#3b82f6',
+              textShadow: '0 0 5px rgba(59, 130, 246, 0.5)'
+            }}>
+              {formatTime(raceTime)}
             </div>
-          )}
+          </div>
         </div>
-        
-        {/* Leaderboard Sidebar */}
-        {showLeaderboard && (
-          <div style={{
-            background: isDark ? '#0f172a' : '#ffffff',
-            borderLeft: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}`,
-            padding: '1.5rem',
-            overflowY: 'auto'
-          }}>
-            <h3 style={{
-              margin: '0 0 1rem 0',
-              fontSize: '1.125rem',
-              fontWeight: '700',
-              color: isDark ? '#f1f5f9' : '#1e293b',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}>
-              <Trophy size={18} />
-              Live Rankings
-            </h3>
-            
-            {/* Colony Rankings */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h4 style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: isDark ? '#94a3b8' : '#64748b',
-                marginBottom: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}>
-                Colony Performance
-              </h4>
+      </Header>
+
+      <MainGrid>
+        <Panel>
+          <Card>
+            <CardHeader $color="linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)">
+              <Cpu size={16} />
+              Select Algorithms
+            </CardHeader>
+            <CardContent>
+              {Object.entries(algorithmDefinitions).map(([key, def]) => (
+                <AlgorithmSelector
+                  key={key}
+                  $selected={selectedAlgorithms.includes(key as AlgorithmType)}
+                  $color={def.color}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedAlgorithms.includes(key as AlgorithmType)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedAlgorithms([...selectedAlgorithms, key as AlgorithmType]);
+                      } else {
+                        setSelectedAlgorithms(selectedAlgorithms.filter(a => a !== key));
+                      }
+                      setTimeout(initializeRace, 0);
+                    }}
+                  />
+                  <div style={{ 
+                    width: '24px', 
+                    height: '24px', 
+                    borderRadius: '50%', 
+                    background: def.color,
+                    boxShadow: `0 0 10px ${def.color}60`
+                  }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{def.name}</div>
+                    <div style={{ fontSize: '0.7rem', opacity: 0.7 }}>{def.description}</div>
+                  </div>
+                </AlgorithmSelector>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader $color="linear-gradient(90deg, #14b8a6 0%, #0d9488 100%)">
+              <MapIcon size={16} />
+              Problem Settings
+            </CardHeader>
+            <CardContent>
+              <ParameterControl>
+                <div className="header">
+                  <span className="label">City Count</span>
+                  <span className="value">{cityCount}</span>
+                </div>
+                <input
+                  type="range"
+                  min={5}
+                  max={30}
+                  value={cityCount}
+                  onChange={(e) => {
+                    setCityCount(Number(e.target.value));
+                    setTimeout(initializeRace, 0);
+                  }}
+                />
+              </ParameterControl>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <ModeButton 
+                  $active={raceMode === 'sprint'}
+                  onClick={() => setRaceMode('sprint')}
+                >
+                  <Zap size={14} />
+                  Sprint
+                </ModeButton>
+                <ModeButton 
+                  $active={raceMode === 'quality'}
+                  onClick={() => setRaceMode('quality')}
+                >
+                  <Trophy size={14} />
+                  Quality
+                </ModeButton>
+                <ModeButton 
+                  $active={raceMode === 'exploration'}
+                  onClick={() => setRaceMode('exploration')}
+                >
+                  <Globe size={14} />
+                  Explorer
+                </ModeButton>
+              </div>
+            </CardContent>
+          </Card>
+        </Panel>
+
+        <Panel>
+          <VideoSection>
+            <CanvasContainer>
+              <SimCanvas
+                ref={canvasRef}
+                width={CANVAS_WIDTH}
+                height={CANVAS_HEIGHT}
+              />
               
-              {stats.colonies
-                .sort((a, b) => b.food - a.food)
-                .map((colony, index) => (
-                  <div key={colony.name} style={{
-                    padding: '0.75rem',
-                    marginBottom: '0.5rem',
-                    background: index === 0 
-                      ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.1))'
-                      : isDark ? '#1e293b' : '#f8fafc',
-                    borderRadius: '8px',
-                    border: index === 0
-                      ? '1px solid #fbbf24'
-                      : `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          backgroundColor: colony.color
-                        }} />
-                        <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>
-                          {colony.name}
-                        </span>
-                        {index === 0 && <Crown size={14} color="#fbbf24" />}
+              <HUD $isDark={true}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ 
+                      width: 40, height: 40, borderRadius: 8, 
+                      background: 'linear-gradient(135deg,#3b82f6,#2563eb)', 
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <Route size={20} />
+                    </div>
+                    <div>
+                    <div style={{ fontWeight: 900, fontSize: '14px' }}>TSP SOLVER</div>
+                      <div style={{ fontSize: 11, opacity: 0.8 }}>
+                        Mode: {raceMode.toUpperCase()}
                       </div>
-                      <span style={{ fontWeight: '700', fontSize: '1rem' }}>
-                        {colony.food}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {racers.slice(0, 3).map(racer => (
+                    <div key={racer.id} style={{ 
+                      display: 'flex', gap: 6, alignItems: 'center', 
+                      background: `${racer.color}15`, 
+                      padding: '6px 10px', 
+                      borderRadius: 6, 
+                      border: `1px solid ${racer.color}40` 
+                    }}>
+                      <div style={{ 
+                        width: 8, height: 8, borderRadius: '50%', 
+                        background: racer.color 
+                      }} />
+                      <span style={{ fontSize: 11, fontWeight: 700 }}>
+                        {racer.bestTour.distance.toFixed(0)}
                       </span>
                     </div>
-                    <div style={{ 
-                      fontSize: '0.75rem', 
-                      color: isDark ? '#64748b' : '#94a3b8',
-                      marginTop: '0.25rem'
-                    }}>
-                      {colony.userCount} active users
-                    </div>
+                  ))}
+                </div>
+              </HUD>
+
+              <PlaybackControls>
+                <button onClick={() => setRaceStatus(raceStatus === 'racing' ? 'preparing' : 'racing')} title={raceStatus === 'racing' ? 'Pause' : 'Play'}>
+                  {raceStatus === 'racing' ? <Pause size={20} /> : <Play size={20} />}
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Sliders size={16} />
+                  <input 
+                    type="range" min={0.5} max={5} step={0.5} 
+                    value={speed} onChange={(e) => setSpeed(Number(e.target.value))} 
+                  />
+                  <div style={{ minWidth: 48, textAlign: 'right', fontWeight: 900, fontFamily: 'Courier New' }}>
+                    {speed.toFixed(1)}x
                   </div>
-                ))}
-            </div>
+                </div>
+                <button onClick={toggleFullscreen}>
+                  <Maximize2 size={18} />
+                </button>
+              </PlaybackControls>
+
+              <SpeedIndicator>OPTIMIZATION SPEED: {speed.toFixed(1)}x</SpeedIndicator>
+            </CanvasContainer>
+          </VideoSection>
+
+          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'center' }}>
+            <GlowButton
+              onClick={() => raceStatus === 'preparing' ? startRace() : setRaceStatus('preparing')}
+              $color={raceStatus === 'racing' ? '#ef4444' : '#3b82f6'}
+            >
+              {raceStatus === 'racing' ? (
+                <>
+                  <Pause size={16} />
+                  Pause
+                </>
+              ) : raceStatus === 'starting' ? (
+                <>
+                  <Zap size={16} />
+                  Starting...
+                </>
+              ) : (
+                <>
+                  <Play size={16} />
+                  Start Race
+                </>
+              )}
+            </GlowButton>
             
-            {/* User Rankings */}
-            <div>
-              <h4 style={{
-                fontSize: '0.875rem',
-                fontWeight: '600',
-                color: isDark ? '#94a3b8' : '#64748b',
-                marginBottom: '0.75rem',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}>
-                Top Users
-              </h4>
-              
-              {Array.from(userAntsRef.current.values())
-                .sort((a, b) => antScoresRef.current[b.antIndex] - antScoresRef.current[a.antIndex])
-                .slice(0, 5)
-                .map((userAnt, index) => (
-                  <div key={userAnt.userId} style={{
-                    padding: '0.75rem',
-                    marginBottom: '0.5rem',
-                    background: isDark ? '#1e293b' : '#f8fafc',
-                    borderRadius: '8px',
-                    border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontWeight: '700', fontSize: '0.875rem' }}>
-                            #{index + 1}
-                          </span>
-                          <span style={{ fontWeight: '600', fontSize: '0.875rem' }}>
-                            {userAnt.profile.name}
-                          </span>
-                          {userAnt.profile.verified && (
-                            <Shield size={12} color="#3b82f6" />
-                          )}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8' }}>
-                          @{userAnt.profile.username}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: '700', fontSize: '1rem' }}>
-                          {Math.round(antScoresRef.current[userAnt.antIndex])}
-                        </div>
-                        <div style={{ fontSize: '0.625rem', color: isDark ? '#64748b' : '#94a3b8' }}>
-                          points
-                        </div>
-                      </div>
+            <GlowButton onClick={initializeRace} $color="#8b5cf6">
+              <Shuffle size={16} />
+              New Cities
+            </GlowButton>
+          </div>
+        </Panel>
+
+        <Panel>
+          <Card>
+            <CardHeader $color="linear-gradient(90deg, #f59e0b 0%, #d97706 100%)">
+              <Trophy size={16} />
+              Algorithm Rankings
+            </CardHeader>
+            <CardContent>
+              {racers
+                .sort((a, b) => a.bestTour.distance - b.bestTour.distance)
+                .map((racer, position) => (
+                  <LeaderboardItem
+                    key={racer.id}
+                    $position={position}
+                    $color={racer.color}
+                  >
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, width: '32px' }}>
+                      {position === 0 && racer.status === 'converged' ? '🏆' : `${position + 1}.`}
                     </div>
-                  </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ 
+                          width: '16px', 
+                          height: '16px', 
+                          borderRadius: '50%', 
+                          backgroundColor: racer.color 
+                        }} />
+                        <span style={{ fontWeight: 600, fontSize: '0.875rem', fontFamily: 'Courier New' }}>
+                          {racer.name}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.25rem', fontFamily: 'Courier New' }}>
+                        Distance: {racer.bestTour.distance.toFixed(2)}
+                      </div>
+                      {racer.status === 'converged' && (
+                        <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '0.25rem' }}>
+                          ✓ Converged
+                        </div>
+                      )}
+                    </div>
+                  </LeaderboardItem>
                 ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader $color="linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)">
+              <Radio size={16} />
+              Race Commentary
+            </CardHeader>
+            <CardContent>
+              <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
+                {commentary.slice(-5).reverse().map((comment, i) => (
+                  <Commentary key={i} $type={comment.type}>
+                    <span style={{ opacity: 0.6, fontSize: '0.75rem' }}>
+                      [{formatTime(comment.time)}]
+                    </span>{' '}
+                    {comment.message}
+                  </Commentary>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </Panel>
+      </MainGrid>
+
+      <ControlsSection $isDark={true}>
+        <TabContainer>
+          <Tab $active={activeTab === 'settings'} onClick={() => setActiveTab('settings')}>
+            <Settings size={16} style={{ marginRight: 8 }} />
+            VIEW OPTIONS
+          </Tab>
+          <Tab $active={activeTab === 'metrics'} onClick={() => setActiveTab('metrics')}>
+            <Gauge size={16} style={{ marginRight: 8 }} />
+            METRICS
+          </Tab>
+          <Tab $active={activeTab === 'history'} onClick={() => setActiveTab('history')}>
+            <Activity size={16} style={{ marginRight: 8 }} />
+            HISTORY
+          </Tab>
+        </TabContainer>
+
+        <TabContent>
+          {activeTab === 'settings' && (
+            <InterventionGrid>
+              <InterventionCard 
+                $active={showPaths} 
+                onClick={() => setShowPaths(!showPaths)}
+                $color="#3b82f6"
+              >
+                <div className="icon"><Eye size={20} /></div>
+                <div className="name">Show Paths</div>
+                <div className="efficacy">{showPaths ? 'ON' : 'OFF'}</div>
+              </InterventionCard>
+              
+              <InterventionCard 
+                $active={showNeurons} 
+                onClick={() => setShowNeurons(!showNeurons)}
+                $color="#14b8a6"
+              >
+                <div className="icon"><Brain size={20} /></div>
+                <div className="name">Show Neurons</div>
+                <div className="efficacy">{showNeurons ? 'ON' : 'OFF'}</div>
+              </InterventionCard>
+            </InterventionGrid>
+          )}
+
+          {activeTab === 'metrics' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              {racers.map(racer => (
+                <StatCard key={racer.id} $color={racer.color}>
+                  <div className="label">{racer.name}</div>
+                  <div className="value">{racer.efficiency}%</div>
+                  <div className="change">
+                    {racer.exploredPaths} paths • {racer.iterations} iterations
+                  </div>
+                </StatCard>
+              ))}
             </div>
-          </div>
-        )}
-      </div>
-      
-      {/* Statistics Bar */}
-      <div style={{
-        background: isDark ? '#0f172a' : '#f8fafc',
-        borderTop: `1px solid ${isDark ? '#1e293b' : '#e2e8f0'}`,
-        padding: '1rem 1.5rem',
-        display: 'flex',
-        justifyContent: 'space-around',
-        flexWrap: 'wrap',
-        gap: '1rem'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8', marginBottom: '0.25rem' }}>
-            Total Ants
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: isDark ? '#f1f5f9' : '#1e293b' }}>
-            {stats.regularAnts + stats.userAnts}
-          </div>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8', marginBottom: '0.25rem' }}>
-            User Ants
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#3b82f6' }}>
-            {stats.userAnts}
-          </div>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8', marginBottom: '0.25rem' }}>
-            Food Remaining
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#8b5cf6' }}>
-            {stats.totalFood}
-          </div>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '0.75rem', color: isDark ? '#64748b' : '#94a3b8', marginBottom: '0.25rem' }}>
-            Performance
-          </div>
-          <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#10b981' }}>
-            {stats.fps} FPS
-          </div>
-        </div>
-      </div>
-    </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div style={{ textAlign: 'center', padding: '2rem', opacity: 0.6 }}>
+              Race history will appear here after completion
+            </div>
+          )}
+        </TabContent>
+      </ControlsSection>
+    </SimulationContainer>
   );
 }

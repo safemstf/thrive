@@ -5,6 +5,90 @@
 @tailwind components;
 @tailwind utilities;
 
+
+/* Matrix-active global styles */
+html.matrix-active {
+  /* Subtle green tint to the entire page background */
+  background: radial-gradient(circle at center, rgba(0, 20, 0, 0.1) 0%, transparent 70%);
+}
+
+/* Matrix scrollbar styling */
+html.matrix-active ::-webkit-scrollbar {
+  width: 8px;
+  background: rgba(0, 20, 0, 0.3);
+}
+
+html.matrix-active ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #22c55e, rgba(34, 197, 94, 0.6));
+  border-radius: 4px;
+}
+
+html.matrix-active ::-webkit-scrollbar-thumb:hover {
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
+/* Matrix selection styling */
+html.matrix-active ::selection {
+  background: rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+}
+
+html.matrix-active ::-moz-selection {
+  background: rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+}
+
+/* Matrix focus outlines */
+html.matrix-active *:focus-visible {
+  outline: 2px solid #22c55e !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4) !important;
+}
+
+/* Matrix form elements */
+html.matrix-active input,
+html.matrix-active textarea,
+html.matrix-active select {
+  border-color: rgba(34, 197, 94, 0.3) !important;
+  background: rgba(0, 20, 0, 0.1) !important;
+}
+
+html.matrix-active input:focus,
+html.matrix-active textarea:focus,
+html.matrix-active select:focus {
+  border-color: #22c55e !important;
+  background: rgba(0, 20, 0, 0.2) !important;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.2) !important;
+}
+
+/* Matrix button hover effects (if not already styled) */
+html.matrix-active button:not([data-no-matrix]):hover {
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.3) !important;
+}
+
+/* Subtle matrix animation for text elements */
+html.matrix-active h1,
+html.matrix-active h2,
+html.matrix-active h3 {
+  text-shadow: 0 0 5px rgba(34, 197, 94, 0.2);
+}
+
+/* Matrix loading/transition effects */
+.matrix-transition {
+  transition: all 0.3s ease,
+              color 0.3s ease,
+              background 0.3s ease,
+              border-color 0.3s ease,
+              text-shadow 0.3s ease,
+              box-shadow 0.3s ease !important;
+}
+
+/* Apply transition class to elements that should animate */
+html.matrix-active * {
+  @extend .matrix-transition;
+}
+
 /* 
   NOTE: All theme variables are now injected by GlobalStyles component
   All typography and base styles are handled by the theme system

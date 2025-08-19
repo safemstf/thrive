@@ -8,6 +8,7 @@ import { Menu, X, Search, Sun, Moon } from 'lucide-react';
 import logoLight from '../../../public/assets/logo3.png';
 import logoDark from '../../../public/assets/logo3-dark.png';
 import { Taskbar } from './taskbar';
+import { useMatrix } from '@/hooks/useMatrix';
 import { useDarkMode } from '@/providers/darkModeProvider';
 
 interface HeaderProps {
@@ -101,18 +102,104 @@ const useOptimizedScroll = () => {
 
 // -------- Styled components (minor tweak: logo uses transform scale instead of width/height changes) --------
 
-const HeaderContainer = styled.header<{ $scrolled: boolean; $visible: boolean }>`
+// Enhanced HeaderContainer with better matrix effects
+const HeaderContainer = styled.header<{ $scrolled: boolean; $visible: boolean; $matrixActive?: boolean }>`
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: var(--color-background-secondary);
-  border-bottom: 1px solid ${props => (props.$scrolled ? 'var(--color-border-medium)' : 'var(--color-border-light)')};
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.35s;
-  box-shadow: ${props => (props.$scrolled ? 'var(--shadow-sm)' : 'none')};
+  
+  /* Matrix vs Normal background */
+  background: ${props => {
+    if (props.$matrixActive) {
+      return props.$scrolled 
+        ? 'rgba(0, 15, 0, 0.75)' // Darker when scrolled + matrix
+        : 'rgba(0, 20, 0, 0.45)'; // Semi-transparent matrix
+    }
+    return 'var(--color-background-secondary)';
+  }};
+  
+  /* Matrix vs Normal border */
+  border-bottom: 1px solid ${props => {
+    if (props.$matrixActive) {
+      return props.$scrolled 
+        ? 'rgba(34, 197, 94, 0.25)' // More visible when scrolled
+        : 'rgba(34, 197, 94, 0.12)';
+    }
+    return props.$scrolled 
+      ? 'var(--color-border-medium)' 
+      : 'var(--color-border-light)';
+  }};
+  
+  /* Enhanced transitions */
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.35s, 
+              background 0.25s,
+              border-color 0.25s;
+              
+  /* Box shadow with matrix glow effect */
+  box-shadow: ${props => {
+    if (props.$matrixActive && props.$scrolled) {
+      return '0 4px 20px rgba(34, 197, 94, 0.1), var(--shadow-sm)';
+    }
+    return props.$scrolled ? 'var(--shadow-sm)' : 'none';
+  }};
+  
   transform: translateY(${props => (props.$visible ? '0' : '-100%')});
   will-change: transform;
+  
+  /* Matrix-specific backdrop blur */
+  ${props => props.$matrixActive && `
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  `}
+  
+  /* Matrix text color adjustments for all child text */
+  ${props => props.$matrixActive && `
+    color: #22c55e;
+    
+    /* Ensure text remains readable */
+    * {
+      text-shadow: ${props.$scrolled ? '0 0 8px rgba(34, 197, 94, 0.3)' : 'none'};
+    }
+  `}
 `;
 
+// Enhanced BrandTitle for matrix effect
+const BrandTitle = styled.span<{ $scrolled: boolean; $matrixActive?: boolean }>`
+  font-size: ${props => (props.$scrolled ? '1.25rem' : '1.6rem')};
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  color: ${props => props.$matrixActive ? '#22c55e' : 'var(--color-text-primary)'};
+  letter-spacing: 1px;
+  transition: font-size 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.25s,
+              text-shadow 0.25s;
+  white-space: nowrap;
+  
+  /* Matrix glow effect */
+  ${props => props.$matrixActive && `
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+  `}
+
+  @media (max-width: 768px) {
+    font-size: ${props => (props.$scrolled ? '1rem' : '1.25rem')};
+  }
+`;
+
+// Enhanced BrandSubtitle for matrix effect
+const BrandSubtitle = styled.p<{ $scrolled: boolean; $matrixActive?: boolean }>`
+  font-size: ${props => (props.$scrolled ? '0.85rem' : '0.95rem')};
+  color: ${props => props.$matrixActive ? 'rgba(34, 197, 94, 0.8)' : 'var(--color-text-secondary)'};
+  font-family: 'Work Sans', sans-serif;
+  margin: 0;
+  transition: opacity 0.22s, color 0.25s;
+  opacity: ${props => (props.$scrolled ? '0.9' : '1')};
+  white-space: nowrap;
+
+  @media (max-width: 768px) {
+    font-size: 0.85rem;
+  }
+`;
 const HeaderContent = styled.div<{ $scrolled: boolean }>`
   max-width: 1200px;
   margin: 0 auto;
@@ -210,34 +297,6 @@ const BrandText = styled.div<{ $scrolled: boolean }>`
 
   @media (max-width: 480px) {
     display: none;
-  }
-`;
-
-const BrandTitle = styled.span<{ $scrolled: boolean }>`
-  font-size: ${props => (props.$scrolled ? '1.25rem' : '1.6rem')};
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 400;
-  color: var(--color-text-primary);
-  letter-spacing: 1px;
-  transition: font-size 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
-
-  @media (max-width: 768px) {
-    font-size: ${props => (props.$scrolled ? '1rem' : '1.25rem')};
-  }
-`;
-
-const BrandSubtitle = styled.p<{ $scrolled: boolean }>`
-  font-size: ${props => (props.$scrolled ? '0.85rem' : '0.95rem')};
-  color: var(--color-text-secondary);
-  font-family: 'Work Sans', sans-serif;
-  margin: 0;
-  transition: opacity 0.22s;
-  opacity: ${props => (props.$scrolled ? '0.9' : '1')};
-  white-space: nowrap;
-
-  @media (max-width: 768px) {
-    font-size: 0.85rem;
   }
 `;
 
@@ -418,6 +477,17 @@ export function Header({ title, subtitle }: HeaderProps) {
     }
   }
 
+  // Matrix state hookup
+  let isMatrixOn = false;
+  if (isMounted) {
+    try {
+      const matrixCtx = useMatrix();
+      isMatrixOn = matrixCtx.isMatrixOn;
+    } catch {
+      // no provider present — keep false
+    }
+  }
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -455,7 +525,11 @@ export function Header({ title, subtitle }: HeaderProps) {
 
   return (
     <>
-      <HeaderContainer $scrolled={isScrolled} $visible={isVisible}>
+      <HeaderContainer 
+        $scrolled={isScrolled} 
+        $visible={isVisible}
+        $matrixActive={isMatrixOn}
+      >
         <HeaderContent $scrolled={isScrolled}>
           <LogoSection href="/" aria-label="Go to homepage">
             <LogoImageContainer $scrolled={isScrolled} $loaded={imageLoaded}>
@@ -468,10 +542,15 @@ export function Header({ title, subtitle }: HeaderProps) {
                 onLoad={() => setImageLoaded(true)}
               />
             </LogoImageContainer>
-
             <BrandText $scrolled={isScrolled}>
-              <BrandTitle $scrolled={isScrolled}>{title}</BrandTitle>
-              {subtitle && <BrandSubtitle $scrolled={isScrolled}>{subtitle}</BrandSubtitle>}
+              <BrandTitle $scrolled={isScrolled} $matrixActive={isMatrixOn}>
+                {title}
+              </BrandTitle>
+              {subtitle && (
+                <BrandSubtitle $scrolled={isScrolled} $matrixActive={isMatrixOn}>
+                  {subtitle}
+                </BrandSubtitle>
+              )}
             </BrandText>
           </LogoSection>
 
@@ -498,10 +577,18 @@ export function Header({ title, subtitle }: HeaderProps) {
         </SearchBar>
       </HeaderContainer>
 
+      {/* Mobile menu with matrix-aware styling */}
       <MobileMenuOverlay
         $isOpen={isMobileMenuOpen}
         onClick={closeMobileMenu}
         aria-hidden={!isMobileMenuOpen}
+        style={{
+          // Enhanced backdrop when matrix is active
+          backdropFilter: isMatrixOn ? 'blur(8px)' : 'blur(4px)',
+          background: isMatrixOn 
+            ? 'rgba(0, 20, 0, 0.7)' 
+            : 'rgba(0, 0, 0, 0.5)'
+        }}
       >
         <MobileMenu
           $isOpen={isMobileMenuOpen}
@@ -509,10 +596,30 @@ export function Header({ title, subtitle }: HeaderProps) {
           role="dialog"
           aria-modal="true"
           aria-label="Mobile navigation menu"
+          style={{
+            // Matrix styling for mobile menu
+            background: isMatrixOn 
+              ? 'rgba(0, 20, 0, 0.95)' 
+              : 'var(--color-background-secondary)',
+            borderLeft: isMatrixOn 
+              ? '1px solid rgba(34, 197, 94, 0.3)' 
+              : '1px solid var(--color-border-medium)'
+          }}
         >
           <MobileMenuHeader>
-            <MobileBrand>{title}</MobileBrand>
-            <MobileCloseButton onClick={closeMobileMenu} aria-label="Close menu">
+            <MobileBrand style={{ 
+              color: isMatrixOn ? '#22c55e' : 'var(--color-text-primary)' 
+            }}>
+              {title}
+            </MobileBrand>
+            <MobileCloseButton 
+              onClick={closeMobileMenu} 
+              aria-label="Close menu"
+              style={{
+                borderColor: isMatrixOn ? '#22c55e' : 'var(--color-primary-500)',
+                color: isMatrixOn ? '#22c55e' : 'var(--color-primary-500)'
+              }}
+            >
               <X size={20} />
             </MobileCloseButton>
           </MobileMenuHeader>
