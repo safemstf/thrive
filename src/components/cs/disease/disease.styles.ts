@@ -1,298 +1,256 @@
-// src/components/cs/disease/disease.styles.ts
-import styled, { css } from 'styled-components';
-import { 
-  Card, 
-  CardContent,
-  pulse,
-  glow,
-  slideUp,
-  Badge
-} from '../../../styles/styled-components';
+import { fadeIn, pulse } from "@/styles/styled-components";
+import styled from "styled-components";
 
-// Only disease-specific components that don't exist in the main hub
-
-export const SimCanvas = styled.canvas`
+export const SimulationContainer = styled.div<{ $isDark?: boolean }>`
   width: 100%;
-  height: auto;
-  max-height: 500px;
-  aspect-ratio: 1.6;
-  border-radius: var(--radius-lg);
-  background: var(--color-background-primary);
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--color-border-light);
+  background: ${({ $isDark }) => 
+    $isDark ? '#0a0a0a' : '#ffffff'};
+  border-radius: 16px;
+  overflow: hidden;
+  animation: ${fadeIn} 0.6s ease-out;
 `;
 
-export const StatGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--spacing-sm);
-  margin: var(--spacing-md) 0;
-`;
-
-export const Toggle = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-
-  input {
-    margin-right: 0.5rem;
-  }
-`;
-
-
-export const StatItem = styled.div<{ $color: string; $alert?: boolean }>`
-  background: var(--color-background-tertiary);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-md);
-  border-left: 3px solid ${({ $color }) => $color};
-  transition: var(--transition-fast);
-  
-  ${({ $alert }) => $alert && css`
-    animation: ${pulse} 2s infinite;
-    background: rgba(239, 68, 68, 0.05);
-  `}
-`;
-
-export const StatLabel = styled.div`
-  font-size: 0.625rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: var(--spacing-xs);
-`;
-
-export const StatValue = styled.div`
-  font-size: 1.125rem;
-  font-weight: 700;
-  font-family: var(--font-mono, 'Monaco', 'Courier New', monospace);
-  color: var(--color-text-primary);
-`;
-
-export const RValue = styled.div<{ $value: number }>`
+export const VideoSection = styled.div`
+  width: 100%;
+  background: #000;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  max-height: 70vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.75rem;
-  font-weight: 700;
-  font-family: var(--font-mono, 'Monaco', 'Courier New', monospace);
-  padding: var(--spacing-lg);
-  border-radius: var(--radius-lg);
-  margin: var(--spacing-md) 0;
-  transition: var(--transition-normal);
-  
-  background: ${({ $value }) => {
-    if ($value < 1) return 'rgba(34, 197, 94, 0.05)';
-    if ($value < 1.5) return 'rgba(251, 191, 36, 0.05)';
-    return 'rgba(239, 68, 68, 0.05)';
-  }};
-  
-  color: ${({ $value }) => {
-    if ($value < 1) return '#10b981';
-    if ($value < 1.5) return '#fbbf24';
-    return '#ef4444';
-  }};
-  
-  border: 2px solid ${({ $value }) => {
-    if ($value < 1) return '#10b981';
-    if ($value < 1.5) return '#fbbf24';
-    return '#ef4444';
-  }};
 `;
 
-export const ControlGrid = styled.div`
-  display: grid;
-  gap: var(--spacing-md);
+export const CanvasContainer = styled.div`
+  width: 100%;
+  height: 100%;
+  position: relative;
 `;
 
-export const ControlRow = styled.div`
+export const SimCanvas = styled.canvas`
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  
+  &:active {
+    cursor: grabbing;
+  }
+`;
+
+export const HUD = styled.div<{ $isDark?: boolean }>`
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.875rem;
+  min-width: 180px;
+  z-index: 10;
+`;
+
+export const DiseaseSelector = styled.div`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem;
+  z-index: 10;
+`;
+
+export const PlaybackControls = styled.div`
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 0.75rem;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 0.75rem 1.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 10;
 `;
 
-export const ControlLabel = styled.label`
+export const SpeedIndicator = styled.div`
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  z-index: 10;
+`;
+
+export const ControlsSection = styled.div<{ $isDark?: boolean }>`
+  padding: 1.5rem;
+  background: ${({ $isDark }) => 
+    $isDark ? 'rgba(20, 20, 20, 0.95)' : 'rgba(250, 250, 250, 0.95)'};
+  border-top: 1px solid ${({ $isDark }) => 
+    $isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'};
+`;
+
+export const TabContainer = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-border-light);
 `;
 
-export const ControlValue = styled.span`
-  color: var(--color-text-primary);
-  font-family: var(--font-mono, 'Monaco', 'Courier New', monospace);
-  font-size: 0.875rem;
-  font-weight: 500;
-`;
-
-export const Slider = styled.input`
-  width: 100%;
-  height: 4px;
-  border-radius: var(--radius-full);
-  background: var(--color-background-tertiary);
-  outline: none;
-  -webkit-appearance: none;
+export const Tab = styled.button<{ $active?: boolean }>`
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  color: ${({ $active }) => 
+    $active ? 'var(--color-primary-500)' : 'var(--color-text-secondary)'};
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
   
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
     background: var(--color-primary-500);
-    cursor: pointer;
-    transition: var(--transition-fast);
-    
-    &:hover {
-      background: var(--color-primary-600);
-      transform: scale(1.2);
-    }
+    transform: scaleX(${({ $active }) => $active ? 1 : 0});
+    transition: transform 0.2s ease;
   }
   
-  &::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: var(--color-primary-500);
-    cursor: pointer;
-    border: none;
-    transition: var(--transition-fast);
+  &:hover {
+    color: var(--color-text-primary);
+  }
+`;
+
+export const TabContent = styled.div`
+  animation: ${fadeIn} 0.3s ease-out;
+`;
+
+export const StatCard = styled.div<{ $color?: string; $alert?: boolean }>`
+  padding: 1rem;
+  background: var(--color-background-tertiary);
+  border-radius: 8px;
+  border-left: 3px solid ${({ $color = '#3b82f6' }) => $color};
+  ${({ $alert }) => $alert && `animation: ${pulse} 2s infinite;`}
+  
+  .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+  
+  .value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: monospace;
+  }
+  
+  .change {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    opacity: 0.8;
+  }
+`;
+
+export const ParameterControl = styled.div`
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+  
+  .label {
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  
+  .value {
+    color: var(--color-primary-500);
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 0.875rem;
+  }
+  
+  input[type="range"] {
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--color-background-tertiary);
+    outline: none;
+    -webkit-appearance: none;
     
-    &:hover {
-      background: var(--color-primary-600);
-      transform: scale(1.2);
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--color-primary-500);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      
+      &:hover {
+        transform: scale(1.2);
+      }
     }
   }
 `;
 
 export const InterventionGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-sm);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
 `;
 
-export const InterventionBtn = styled.button<{ $active: boolean; $color: string }>`
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
-  border: 1px solid ${({ $active, $color }) => 
-    $active ? $color : 'var(--color-border-light)'};
-  background: ${({ $active, $color }) => 
+export const InterventionCard = styled.button<{ $active?: boolean; $color?: string }>`
+  padding: 1rem;
+  background: ${({ $active, $color = '#3b82f6' }) => 
     $active ? `${$color}15` : 'var(--color-background-tertiary)'};
-  color: var(--color-text-primary);
-  font-size: 0.75rem;
-  font-weight: 600;
+  border: 2px solid ${({ $active, $color = '#3b82f6' }) => 
+    $active ? $color : 'var(--color-border-light)'};
+  border-radius: 12px;
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: 0.5rem;
+  color: var(--color-text-primary);
   
   &:hover {
-    background: ${({ $color }) => `${$color}20`};
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   
-  svg {
-    color: ${({ $color }) => $color};
-  }
-`;
-
-export const EventList = styled.div`
-  max-height: 200px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  
-  &::-webkit-scrollbar {
-    width: 4px;
+  .icon {
+    color: ${({ $color = '#3b82f6' }) => $color};
   }
   
-  &::-webkit-scrollbar-track {
-    background: var(--color-background-tertiary);
-    border-radius: var(--radius-full);
+  .name {
+    font-weight: 600;
+    font-size: 0.875rem;
   }
   
-  &::-webkit-scrollbar-thumb {
-    background: var(--color-border-medium);
-    border-radius: var(--radius-full);
+  .efficacy {
+    font-size: 0.7rem;
+    opacity: 0.7;
   }
-`;
-
-export const EventItem = styled.div<{ $type: 'info' | 'warning' | 'critical' | 'success' }>`
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  animation: ${slideUp} 0.3s ease;
-  display: flex;
-  gap: var(--spacing-sm);
-  
-  background: ${({ $type }) => {
-    switch ($type) {
-      case 'warning': return 'rgba(251, 191, 36, 0.05)';
-      case 'critical': return 'rgba(239, 68, 68, 0.05)';
-      case 'success': return 'rgba(16, 185, 129, 0.05)';
-      default: return 'var(--color-background-tertiary)';
-    }
-  }};
-  
-  border-left: 2px solid ${({ $type }) => {
-    switch ($type) {
-      case 'warning': return '#f59e0b';
-      case 'critical': return '#dc2626';
-      case 'success': return '#10b981';
-      default: return 'var(--color-border-medium)';
-    }
-  }};
-`;
-
-export const EventTime = styled.span`
-  color: var(--color-text-muted);
-  font-family: var(--font-mono, 'Monaco', 'Courier New', monospace);
-  min-width: 45px;
-  font-size: 0.7rem;
-`;
-
-export const MutationIndicator = styled.div<{ $variant: string }>`
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-full);
-  font-size: 0.7rem;
-  font-weight: 600;
-  background: ${({ $variant }) => {
-    const colors: Record<string, string> = {
-      'original': 'rgba(59, 130, 246, 0.1)',
-      'alpha': 'rgba(139, 92, 246, 0.1)',
-      'beta': 'rgba(236, 72, 153, 0.1)',
-      'gamma': 'rgba(251, 191, 36, 0.1)',
-      'delta': 'rgba(239, 68, 68, 0.1)',
-      'omega': 'rgba(16, 185, 129, 0.1)'
-    };
-    return colors[$variant] || colors.original;
-  }};
-  color: ${({ $variant }) => {
-    const colors: Record<string, string> = {
-      'original': '#3b82f6',
-      'alpha': '#8b5cf6',
-      'beta': '#ec4899',
-      'gamma': '#fbbf24',
-      'delta': '#ef4444',
-      'omega': '#10b981'
-    };
-    return colors[$variant] || colors.original;
-  }};
-`;
-
-export const ChartContainer = styled.div`
-  height: 180px;
-  position: relative;
-  margin-top: var(--spacing-md);
 `;
