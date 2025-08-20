@@ -21,7 +21,7 @@ import {
   Eye
 } from 'lucide-react';
 import MazeSolverDemo from '@/components/cs/mazesolver/mazeSolver';
-import AntsSimulation from '@/components/cs/ants/ants'; // Using Matrix-themed version
+import TSPAlgorithmRace from '@/components/cs/ants/ants'; // Using Matrix-themed version
 import { useDarkMode } from '@/providers/darkModeProvider';
 import DiseaseSimulation from '@/components/cs/disease/disease';
 import LifeSimulation from '@/components/cs/life/life';
@@ -669,10 +669,9 @@ export default function SimulationsPage() {
     switch (activeSimulation) {
       case 'ants':
         return (
-          <AntsSimulation 
+          <TSPAlgorithmRace 
             isRunning={isRunning} 
             speed={speed} 
-            isDark={true} // Always use dark mode for Matrix theme
           />
         );
         
@@ -718,7 +717,7 @@ export default function SimulationsPage() {
 
           <SubtitleBadge>
             <Cpu size={16} />
-            Neural Simulation Hub
+            Red pill--blue pill?
           </SubtitleBadge>
 
           <BodyText 
