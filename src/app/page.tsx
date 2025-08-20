@@ -275,7 +275,7 @@ const ConnectionBanner: React.FC<{
 
   const config = {
     offline: { icon: WifiOff, title: 'You\'re offline', color: '#ef4444' },
-    error: { icon: AlertCircle, title: 'Connection error', color: '#ef4444' }
+    error: { icon: AlertCircle, title: 'Server under development', color: '#ef4444' }
   };
 
   const { icon: Icon, title, color } = config[state];
