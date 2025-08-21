@@ -11,7 +11,8 @@ import {
   Target, 
   Grid as GridIcon, 
   Volume2, 
-  VolumeX, 
+  VolumeX,
+  Bone, 
   Zap, 
   Users, 
   Trophy, 
@@ -38,6 +39,7 @@ import {
   fadeIn
 } from '@/styles/styled-components';
 import { MatrixRain } from './matrixStyling';
+import AlgorithmVisualizer from '@/components/cs/algorithms/algorithms';
 
 // Matrix-themed animations
 const dataFlow = keyframes`
@@ -588,7 +590,7 @@ const MazeContainer = styled.div`
 `;
 
 // Types and enhanced data
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'algorithms';
 
 interface Simulation {
   key: SimulationType;
@@ -636,6 +638,15 @@ const simulations: Simulation[] = [
     icon: <Target size={24} />,
     color: '#ef4444',
     description: 'Agent-based disease simulation with intervention strategies',
+    optimized: false,
+    featured: false
+  },
+  {
+    key: 'algorithms',
+    label: 'Exploring Algorithms',
+    icon: <Bone size={24} />,
+    color: '#44efd5ff',
+    description: 'Learning about different algorithms',
     optimized: false,
     featured: false
   }
@@ -699,7 +710,14 @@ export default function SimulationsPage() {
             speed={speed}
           />
         );
-        
+      case 'algorithms':
+      return (
+        <AlgorithmVisualizer 
+          isRunning={isRunning} 
+          speed={speed}
+          isDark={true}
+        />
+      );
       default:
         return null;
     }
