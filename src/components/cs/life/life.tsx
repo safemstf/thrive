@@ -1,8 +1,8 @@
-import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
+// <full component code — replace your file with this>
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { 
-  Play, Pause, RotateCcw, Palette, Info, ZoomIn, ZoomOut, Grid3X3, 
-  Download, Upload, Camera, Maximize, Mouse, Brush, Eraser, History,
-  BarChart3, Settings, Save, FolderOpen, Copy, Share2, Sparkles
+  Play, Pause, RotateCcw, Palette, ZoomIn, ZoomOut, Grid3X3, 
+  BarChart3, Sparkles
 } from "lucide-react";
 
 // Constants
@@ -21,11 +21,11 @@ type Cell = {
   energy?: number;
 };
 
-type ColorMode = "none" | "age" | "rainbow" | "heat" | "energy" | "blend" | "trails";
+type ColorMode = "none" | "age" | "rainbow" | "heat" | "energy" | "blend" | "trails" | "vangogh";
 type RenderMode = "classic" | "impressionist" | "flowy" | "arcade" | "particle" | "organic";
 type DrawMode = "draw" | "erase";
 type BoundaryType = "toroidal" | "fixed" | "reflective";
-type Variant = "conway" | "highlife" | "daynight" | "seeds" | "coral" | "amoeba" | "life34" | "diamoeba" | "maze" | "fredkin";
+type Variant = "conway" | "highlife" | "daynight" | "seeds" | "coral" | "amoeba" | "life34" | "diamoeba" | "maze" | "fredkin" | "vangogh";
 
 type Pattern = { 
   name: string; 
@@ -57,7 +57,9 @@ const RULES_LOOKUP: Record<Variant, RuleSet> = {
   life34: { birth: [3, 4], survive: [3, 4] },
   diamoeba: { birth: [3, 4, 5, 6, 7, 8], survive: [5, 6, 7, 8] },
   maze: { birth: [3], survive: [1, 2, 3, 4, 5] },
-  fredkin: { birth: [1, 3, 5, 7], survive: [1, 3, 5, 7] }
+  fredkin: { birth: [1, 3, 5, 7], survive: [1, 3, 5, 7] },
+  // New Van Gogh-friendly rule: encourages branches and denser swirls
+  vangogh: { birth: [3, 4, 6], survive: [2, 3, 4, 5] }
 };
 
 // Patterns library (simplified for performance)
@@ -95,8 +97,8 @@ export default function OptimizedLifeSimulation({
   const [simSpeed, setSimSpeed] = useState(externalSpeed);
   
   // Computed dimensions
-  const COLS = Math.floor(canvasSize.w / cellSize);
-  const ROWS = Math.floor(canvasSize.h / cellSize);
+  const COLS = Math.max(1, Math.floor(canvasSize.w / cellSize));
+  const ROWS = Math.max(1, Math.floor(canvasSize.h / cellSize));
   const GRID_SIZE = ROWS * COLS;
   
   // Sync with external props
@@ -117,7 +119,7 @@ export default function OptimizedLifeSimulation({
     for (let i = 0; i < GRID_SIZE; i++) {
       if (Math.random() > 0.7) {
         gridRef.current[i] = 1;
-        colorDataRef.current[i] = 0xFF000000 | (Math.random() * 0xFFFFFF);
+        colorDataRef.current[i] = 0xFF000000 | (Math.floor(Math.random() * 0xFFFFFF));
       }
     }
     
@@ -167,6 +169,7 @@ export default function OptimizedLifeSimulation({
     if (!gridRef.current) return;
     
     const newGrid = new Uint8Array(GRID_SIZE);
+    // choose ruleset (supports the new 'vangogh' variant)
     const rules = RULES_LOOKUP[variant];
     
     for (let i = 0; i < GRID_SIZE; i++) {
@@ -178,7 +181,24 @@ export default function OptimizedLifeSimulation({
         : rules.birth.includes(neighbors);
       
       if (shouldLive) {
+        // if alive, increment age up to 255; if born, set age=1
         newGrid[i] = alive ? Math.min(255, gridRef.current[i] + 1) : 1;
+      } else {
+        newGrid[i] = 0;
+      }
+    }
+
+    // small post-process nudge for vangogh variant (adds a slight tendency to create swirls)
+    if (variant === "vangogh") {
+      // randomly flip a tiny fraction of cells near high-age neighbors to add organic texture
+      for (let i = 0; i < GRID_SIZE; i += Math.max(1, Math.floor(GRID_SIZE / 3000))) {
+        if (newGrid[i] === 0) {
+          // if a dead cell has many old neighbors, occasionally let it spark
+          const neighbors = getNeighborCount(i);
+          if (neighbors >= 3 && Math.random() < 0.02) {
+            newGrid[i] = 1;
+          }
+        }
       }
     }
     
@@ -186,6 +206,61 @@ export default function OptimizedLifeSimulation({
     setGeneration(g => g + 1);
     countPopulation();
   }, [GRID_SIZE, variant, getNeighborCount, countPopulation]);
+  
+  // Helper function for HSL to RGB conversion (moved above render for safety)
+  const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+    let r: number = 0, g: number = 0, b: number = 0;
+    
+    if (s === 0) {
+      r = g = b = l;
+    } else {
+      const hue2rgb = (p: number, q: number, t: number) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+      };
+      
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = hue2rgb(p, q, h + 1/3);
+      g = hue2rgb(p, q, h);
+      b = hue2rgb(p, q, h - 1/3);
+    }
+    
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+  };
+  
+  // --- Van Gogh palette + helper ---
+  const vanGoghPalette: [number, number, number][] = [
+    [21, 33, 84],   // deep night blue
+    [34, 71, 153],  // cobalt blue
+    [65, 130, 202], // sky blue
+    [249, 215, 28], // bright yellow
+    [232, 176, 51], // warm gold
+    [30, 120, 90],  // teal/green accent
+    [120, 80, 40]   // earthy mid-brown
+  ];
+  
+  function getVanGoghColor(age: number, maxAge = 60): [number, number, number] {
+    const t = Math.min(1, (age || 1) / maxAge);
+    const idxF = t * (vanGoghPalette.length - 1);
+    const paletteIndex = Math.floor(idxF);
+    const nextIndex = Math.min(vanGoghPalette.length - 1, paletteIndex + 1);
+    const localT = idxF - paletteIndex;
+
+    const a = vanGoghPalette[paletteIndex];
+    const b = vanGoghPalette[nextIndex];
+
+    const r = Math.round(a[0] + (b[0] - a[0]) * localT);
+    const g = Math.round(a[1] + (b[1] - a[1]) * localT);
+    const bb = Math.round(a[2] + (b[2] - a[2]) * localT);
+
+    return [r, g, bb];
+  }
+  // --- end Van Gogh helper ---
   
   // Optimized rendering using ImageData
   const render = useCallback(() => {
@@ -215,30 +290,41 @@ export default function OptimizedLifeSimulation({
           let r = 0, g = 0, b = 0;
           
           switch (colorMode) {
-            case "age":
+            case "age": {
               const hue = (cell * 15) % 360;
               [r, g, b] = hslToRgb(hue / 360, 0.7, 0.6);
               break;
-            case "rainbow":
+            }
+            case "rainbow": {
               const rainbowHue = (cell * 12) % 360;
               [r, g, b] = hslToRgb(rainbowHue / 360, 0.8, 0.5);
               break;
-            case "heat":
+            }
+            case "heat": {
               const heat = Math.min(1, cell / 20);
               r = Math.floor(255 * heat);
               g = Math.floor(255 * (1 - heat) * heat * 4);
               b = Math.floor(50 * (1 - heat));
               break;
-            default:
+            }
+            case "vangogh": {
+              [r, g, b] = getVanGoghColor(cell, 60);
+              break;
+            }
+            default: {
               r = isDark ? 74 : 34;
               g = isDark ? 222 : 197;
               b = isDark ? 128 : 94;
+            }
           }
           
           // Draw cell pixels directly to ImageData
           for (let py = 0; py < cellSize; py++) {
             for (let px = 0; px < cellSize; px++) {
-              const pixelIndex = ((y + py) * canvas.width + (x + px)) * 4;
+              const pxX = x + px;
+              const pxY = y + py;
+              if (pxX < 0 || pxX >= canvas.width || pxY < 0 || pxY >= canvas.height) continue;
+              const pixelIndex = (pxY * canvas.width + pxX) * 4;
               data[pixelIndex] = r;
               data[pixelIndex + 1] = g;
               data[pixelIndex + 2] = b;
@@ -252,25 +338,117 @@ export default function OptimizedLifeSimulation({
     // Batch render all pixels at once
     ctx.putImageData(imageData, 0, 0);
     
-    // Draw grid if enabled
-    if (showGrid && cellSize >= 4) {
-      ctx.strokeStyle = isDark ? "rgba(100, 116, 139, 0.2)" : "rgba(148, 163, 184, 0.2)";
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      
-      for (let x = 0; x <= canvas.width; x += cellSize) {
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
+    // --- Van Gogh painterly overlay (subtle) ---
+    if (colorMode === "vangogh" && gridRef.current) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.08;
+
+      // Keep overlay cost in check: choose skip based on cell size
+      const strokeSkip = Math.max(1, Math.floor(4 / Math.max(1, cellSize / 4)));
+
+      for (let row = 0; row < ROWS; row += strokeSkip) {
+        for (let col = 0; col < COLS; col += strokeSkip) {
+          const idx = row * COLS + col;
+          const cellVal = gridRef.current[idx];
+          if (!cellVal) continue;
+
+          const [sr, sg, sb] = getVanGoghColor(cellVal, 60);
+          ctx.fillStyle = `rgba(${sr}, ${sg}, ${sb}, 0.95)`;
+
+          const cx = Math.floor(col * cellSize + cellSize / 2);
+          const cy = Math.floor(row * cellSize + cellSize / 2);
+
+          ctx.save();
+          ctx.translate(cx, cy);
+
+          // gentle rotation to create brush direction variety
+          const rot = (((row + col) % 7) * 0.18) + ((cellVal % 5) * 0.08);
+          ctx.rotate(rot);
+
+          const w = Math.max(1, cellSize * (1.2 + (cellVal % 3) * 0.15));
+          const h = Math.max(1, cellSize * 0.35);
+
+          // two overlapping fills to create a small stroke with texture
+          ctx.fillRect(-w / 2, -h / 2, w, h);
+          ctx.globalAlpha = 0.06;
+          ctx.fillRect(-w / 2 + 1, -h / 2 + 1, w * 0.9, h * 0.9);
+
+          ctx.restore();
+          ctx.globalAlpha = 0.08;
+        }
       }
-      
-      for (let y = 0; y <= canvas.height; y += cellSize) {
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-      }
-      
-      ctx.stroke();
+
+      // soft radial highlight to emulate a faint vignette / swirl warmth
+      const rg = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.12,
+        canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.9
+      );
+      rg.addColorStop(0, "rgba(255,255,200,0.03)");
+      rg.addColorStop(0.5, "rgba(34,71,153,0.02)");
+      rg.addColorStop(1, "rgba(10,10,25,0.25)");
+      ctx.globalCompositeOperation = "overlay";
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.restore();
     }
-  }, [ROWS, COLS, cellSize, colorMode, isDark, showGrid]);
+
+    // --- Van Gogh wavy grid (if enabled in UI) ---
+    if (showGrid && cellSize >= 4) {
+      if (colorMode === "vangogh") {
+        // warm verticals + cool horizontals with a small wave offset
+        const amplitude = Math.min(8, cellSize * 0.6);
+        const freq = 0.02 + (cellSize / 20) * 0.02;
+        const timePhase = generation * 0.06;
+
+        // vertical warm strokes
+        ctx.lineWidth = 0.7;
+        ctx.strokeStyle = "rgba(249,215,28,0.09)";
+        for (let x = 0; x <= canvas.width; x += cellSize) {
+          ctx.beginPath();
+          for (let y = 0; y <= canvas.height; y += 4) {
+            const offset = Math.sin((y * freq) + x * 0.02 + timePhase) * amplitude;
+            const px = x + offset;
+            if (y === 0) ctx.moveTo(px, y);
+            else ctx.lineTo(px, y);
+          }
+          ctx.stroke();
+        }
+
+        // horizontal cool strokes
+        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = "rgba(65,130,202,0.06)";
+        for (let y = 0; y <= canvas.height; y += cellSize) {
+          ctx.beginPath();
+          for (let x = 0; x <= canvas.width; x += 4) {
+            const offset = Math.sin((x * freq) + y * 0.02 + timePhase * 0.7) * (amplitude * 0.6);
+            const py = y + offset;
+            if (x === 0) ctx.moveTo(x, py);
+            else ctx.lineTo(x, py);
+          }
+          ctx.stroke();
+        }
+      } else {
+        // default grid (square)
+        ctx.strokeStyle = isDark ? "rgba(100, 116, 139, 0.2)" : "rgba(148, 163, 184, 0.2)";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        
+        for (let x = 0; x <= canvas.width; x += cellSize) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+        }
+        
+        for (let y = 0; y <= canvas.height; y += cellSize) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+        }
+        
+        ctx.stroke();
+      }
+    }
+  }, [ROWS, COLS, cellSize, colorMode, isDark, showGrid, generation, variant]);
   
   // Optimized animation loop
   useEffect(() => {
@@ -304,11 +482,15 @@ export default function OptimizedLifeSimulation({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
+      // set drawing buffer size to match canvas pixel size for crispness
+      canvas.width = canvasSize.w;
+      canvas.height = canvasSize.h;
       ctxRef.current = canvas.getContext("2d", { alpha: false });
       initializeGrid();
       render();
     }
-  }, [initializeGrid, render]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initializeGrid]);
   
   // Handle canvas click
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -359,32 +541,6 @@ export default function OptimizedLifeSimulation({
     render();
   }, [ROWS, COLS, countPopulation, render]);
   
-  // Helper function for HSL to RGB conversion
-  const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
-    let r, g, b;
-    
-    if (s === 0) {
-      r = g = b = l;
-    } else {
-      const hue2rgb = (p: number, q: number, t: number) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-        return p;
-      };
-      
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1/3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1/3);
-    }
-    
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-  };
-  
   const containerStyle = {
     minHeight: '100vh',
     padding: '1rem',
@@ -392,7 +548,7 @@ export default function OptimizedLifeSimulation({
       ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
       : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
     color: isDark ? '#f8fafc' : '#1e293b'
-  };
+  } as React.CSSProperties;
   
   const cardStyle = {
     backgroundColor: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.9)',
@@ -401,7 +557,7 @@ export default function OptimizedLifeSimulation({
     borderRadius: '12px',
     padding: '1.5rem',
     boxShadow: isDark ? '0 8px 32px rgba(0, 0, 0, 0.3)' : '0 8px 32px rgba(0, 0, 0, 0.1)'
-  };
+  } as React.CSSProperties;
   
   const buttonStyle = {
     padding: '0.5rem 1rem',
@@ -413,7 +569,7 @@ export default function OptimizedLifeSimulation({
     display: 'flex',
     alignItems: 'center',
     gap: '0.5rem'
-  };
+  } as React.CSSProperties;
   
   return (
     <div style={containerStyle}>
@@ -557,10 +713,28 @@ export default function OptimizedLifeSimulation({
             
             {/* Visual Settings */}
             <div style={cardStyle}>
-              <h3 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Palette size={16} />
-                Visual Settings
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h3 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Palette size={16} />
+                  Visual Settings
+                </h3>
+
+                {/* quick Van Gogh toggle */}
+                <button
+                  onClick={() => setColorMode(prev => prev === 'vangogh' ? 'rainbow' : 'vangogh')}
+                  title="Toggle Van Gogh theme"
+                  style={{
+                    ...buttonStyle,
+                    padding: '0.35rem 0.6rem',
+                    backgroundColor: colorMode === 'vangogh' ? '#f59e0b' : (isDark ? '#374151' : '#e5e7eb'),
+                    color: colorMode === 'vangogh' ? '#1f2937' : (isDark ? '#f9fafb' : '#374151'),
+                    fontSize: '0.8rem'
+                  } as React.CSSProperties}
+                >
+                  <Sparkles size={14} />
+                  {colorMode === 'vangogh' ? 'Van Gogh' : 'Painterly'}
+                </button>
+              </div>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div>
@@ -583,6 +757,7 @@ export default function OptimizedLifeSimulation({
                     <option value="age">Age Based</option>
                     <option value="rainbow">Rainbow</option>
                     <option value="heat">Heat Map</option>
+                    <option value="vangogh">Van Gogh (Painterly)</option>
                   </select>
                 </div>
                 
@@ -612,6 +787,7 @@ export default function OptimizedLifeSimulation({
                     <option value="diamoeba">Diamoeba</option>
                     <option value="maze">Maze</option>
                     <option value="fredkin">Fredkin</option>
+                    <option value="vangogh">Van Gogh Variant</option>
                   </select>
                 </div>
               </div>
