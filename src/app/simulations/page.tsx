@@ -756,7 +756,7 @@ export default function SimulationsPage() {
         <PageHeader>
           <PageTitle>Simulation Laboratory</PageTitle>
           <PageSubtitle>
-            High-performance visualizations powered by WebGL and quantum algorithms
+            Visualizing AI
           </PageSubtitle>
         </PageHeader>
 
