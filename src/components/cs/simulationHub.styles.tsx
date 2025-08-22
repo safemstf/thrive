@@ -114,6 +114,7 @@ export const HUD = styled.div<{ $isDark?: boolean }>`
 // Control selector with enhanced styling
 export const DiseaseSelector = styled.div`
   position: absolute;
+  margin-top: 100px;
   top: 1rem;
   right: 1rem;
   background: rgba(0, 0, 0, 0.85);
