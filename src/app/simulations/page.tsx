@@ -14,7 +14,7 @@ import TSPAlgorithmRace from '@/components/cs/ants/ants';
 import DiseaseSimulation from '@/components/cs/disease/disease';
 import LifeSimulation from '@/components/cs/life/life';
 import AlgorithmVisualizer from '@/components/cs/algorithms/algorithms';
-
+import BacteriaPhageSimulation from '@/components/bacteria/bacteria';
 
 // Types
 type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'algorithms' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'parallel-model' | 'amdahl' | 'masters-visual' | 'wireless';
@@ -530,7 +530,7 @@ const allItems: SimulationItem[] = [
     description: 'Bacterial colony interactions with bacteriophage dynamics',
     optimized: false,
     featured: false,
-    comingSoon: true,
+    comingSoon: false,
     category: 'simulations'
   },
   {
@@ -713,7 +713,15 @@ export default function SimulationsPage() {
             isDark={true}
           />
         );
-    
+
+      case 'bacteria-phage':
+        return (
+          <BacteriaPhageSimulation
+            isRunning={isRunning}
+            speed={speed}
+            isDark={true}
+          />
+        );
       
       default:
         // Placeholder for simulations that aren't imported yet

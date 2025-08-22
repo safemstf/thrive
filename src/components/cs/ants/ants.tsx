@@ -433,8 +433,8 @@ const generateCities = (count: number, mode: CityMode): City[] => {
 
 export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [localSpeed, setLocalSpeed] = useState(1);
+  const [isPlaying, setIsPlaying] = useState(isRunning);
+  const [localSpeed, setLocalSpeed] = useState(speed);
   const [cities, setCities] = useState<City[]>([]);
   const [algorithms, setAlgorithms] = useState<Algorithm[]>([]);
   const [selectedAlgos, setSelectedAlgos] = useState<AlgorithmType[]>(['greedy', 'twoOpt', 'annealing']);
