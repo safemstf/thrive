@@ -37,7 +37,7 @@ const AlgorithmVisualizer = dynamic(() => import('@/components/cs/algorithms/alg
   loading: () => <SimulationLoader>Loading Algorithm Explorer...</SimulationLoader>
 });
 
-const BacteriaPhageSimulation = dynamic(() => import('@/components/bacteria/bacteria'), {
+const BacteriaPhageSimulation = dynamic(() => import('@/components/cs/bacteria/bacteria'), {
   ssr: false,
   loading: () => <SimulationLoader>Loading Bacteria & Phages...</SimulationLoader>
 });
@@ -539,6 +539,16 @@ const StatusBar = styled.div`
 // Data
 const allItems: SimulationItem[] = [
   // Simulations
+    {
+    key: 'life',
+    label: "Conway's Game of Life",
+    icon: <Activity size={24} />,
+    color: '#10b981',
+    description: 'GPU-accelerated cellular automaton with pattern analysis',
+    optimized: true,
+    featured: false,
+    category: 'simulations'
+  },
   {
     key: 'ants',
     label: 'Travelling Salesman',
@@ -548,17 +558,7 @@ const allItems: SimulationItem[] = [
     optimized: true,
     featured: true,
     special: true,
-    category: 'simulations'
-  },
-  {
-    key: 'life',
-    label: "Conway's Game of Life",
-    icon: <Activity size={24} />,
-    color: '#10b981',
-    description: 'GPU-accelerated cellular automaton with pattern analysis',
-    optimized: true,
-    featured: false,
-    category: 'simulations'
+    category: 'algorithms'
   },
   {
     key: 'disease',
@@ -696,7 +696,7 @@ const allItems: SimulationItem[] = [
 // Main Component
 export default function SimulationsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('simulations');
-  const [activeSimulation, setActiveSimulation] = useState<SimulationType>('ants');
+  const [activeSimulation, setActiveSimulation] = useState<SimulationType>('disease');
   const [isRunning, setIsRunning] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -809,9 +809,9 @@ export default function SimulationsPage() {
       
       <ContentWrapper>
         <PageHeader>
-          <PageTitle>Simulation Laboratory</PageTitle>
+          <PageTitle>AIs are friends not foods</PageTitle>
           <PageSubtitle>
-            Visualizing AI
+            Hi friend!
           </PageSubtitle>
         </PageHeader>
 

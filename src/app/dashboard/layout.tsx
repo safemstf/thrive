@@ -538,15 +538,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ({ children }: { children: React.ReactNode }) => <>{children}</> : 
     ProtectedRoute;
 
-  console.log('Layout render:', {
-    portfolioLoading,
-    hasPortfolio: !!portfolio,
-    useOfflineMode,
-    isOffline,
-    hasOfflineData,
-    dataStatus: dataStatus.type
-  });
-
   return (
     <AuthWrapper>
       <DashboardContainer>
