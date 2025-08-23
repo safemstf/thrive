@@ -1,3 +1,4 @@
+'use client'
 import React, { useRef, useEffect } from "react";
 import styled from "styled-components";
 
@@ -7,21 +8,24 @@ export const MatrixRainCanvas = styled.canvas`
   z-index: -1; /* Always behind your app */
   background: black;
   pointer-events: none;
+  display: block; /* Prevent hydration issues */
 `;
 
 export const MatrixRain: React.FC<{
   fontSize?: number;
   layers?: number;
   style?: React.CSSProperties;
-  }> = ({ fontSize = 16, layers = 3, style }) => {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+}> = ({ fontSize = 16, layers = 3, style }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Set initial dimensions
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
     let animationId: number;
@@ -41,7 +45,7 @@ export const MatrixRain: React.FC<{
     });
 
     const draw = () => {
-      if (!ctx) return;
+      if (!ctx || !canvas) return;
 
       // fade previous frame slightly for trailing effect
       ctx.fillStyle = "rgba(0,0,0,0.15)";
@@ -66,9 +70,8 @@ export const MatrixRain: React.FC<{
       animationId = requestAnimationFrame(draw);
     };
 
-    draw();
-
     const handleResize = () => {
+      if (!canvas) return;
       width = canvas.width = window.innerWidth;
       height = canvas.height = window.innerHeight;
 
@@ -78,10 +81,15 @@ export const MatrixRain: React.FC<{
       });
     };
 
+    // Start animation
+    draw();
+
     window.addEventListener("resize", handleResize);
 
     return () => {
-      cancelAnimationFrame(animationId);
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
       window.removeEventListener("resize", handleResize);
     };
   }, [fontSize, layers]);

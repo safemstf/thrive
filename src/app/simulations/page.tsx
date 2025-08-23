@@ -1,20 +1,46 @@
+// src/app/simulations/page.tsx
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import dynamic from "next/dynamic";
 import styled, { keyframes, css } from 'styled-components';
 import { 
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Bone, Zap, Users, Trophy, Shield, Crown, Cpu, Eye, Star, RotateCw, Microscope,
-  Droplet, Wifi, BookOpen, Sliders, Monitor, Beaker
+  Droplet, Wifi, BookOpen, Sliders, Monitor, Beaker, Loader
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 
-import MazeSolverDemo from '@/components/cs/mazesolver/mazeSolver';
-import TSPAlgorithmRace from '@/components/cs/ants/ants';
-import DiseaseSimulation from '@/components/cs/disease/disease';
-import LifeSimulation from '@/components/cs/life/life';
-import AlgorithmVisualizer from '@/components/cs/algorithms/algorithms';
-import BacteriaPhageSimulation from '@/components/bacteria/bacteria';
+// Dynamically import ALL simulations with loading states for future-proofing
+const TSPAlgorithmRace = dynamic(() => import("@/components/cs/ants/ants"), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading TSP Algorithm Race...</SimulationLoader>
+});
+
+const MazeSolverDemo = dynamic(() => import('@/components/cs/mazesolver/mazeSolver'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Pathfinding Derby...</SimulationLoader>
+});
+
+const DiseaseSimulation = dynamic(() => import('@/components/cs/disease/disease'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Epidemic Models...</SimulationLoader>
+});
+
+const LifeSimulation = dynamic(() => import('@/components/cs/life/life'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Game of Life...</SimulationLoader>
+});
+
+const AlgorithmVisualizer = dynamic(() => import('@/components/cs/algorithms/algorithms'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Algorithm Explorer...</SimulationLoader>
+});
+
+const BacteriaPhageSimulation = dynamic(() => import('@/components/bacteria/bacteria'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Bacteria & Phages...</SimulationLoader>
+});
 
 // Types
 type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'algorithms' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'parallel-model' | 'amdahl' | 'masters-visual' | 'wireless';
@@ -51,11 +77,33 @@ const pulse = keyframes`
   50% { opacity: 0.7; }
 `;
 
-const matrixTextFlow = keyframes`
-  0% { transform: translateY(-100%); opacity: 0; }
-  10% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { transform: translateY(100vh); opacity: 0; }
+const spin = keyframes`
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+`;
+
+// Loading Component
+const SimulationLoader = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  color: #00ff00;
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+  
+  &::before {
+    content: '';
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(0, 255, 0, 0.1);
+    border-top: 3px solid #00ff00;
+    border-radius: 50%;
+    margin-bottom: 1rem;
+    animation: ${spin} 1s linear infinite;
+  }
 `;
 
 // Main Container with darker background for matrix effect
@@ -674,7 +722,6 @@ export default function SimulationsPage() {
 
   // Render the actual simulation component or placeholder
   const renderSimulation = () => {
-    // Uncomment these cases as you import the actual components
     switch (activeSimulation) {
       case 'ants':
         return (

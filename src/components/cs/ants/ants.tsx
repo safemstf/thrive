@@ -1,3 +1,6 @@
+// src/components/cs/ants/ants.tsx
+'use client'
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Pause, Zap, Sparkles, Map as MapIcon, TrendingUp, Award, Brain, Circle, Grid3x3, Shuffle, Eye, EyeOff, Volume2, VolumeX, Trophy, Flame, Target, Cpu, BarChart3, Timer, Activity, ChevronDown, ChevronUp, Info } from 'lucide-react';
 
@@ -432,6 +435,10 @@ const generateCities = (count: number, mode: CityMode): City[] => {
 };
 
 export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceProps) {
+  // REMOVED: const [isClient, setIsClient] = useState(false);
+  // Since this component is dynamically imported with ssr: false, 
+  // we don't need client-side initialization checks
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPlaying, setIsPlaying] = useState(isRunning);
   const [localSpeed, setLocalSpeed] = useState(speed);
@@ -455,6 +462,8 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
   const timeRef = useRef(0);
   const trailsRef = useRef<Map<string, Array<{x: number, y: number, alpha: number}>>>(new Map());
 
+  // REMOVED: useEffect(() => { setIsClient(true); }, []);
+
   // Use prop values when available
   useEffect(() => {
     setIsPlaying(isRunning);
@@ -464,7 +473,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     setLocalSpeed(speed);
   }, [speed]);
 
-  // Initialize simulation
+  // Initialize simulation (runs immediately since this is client-only)
   const initializeSimulation = useCallback(() => {
     const newCities = generateCities(cityCount, cityMode);
     setCities(newCities);
@@ -826,7 +835,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     };
   }, [isPlaying, localSpeed, updateAlgorithms, render]);
 
-  // Initialize on mount
+  // Initialize on mount - runs immediately since this is client-only
   useEffect(() => {
     initializeSimulation();
   }, [initializeSimulation]);

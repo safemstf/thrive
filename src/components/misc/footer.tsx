@@ -10,6 +10,20 @@ interface FooterProps {
   className?: string;
 }
 
+// Safe hook wrapper to prevent hook order violations
+function useMatrixSafe() {
+  try {
+    return useMatrix();
+  } catch (error) {
+    return {
+      isMatrixOn: false,
+      toggleMatrix: () => {},
+      setMatrixOn: () => {},
+      isHydrated: true
+    };
+  }
+}
+
 // Main footer container with matrix styling
 const FooterContainer = styled.footer<{ $matrixActive?: boolean }>`
   background: ${props => 
@@ -129,20 +143,14 @@ const FooterBottom = styled.div<{ $matrixActive?: boolean }>`
 `;
 
 export function Footer({ className }: FooterProps) {
-  const [isMounted, setIsMounted] = useState(false);
+  // ✅ ALL HOOKS CALLED AT TOP LEVEL - ALWAYS THE SAME ORDER
+  const [currentYear] = useState(() => new Date().getFullYear());
+  const { isMatrixOn } = useMatrixSafe(); // ✅ Always called, safe wrapper
   
-  useEffect(() => setIsMounted(true), []);
-  
-  // Get matrix state
-  let isMatrixOn = false;
-  if (isMounted) {
-    try {
-      const matrixCtx = useMatrix();
-      isMatrixOn = matrixCtx.isMatrixOn;
-    } catch {
-      // No provider present — keep false
-    }
-  }
+  // ✅ useEffect in consistent position (even if not currently used)
+  useEffect(() => {
+    // Any footer effects would go here
+  }, []);
 
   return (
     <FooterContainer $matrixActive={isMatrixOn} className={className}>
@@ -199,7 +207,7 @@ export function Footer({ className }: FooterProps) {
       
       <FooterBottom $matrixActive={isMatrixOn}>
         <p>
-          © {new Date().getFullYear()} LearnMorra. All rights reserved. Brag Responsibly.
+          © {currentYear} LearnMorra. All rights reserved. Brag Responsibly.
         </p>
       </FooterBottom>
     </FooterContainer>

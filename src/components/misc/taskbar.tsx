@@ -10,6 +10,31 @@ import { LogOut, User, Moon, Sun, ArrowDownToLine } from 'lucide-react';
 import { useDarkMode as useDarkModeHook } from '@/providers/darkModeProvider';
 import { useMatrix } from '@/hooks/useMatrix';
 
+/* ---------- Safe hook wrappers ---------- */
+function useMatrixSafe() {
+  try {
+    return useMatrix();
+  } catch (error) {
+    return {
+      isMatrixOn: false,
+      toggleMatrix: () => {},
+      setMatrixOn: () => {},
+      isHydrated: true
+    };
+  }
+}
+
+function useDarkModeSafe() {
+  try {
+    return useDarkModeHook();
+  } catch (error) {
+    return {
+      isDarkMode: false,
+      isLoaded: true,
+      toggleDarkMode: () => {}
+    };
+  }
+}
 
 /* ---------- types ---------- */
 export interface NavLink {
@@ -40,7 +65,7 @@ const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
   return links;
 };
 
-/* ---------- styles (kept your original styles, with DebugPanel styles added) ---------- */
+/* ---------- styles ---------- */
 const NavContainer = styled.nav<{ $isScrolled?: boolean }>`
   display: flex;
   align-items: center;
@@ -52,9 +77,6 @@ const NavContainer = styled.nav<{ $isScrolled?: boolean }>`
   box-sizing: border-box;
   transition: all 0.3s ease;
 `;
-
-/* ... your existing styled components - NavButton, UserSection, etc. ... */
-/* For brevity I include them (identical to your version) */
 
 const NavButton = styled(Link)<{ $active?: boolean; $isScrolled?: boolean }>`
   background: none;
@@ -97,7 +119,6 @@ const NavButton = styled(Link)<{ $active?: boolean; $isScrolled?: boolean }>`
   }
 `;
 
-/* User section & buttons (unchanged) */
 const UserSection = styled.div<{ $isScrolled?: boolean }>`
   display: flex;
   flex-direction: column;
@@ -106,6 +127,7 @@ const UserSection = styled.div<{ $isScrolled?: boolean }>`
   margin-left: ${props => (props.$isScrolled ? '0.5rem' : '1rem')};
   transition: all 0.3s ease;
 `;
+
 const UserInfo = styled.div<{ $isScrolled?: boolean }>`
   display: flex;
   align-items: center;
@@ -131,6 +153,7 @@ const UserInfo = styled.div<{ $isScrolled?: boolean }>`
     background: transparent;
   }
 `;
+
 const UserIcon = styled.span`
   display: flex;
   align-items: center;
@@ -147,6 +170,7 @@ const UserIcon = styled.span`
     border: 1px solid var(--color-border-medium);
   }
 `;
+
 const LogoutButton = styled.button<{ $isScrolled?: boolean }>`
   background: var(--color-background-secondary);
   border: 1px solid #dc2626;
@@ -194,8 +218,13 @@ const LogoutButton = styled.button<{ $isScrolled?: boolean }>`
   }
 `;
 
-/* Mobile components (unchanged) */
-const MobileNavContainer = styled.nav` display:flex; flex-direction:column; gap:0.75rem; `;
+/* Mobile components */
+const MobileNavContainer = styled.nav`
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+`;
+
 const MobileNavButton = styled(Link)<{ $active?: boolean }>`
   background: var(--color-background-secondary);
   border: 1px solid ${props => (props.$active ? 'var(--color-primary-500)' : 'var(--color-border-medium)')};
@@ -221,10 +250,62 @@ const MobileNavButton = styled(Link)<{ $active?: boolean }>`
     color: var(--color-primary-500);
   }
 `;
-const MobileUserSection = styled.div` margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid var(--color-border-light); display:flex; flex-direction:column; gap:1rem; `;
-const MobileUserInfo = styled.div` display:flex; align-items:center; gap:0.75rem; padding:1rem; background:var(--color-background-tertiary); border-radius:8px; color:var(--color-text-secondary); font-family:'Work Sans',sans-serif; font-size:0.9rem; `;
-const MobileUserAvatar = styled.div` width:40px; height:40px; background:var(--color-background-secondary); border-radius:50%; display:flex; align-items:center; justify-content:center; border:1px solid var(--color-border-medium); `;
-const MobileLogoutButton = styled.button` background:var(--color-background-secondary); border:1px solid #dc2626; color:#dc2626; padding:0.875rem 1.5rem; font-size:0.95rem; font-family:'Work Sans',sans-serif; letter-spacing:0.5px; cursor:pointer; transition:all 0.2s ease; font-weight:300; width:100%; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:0.5rem; &:hover{ background:#dc2626; color:var(--color-background-secondary) }`;
+
+const MobileUserSection = styled.div`
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const MobileUserInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--color-background-tertiary);
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-family: 'Work Sans', sans-serif;
+  font-size: 0.9rem;
+`;
+
+const MobileUserAvatar = styled.div`
+  width: 40px;
+  height: 40px;
+  background: var(--color-background-secondary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-medium);
+`;
+
+const MobileLogoutButton = styled.button`
+  background: var(--color-background-secondary);
+  border: 1px solid #dc2626;
+  color: #dc2626;
+  padding: 0.875rem 1.5rem;
+  font-size: 0.95rem;
+  font-family: 'Work Sans', sans-serif;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 300;
+  width: 100%;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  &:hover {
+    background: #dc2626;
+    color: var(--color-background-secondary);
+  }
+`;
 
 /* Control buttons */
 const DarkModeButton = styled.button<{ $isScrolled?: boolean; $isDark?: boolean }>`
@@ -249,7 +330,30 @@ const DarkModeButton = styled.button<{ $isScrolled?: boolean; $isDark?: boolean 
     box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
   }
 `;
-const MobileDarkModeButton = styled.button` background:var(--color-background-secondary); border:1px solid var(--color-primary-500); color:var(--color-primary-500); padding:0.875rem 1.5rem; font-size:0.95rem; font-family:'Work Sans',sans-serif; letter-spacing:0.5px; cursor:pointer; transition:all 0.2s ease; font-weight:300; width:100%; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:0.5rem; &:hover{ background:var(--color-primary-500); color:var(--color-background-secondary); }`;
+
+const MobileDarkModeButton = styled.button`
+  background: var(--color-background-secondary);
+  border: 1px solid var(--color-primary-500);
+  color: var(--color-primary-500);
+  padding: 0.875rem 1.5rem;
+  font-size: 0.95rem;
+  font-family: 'Work Sans', sans-serif;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 300;
+  width: 100%;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  &:hover {
+    background: var(--color-primary-500);
+    color: var(--color-background-secondary);
+  }
+`;
 
 /* Skip buttons */
 const SkipButton = styled.button<{ $isScrolled?: boolean }>`
@@ -279,7 +383,30 @@ const SkipButton = styled.button<{ $isScrolled?: boolean }>`
     transform: translateY(0);
   }
 `;
-const MobileSkipButton = styled.button` background:var(--color-background-secondary); border:1px solid var(--color-primary-500); color:var(--color-primary-500); padding:0.875rem 1.5rem; font-size:0.95rem; font-family:'Work Sans',sans-serif; letter-spacing:0.5px; cursor:pointer; transition:all 0.2s ease; font-weight:300; width:100%; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:0.5rem; &:hover{ background:var(--color-primary-500); color:var(--color-background-secondary); }`;
+
+const MobileSkipButton = styled.button`
+  background: var(--color-background-secondary);
+  border: 1px solid var(--color-primary-500);
+  color: var(--color-primary-500);
+  padding: 0.875rem 1.5rem;
+  font-size: 0.95rem;
+  font-family: 'Work Sans', sans-serif;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 300;
+  width: 100%;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  &:hover {
+    background: var(--color-primary-500);
+    color: var(--color-background-secondary);
+  }
+`;
 
 const DebugHandle = styled.button<{ $open: boolean }>`
   position: fixed;
@@ -308,7 +435,6 @@ const DebugHandle = styled.button<{ $open: boolean }>`
   }
 `;
 
-/* Updated DebugPanel: when open, center on screen; when closed, sit above handle (preserves original look when closed) */
 const DebugPanel = styled.div<{ $open: boolean }>`
   position: fixed;
   z-index: 99999;
@@ -316,15 +442,12 @@ const DebugPanel = styled.div<{ $open: boolean }>`
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 96px);
   overflow: auto;
-
   border-radius: 8px;
   border: 1px solid var(--color-border-medium);
   background: var(--color-background-secondary);
   box-shadow: var(--shadow-lg);
-
   transition: transform 200ms ease, opacity 160ms ease, left 200ms ease, top 200ms ease, right 200ms ease, bottom 200ms ease;
 
-  /* closed state: keep it near bottom-right above the handle */
   ${p => !p.$open && `
     right: 16px;
     bottom: 64px;
@@ -333,7 +456,6 @@ const DebugPanel = styled.div<{ $open: boolean }>`
     pointer-events: none;
   `}
 
-  /* open state: center on screen */
   ${p => p.$open && `
     left: 50%;
     top: 50%;
@@ -348,7 +470,6 @@ const DebugPanel = styled.div<{ $open: boolean }>`
   font-size: 12px;
 
   @media (max-width: 480px) {
-    /* for narrow screens, open as a panel above the handle to avoid covering everything */
     ${p => p.$open ? `
       left: 12px;
       right: 12px;
@@ -367,104 +488,82 @@ const DebugPanel = styled.div<{ $open: boolean }>`
   }
 `;
 
-
-/* content area */
 const DebugContent = styled.div`
   padding: 12px;
   color: var(--color-text-primary);
 `;
 
-/* header row with actions */
 const DebugHeaderRow = styled.div`
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  margin-bottom:8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
 `;
 
-/* small action button */
 const DebugAction = styled.button`
-  padding:6px 8px;
-  font-size:12px;
-  border-radius:6px;
-  border:1px solid var(--color-border-medium);
-  background:var(--color-background-tertiary);
-  cursor:pointer;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-medium);
+  background: var(--color-background-tertiary);
+  cursor: pointer;
 `;
 
-/* key/value row */
 const KeyRow = styled.div`
-  display:flex;
-  justify-content:space-between;
-  gap:8px;
-  padding:4px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
   border-top: 1px dashed var(--color-border-light);
   &:first-of-type { border-top: none; padding-top: 0; }
 `;
 
 /* ---------- Taskbar component ---------- */
 export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: TaskbarProps) {
+  // ✅ ALL HOOKS CALLED AT TOP LEVEL - ALWAYS THE SAME ORDER
   const pathname = usePathname();
   const { user, logout, loading } = useAuth();
-  const darkModeHook = useDarkModeHook?.(); // defensive (if provider missing)
-  const toggleDarkMode = darkModeHook?.toggleDarkMode ?? (() => {});
-  const isDarkMode = darkModeHook?.isDarkMode ?? false;
-  const isDarkModeLoaded = darkModeHook?.isLoaded ?? true;
+  const { toggleDarkMode, isDarkMode, isLoaded: isDarkModeLoaded } = useDarkModeSafe();
+  const { setMatrixOn } = useMatrixSafe();
+  const [debugOpen, setDebugOpen] = useState<boolean>(false); // Start closed to avoid hydration
+  const [viewport, setViewport] = useState({ w: 0, h: 0 });
+  const [isClient, setIsClient] = useState(false); // For debug panel only
+  const skipButtonRef = useRef<HTMLButtonElement>(null);
 
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => setIsMounted(true), []);
-  let setMatrixOn: (v: boolean) => void = () => {};
-  // optional read of current state if you need it:
-  // let isMatrixOn = false;
-
-  if (isMounted) {
-    try {
-      const matrixCtx = useMatrix();
-      setMatrixOn = matrixCtx.setMatrixOn;
-      // isMatrixOn = matrixCtx.isMatrixOn;
-    } catch (err) {
-      // provider not present — leave no-op setter
-    }
-  }
-
-  const [debugOpen, setDebugOpen] = useState<boolean>(() => {
-    try {
-      if (typeof window !== 'undefined') return !!localStorage.getItem('taskbarDebug');
-      return false;
-    } catch {
-      return false;
-    }
-  });
-
-  // reflect debugOpen to localStorage (so it persists across reloads while debugging)
+  // ✅ ALL useEffects in consistent order
   useEffect(() => {
+    setIsClient(true);
+    // Initialize debug state from localStorage on client
     try {
-      if (typeof window !== 'undefined') {
-        if (debugOpen) localStorage.setItem('taskbarDebug', '1');
-        else localStorage.removeItem('taskbarDebug');
+      if (typeof window !== 'undefined' && localStorage.getItem('taskbarDebug')) {
+        setDebugOpen(true);
       }
     } catch {}
-  }, [debugOpen]);
+  }, []);
 
-  const [viewport, setViewport] = useState({ w: 0, h: 0 });
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!isClient) return; // Only save to localStorage on client
+    try {
+      if (debugOpen) localStorage.setItem('taskbarDebug', '1');
+      else localStorage.removeItem('taskbarDebug');
+    } catch {}
+  }, [debugOpen, isClient]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isClient) return; // Wait for client
     const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
     onResize();
     window.addEventListener('resize', onResize, { passive: true });
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [isClient]);
 
+  // ✅ Memoized values (always computed)
   const isAuthenticated = !!user;
   const isAdmin = user?.role === 'admin';
   const navLinks = useMemo(() => getNavLinks(isAuthenticated, isAdmin), [isAuthenticated, isAdmin]);
 
-  const [isLoaded] = useState(true); // keep backwards compatibility with your previous code
-
-  // Create a ref for the skip button
-  const skipButtonRef = useRef<HTMLButtonElement>(null);
-
+  // ✅ Event handlers
   const handleSkipClick = () => {
     const mainContent = document.getElementById('main-content');
     if (mainContent) {
@@ -488,26 +587,30 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
     if (onNavigate) onNavigate();
   };
 
-  // Copy debug JSON
   const copyDebug = async () => {
     const payload = {
       time: new Date().toISOString(),
       darkMode: { isDarkMode, isDarkModeLoaded },
-      htmlClass: typeof document !== 'undefined' ? document.documentElement.className : null,
+      htmlClass: isClient && typeof document !== 'undefined' 
+        ? document.documentElement.className 
+        : 'server-render',
       pathname,
       isScrolled,
-      viewport,
-      user: user ? { id: user.id ?? user.id ?? null, name: user.name ?? user.username ?? null, email: user.email ?? null, role: user.role ?? null } : null,
+      viewport: isClient ? viewport : { w: 0, h: 0 },
+      user: user ? { 
+        id: user.id ?? null, 
+        name: user.name ?? user.username ?? null, 
+        email: user.email ?? null, 
+        role: user.role ?? null 
+      } : null,
       navLinks,
+      isClient
     };
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-        // quick native feedback by flashing handle
         setDebugOpen(true);
-        // we could show a toast — kept minimal
       } else {
-        // fallback
         const ta = document.createElement('textarea');
         ta.value = JSON.stringify(payload, null, 2);
         document.body.appendChild(ta);
@@ -520,9 +623,8 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
     }
   };
 
-  // Only render debug UI on client dev or when user explicitly enabled via localStorage
-  // (This prevents leaking info in SSR or production accidentally.)
-  const shouldShowDebug = isMounted && (process.env.NODE_ENV !== 'production' || debugOpen);
+  // ✅ Render logic (after all hooks)
+  const shouldShowDebug = isClient && (process.env.NODE_ENV !== 'production' || debugOpen);
 
   /* ----------------- Mobile UI ----------------- */
   if (isMobile) {
@@ -547,9 +649,9 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
               >
                 {link.label}
               </MobileNavButton>
-
             );
           })}
+          
           <MobileSkipButton onClick={handleSkipClick} ref={skipButtonRef} aria-label="Skip to main content">
             <ArrowDownToLine size={16} />
             Skip to Content
@@ -579,7 +681,7 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
           )}
         </MobileNavContainer>
 
-        {/* debug UI for mobile (small handle only if enabled) */}
+        {/* Debug UI */}
         {shouldShowDebug && (
           <>
             <DebugHandle $open={debugOpen} onClick={() => setDebugOpen(v => !v)}>
@@ -597,18 +699,21 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
 
                 <KeyRow><div>Mode</div><div>{isDarkMode ? 'Dark' : 'Light'}</div></KeyRow>
                 <KeyRow><div>Loaded</div><div>{String(isDarkModeLoaded)}</div></KeyRow>
-                <KeyRow><div>HTML class</div><div style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{typeof document !== 'undefined' ? document.documentElement.className : 'n/a'}</div></KeyRow>
+                <KeyRow><div>HTML class</div><div style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {isClient ? (document.documentElement.className || 'none') : 'loading...'}
+                </div></KeyRow>
                 <KeyRow><div>Path</div><div>{pathname}</div></KeyRow>
                 <KeyRow><div>isScrolled</div><div>{String(isScrolled)}</div></KeyRow>
-                <KeyRow><div>Viewport</div><div>{viewport.w}×{viewport.h}</div></KeyRow>
+                <KeyRow><div>Viewport</div><div>{isClient ? `${viewport.w}×${viewport.h}` : 'loading...'}</div></KeyRow>
+                
                 <div style={{ marginTop: 8 }}>
                   <details>
                     <summary>More</summary>
                     <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 220, overflow: 'auto' }}>
-{JSON.stringify({
+{isClient ? JSON.stringify({
   user: user ? { name: user.name, email: user.email, role: user.role } : null,
   navLinks
-}, null, 2)}
+}, null, 2) : 'Loading debug info...'}
                     </pre>
                   </details>
                 </div>
@@ -630,14 +735,12 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
           if (link.hideWhenAuth && isAuthenticated) return null;
 
           return (
-
             <NavButton
               key={link.href}
               href={link.href}
               $active={pathname === link.href || (link.href === '/dashboard' && pathname.startsWith('/dashboard'))}
               $isScrolled={isScrolled}
               onClick={() => {
-                // enable matrix styling only when navigating to /simulations
                 if (link.href === '/simulations') setMatrixOn(true);
                 else setMatrixOn(false);
                 handleNavClick();
@@ -645,11 +748,10 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
             >
               {link.label}
             </NavButton>
-
           );
         })}
 
-        {/* Debug UI: only show when client mounted and in dev or explicitly enabled */}
+        {/* Debug UI */}
         {shouldShowDebug && (
           <>
             <DebugHandle $open={debugOpen} onClick={() => setDebugOpen(v => !v)}>
@@ -668,10 +770,13 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
 
                 <KeyRow><div>Mode</div><div>{isDarkMode ? 'Dark' : 'Light'}</div></KeyRow>
                 <KeyRow><div>Loaded</div><div>{String(isDarkModeLoaded)}</div></KeyRow>
-                <KeyRow><div>HTML class</div><div style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{typeof document !== 'undefined' ? document.documentElement.className : 'n/a'}</div></KeyRow>
+                <KeyRow><div>HTML class</div><div style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {isClient ? (document.documentElement.className || 'none') : 'loading...'}
+                </div></KeyRow>
                 <KeyRow><div>Path</div><div>{pathname}</div></KeyRow>
                 <KeyRow><div>isScrolled</div><div>{String(isScrolled)}</div></KeyRow>
-                <KeyRow><div>Viewport</div><div>{viewport.w}×{viewport.h}</div></KeyRow>
+                <KeyRow><div>Viewport</div><div>{isClient ? `${viewport.w}×${viewport.h}` : 'loading...'}</div></KeyRow>
+                
                 <div style={{ marginTop: 8 }}>
                   <details>
                     <summary>More</summary>

@@ -1,9 +1,36 @@
-// src\components\cs\simulationHub.styles.tsx
+'use client'
+// src/components/cs/simulationHub.styles.tsx
 import styled, { keyframes, css } from "styled-components";
-import { fadeInUp, pulse, glow } from "@/styles/styled-components";
 
-// Animation keyframes
-const fadeIn = fadeInUp
+// Define animations locally to avoid import issues
+const fadeInUp = keyframes`
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
+const pulse = keyframes`
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+`;
+
+const glow = keyframes`
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+  }
+`;
 
 const shimmer = keyframes`
   0% { background-position: -1000px 0; }
@@ -14,19 +41,19 @@ const shimmer = keyframes`
 export const SimulationContainer = styled.div<{ $isDark?: boolean }>`
   width: 100%;
   min-height: 100vh;
-  background: ${({ $isDark }) => 
+  background: ${({ $isDark = true }) => 
     $isDark 
-      ? 'rgba(5, 10, 20, 0.85)' // Dark with transparency for Matrix Rain
+      ? 'rgba(5, 10, 20, 0.85)' // Default to dark to match Matrix theme
       : 'rgba(255, 255, 255, 0.95)'
   };
   backdrop-filter: blur(8px);
   border-radius: 0;
   position: relative;
   z-index: 1;
-  animation: ${fadeIn} 0.8s ease-out;
+  animation: ${fadeInUp} 0.8s ease-out;
   
   /* Subtle border to define against Matrix background */
-  border: 1px solid ${({ $isDark }) => 
+  border: 1px solid ${({ $isDark = true }) => 
     $isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(0, 0, 0, 0.1)'
   };
 `;
@@ -66,6 +93,7 @@ export const SimCanvas = styled.canvas`
   height: 100%;
   cursor: crosshair;
   transition: all 0.2s ease;
+  display: block; /* Prevent hydration issues with canvas */
   
   &:active {
     cursor: grabbing;
@@ -76,7 +104,7 @@ export const SimCanvas = styled.canvas`
   }
 `;
 
-// Enhanced HUD with Matrix integration
+// Enhanced HUD with Matrix integration - removed complex pseudo-elements
 export const HUD = styled.div<{ $isDark?: boolean }>`
   position: absolute;
   top: 1rem;
@@ -90,25 +118,12 @@ export const HUD = styled.div<{ $isDark?: boolean }>`
   font-size: 0.875rem;
   min-width: 200px;
   z-index: 15;
-  animation: ${glow} 3s ease-in-out infinite;
+  
+  /* Simplified glow effect */
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
   
   /* Matrix-style text shadow */
   text-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
-  
-  /* Subtle matrix pattern overlay */
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      45deg,
-      transparent 30%,
-      rgba(59, 130, 246, 0.03) 50%,
-      transparent 70%
-    );
-    border-radius: 12px;
-    pointer-events: none;
-  }
 `;
 
 // Control selector with enhanced styling
@@ -129,7 +144,7 @@ export const DiseaseSelector = styled.div`
   box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
 `;
 
-// Enhanced playback controls
+// Enhanced playback controls - simplified for hydration safety
 export const PlaybackControls = styled.div`
   position: absolute;
   bottom: 1.5rem;
@@ -145,18 +160,14 @@ export const PlaybackControls = styled.div`
   border: 1px solid rgba(59, 130, 246, 0.5);
   z-index: 15;
   
-  /* Enhanced visual effects */
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  /* Simplified visual effects */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   
   /* Hover effect */
   transition: all 0.3s ease;
   &:hover {
     transform: translateX(-50%) translateY(-2px);
-    box-shadow: 
-      0 12px 40px rgba(0, 0, 0, 0.5),
-      0 0 30px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   }
   
   button {
@@ -216,32 +227,25 @@ export const SpeedIndicator = styled.div`
   font-family: 'Courier New', monospace;
   z-index: 15;
   text-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
-  
-  /* Animated border */
-  background: linear-gradient(45deg, rgba(0,0,0,0.85), rgba(0,0,0,0.85)),
-              linear-gradient(45deg, #3b82f6, #1d4ed8, #3b82f6);
-  background-size: 100% 100%, 200% 200%;
-  background-clip: padding-box, border-box;
-  animation: ${shimmer} 3s linear infinite;
 `;
 
-// Enhanced controls section
+// Enhanced controls section with default props
 export const ControlsSection = styled.div<{ $isDark?: boolean }>`
   padding: 2rem;
-  background: ${({ $isDark }) => 
+  background: ${({ $isDark = true }) => 
     $isDark 
       ? 'rgba(10, 15, 30, 0.95)' 
       : 'rgba(248, 250, 252, 0.95)'
   };
   backdrop-filter: blur(10px);
-  border-top: 1px solid ${({ $isDark }) => 
+  border-top: 1px solid ${({ $isDark = true }) => 
     $isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(0, 0, 0, 0.1)'
   };
   margin: 1rem;
   border-radius: 0 0 12px 12px;
   
-  /* Subtle matrix grid background */
-  background-image: ${({ $isDark }) => 
+  /* Simplified background pattern */
+  background-image: ${({ $isDark = true }) => 
     $isDark 
       ? 'radial-gradient(circle at 1px 1px, rgba(59, 130, 246, 0.05) 1px, transparent 0)'
       : 'none'
@@ -260,18 +264,18 @@ export const TabContainer = styled.div`
 
 export const Tab = styled.button<{ $active?: boolean }>`
   padding: 0.875rem 1.75rem;
-  background: ${({ $active }) => 
+  background: ${({ $active = false }) => 
     $active 
       ? 'rgba(59, 130, 246, 0.15)' 
       : 'transparent'
   };
-  border: 1px solid ${({ $active }) => 
+  border: 1px solid ${({ $active = false }) => 
     $active 
       ? 'rgba(59, 130, 246, 0.5)' 
       : 'rgba(59, 130, 246, 0.2)'
   };
   border-radius: 8px;
-  color: ${({ $active }) => 
+  color: ${({ $active = false }) => 
     $active ? '#3b82f6' : '#94a3b8'
   };
   font-weight: 600;
@@ -289,29 +293,31 @@ export const Tab = styled.button<{ $active?: boolean }>`
 `;
 
 export const TabContent = styled.div`
-  animation: ${fadeIn} 0.4s ease-out;
+  animation: ${fadeInUp} 0.4s ease-out;
 `;
 
-// Enhanced stat cards
+// Enhanced stat cards with default props
 export const StatCard = styled.div<{ $color?: string; $alert?: boolean }>`
+  --card-color: ${({ $color }) => $color || '#3b82f6'};
+  
   padding: 1.25rem;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(8px);
   border-radius: 12px;
-  border: 1px solid ${({ $color = '#3b82f6' }) => `${$color}40`};
+  border: 1px solid rgba(59, 130, 246, 0.4);
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
   
-  ${({ $alert }) => $alert && `animation: ${pulse} 2s infinite;`}
+  ${({ $alert = false }) => $alert && css`animation: ${pulse} 2s infinite;`}
   
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-    border-color: ${({ $color = '#3b82f6' }) => `${$color}80`};
+    border-color: rgba(59, 130, 246, 0.8);
   }
   
-  /* Gradient overlay */
+  /* Simplified gradient overlay */
   &::before {
     content: '';
     position: absolute;
@@ -319,11 +325,7 @@ export const StatCard = styled.div<{ $color?: string; $alert?: boolean }>`
     left: 0;
     right: 0;
     height: 3px;
-    background: linear-gradient(90deg, 
-      ${({ $color = '#3b82f6' }) => $color}, 
-      ${({ $color = '#3b82f6' }) => `${$color}60`},
-      ${({ $color = '#3b82f6' }) => $color}
-    );
+    background: var(--card-color);
   }
   
   .label {
@@ -340,8 +342,8 @@ export const StatCard = styled.div<{ $color?: string; $alert?: boolean }>`
     font-size: 2rem;
     font-weight: 900;
     font-family: 'Courier New', monospace;
-    color: ${({ $color = '#3b82f6' }) => $color};
-    text-shadow: 0 0 10px ${({ $color = '#3b82f6' }) => `${$color}40`};
+    color: var(--card-color);
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
     line-height: 1;
   }
   
@@ -353,7 +355,7 @@ export const StatCard = styled.div<{ $color?: string; $alert?: boolean }>`
   }
 `;
 
-// Parameter controls with Matrix styling
+// Parameter controls with Matrix styling - simplified
 export const ParameterControl = styled.div`
   margin-bottom: 1.5rem;
   
@@ -386,18 +388,6 @@ export const ParameterControl = styled.div`
     background: rgba(59, 130, 246, 0.2);
     outline: none;
     -webkit-appearance: none;
-    position: relative;
-    
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      height: 100%;
-      background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-      border-radius: 3px;
-      width: var(--value, 50%);
-    }
     
     &::-webkit-slider-thumb {
       -webkit-appearance: none;
@@ -418,7 +408,7 @@ export const ParameterControl = styled.div`
   }
 `;
 
-// Intervention components
+// Intervention components with default props
 export const InterventionGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -426,15 +416,17 @@ export const InterventionGrid = styled.div`
 `;
 
 export const InterventionCard = styled.button<{ $active?: boolean; $color?: string }>`
+  --intervention-color: ${({ $color }) => $color || '#3b82f6'};
+  
   padding: 1.5rem;
-  background: ${({ $active, $color = '#3b82f6' }) => 
+  background: ${({ $active = false }) => 
     $active 
-      ? `rgba(59, 130, 246, 0.15)` 
+      ? 'rgba(59, 130, 246, 0.15)' 
       : 'rgba(0, 0, 0, 0.3)'
   };
   backdrop-filter: blur(8px);
-  border: 2px solid ${({ $active, $color = '#3b82f6' }) => 
-    $active ? $color : 'rgba(59, 130, 246, 0.3)'};
+  border: 2px solid ${({ $active = false }) => 
+    $active ? 'var(--intervention-color)' : 'rgba(59, 130, 246, 0.3)'};
   border-radius: 16px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -458,24 +450,9 @@ export const InterventionCard = styled.button<{ $active?: boolean; $color?: stri
     transform: translateY(-2px) scale(0.98);
   }
   
-  /* Animated background for active state */
-  ${({ $active }) => $active && `
-    &::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(
-        45deg,
-        transparent 30%,
-        rgba(59, 130, 246, 0.1) 50%,
-        transparent 70%
-      );
-    }
-  `}
-  
   .icon {
-    color: ${({ $color = '#3b82f6' }) => $color};
-    filter: drop-shadow(0 0 5px ${({ $color = '#3b82f6' }) => `${$color}40`});
+    color: var(--intervention-color);
+    filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.4));
     z-index: 1;
   }
   
@@ -508,9 +485,11 @@ export const MatrixOverlay = styled.div`
 `;
 
 export const GlowButton = styled.button<{ $color?: string }>`
+  --glow-color: ${({ $color }) => $color || '#3b82f6'};
+  
   background: linear-gradient(135deg, 
-    ${({ $color = '#3b82f6' }) => $color}, 
-    ${({ $color = '#3b82f6' }) => `${$color}CC`}
+    var(--glow-color), 
+    color-mix(in srgb, var(--glow-color) 80%, transparent)
   );
   border: none;
   color: white;
@@ -526,8 +505,8 @@ export const GlowButton = styled.button<{ $color?: string }>`
   &:hover {
     transform: translateY(-2px);
     box-shadow: 
-      0 8px 25px ${({ $color = '#3b82f6' }) => `${$color}40`},
-      0 0 20px ${({ $color = '#3b82f6' }) => `${$color}60`};
+      0 8px 25px rgba(59, 130, 246, 0.4),
+      0 0 20px rgba(59, 130, 246, 0.6);
     filter: brightness(1.1);
   }
   

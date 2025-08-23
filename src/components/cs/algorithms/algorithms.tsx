@@ -1,3 +1,4 @@
+'use client'
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Zap, Lightbulb, Code, Brain, Target, Info, Eye, EyeOff, BarChart3, ChevronDown, ChevronUp, Shuffle, CheckCircle, XCircle, AlertCircle, Terminal } from 'lucide-react';
 

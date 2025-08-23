@@ -18,13 +18,13 @@ interface ConditionalLayoutProps {
  */
 function LayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [isMounted, setIsMounted] = useState(false);
+  // REMOVED: const [isMounted, setIsMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // read matrix state + setter from the provider
   const { isMatrixOn, setMatrixOn } = useMatrix();
 
-  useEffect(() => setIsMounted(true), []);
+  // REMOVED: useEffect(() => setIsMounted(true), []);
 
   useEffect(() => {
     // determine "fullscreen" routes as before
@@ -39,15 +39,9 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
     const isMatrixRoute = pathname?.startsWith('/simulations') ?? false;
 
     // Auto-enable when landing on /simulations, disable otherwise.
-    // This ensures header/footer style updates even if user navigates directly
-    // by URL (bookmark / reload), or via client-side navigation.
     try {
       setMatrixOn(Boolean(isMatrixRoute));
     } catch (err) {
-      // If for any reason setMatrixOn is not callable, swallow error.
-      // MatrixProvider should exist because this LayoutInner is rendered inside it.
-      // But this keeps things robust in dev.
-      // eslint-disable-next-line no-console
       console.warn('Matrix toggle failed', err);
     }
   }, [pathname, setMatrixOn]);
@@ -72,28 +66,16 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Header */}
-      {!isFullscreen && (
-        isMounted ? (
-          <Header title="LearnMorra" subtitle="Brag Responsibly" />
-        ) : (
-          <div className="h-[80px] bg-transparent" />
-        )
-      )}
+      {/* Header - Always render the same structure */}
+      {!isFullscreen && <Header title="LearnMorra" subtitle="Brag Responsibly" />}
 
       {/* Main */}
       <main id="main-content" className="flex-grow relative z-10">
         {children}
       </main>
 
-      {/* Footer */}
-      {!isFullscreen && (
-        isMounted ? (
-          <Footer />
-        ) : (
-          <div className="h-[60px] bg-transparent" />
-        )
-      )}
+      {/* Footer - Always render the same structure */}
+      {!isFullscreen && <Footer />}
     </div>
   );
 }

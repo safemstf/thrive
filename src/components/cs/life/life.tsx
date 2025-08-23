@@ -1,3 +1,4 @@
+'use client'
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { 
   Play, Pause, RotateCcw, Palette, Info, ZoomIn, ZoomOut, Grid3X3, 

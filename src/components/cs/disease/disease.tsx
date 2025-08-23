@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { 
   PlayCircle, PauseCircle, RefreshCw, TrendingUp, 

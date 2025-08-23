@@ -1,13 +1,31 @@
-// src\components\bacteria\bacteria.tsx
-import React, { useRef, useEffect, useState, useCallback, ReactNode, CSSProperties } from "react";
-import { 
-  PlayCircle, PauseCircle, RefreshCw, Zap, 
-  Droplet, Plus, Eye, Activity,
-  Thermometer, Beaker, Dna, Shield, AlertTriangle,
-  Microscope
+'use client'
+// src/components/bacteria/bacteria.tsx
+import React, {
+  useRef,
+  useEffect,
+  useState,
+  useCallback,
+  ReactNode,
+  CSSProperties,
+} from "react";
+import {
+  PlayCircle,
+  PauseCircle,
+  RefreshCw,
+  Zap,
+  Droplet,
+  Plus,
+  Eye,
+  Activity,
+  Thermometer,
+  Beaker,
+  Dna,
+  Shield,
+  AlertTriangle,
+  Microscope,
 } from "lucide-react";
 
-// Import styled components from the shared styles
+// Import styled components from the shared styles (your file)
 import {
   SimulationContainer,
   VideoSection,
@@ -24,77 +42,16 @@ import {
   ParameterControl,
   InterventionGrid,
   InterventionCard,
-  GlowButton
-} from '../cs/simulationHub.styles';
+  GlowButton,
+} from "../cs/simulationHub.styles";
 
-// Additional components for this simulation
-interface MicroscopeOverlayProps {
-  children?: ReactNode; // make optional if you sometimes render <MicroscopeOverlay /> without children
-}
+/* -------------------------
+   Types & constants
+   ------------------------- */
 
-const MicroscopeOverlay: React.FC<MicroscopeOverlayProps> = ({ children }) => (
-  <div
-    style={{
-      position: 'absolute',
-      inset: 0,
-      pointerEvents: 'none',
-      background:
-        'radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.3) 60%, rgba(0, 0, 0, 0.8) 100%)',
-      zIndex: 20,
-    }}
-  >
-    {children}
-  </div>
-);
+type BacteriumType = "ecoli" | "bacillus" | "coccus" | "spirillum";
+type PhageType = "lambda" | "T4" | "T7";
 
-
-interface DepthIndicatorProps {
-  children?: ReactNode;
-}
-
-const DepthIndicator: React.FC<DepthIndicatorProps> = ({ children }) => (
-  <div
-    style={{
-      position: 'absolute',
-      bottom: '1rem',
-      left: '1rem',
-      padding: '0.75rem',
-      background: 'rgba(0, 0, 0, 0.85)',
-      backdropFilter: 'blur(10px)',
-      borderRadius: '8px',
-      border: '1px solid rgba(59, 130, 246, 0.3)',
-      fontSize: '0.75rem',
-      color: '#fff',
-      zIndex: 10,
-      fontFamily: 'Courier New, monospace',
-    }}
-  >
-    {children}
-  </div>
-);
-
-interface GridProps {
-  $columns: number;
-  $gap?: string;
-  children?: ReactNode;
-  style?: CSSProperties;
-}
-
-const Grid: React.FC<GridProps> = ({ $columns, $gap, children, style }) => (
-  <div
-    style={{
-      display: 'grid',
-      gridTemplateColumns: `repeat(${$columns}, 1fr)`,
-      gap: $gap || '1rem',
-      ...style,
-    }}
-  >
-    {children}
-  </div>
-);
-
-
-// Types
 interface Bacterium {
   id: number;
   x: number;
@@ -103,7 +60,7 @@ interface Bacterium {
   vy: number;
   angle: number;
   angularVelocity: number;
-  type: 'ecoli' | 'bacillus' | 'coccus' | 'spirillum';
+  type: BacteriumType;
   health: number;
   age: number;
   divisionTimer: number;
@@ -126,9 +83,10 @@ interface Phage {
   vx: number;
   vy: number;
   attached: boolean;
-  targetId?: number;
+  attachTick?: number;
   injected: boolean;
-  type: 'lambda' | 'T4' | 'T7';
+  targetId?: number;
+  type: PhageType;
   size: number;
   color: string;
   tailLength: number;
@@ -140,7 +98,7 @@ interface Nutrient {
   x: number;
   y: number;
   value: number;
-  type: 'glucose' | 'amino' | 'vitamin';
+  type: "glucose" | "amino" | "vitamin";
   color: string;
   consumed: boolean;
 }
@@ -155,103 +113,127 @@ interface Particle {
   size: number;
 }
 
-// Constants
+/* Keep your type maps (copied from what you shared) */
 const BACTERIA_TYPES = {
-  ecoli: { 
-    color: '#22c55e', 
-    size: 20, 
-    shape: 'rod',
+  ecoli: {
+    color: "#22c55e",
+    size: 20,
+    shape: "rod",
     divisionRate: 0.03,
     speed: 1.5,
-    name: 'E. coli'
+    name: "E. coli",
   },
-  bacillus: { 
-    color: '#3b82f6', 
-    size: 25, 
-    shape: 'rod',
+  bacillus: {
+    color: "#3b82f6",
+    size: 25,
+    shape: "rod",
     divisionRate: 0.02,
     speed: 1.0,
-    name: 'Bacillus'
+    name: "Bacillus",
   },
-  coccus: { 
-    color: '#f59e0b', 
-    size: 15, 
-    shape: 'sphere',
+  coccus: {
+    color: "#f59e0b",
+    size: 15,
+    shape: "sphere",
     divisionRate: 0.04,
     speed: 0.8,
-    name: 'Coccus'
+    name: "Coccus",
   },
-  spirillum: { 
-    color: '#a78bfa', 
-    size: 18, 
-    shape: 'spiral',
+  spirillum: {
+    color: "#a78bfa",
+    size: 18,
+    shape: "spiral",
     divisionRate: 0.025,
     speed: 2.0,
-    name: 'Spirillum'
-  }
-};
+    name: "Spirillum",
+  },
+} as const;
 
 const PHAGE_TYPES = {
-  lambda: { 
-    color: '#ef4444', 
+  lambda: {
+    color: "#ef4444",
     size: 8,
     tailLength: 12,
     burstSize: 50,
     latency: 150,
-    name: 'λ Phage'
+    name: "λ Phage",
   },
-  T4: { 
-    color: '#dc2626', 
+  T4: {
+    color: "#dc2626",
     size: 10,
     tailLength: 15,
     burstSize: 100,
     latency: 200,
-    name: 'T4 Phage'
+    name: "T4 Phage",
   },
-  T7: { 
-    color: '#b91c1c', 
+  T7: {
+    color: "#b91c1c",
     size: 7,
     tailLength: 10,
     burstSize: 30,
     latency: 100,
-    name: 'T7 Phage'
-  }
+    name: "T7 Phage",
+  },
+} as const;
+
+/* -------------------------
+   Helpers
+   ------------------------- */
+
+const hexToRgba = (hex: string, alpha = 1) => {
+  // accepts "#rrggbb"
+  const bigint = parseInt(hex.slice(1), 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r},${g},${b},${alpha})`;
 };
 
-// Main Component
-export default function BacteriaPhageSimulation({   
-  isRunning: externalIsRunning = false, 
-  speed: externalSpeed = 1,
-  isDark = true }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const bacteria = useRef<Bacterium[]>([]);
-  const phages = useRef<Phage[]>([]);
-  const nutrients = useRef<Nutrient[]>([]);
-  const particles = useRef<Particle[]>([]);
-  const animationRef = useRef<number | null>(null);
+/* -------------------------
+   Component
+   ------------------------- */
 
-  // State
-  const [isRunning, setIsRunning] = useState(externalIsRunning);
-  const [speed, setSpeed] = useState(externalSpeed);
-  const [tickCount, setTickCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<'environment' | 'population' | 'microscope'>('environment');
-  const [viewMode, setViewMode] = useState<'normal' | 'fluorescent' | 'phase'>('normal');
-  const [zoomLevel, setZoomLevel] = useState(1);
-  
-  // Environment parameters
-  const [temperature, setTemperature] = useState(37); // Celsius
-  const [ph, setPh] = useState(7.0);
-  const [oxygenLevel, setOxygenLevel] = useState(80);
-  const [nutrientDensity, setNutrientDensity] = useState(50);
-  const [antibioticLevel, setAntibioticLevel] = useState(0);
-  
-  // Intervention states
-  const [addingPhages, setAddingPhages] = useState(false);
-  const [addingNutrients, setAddingNutrients] = useState(true);
-  const [biofilmMode, setBiofilmMode] = useState(false);
-  const [quorumSensing, setQuorumSensing] = useState(true);
-  
-  // Statistics
+interface Props {
+  isRunning?: boolean;
+  speed?: number;
+  isDark?: boolean;
+}
+
+export default function BacteriaPhageSimulation({
+  isRunning: externalIsRunning = false,
+  speed: externalSpeed = 1,
+  isDark = true,
+}: Props) {
+  // Canvas ref
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasWidth = useRef(1200);
+  const canvasHeight = useRef(675);
+
+  // Mutable simulation state (keeps renders low)
+  const bacteriaRef = useRef<Bacterium[]>([]);
+  const phagesRef = useRef<Phage[]>([]);
+  const nutrientsRef = useRef<Nutrient[]>([]);
+  const particlesRef = useRef<Particle[]>([]);
+  const nextIdRef = useRef(1);
+
+  // ticks tracked in ref, occasional UI updates via state
+  const tickRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+
+  // UI state
+  const [isRunning, setIsRunning] = useState<boolean>(externalIsRunning);
+  const [speed, setSpeed] = useState<number>(externalSpeed);
+  const [viewMode, setViewMode] = useState<"normal" | "fluorescent" | "phase">(
+    "normal"
+  );
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [nutrientDensity, setNutrientDensity] = useState<number>(50);
+  const [addingNutrients, setAddingNutrients] = useState<boolean>(true);
+  const [addingPhages, setAddingPhages] = useState<boolean>(false);
+  const [biofilmMode, setBiofilmMode] = useState<boolean>(false);
+  const [quorumSensing, setQuorumSensing] = useState<boolean>(true);
+
+  // Stats (UI-friendly, updated intermittently)
   const [stats, setStats] = useState({
     totalBacteria: 0,
     healthyBacteria: 0,
@@ -261,896 +243,832 @@ export default function BacteriaPhageSimulation({
     nutrients: 0,
     biodiversity: 0,
     resistanceLevel: 0,
-    generationNumber: 0
+    generationNumber: 0,
   });
 
-  // Canvas dimensions
-  const canvasWidth = useRef(1200);
-  const canvasHeight = useRef(675);
-
-  // Initialize simulation
-  const initSimulation = useCallback(() => {
+  /* -------------------------
+     Initialization (client-only to avoid hydration issues)
+     ------------------------- */
+  useEffect(() => {
+    // run once on client
     const width = canvasWidth.current;
     const height = canvasHeight.current;
-    
-    // Initialize bacteria
-    const newBacteria: Bacterium[] = [];
-    const bacteriaCount = 30;
-    
-    for (let i = 0; i < bacteriaCount; i++) {
-      const types = Object.keys(BACTERIA_TYPES) as Array<keyof typeof BACTERIA_TYPES>;
-      const type = types[Math.floor(Math.random() * types.length)];
-      const config = BACTERIA_TYPES[type];
-      
-      newBacteria.push({
-        id: i,
-        x: Math.random() * width,
-        y: Math.random() * height,
-        vx: (Math.random() - 0.5) * config.speed,
-        vy: (Math.random() - 0.5) * config.speed,
-        angle: Math.random() * Math.PI * 2,
-        angularVelocity: (Math.random() - 0.5) * 0.1,
-        type,
-        health: 100,
-        age: 0,
-        divisionTimer: Math.random() * 200,
-        infected: false,
-        phageCount: 0,
-        resistance: Math.random() * 0.3,
-        flagella: type === 'ecoli' || type === 'spirillum',
-        pili: [],
-        color: config.color,
-        size: config.size,
-        energy: 80 + Math.random() * 20,
-        dead: false
-      });
-      
-      // Add pili for some bacteria
-      if (Math.random() > 0.5) {
-        const piliCount = 2 + Math.floor(Math.random() * 4);
-        for (let j = 0; j < piliCount; j++) {
-          newBacteria[i].pili.push({
-            x: Math.random() * Math.PI * 2,
-            y: Math.random() * Math.PI * 2,
-            length: 5 + Math.random() * 10
-          });
-        }
-      }
-    }
-    
-    // Initialize nutrients
-    const newNutrients: Nutrient[] = [];
-    const nutrientCount = Math.floor(nutrientDensity * 0.5);
-    
-    for (let i = 0; i < nutrientCount; i++) {
-      const types = ['glucose', 'amino', 'vitamin'] as const;
-      const type = types[Math.floor(Math.random() * types.length)];
-      
-      const colors = {
-        glucose: '#fbbf24',
-        amino: '#34d399',
-        vitamin: '#f472b6'
-      };
-      
-      newNutrients.push({
-        id: i,
-        x: Math.random() * width,
-        y: Math.random() * height,
-        value: 10 + Math.random() * 20,
-        type,
-        color: colors[type],
-        consumed: false
-      });
-    }
-    
-    // Initialize phages (start with few)
-    const newPhages: Phage[] = [];
-    if (addingPhages) {
-      for (let i = 0; i < 5; i++) {
-        const types = Object.keys(PHAGE_TYPES) as Array<keyof typeof PHAGE_TYPES>;
+
+    const createBacteria = (count = 30) => {
+      const types = Object.keys(BACTERIA_TYPES) as BacteriumType[];
+      const arr: Bacterium[] = [];
+      for (let i = 0; i < count; i++) {
         const type = types[Math.floor(Math.random() * types.length)];
-        const config = PHAGE_TYPES[type];
-        
-        newPhages.push({
-          id: i,
+        const cfg = BACTERIA_TYPES[type];
+        arr.push({
+          id: nextIdRef.current++,
+          x: Math.random() * width,
+          y: Math.random() * height,
+          vx: (Math.random() - 0.5) * cfg.speed,
+          vy: (Math.random() - 0.5) * cfg.speed,
+          angle: Math.random() * Math.PI * 2,
+          angularVelocity: (Math.random() - 0.5) * 0.1,
+          type,
+          health: 100,
+          age: 0,
+          divisionTimer: 100 + Math.random() * 200,
+          infected: false,
+          phageCount: 0,
+          resistance: Math.random() * 0.3,
+          flagella: type === "ecoli" || type === "spirillum",
+          pili:
+            Math.random() > 0.5
+              ? Array.from({ length: 2 + Math.floor(Math.random() * 4) }, () => ({
+                  x: Math.random() * Math.PI * 2,
+                  y: Math.random() * Math.PI * 2,
+                  length: 5 + Math.random() * 10,
+                }))
+              : [],
+          color: cfg.color,
+          size: cfg.size,
+          energy: 60 + Math.random() * 40,
+          dead: false,
+        });
+      }
+      return arr;
+    };
+
+    const createNutrients = (count: number) => {
+      const types = ["glucose", "amino", "vitamin"] as const;
+      const colors: Record<typeof types[number], string> = {
+        glucose: "#fbbf24",
+        amino: "#34d399",
+        vitamin: "#f472b6",
+      };
+      const arr: Nutrient[] = [];
+      for (let i = 0; i < count; i++) {
+        const t = types[Math.floor(Math.random() * types.length)];
+        arr.push({
+          id: nextIdRef.current++,
+          x: Math.random() * width,
+          y: Math.random() * height,
+          value: 10 + Math.random() * 20,
+          type: t,
+          color: colors[t],
+          consumed: false,
+        });
+      }
+      return arr;
+    };
+
+    const createPhages = (count = 5) => {
+      const types = Object.keys(PHAGE_TYPES) as PhageType[];
+      const arr: Phage[] = [];
+      for (let i = 0; i < count; i++) {
+        const t = types[Math.floor(Math.random() * types.length)];
+        const cfg = PHAGE_TYPES[t];
+        arr.push({
+          id: nextIdRef.current++,
           x: Math.random() * width,
           y: Math.random() * height,
           vx: (Math.random() - 0.5) * 3,
           vy: (Math.random() - 0.5) * 3,
           attached: false,
           injected: false,
-          type,
-          size: config.size,
-          color: config.color,
-          tailLength: config.tailLength,
-          angle: Math.random() * Math.PI * 2
+          type: t,
+          size: cfg.size,
+          color: cfg.color,
+          tailLength: cfg.tailLength,
+          angle: Math.random() * Math.PI * 2,
         });
       }
-    }
-    
-    bacteria.current = newBacteria;
-    phages.current = newPhages;
-    nutrients.current = newNutrients;
-    particles.current = [];
-    setTickCount(0);
-    updateStats();
-  }, [nutrientDensity, addingPhages]);
+      return arr;
+    };
 
-  // Update statistics
-  const updateStats = useCallback(() => {
-    const totalBacteria = bacteria.current.length;
-    const healthyBacteria = bacteria.current.filter(b => !b.infected && !b.dead).length;
-    const infectedBacteria = bacteria.current.filter(b => b.infected && !b.dead).length;
-    const deadBacteria = bacteria.current.filter(b => b.dead).length;
-    
-    // Calculate biodiversity (Shannon index simplified)
-    const typeCounts = new Map<string, number>();
-    bacteria.current.forEach(b => {
-      if (!b.dead) {
-        typeCounts.set(b.type, (typeCounts.get(b.type) || 0) + 1);
-      }
-    });
-    
-    let biodiversity = 0;
-    const livingBacteria = totalBacteria - deadBacteria;
-    if (livingBacteria > 0) {
-      typeCounts.forEach(count => {
-        const p = count / livingBacteria;
-        if (p > 0) biodiversity -= p * Math.log(p);
-      });
-    }
-    
-    const avgResistance = bacteria.current.reduce((sum, b) => sum + b.resistance, 0) / (totalBacteria || 1);
-    
-    setStats({
+    bacteriaRef.current = createBacteria(30);
+    nutrientsRef.current = createNutrients(Math.floor(nutrientDensity * 0.5));
+    phagesRef.current = addingPhages ? createPhages(5) : [];
+    particlesRef.current = [];
+
+    // initial stats
+    setTimeout(() => {
+      // small delay so refs populated
+      updateStatsImmediate();
+      renderOnce();
+    }, 20);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // client-only initialization to avoid hydration mismatch
+
+  /* -------------------------
+     Simulation update & rendering
+     ------------------------- */
+
+  // lightweight immediate stats updater used in init/reset
+  const updateStatsImmediate = useCallback(() => {
+    const totalBacteria = bacteriaRef.current.length;
+    const deadBacteria = bacteriaRef.current.filter((b) => b.dead).length;
+    const healthyBacteria = bacteriaRef.current.filter(
+      (b) => !b.infected && !b.dead
+    ).length;
+    const infectedBacteria = bacteriaRef.current.filter(
+      (b) => b.infected && !b.dead
+    ).length;
+    const avgResistance =
+      bacteriaRef.current.reduce((s, b) => s + b.resistance, 0) /
+      (totalBacteria || 1);
+
+    setStats((s) => ({
+      ...s,
       totalBacteria,
       healthyBacteria,
       infectedBacteria,
       deadBacteria,
-      totalPhages: phages.current.length,
-      nutrients: nutrients.current.filter(n => !n.consumed).length,
-      biodiversity: biodiversity * 100,
+      totalPhages: phagesRef.current.length,
+      nutrients: nutrientsRef.current.filter((n) => !n.consumed).length,
+      biodiversity: Math.max(0, totalBacteria - deadBacteria),
       resistanceLevel: avgResistance * 100,
-      generationNumber: Math.floor(tickCount / 500)
-    });
-  }, [tickCount]);
+      generationNumber: Math.floor(tickRef.current / 500),
+    }));
+  }, []);
 
-  // Update simulation
-  const update = useCallback(() => {
-    if (!isRunning) return;
-    
-    const width = canvasWidth.current;
-    const height = canvasHeight.current;
-    const dt = speed;
-    
-    // Environmental effects
-    const tempEffect = 1 + (temperature - 37) * 0.02; // Optimal at 37°C
-    const phEffect = 1 - Math.abs(ph - 7) * 0.1; // Optimal at pH 7
-    const oxygenEffect = oxygenLevel / 100;
-    
-    // Update bacteria
-    bacteria.current.forEach((bacterium, idx) => {
-      if (bacterium.dead) {
-        // Dead bacteria slowly decompose
-        bacterium.size *= 0.99;
-        if (bacterium.size < 1) {
-          bacteria.current.splice(idx, 1);
+  // render once (used on init/reset)
+  const renderOnce = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    canvas.width = canvasWidth.current;
+    canvas.height = canvasHeight.current;
+
+    // do a quick render by delegating to the full render function
+    // (we'll reuse renderLoopRender below)
+    renderLoopRender(ctx);
+  }, []);
+
+  // core update: advances simulation by dt (dt scaled by speed)
+  const stepSimulation = useCallback(
+    (dt: number) => {
+      const width = canvasWidth.current;
+      const height = canvasHeight.current;
+
+      // environmental factors (kept simple here)
+      const tempEffect = 1; // placeholder, could be dynamic
+      const phEffect = 1;
+
+      // Bacteria updates
+      for (const bacterium of bacteriaRef.current) {
+        if (bacterium.dead) {
+          bacterium.size *= 0.995; // decompose
+          continue;
         }
-        return;
-      }
-      
-      // Age and energy
-      bacterium.age += dt;
-      bacterium.energy -= 0.1 * dt * tempEffect;
-      
-      // Movement (chemotaxis toward nutrients)
-      let targetX = 0, targetY = 0;
-      let foundTarget = false;
-      
-      if (bacterium.flagella && nutrients.current.length > 0) {
-        // Find nearest nutrient
-        let minDist = Infinity;
-        nutrients.current.forEach(nutrient => {
-          if (!nutrient.consumed) {
-            const dx = nutrient.x - bacterium.x;
-            const dy = nutrient.y - bacterium.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < minDist && dist < 100) {
-              minDist = dist;
-              targetX = dx;
-              targetY = dy;
-              foundTarget = true;
-            }
-          }
-        });
-      }
-      
-      // Apply movement
-      if (foundTarget) {
-        // Move toward nutrient
-        const angle = Math.atan2(targetY, targetX);
-        bacterium.vx += Math.cos(angle) * 0.1 * dt;
-        bacterium.vy += Math.sin(angle) * 0.1 * dt;
-      } else {
-        // Random walk
-        bacterium.vx += (Math.random() - 0.5) * 0.5 * dt;
-        bacterium.vy += (Math.random() - 0.5) * 0.5 * dt;
-      }
-      
-      // Limit speed
-      const speed = Math.sqrt(bacterium.vx * bacterium.vx + bacterium.vy * bacterium.vy);
-      const maxSpeed = BACTERIA_TYPES[bacterium.type].speed * tempEffect * phEffect;
-      if (speed > maxSpeed) {
-        bacterium.vx = (bacterium.vx / speed) * maxSpeed;
-        bacterium.vy = (bacterium.vy / speed) * maxSpeed;
-      }
-      
-      // Update position
-      bacterium.x += bacterium.vx * dt;
-      bacterium.y += bacterium.vy * dt;
-      bacterium.angle += bacterium.angularVelocity * dt;
-      
-      // Boundary conditions
-      if (bacterium.x < bacterium.size) {
-        bacterium.x = bacterium.size;
-        bacterium.vx *= -0.8;
-      }
-      if (bacterium.x > width - bacterium.size) {
-        bacterium.x = width - bacterium.size;
-        bacterium.vx *= -0.8;
-      }
-      if (bacterium.y < bacterium.size) {
-        bacterium.y = bacterium.size;
-        bacterium.vy *= -0.8;
-      }
-      if (bacterium.y > height - bacterium.size) {
-        bacterium.y = height - bacterium.size;
-        bacterium.vy *= -0.8;
-      }
-      
-      // Consume nutrients
-      nutrients.current.forEach(nutrient => {
-        if (!nutrient.consumed) {
+
+        bacterium.age += dt;
+        bacterium.energy -= 0.05 * dt * tempEffect;
+
+        // random movement / chemotaxis simplification
+        bacterium.vx += (Math.random() - 0.5) * 0.2 * dt;
+        bacterium.vy += (Math.random() - 0.5) * 0.2 * dt;
+
+        const vel = Math.sqrt(bacterium.vx * bacterium.vx + bacterium.vy * bacterium.vy);
+        const maxSpeed =
+          BACTERIA_TYPES[bacterium.type].speed * tempEffect * phEffect;
+        if (vel > maxSpeed) {
+          bacterium.vx = (bacterium.vx / vel) * maxSpeed;
+          bacterium.vy = (bacterium.vy / vel) * maxSpeed;
+        }
+
+        bacterium.x += bacterium.vx * dt;
+        bacterium.y += bacterium.vy * dt;
+        bacterium.angle += bacterium.angularVelocity * dt;
+
+        // bounds
+        if (bacterium.x < bacterium.size) {
+          bacterium.x = bacterium.size;
+          bacterium.vx *= -0.8;
+        }
+        if (bacterium.x > width - bacterium.size) {
+          bacterium.x = width - bacterium.size;
+          bacterium.vx *= -0.8;
+        }
+        if (bacterium.y < bacterium.size) {
+          bacterium.y = bacterium.size;
+          bacterium.vy *= -0.8;
+        }
+        if (bacterium.y > height - bacterium.size) {
+          bacterium.y = height - bacterium.size;
+          bacterium.vy *= -0.8;
+        }
+
+        // consume nearby nutrient (simple)
+        for (const nutrient of nutrientsRef.current) {
+          if (nutrient.consumed) continue;
           const dx = nutrient.x - bacterium.x;
           const dy = nutrient.y - bacterium.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          if (dist < bacterium.size + 5) {
+          const dist2 = dx * dx + dy * dy;
+          if (dist2 < (bacterium.size + 5) * (bacterium.size + 5)) {
             nutrient.consumed = true;
             bacterium.energy = Math.min(100, bacterium.energy + nutrient.value);
             bacterium.health = Math.min(100, bacterium.health + nutrient.value * 0.5);
-            
-            // Create consumption particles
-            for (let i = 0; i < 5; i++) {
-              particles.current.push({
+
+            // add a couple particles
+            for (let i = 0; i < 4; i++) {
+              particlesRef.current.push({
                 x: nutrient.x,
                 y: nutrient.y,
-                vx: (Math.random() - 0.5) * 2,
-                vy: (Math.random() - 0.5) * 2,
+                vx: (Math.random() - 0.5) * 1.5,
+                vy: (Math.random() - 0.5) * 1.5,
                 life: 30,
                 color: nutrient.color,
-                size: 2
+                size: 1 + Math.random() * 2,
               });
             }
           }
         }
-      });
-      
-      // Cell division
-      if (bacterium.energy > 80 && bacterium.health > 60 && !bacterium.infected) {
-        bacterium.divisionTimer -= dt * tempEffect * phEffect * oxygenEffect;
-        
-        if (bacterium.divisionTimer <= 0) {
-          // Divide!
-          const daughter: Bacterium = {
-            ...bacterium,
-            id: Date.now() + Math.random(),
-            x: bacterium.x + (Math.random() - 0.5) * 20,
-            y: bacterium.y + (Math.random() - 0.5) * 20,
-            vx: (Math.random() - 0.5) * 2,
-            vy: (Math.random() - 0.5) * 2,
-            energy: bacterium.energy / 2,
-            health: bacterium.health * 0.9,
-            age: 0,
-            divisionTimer: 200 + Math.random() * 100,
-            resistance: bacterium.resistance + (Math.random() - 0.5) * 0.1,
-            pili: []
-          };
-          
-          bacterium.energy /= 2;
-          bacterium.divisionTimer = 200 + Math.random() * 100;
-          
-          bacteria.current.push(daughter);
-          
-          // Division particles
-          for (let i = 0; i < 10; i++) {
-            particles.current.push({
-              x: bacterium.x,
-              y: bacterium.y,
-              vx: (Math.random() - 0.5) * 3,
-              vy: (Math.random() - 0.5) * 3,
-              life: 40,
-              color: bacterium.color,
-              size: 3
-            });
+
+        // division
+        if (!bacterium.infected && bacterium.energy > 80 && bacterium.health > 50) {
+          bacterium.divisionTimer -= dt;
+          if (bacterium.divisionTimer <= 0) {
+            const daughter: Bacterium = {
+              ...bacterium,
+              id: nextIdRef.current++,
+              x: bacterium.x + (Math.random() - 0.5) * 12,
+              y: bacterium.y + (Math.random() - 0.5) * 12,
+              vx: (Math.random() - 0.5) * 1,
+              vy: (Math.random() - 0.5) * 1,
+              energy: bacterium.energy / 2,
+              health: bacterium.health * 0.9,
+              age: 0,
+              divisionTimer: 150 + Math.random() * 120,
+              pili: [],
+            };
+            bacterium.energy /= 2;
+            bacterium.divisionTimer = 150 + Math.random() * 120;
+            bacteriaRef.current.push(daughter);
           }
         }
-      }
-      
-      // Phage infection progression
-      if (bacterium.infected) {
-        bacterium.health -= 0.5 * dt;
-        bacterium.lysisTimer = (bacterium.lysisTimer || 0) - dt;
-        
-        if (bacterium.lysisTimer <= 0 || bacterium.health <= 0) {
-          // Lysis! Burst and release new phages
-          bacterium.dead = true;
-          
-          const burstSize = bacterium.phageCount * 10;
-          for (let i = 0; i < burstSize; i++) {
-            const angle = (Math.PI * 2 * i) / burstSize;
-            phages.current.push({
-              id: Date.now() + i,
-              x: bacterium.x,
-              y: bacterium.y,
-              vx: Math.cos(angle) * 3,
-              vy: Math.sin(angle) * 3,
-              attached: false,
-              injected: false,
-              type: 'T4',
-              size: 8,
-              color: '#dc2626',
-              tailLength: 12,
-              angle: angle
-            });
-          }
-          
-          // Lysis particles
-          for (let i = 0; i < 20; i++) {
-            particles.current.push({
-              x: bacterium.x,
-              y: bacterium.y,
-              vx: (Math.random() - 0.5) * 5,
-              vy: (Math.random() - 0.5) * 5,
-              life: 60,
-              color: '#ef4444',
-              size: 4
-            });
+
+        // infected progression (lysis)
+        if (bacterium.infected) {
+          bacterium.health -= 0.2 * dt;
+          bacterium.lysisTimer = (bacterium.lysisTimer ?? 100) - dt;
+          if ((bacterium.lysisTimer ?? 0) <= 0 || bacterium.health <= 0) {
+            // lysis: bacterium dies and releases phages
+            bacterium.dead = true;
+            const burstSize = Math.max(5, bacterium.phageCount * 8);
+            for (let i = 0; i < burstSize; i++) {
+              const angle = Math.random() * Math.PI * 2;
+              phagesRef.current.push({
+                id: nextIdRef.current++,
+                x: bacterium.x,
+                y: bacterium.y,
+                vx: Math.cos(angle) * (1 + Math.random() * 2),
+                vy: Math.sin(angle) * (1 + Math.random() * 2),
+                attached: false,
+                injected: false,
+                type: "T4",
+                size: PHAGE_TYPES.T4.size,
+                color: PHAGE_TYPES.T4.color,
+                tailLength: PHAGE_TYPES.T4.tailLength,
+                angle,
+              });
+            }
+            // explosion particles
+            for (let p = 0; p < 10; p++) {
+              particlesRef.current.push({
+                x: bacterium.x,
+                y: bacterium.y,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                life: 40,
+                color: "#ef4444",
+                size: 2 + Math.random() * 2,
+              });
+            }
           }
         }
-      }
-      
-      // Antibiotic effects
-      if (antibioticLevel > 0) {
-        const damage = antibioticLevel * (1 - bacterium.resistance) * 0.1 * dt;
-        bacterium.health -= damage;
-        
-        if (bacterium.health <= 0) {
+
+        // natural death
+        if (bacterium.energy <= 0 || bacterium.age > 2000) {
           bacterium.dead = true;
         }
       }
-      
-      // Natural death
-      if (bacterium.energy <= 0 || bacterium.age > 1000) {
-        bacterium.dead = true;
-      }
-    });
-    
-    // Update phages
-    phages.current.forEach((phage, idx) => {
-      if (!phage.attached) {
-        // Free-floating movement
-        phage.x += phage.vx * dt;
-        phage.y += phage.vy * dt;
-        phage.angle += 0.05 * dt;
-        
-        // Boundary bounce
-        if (phage.x < 0 || phage.x > width) phage.vx *= -1;
-        if (phage.y < 0 || phage.y > height) phage.vy *= -1;
-        
-        // Check for bacterial collision
-        bacteria.current.forEach(bacterium => {
-          if (!bacterium.dead && !bacterium.infected && !phage.attached) {
+
+      // Phage updates
+      for (const phage of phagesRef.current) {
+        if (!phage.attached) {
+          phage.x += phage.vx * dt;
+          phage.y += phage.vy * dt;
+          phage.angle += 0.05 * dt;
+
+          // bounce
+          if (phage.x < 0 || phage.x > width) phage.vx *= -1;
+          if (phage.y < 0 || phage.y > height) phage.vy *= -1;
+
+          // collision check
+          for (const bacterium of bacteriaRef.current) {
+            if (bacterium.dead || bacterium.infected) continue;
             const dx = bacterium.x - phage.x;
             const dy = bacterium.y - phage.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            if (dist < bacterium.size) {
-              // Attachment probability based on resistance
+            const dist2 = dx * dx + dy * dy;
+            if (dist2 < bacterium.size * bacterium.size) {
+              // attach probabilistically based on resistance
               if (Math.random() > bacterium.resistance) {
                 phage.attached = true;
                 phage.targetId = bacterium.id;
+                phage.attachTick = tickRef.current;
                 phage.x = bacterium.x;
                 phage.y = bacterium.y;
-                
-                // Start infection
-                setTimeout(() => {
-                  if (!phage.injected && phage.attached) {
-                    phage.injected = true;
-                    bacterium.infected = true;
-                    bacterium.phageCount++;
-                    bacterium.lysisTimer = PHAGE_TYPES[phage.type].latency;
-                  }
-                }, 500);
+                // keep phage.injected false; injection handled below by timing
               }
+              break;
             }
           }
-        });
-      } else if (phage.targetId !== undefined) {
-        // Follow attached bacterium
-        const target = bacteria.current.find(b => b.id === phage.targetId);
-        if (target && !target.dead) {
-          phage.x = target.x + Math.cos(phage.angle) * target.size * 0.8;
-          phage.y = target.y + Math.sin(phage.angle) * target.size * 0.8;
         } else {
-          // Detach if bacterium is dead
-          phage.attached = false;
-          phage.targetId = undefined;
-          phage.vx = (Math.random() - 0.5) * 3;
-          phage.vy = (Math.random() - 0.5) * 3;
+          // follow target
+          const t = bacteriaRef.current.find((b) => b.id === phage.targetId);
+          if (t && !t.dead) {
+            phage.x = t.x + Math.cos(phage.angle) * t.size * 0.6;
+            phage.y = t.y + Math.sin(phage.angle) * t.size * 0.6;
+            // check latency -> inject
+            const latency = PHAGE_TYPES[phage.type].latency;
+            if (!phage.injected && phage.attachTick !== undefined) {
+              if (tickRef.current - phage.attachTick >= latency) {
+                phage.injected = true;
+                t.infected = true;
+                t.phageCount++;
+                t.lysisTimer = PHAGE_TYPES[phage.type].latency;
+              }
+            }
+          } else {
+            // detach if target gone
+            phage.attached = false;
+            phage.targetId = undefined;
+            phage.vx = (Math.random() - 0.5) * 2;
+            phage.vy = (Math.random() - 0.5) * 2;
+          }
         }
       }
-    });
-    
-    // Update particles
-    particles.current = particles.current.filter(particle => {
-      particle.x += particle.vx;
-      particle.y += particle.vy;
-      particle.life--;
-      particle.vx *= 0.98;
-      particle.vy *= 0.98;
-      return particle.life > 0;
-    });
-    
-    // Remove consumed nutrients
-    nutrients.current = nutrients.current.filter(n => !n.consumed);
-    
-    // Periodically add new nutrients
-    if (addingNutrients && tickCount % 100 === 0) {
-      const types = ['glucose', 'amino', 'vitamin'] as const;
-      const type = types[Math.floor(Math.random() * types.length)];
-      const colors = {
-        glucose: '#fbbf24',
-        amino: '#34d399',
-        vitamin: '#f472b6'
-      };
-      
-      nutrients.current.push({
-        id: Date.now(),
-        x: Math.random() * width,
-        y: Math.random() * height,
-        value: 10 + Math.random() * 20,
-        type,
-        color: colors[type],
-        consumed: false
-      });
-    }
-    
-    setTickCount(prev => prev + 1);
-    updateStats();
-  }, [isRunning, speed, temperature, ph, oxygenLevel, antibioticLevel, addingNutrients, tickCount, updateStats]);
 
-  // Render function
-  const render = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    canvas.width = canvasWidth.current;
-    canvas.height = canvasHeight.current;
-    
-    // Background (petri dish)
-    const gradient = ctx.createRadialGradient(
-      canvas.width / 2, canvas.height / 2, 0,
-      canvas.width / 2, canvas.height / 2, canvas.width / 2
-    );
-    
-    if (viewMode === 'fluorescent') {
-      gradient.addColorStop(0, '#000814');
-      gradient.addColorStop(1, '#001d3d');
-    } else if (viewMode === 'phase') {
-      gradient.addColorStop(0, '#1a1a2e');
-      gradient.addColorStop(1, '#0f0f1e');
+      // Particles
+      particlesRef.current = particlesRef.current.filter((p) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 1;
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        return p.life > 0;
+      });
+
+      // remove consumed nutrients
+      nutrientsRef.current = nutrientsRef.current.filter((n) => !n.consumed);
+
+      // add nutrients occasionally
+      if (addingNutrients && tickRef.current % 120 === 0) {
+        const types = ["glucose", "amino", "vitamin"] as const;
+        const t = types[Math.floor(Math.random() * types.length)];
+        const colors = {
+          glucose: "#fbbf24",
+          amino: "#34d399",
+          vitamin: "#f472b6",
+        } as const;
+        nutrientsRef.current.push({
+          id: nextIdRef.current++,
+          x: Math.random() * width,
+          y: Math.random() * height,
+          value: 10 + Math.random() * 20,
+          type: t,
+          color: colors[t],
+          consumed: false,
+        });
+      }
+
+      // increment tick
+      tickRef.current += Math.max(1, Math.round(dt));
+    },
+    [addingNutrients]
+  );
+
+  // render helper used by both one-shot render and loop
+  const renderLoopRender = (ctx: CanvasRenderingContext2D) => {
+    const canvas = ctx.canvas;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // background
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    if (viewMode === "fluorescent") {
+      gradient.addColorStop(0, "#001018");
+      gradient.addColorStop(1, "#002a2a");
+    } else if (viewMode === "phase") {
+      gradient.addColorStop(0, "#111216");
+      gradient.addColorStop(1, "#0b0b0f");
     } else {
-      gradient.addColorStop(0, '#0d1117');
-      gradient.addColorStop(1, '#010409');
+      gradient.addColorStop(0, "#071021");
+      gradient.addColorStop(1, "#000409");
     }
-    
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Apply zoom
+
+    // zoom transform
     ctx.save();
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(zoomLevel, zoomLevel);
     ctx.translate(-canvas.width / 2, -canvas.height / 2);
-    
-    // Draw biofilm if enabled
-    if (biofilmMode) {
-      ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
-      bacteria.current.forEach(b1 => {
-        if (!b1.dead) {
-          bacteria.current.forEach(b2 => {
-            if (b1.id !== b2.id && !b2.dead) {
-              const dx = b2.x - b1.x;
-              const dy = b2.y - b1.y;
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              if (dist < 60) {
-                ctx.beginPath();
-                ctx.moveTo(b1.x, b1.y);
-                ctx.lineTo(b2.x, b2.y);
-                ctx.strokeStyle = 'rgba(34, 197, 94, 0.05)';
-                ctx.lineWidth = 20;
-                ctx.stroke();
-              }
-            }
-          });
-        }
-      });
-    }
-    
-    // Draw nutrients
-    nutrients.current.forEach(nutrient => {
-      if (!nutrient.consumed) {
-        ctx.save();
-        ctx.globalAlpha = 0.6;
-        
-        // Nutrient glow
-        const glow = ctx.createRadialGradient(
-          nutrient.x, nutrient.y, 0,
-          nutrient.x, nutrient.y, nutrient.value
-        );
-        glow.addColorStop(0, nutrient.color + '80');
-        glow.addColorStop(1, nutrient.color + '00');
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(nutrient.x, nutrient.y, nutrient.value, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Nutrient core
-        ctx.fillStyle = nutrient.color;
-        ctx.beginPath();
-        ctx.arc(nutrient.x, nutrient.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.restore();
-      }
-    });
-    
-    // Draw bacteria
-    bacteria.current.forEach(bacterium => {
+
+    // nutrients
+    for (const nutrient of nutrientsRef.current) {
+      if (nutrient.consumed) continue;
       ctx.save();
-      ctx.translate(bacterium.x, bacterium.y);
-      ctx.rotate(bacterium.angle);
-      
-      // Apply visual mode effects
-      if (viewMode === 'fluorescent') {
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = bacterium.infected ? '#ef4444' : bacterium.color;
-      } else if (viewMode === 'phase') {
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1;
-      }
-      
-      // Draw bacterial body
-      ctx.globalAlpha = bacterium.dead ? 0.3 : (bacterium.health / 100);
-      
-      const shape = BACTERIA_TYPES[bacterium.type].shape;
-      
-      if (shape === 'rod') {
-        // Rod-shaped bacteria
-        ctx.fillStyle = bacterium.infected ? '#ef4444' : bacterium.color;
+      ctx.globalAlpha = 0.6;
+      const glow = ctx.createRadialGradient(
+        nutrient.x,
+        nutrient.y,
+        0,
+        nutrient.x,
+        nutrient.y,
+        nutrient.value * 1.5
+      );
+      glow.addColorStop(0, hexToRgba(nutrient.color, 0.6));
+      glow.addColorStop(1, hexToRgba(nutrient.color, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(nutrient.x, nutrient.y, nutrient.value, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = nutrient.color;
+      ctx.beginPath();
+      ctx.arc(nutrient.x, nutrient.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // bacteria
+    for (const b of bacteriaRef.current) {
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.angle);
+      ctx.globalAlpha = b.dead ? 0.35 : Math.min(1, b.health / 100);
+      const shape = BACTERIA_TYPES[b.type].shape;
+
+      if (shape === "rod") {
+        ctx.fillStyle = b.infected ? "#ef4444" : b.color;
         ctx.beginPath();
-        ctx.ellipse(0, 0, bacterium.size * 0.8, bacterium.size * 0.4, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, b.size * 0.8, b.size * 0.45, 0, 0, Math.PI * 2);
         ctx.fill();
-        if (viewMode === 'phase') ctx.stroke();
-      } else if (shape === 'sphere') {
-        // Spherical bacteria
-        const gradient = ctx.createRadialGradient(
-          -bacterium.size * 0.3, -bacterium.size * 0.3, 0,
-          0, 0, bacterium.size
-        );
-        gradient.addColorStop(0, bacterium.infected ? '#ff6b6b' : bacterium.color);
-        gradient.addColorStop(1, bacterium.infected ? '#c92a2a' : bacterium.color + '80');
-        ctx.fillStyle = gradient;
+      } else if (shape === "sphere") {
+        const grad = ctx.createRadialGradient(-b.size * 0.2, -b.size * 0.2, 0, 0, 0, b.size);
+        grad.addColorStop(0, b.infected ? "#ff6b6b" : b.color);
+        grad.addColorStop(1, hexToRgba(b.color, 0.4));
+        ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(0, 0, bacterium.size * 0.5, 0, Math.PI * 2);
+        ctx.arc(0, 0, b.size * 0.5, 0, Math.PI * 2);
         ctx.fill();
-        if (viewMode === 'phase') ctx.stroke();
-      } else if (shape === 'spiral') {
-        // Spiral bacteria
-        ctx.strokeStyle = bacterium.infected ? '#ef4444' : bacterium.color;
-        ctx.lineWidth = 3;
+      } else {
+        ctx.strokeStyle = b.infected ? "#ef4444" : b.color;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        for (let t = 0; t < Math.PI * 4; t += 0.1) {
-          const x = t * 2 * Math.cos(t);
-          const y = t * Math.sin(t);
+        for (let t = 0; t < Math.PI * 4; t += 0.2) {
+          const x = (t * 2) * Math.cos(t);
+          const y = (t * 1) * Math.sin(t);
           if (t === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
         ctx.stroke();
       }
-      
-      // Draw flagella
-      if (bacterium.flagella && !bacterium.dead) {
-        ctx.strokeStyle = bacterium.color + '60';
+
+      // flagella (simple)
+      if (b.flagella && !b.dead) {
+        ctx.strokeStyle = hexToRgba(b.color, 0.6);
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(bacterium.size * 0.5, 0);
-        for (let i = 1; i <= 5; i++) {
-          const x = bacterium.size * 0.5 + i * 5;
-          const y = Math.sin(tickCount * 0.1 + i * 0.5) * 5;
+        ctx.moveTo(b.size * 0.5, 0);
+        for (let i = 1; i <= 4; i++) {
+          const x = b.size * 0.5 + i * 4.5;
+          const y = Math.sin(tickRef.current * 0.05 + i * 0.5) * 4;
           ctx.lineTo(x, y);
         }
         ctx.stroke();
       }
-      
-      // Draw pili
-      bacterium.pili.forEach(pilus => {
-        ctx.strokeStyle = bacterium.color + '40';
-        ctx.lineWidth = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        const x = Math.cos(pilus.x) * pilus.length;
-        const y = Math.sin(pilus.y) * pilus.length;
-        ctx.lineTo(x, y);
-        ctx.stroke();
-      });
-      
-      // Health indicator
-      if (!bacterium.dead && bacterium.health < 50) {
-        ctx.fillStyle = '#ef4444';
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath();
-        ctx.arc(0, -bacterium.size - 5, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      
+
       ctx.restore();
-    });
-    
-    // Draw phages
-    phages.current.forEach(phage => {
+    }
+
+    // phages
+    for (const p of phagesRef.current) {
       ctx.save();
-      ctx.translate(phage.x, phage.y);
-      ctx.rotate(phage.angle);
-      
-      if (viewMode === 'fluorescent') {
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = phage.color;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      if (viewMode === "fluorescent") {
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = p.color;
       }
-      
-      // Phage head (icosahedral)
-      ctx.fillStyle = phage.color;
+      ctx.fillStyle = p.color;
       ctx.beginPath();
+      // hex-ish head
       for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI * 2 * i) / 6;
-        const x = Math.cos(angle) * phage.size;
-        const y = Math.sin(angle) * phage.size;
+        const a = (Math.PI * 2 * i) / 6;
+        const x = Math.cos(a) * p.size;
+        const y = Math.sin(a) * p.size;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
       ctx.closePath();
       ctx.fill();
-      
-      // Phage tail
-      ctx.strokeStyle = phage.color;
-      ctx.lineWidth = 2;
+
+      // tail
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(0, phage.size);
-      ctx.lineTo(0, phage.size + phage.tailLength);
+      ctx.moveTo(0, p.size);
+      ctx.lineTo(0, p.size + p.tailLength);
       ctx.stroke();
-      
-      // Tail fibers
-      if (!phage.injected) {
-        ctx.lineWidth = 1;
-        for (let i = -1; i <= 1; i++) {
-          if (i !== 0) {
+
+      ctx.restore();
+    }
+
+    // particles
+    for (const pt of particlesRef.current) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, pt.life / 60));
+      ctx.fillStyle = pt.color;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // quorum overlay
+    if (quorumSensing) {
+      const density = bacteriaRef.current.filter((b) => !b.dead).length;
+      if (density > 20) {
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = "#10b981";
+        for (const b of bacteriaRef.current) {
+          if (!b.dead) {
             ctx.beginPath();
-            ctx.moveTo(0, phage.size + phage.tailLength);
-            ctx.lineTo(i * 5, phage.size + phage.tailLength + 5);
-            ctx.stroke();
+            ctx.arc(b.x, b.y, 24, 0, Math.PI * 2);
+            ctx.fill();
           }
         }
       }
-      
-      ctx.restore();
-    });
-    
-    // Draw particles
-    particles.current.forEach(particle => {
-      ctx.globalAlpha = particle.life / 60;
-      ctx.fillStyle = particle.color;
-      ctx.beginPath();
-      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    
-    ctx.restore();
-    
-    // Draw quorum sensing signals
-    if (quorumSensing) {
-      ctx.globalAlpha = 0.2;
-      const density = bacteria.current.filter(b => !b.dead).length;
-      if (density > 20) {
-        ctx.fillStyle = '#10b981';
-        bacteria.current.forEach(b => {
-          if (!b.dead) {
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, 30, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        });
-      }
+      ctx.globalAlpha = 1;
     }
-    
-    ctx.globalAlpha = 1;
-  }, [viewMode, zoomLevel, biofilmMode, quorumSensing, tickCount]);
-
-  // Animation loop
-  useEffect(() => {
-    const animate = () => {
-      update();
-      render();
-      animationRef.current = requestAnimationFrame(animate);
-    };
-    
-    if (isRunning) {
-      animationRef.current = requestAnimationFrame(animate);
-    }
-    
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isRunning, update, render]);
-
-  // Initialize on mount
-  useEffect(() => {
-    initSimulation();
-    setTimeout(() => render(), 50);
-  }, []);
-
-  // Handle reset
-  const handleReset = () => {
-    setIsRunning(false);
-    setTickCount(0);
-    initSimulation();
-    setTimeout(() => render(), 100);
   };
 
-  // Add phages
+  // main loop tick
+  const loop = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // dt scaled by speed (we use 1 as base)
+    const dt = Math.max(1, Math.round(speed * 1)); // simple discrete dt
+    stepSimulation(dt);
+    renderLoopRender(ctx);
+
+    // update stats every ~20 ticks to avoid over-render
+    if (tickRef.current % 20 === 0) {
+      updateStatsImmediate();
+    }
+
+    rafRef.current = requestAnimationFrame(loop);
+  }, [speed, stepSimulation, updateStatsImmediate]);
+
+  // start/stop effect
+  useEffect(() => {
+    if (isRunning && rafRef.current === null) {
+      rafRef.current = requestAnimationFrame(loop);
+    } else if (!isRunning && rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [isRunning, loop]);
+
+  /* -------------------------
+     Controls
+     ------------------------- */
+
+  const handleReset = () => {
+    setIsRunning(false);
+    tickRef.current = 0;
+    // re-run client-only initialization logic quickly:
+    // reuse same init logic but smaller
+    const width = canvasWidth.current;
+    const height = canvasHeight.current;
+    bacteriaRef.current = [];
+    phagesRef.current = [];
+    nutrientsRef.current = [];
+    particlesRef.current = [];
+    nextIdRef.current = 1;
+    // small seed
+    const types = Object.keys(BACTERIA_TYPES) as BacteriumType[];
+    for (let i = 0; i < 24; i++) {
+      const t = types[Math.floor(Math.random() * types.length)];
+      const cfg = BACTERIA_TYPES[t];
+      bacteriaRef.current.push({
+        id: nextIdRef.current++,
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * cfg.speed,
+        vy: (Math.random() - 0.5) * cfg.speed,
+        angle: 0,
+        angularVelocity: 0,
+        type: t,
+        health: 100,
+        age: 0,
+        divisionTimer: 100 + Math.random() * 200,
+        infected: false,
+        phageCount: 0,
+        resistance: Math.random() * 0.3,
+        flagella: t === "ecoli" || t === "spirillum",
+        pili: [],
+        color: cfg.color,
+        size: cfg.size,
+        energy: 70 + Math.random() * 30,
+        dead: false,
+      });
+    }
+    nutrientsRef.current = [];
+    for (let n = 0; n < Math.floor(nutrientDensity * 0.5); n++) {
+      nutrientsRef.current.push({
+        id: nextIdRef.current++,
+        x: Math.random() * width,
+        y: Math.random() * height,
+        value: 10 + Math.random() * 20,
+        type: (["glucose", "amino", "vitamin"] as const)[Math.floor(Math.random() * 3)],
+        color: "#fbbf24",
+        consumed: false,
+      });
+    }
+    // brief render
+    setTimeout(() => {
+      updateStatsImmediate();
+      renderOnce();
+    }, 30);
+  };
+
   const addPhages = () => {
-    const types = Object.keys(PHAGE_TYPES) as Array<keyof typeof PHAGE_TYPES>;
-    for (let i = 0; i < 10; i++) {
-      const type = types[Math.floor(Math.random() * types.length)];
-      const config = PHAGE_TYPES[type];
-      
-      phages.current.push({
-        id: Date.now() + i,
-        x: Math.random() * canvasWidth.current,
-        y: Math.random() * canvasHeight.current,
+    const width = canvasWidth.current;
+    const height = canvasHeight.current;
+    const types = Object.keys(PHAGE_TYPES) as PhageType[];
+    for (let i = 0; i < 8; i++) {
+      const t = types[Math.floor(Math.random() * types.length)];
+      const cfg = PHAGE_TYPES[t];
+      phagesRef.current.push({
+        id: nextIdRef.current++,
+        x: Math.random() * width,
+        y: Math.random() * height,
         vx: (Math.random() - 0.5) * 3,
         vy: (Math.random() - 0.5) * 3,
         attached: false,
         injected: false,
-        type,
-        size: config.size,
-        color: config.color,
-        tailLength: config.tailLength,
-        angle: Math.random() * Math.PI * 2
+        type: t,
+        size: cfg.size,
+        color: cfg.color,
+        tailLength: cfg.tailLength,
+        angle: Math.random() * Math.PI * 2,
       });
     }
+    updateStatsImmediate();
   };
+
+  /* -------------------------
+     Component render
+     ------------------------- */
 
   return (
     <SimulationContainer $isDark={isDark}>
       <VideoSection>
         <CanvasContainer>
-          <SimCanvas ref={canvasRef} />
-          <MicroscopeOverlay />
-          
+          <SimCanvas
+            ref={canvasRef}
+            // ensure canvas starts with fixed size server-side (no random)
+            width={canvasWidth.current}
+            height={canvasHeight.current}
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              background:
+                "radial-gradient(circle at center, transparent 40%, rgba(0,0,0,0.25) 60%, rgba(0,0,0,0.6) 100%)",
+              zIndex: 20,
+            }}
+          />
           <HUD $isDark={isDark}>
-            <div style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div
+              style={{
+                fontSize: "1rem",
+                fontWeight: 700,
+                marginBottom: "0.75rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+              }}
+            >
               <Microscope size={16} />
               Microcosmos
             </div>
-            <div style={{ display: 'grid', gap: '0.5rem', fontSize: '0.75rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+
+            <div style={{ display: "grid", gap: "0.5rem", fontSize: "0.75rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ opacity: 0.7 }}>Bacteria:</span>
-                <span style={{ fontWeight: 600, color: '#22c55e' }}>{stats.healthyBacteria}</span>
+                <span style={{ fontWeight: 600, color: "#22c55e" }}>
+                  {stats.healthyBacteria}
+                </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ opacity: 0.7 }}>Infected:</span>
-                <span style={{ fontWeight: 600, color: '#ef4444' }}>{stats.infectedBacteria}</span>
+                <span style={{ fontWeight: 600, color: "#ef4444" }}>
+                  {stats.infectedBacteria}
+                </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ opacity: 0.7 }}>Phages:</span>
-                <span style={{ fontWeight: 600, color: '#dc2626' }}>{stats.totalPhages}</span>
+                <span style={{ fontWeight: 600, color: "#dc2626" }}>
+                  {stats.totalPhages}
+                </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ opacity: 0.7 }}>Nutrients:</span>
-                <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.nutrients}</span>
-              </div>
-              <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ opacity: 0.7 }}>Generation:</span>
-                  <span style={{ fontWeight: 700 }}>{stats.generationNumber}</span>
-                </div>
+                <span style={{ fontWeight: 600, color: "#fbbf24" }}>
+                  {stats.nutrients}
+                </span>
               </div>
             </div>
           </HUD>
-          
-          <DepthIndicator>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+
+          <div style={{ position: "absolute", bottom: 12, left: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <Eye size={12} />
               <span>Magnification: {(zoomLevel * 1000).toFixed(0)}x</span>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: "flex", gap: "0.5rem", marginTop: 8 }}>
               <button
-                onClick={() => setViewMode('normal')}
+                onClick={() => setViewMode("normal")}
                 style={{
-                  padding: '0.25rem 0.5rem',
-                  background: viewMode === 'normal' ? '#3b82f6' : 'transparent',
-                  border: '1px solid #3b82f6',
-                  borderRadius: '4px',
-                  color: '#fff',
-                  fontSize: '0.65rem',
-                  cursor: 'pointer'
+                  padding: "0.25rem 0.5rem",
+                  background: viewMode === "normal" ? "#3b82f6" : "transparent",
+                  border: "1px solid #3b82f6",
+                  borderRadius: 4,
+                  color: "#fff",
+                  fontSize: "0.65rem",
                 }}
               >
                 Normal
               </button>
               <button
-                onClick={() => setViewMode('fluorescent')}
+                onClick={() => setViewMode("fluorescent")}
                 style={{
-                  padding: '0.25rem 0.5rem',
-                  background: viewMode === 'fluorescent' ? '#10b981' : 'transparent',
-                  border: '1px solid #10b981',
-                  borderRadius: '4px',
-                  color: '#fff',
-                  fontSize: '0.65rem',
-                  cursor: 'pointer'
+                  padding: "0.25rem 0.5rem",
+                  background: viewMode === "fluorescent" ? "#10b981" : "transparent",
+                  border: "1px solid #10b981",
+                  borderRadius: 4,
+                  color: "#fff",
+                  fontSize: "0.65rem",
                 }}
               >
                 Fluor
               </button>
               <button
-                onClick={() => setViewMode('phase')}
+                onClick={() => setViewMode("phase")}
                 style={{
-                  padding: '0.25rem 0.5rem',
-                  background: viewMode === 'phase' ? '#8b5cf6' : 'transparent',
-                  border: '1px solid #8b5cf6',
-                  borderRadius: '4px',
-                  color: '#fff',
-                  fontSize: '0.65rem',
-                  cursor: 'pointer'
+                  padding: "0.25rem 0.5rem",
+                  background: viewMode === "phase" ? "#8b5cf6" : "transparent",
+                  border: "1px solid #8b5cf6",
+                  borderRadius: 4,
+                  color: "#fff",
+                  fontSize: "0.65rem",
                 }}
               >
                 Phase
               </button>
             </div>
-          </DepthIndicator>
-          
+          </div>
+
           <PlaybackControls>
-            <button onClick={() => setIsRunning(!isRunning)}>
+            <button onClick={() => setIsRunning((r) => !r)}>
               {isRunning ? <PauseCircle size={32} /> : <PlayCircle size={32} />}
             </button>
-            
+
             <button onClick={handleReset}>
               <RefreshCw size={24} />
             </button>
-            
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.5rem',
-              padding: '0 1rem',
-              borderLeft: '1px solid rgba(255, 255, 255, 0.2)'
-            }}>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0 1rem",
+                borderLeft: "1px solid rgba(255,255,255,0.12)",
+              }}
+            >
               <Zap size={14} />
               <input
                 type="range"
@@ -1160,18 +1078,20 @@ export default function BacteriaPhageSimulation({
                 value={speed}
                 onChange={(e) => setSpeed(Number(e.target.value))}
               />
-              <span style={{ fontSize: '0.875rem', fontWeight: 600, minWidth: '35px' }}>
+              <span style={{ fontSize: "0.875rem", fontWeight: 600, minWidth: 40 }}>
                 {speed}x
               </span>
             </div>
-            
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.5rem',
-              padding: '0 1rem',
-              borderLeft: '1px solid rgba(255, 255, 255, 0.2)'
-            }}>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                padding: "0 1rem",
+                borderLeft: "1px solid rgba(255,255,255,0.12)",
+              }}
+            >
               <Eye size={14} />
               <input
                 type="range"
@@ -1183,274 +1103,181 @@ export default function BacteriaPhageSimulation({
               />
             </div>
           </PlaybackControls>
-          
+
           <SpeedIndicator>
-            <Activity size={14} style={{ marginRight: '0.5rem' }} />
+            <Activity size={14} style={{ marginRight: 8 }} />
             Gen {stats.generationNumber}
           </SpeedIndicator>
         </CanvasContainer>
       </VideoSection>
-      
+
       <ControlsSection $isDark={isDark}>
         <TabContainer>
-          <Tab 
-            $active={activeTab === 'environment'}
-            onClick={() => setActiveTab('environment')}
-          >
-            <Beaker size={16} style={{ marginRight: '0.5rem' }} />
+          <Tab $active onClick={() => {}}>
+            <Beaker size={16} style={{ marginRight: 8 }} />
             Environment
           </Tab>
-          <Tab 
-            $active={activeTab === 'population'}
-            onClick={() => setActiveTab('population')}
-          >
-            <Dna size={16} style={{ marginRight: '0.5rem' }} />
+          <Tab onClick={() => {}}>
+            <Dna size={16} style={{ marginRight: 8 }} />
             Population
           </Tab>
-          <Tab 
-            $active={activeTab === 'microscope'}
-            onClick={() => setActiveTab('microscope')}
-          >
-            <Microscope size={16} style={{ marginRight: '0.5rem' }} />
+          <Tab onClick={() => {}}>
+            <Microscope size={16} style={{ marginRight: 8 }} />
             Microscope
           </Tab>
         </TabContainer>
-        
+
         <TabContent>
-          {activeTab === 'environment' && (
-            <Grid $columns={3} $gap="1.5rem">
-              <ParameterControl>
-                <div className="header">
-                  <span className="label">Temperature</span>
-                  <span className="value">{temperature}°C</span>
-                </div>
-                <input
-                  type="range"
-                  min={20}
-                  max={45}
-                  value={temperature}
-                  onChange={(e) => setTemperature(Number(e.target.value))}
-                />
-              </ParameterControl>
-              
-              <ParameterControl>
-                <div className="header">
-                  <span className="label">pH Level</span>
-                  <span className="value">{ph.toFixed(1)}</span>
-                </div>
-                <input
-                  type="range"
-                  min={4}
-                  max={10}
-                  step={0.1}
-                  value={ph}
-                  onChange={(e) => setPh(Number(e.target.value))}
-                />
-              </ParameterControl>
-              
-              <ParameterControl>
-                <div className="header">
-                  <span className="label">Oxygen Level</span>
-                  <span className="value">{oxygenLevel}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={oxygenLevel}
-                  onChange={(e) => setOxygenLevel(Number(e.target.value))}
-                />
-              </ParameterControl>
-              
-              <ParameterControl>
-                <div className="header">
-                  <span className="label">Nutrient Density</span>
-                  <span className="value">{nutrientDensity}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={nutrientDensity}
-                  onChange={(e) => setNutrientDensity(Number(e.target.value))}
-                />
-              </ParameterControl>
-              
-              <ParameterControl>
-                <div className="header">
-                  <span className="label">Antibiotic Level</span>
-                  <span className="value">{antibioticLevel}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={antibioticLevel}
-                  onChange={(e) => setAntibioticLevel(Number(e.target.value))}
-                />
-              </ParameterControl>
-              
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
-                <GlowButton onClick={addPhages} $color="#ef4444">
-                  <Plus size={14} style={{ marginRight: '0.5rem' }} />
-                  Add Phages
-                </GlowButton>
-              </div>
-            </Grid>
-          )}
-          
-          {activeTab === 'population' && (
-            <div>
-              <InterventionGrid>
-                <InterventionCard
-                  $active={addingNutrients}
-                  $color="#fbbf24"
-                  onClick={() => setAddingNutrients(!addingNutrients)}
-                >
-                  <div className="icon">
-                    <Droplet size={24} />
-                  </div>
-                  <div className="name">Nutrient Supply</div>
-                  <div className="efficacy">Auto-replenish</div>
-                </InterventionCard>
-                
-                <InterventionCard
-                  $active={biofilmMode}
-                  $color="#22c55e"
-                  onClick={() => setBiofilmMode(!biofilmMode)}
-                >
-                  <div className="icon">
-                    <Shield size={24} />
-                  </div>
-                  <div className="name">Biofilm Formation</div>
-                  <div className="efficacy">Collective behavior</div>
-                </InterventionCard>
-                
-                <InterventionCard
-                  $active={quorumSensing}
-                  $color="#3b82f6"
-                  onClick={() => setQuorumSensing(!quorumSensing)}
-                >
-                  <div className="icon">
-                    <Activity size={24} />
-                  </div>
-                  <div className="name">Quorum Sensing</div>
-                  <div className="efficacy">Cell communication</div>
-                </InterventionCard>
-                
-                <InterventionCard
-                  $active={addingPhages}
-                  $color="#ef4444"
-                  onClick={() => setAddingPhages(!addingPhages)}
-                >
-                  <div className="icon">
-                    <AlertTriangle size={24} />
-                  </div>
-                  <div className="name">Phage Therapy</div>
-                  <div className="efficacy">Viral predation</div>
-                </InterventionCard>
-              </InterventionGrid>
-              
-              <Grid $columns={4} $gap="1rem" style={{ marginTop: '1.5rem' }}>
-                <StatCard $color="#22c55e">
-                  <div className="label">Biodiversity</div>
-                  <div className="value">{stats.biodiversity.toFixed(0)}</div>
-                  <div className="change">Shannon index</div>
-                </StatCard>
-                
-                <StatCard $color="#ef4444">
-                  <div className="label">Infection Rate</div>
-                  <div className="value">
-                    {stats.totalBacteria > 0 
-                      ? ((stats.infectedBacteria / stats.totalBacteria) * 100).toFixed(0)
-                      : 0}%
-                  </div>
-                  <div className="change">Phage spread</div>
-                </StatCard>
-                
-                <StatCard $color="#8b5cf6">
-                  <div className="label">Resistance</div>
-                  <div className="value">{stats.resistanceLevel.toFixed(0)}%</div>
-                  <div className="change">Average immunity</div>
-                </StatCard>
-                
-                <StatCard $color="#fbbf24">
-                  <div className="label">Growth Rate</div>
-                  <div className="value">
-                    {bacteria.current.filter(b => !b.dead && b.divisionTimer < 50).length}
-                  </div>
-                  <div className="change">Dividing cells</div>
-                </StatCard>
-              </Grid>
-            </div>
-          )}
-          
-          {activeTab === 'microscope' && (
-            <div>
-              <Grid $columns={2} $gap="1.5rem">
-                <div>
-                  <h3 style={{ fontSize: '1rem', marginBottom: '1rem', color: '#3b82f6' }}>
-                    Species Present
-                  </h3>
-                  {Object.entries(BACTERIA_TYPES).map(([key, config]) => {
-                    const count = bacteria.current.filter(b => b.type === key && !b.dead).length;
-                    return (
-                      <div key={key} style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between',
-                        padding: '0.5rem',
-                        background: 'rgba(59, 130, 246, 0.1)',
-                        borderRadius: '4px',
-                        marginBottom: '0.5rem'
-                      }}>
-                        <span style={{ color: config.color }}>{config.name}</span>
-                        <span>{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                <div>
-                  <h3 style={{ fontSize: '1rem', marginBottom: '1rem', color: '#ef4444' }}>
-                    Phage Types
-                  </h3>
-                  {Object.entries(PHAGE_TYPES).map(([key, config]) => {
-                    const count = phages.current.filter(p => p.type === key).length;
-                    return (
-                      <div key={key} style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between',
-                        padding: '0.5rem',
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        borderRadius: '4px',
-                        marginBottom: '0.5rem'
-                      }}>
-                        <span style={{ color: config.color }}>{config.name}</span>
-                        <span>{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Grid>
-              
-              <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'rgba(0, 0, 0, 0.5)', borderRadius: '8px' }}>
-                <h3 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', color: '#fbbf24' }}>
-                  Observation Notes
-                </h3>
-                <p style={{ fontSize: '0.75rem', lineHeight: 1.6, color: '#94a3b8' }}>
-                  {temperature < 30 && "Low temperature is slowing bacterial metabolism. "}
-                  {temperature > 40 && "High temperature is stressing the bacterial population. "}
-                  {ph < 6 && "Acidic conditions are affecting cell membrane integrity. "}
-                  {ph > 8 && "Alkaline environment is disrupting cellular processes. "}
-                  {antibioticLevel > 50 && "High antibiotic concentration is selecting for resistant strains. "}
-                  {stats.infectedBacteria > stats.healthyBacteria && "Phage outbreak is decimating the population! "}
-                  {biofilmMode && "Biofilm formation is providing protection against phages. "}
-                </p>
-              </div>
-            </div>
-          )}
+          <div style={{ padding: 12 }}>
+            <GridLikeControls
+              nutrientDensity={nutrientDensity}
+              setNutrientDensity={setNutrientDensity}
+              nutrientToggle={{
+                addingNutrients,
+                setAddingNutrients,
+              }}
+              addingPhages={addingPhages}
+              setAddingPhages={setAddingPhages}
+              addPhages={addPhages}
+              biofilmMode={biofilmMode}
+              setBiofilmMode={setBiofilmMode}
+              quorumSensing={quorumSensing}
+              setQuorumSensing={setQuorumSensing}
+              stats={stats}
+            />
+          </div>
         </TabContent>
       </ControlsSection>
     </SimulationContainer>
+  );
+}
+
+/* -------------------------
+   Small presentational subcomponent kept outside main return for clarity
+   (you can inline/replace with your styled components if preferred)
+   ------------------------- */
+
+function GridLikeControls(props: {
+  nutrientDensity: number;
+  setNutrientDensity: (v: number) => void;
+  nutrientToggle: { addingNutrients: boolean; setAddingNutrients: (b: boolean) => void };
+  addingPhages: boolean;
+  setAddingPhages: (b: boolean) => void;
+  addPhages: () => void;
+  biofilmMode: boolean;
+  setBiofilmMode: (b: boolean) => void;
+  quorumSensing: boolean;
+  setQuorumSensing: (b: boolean) => void;
+  stats: any;
+}) {
+  const {
+    nutrientDensity,
+    setNutrientDensity,
+    nutrientToggle,
+    addingPhages,
+    setAddingPhages,
+    addPhages,
+    biofilmMode,
+    setBiofilmMode,
+    quorumSensing,
+    setQuorumSensing,
+    stats,
+  } = props;
+
+  return (
+    <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(3,1fr)" }}>
+      <ParameterControl>
+        <div className="header">
+          <span className="label">Nutrient Density</span>
+          <span className="value">{nutrientDensity}%</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={nutrientDensity}
+          onChange={(e) => setNutrientDensity(Number(e.target.value))}
+        />
+      </ParameterControl>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <GlowButton onClick={addPhages} $color="#ef4444">
+          <Plus size={14} style={{ marginRight: 8 }} /> Add Phages
+        </GlowButton>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <InterventionCard
+          $active={nutrientToggle.addingNutrients}
+          $color="#fbbf24"
+          onClick={() => nutrientToggle.setAddingNutrients(!nutrientToggle.addingNutrients)}
+        >
+          <div className="icon">
+            <Droplet size={24} />
+          </div>
+          <div className="name">Nutrient Supply</div>
+          <div className="efficacy">Auto-replenish</div>
+        </InterventionCard>
+
+        <InterventionCard
+          $active={biofilmMode}
+          $color="#22c55e"
+          onClick={() => setBiofilmMode(!biofilmMode)}
+        >
+          <div className="icon">
+            <Shield size={24} />
+          </div>
+          <div className="name">Biofilm Formation</div>
+          <div className="efficacy">Collective behavior</div>
+        </InterventionCard>
+
+        <InterventionCard
+          $active={quorumSensing}
+          $color="#3b82f6"
+          onClick={() => setQuorumSensing(!quorumSensing)}
+        >
+          <div className="icon">
+            <Activity size={24} />
+          </div>
+          <div className="name">Quorum Sensing</div>
+          <div className="efficacy">Cell communication</div>
+        </InterventionCard>
+
+        <InterventionCard
+          $active={addingPhages}
+          $color="#ef4444"
+          onClick={() => setAddingPhages(!addingPhages)}
+        >
+          <div className="icon">
+            <AlertTriangle size={24} />
+          </div>
+          <div className="name">Phage Therapy</div>
+          <div className="efficacy">Viral predation</div>
+        </InterventionCard>
+      </div>
+
+      {/* Quick stat cards */}
+      <StatCard $color="#22c55e">
+        <div className="label">Biodiversity</div>
+        <div className="value">{stats.biodiversity.toFixed ? stats.biodiversity.toFixed(0) : stats.biodiversity}</div>
+        <div className="change">Shannon index (approx)</div>
+      </StatCard>
+
+      <StatCard $color="#ef4444">
+        <div className="label">Infection Rate</div>
+        <div className="value">
+          {stats.totalBacteria > 0
+            ? `${Math.round((stats.infectedBacteria / stats.totalBacteria) * 100)}%`
+            : "0%"}
+        </div>
+        <div className="change">Phage spread</div>
+      </StatCard>
+
+      <StatCard $color="#8b5cf6">
+        <div className="label">Resistance</div>
+        <div className="value">{Math.round(stats.resistanceLevel)}%</div>
+        <div className="change">Average immunity</div>
+      </StatCard>
+    </div>
   );
 }

@@ -17,6 +17,32 @@ interface HeaderProps {
   children?: React.ReactNode;
 }
 
+// Safe hook wrappers to prevent hook order violations
+function useMatrixSafe() {
+  try {
+    return useMatrix();
+  } catch (error) {
+    return {
+      isMatrixOn: false,
+      toggleMatrix: () => {},
+      setMatrixOn: () => {},
+      isHydrated: true
+    };
+  }
+}
+
+function useDarkModeSafe() {
+  try {
+    return useDarkMode();
+  } catch (error) {
+    return {
+      isDarkMode: false,
+      isLoaded: true,
+      toggleDarkMode: () => {}
+    };
+  }
+}
+
 /*
   REPLACED: previous throttle + rAF approach with a stable rAF-driven scroll loop.
   - Uses refs to store last scroll and visibility to avoid unnecessary setState calls.
@@ -99,8 +125,6 @@ const useOptimizedScroll = () => {
 
   return scrollState;
 };
-
-// -------- Styled components (minor tweak: logo uses transform scale instead of width/height changes) --------
 
 // Enhanced HeaderContainer with better matrix effects
 const HeaderContainer = styled.header<{ $scrolled: boolean; $visible: boolean; $matrixActive?: boolean }>`
@@ -200,6 +224,7 @@ const BrandSubtitle = styled.p<{ $scrolled: boolean; $matrixActive?: boolean }>`
     font-size: 0.85rem;
   }
 `;
+
 const HeaderContent = styled.div<{ $scrolled: boolean }>`
   max-width: 1200px;
   margin: 0 auto;
@@ -300,7 +325,6 @@ const BrandText = styled.div<{ $scrolled: boolean }>`
   }
 `;
 
-/* rest of your styled components unchanged (kept for brevity) */
 const DesktopNav = styled.div`
   display: flex;
   align-items: center;
@@ -311,7 +335,6 @@ const DesktopNav = styled.div`
   }
 `;
 
-/* Mobile menu button + overlay + MobileMenu + etc. - kept unchanged from your original file */
 const MobileMenuButton = styled.button`
   display: none;
   background: none;
@@ -450,44 +473,19 @@ const SearchInput = styled.input`
   &::placeholder { color: var(--color-text-muted); }
 `;
 
-
-
 export function Header({ title, subtitle }: HeaderProps) {
+  // ✅ ALL HOOKS CALLED AT TOP LEVEL - ALWAYS THE SAME ORDER
   const { isScrolled, isVisible } = useOptimizedScroll();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // ✅ Always call hooks - use safe wrappers
+  const { isDarkMode, isLoaded } = useDarkModeSafe();
+  const { isMatrixOn } = useMatrixSafe();
 
-  useEffect(() => setIsMounted(true), []);
-
-  // Safe dark-mode hookup, same pattern as your original file
-  let isDarkMode = false;
-  let isLoaded = false;
-  if (isMounted) {
-    try {
-      const darkModeContext = useDarkMode();
-      isDarkMode = darkModeContext.isDarkMode;
-      isLoaded = darkModeContext.isLoaded;
-    } catch (error) {
-      console.warn('Header rendered outside DarkModeProvider, using light mode as fallback');
-      isDarkMode = false;
-      isLoaded = true;
-    }
-  }
-
-  // Matrix state hookup
-  let isMatrixOn = false;
-  if (isMounted) {
-    try {
-      const matrixCtx = useMatrix();
-      isMatrixOn = matrixCtx.isMatrixOn;
-    } catch {
-      // no provider present — keep false
-    }
-  }
-
+  // ✅ All useEffects in consistent order
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
