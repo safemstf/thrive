@@ -10,6 +10,7 @@ import {
   Droplet, Wifi, BookOpen, Sliders, Monitor, Beaker, Loader
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
+import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
 
 // Dynamically import ALL simulations with loading states for future-proofing
 const TSPAlgorithmRace = dynamic(() => import("@/components/cs/ants/ants"), {
@@ -666,7 +667,7 @@ const allItems: SimulationItem[] = [
     description: 'Interactive performance scaling law visualizer',
     optimized: true,
     featured: false,
-    comingSoon: true,
+    comingSoon: false,
     category: 'algorithms'
   },
   {
@@ -769,7 +770,15 @@ export default function SimulationsPage() {
             isDark={true}
           />
         );
-      
+
+      case 'amdahl':
+        return (
+          <AmdahlsLawSimulator
+            isRunning={isRunning}
+            speed={speed}
+            isDark={true}
+            />  
+        )
       default:
         // Placeholder for simulations that aren't imported yet
         return (
