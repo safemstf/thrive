@@ -1,5 +1,3 @@
-// src\components\cs\amdalsLaw\amdalsLaw.tsx
-
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -332,19 +330,19 @@ const ThrusterTrail = styled.div<{ $progress: number; $color: string; $intensity
   }
 `;
 
-const SpaceStation = styled.div`
+const MarsDestination = styled.div`
   position: absolute;
-  right: 8%;
+  right: 5%;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 3rem;
+  font-size: 4rem;
   z-index: 5;
-  animation: float 3s ease-in-out infinite alternate;
-  filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.6));
+  animation: mars-rotate 8s ease-in-out infinite;
+  filter: drop-shadow(0 0 25px rgba(239, 68, 68, 0.6));
   
-  @keyframes float {
-    0% { transform: translateY(-50%) rotate(0deg); }
-    100% { transform: translateY(-50%) rotate(5deg); }
+  @keyframes mars-rotate {
+    0%, 100% { transform: translateY(-50%) rotate(0deg) scale(1); }
+    50% { transform: translateY(-50%) rotate(2deg) scale(1.05); }
   }
   
   &::before {
@@ -353,16 +351,30 @@ const SpaceStation = styled.div`
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 60px;
-    height: 60px;
-    border: 2px solid rgba(59, 130, 246, 0.5);
+    width: 80px;
+    height: 80px;
+    border: 3px solid rgba(239, 68, 68, 0.3);
     border-radius: 50%;
-    animation: orbit 8s linear infinite;
+    animation: mars-atmosphere 12s linear infinite;
   }
   
-  @keyframes orbit {
-    0% { transform: translate(-50%, -50%) rotate(0deg); }
-    100% { transform: translate(-50%, -50%) rotate(360deg); }
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+    border: 2px solid rgba(251, 191, 36, 0.2);
+    border-radius: 50%;
+    animation: mars-atmosphere 15s linear infinite reverse;
+  }
+  
+  @keyframes mars-atmosphere {
+    0% { transform: translate(-50%, -50%) rotate(0deg); opacity: 0.3; }
+    50% { opacity: 0.6; }
+    100% { transform: translate(-50%, -50%) rotate(360deg); opacity: 0.3; }
   }
 `;
 
@@ -370,19 +382,31 @@ const LaunchPad = styled.div`
   position: absolute;
   left: 5%;
   bottom: 10%;
-  width: 40px;
-  height: 20px;
+  width: 50px;
+  height: 25px;
   background: linear-gradient(45deg, #374151 0%, #6b7280 100%);
-  border-radius: 4px;
+  border-radius: 6px;
   z-index: 3;
   
   &::before {
-    content: '🏁';
+    content: '🌍';
     position: absolute;
-    top: -25px;
+    top: -30px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 1.2rem;
+    font-size: 1.5rem;
+  }
+  
+  &::after {
+    content: 'EARTH';
+    position: absolute;
+    top: -45px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: #10b981;
+    text-shadow: 0 0 4px rgba(16, 185, 129, 0.5);
   }
 `;
 
@@ -638,6 +662,12 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [racers, setRacers] = useState<SimulationRacer[]>([]);
   const [activeTab, setActiveTab] = useState<'setup' | 'mission' | 'race' | 'analysis'>('setup');
+  
+  // Performance tracking
+  const [fps, setFps] = useState(0);
+  const [frameCount, setFrameCount] = useState(0);
+  const [lastFrameTime, setLastFrameTime] = useState(Date.now());
+  const [totalDistance, setTotalDistance] = useState(0);
 
   const animationRef = useRef<number>(0);
 
@@ -709,9 +739,19 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
     setRaceTime(0);
   }, [selectedProcessors, currentScenario, customParallelPortion, useCustom, calculateSpeedup, calculateEfficiency]);
 
-  // Animation loop
+  // Animation loop with FPS tracking
   const animate = useCallback(() => {
     if (!isRacing) return;
+    
+    // FPS calculation
+    const currentTime = Date.now();
+    const deltaTime = currentTime - lastFrameTime;
+    setLastFrameTime(currentTime);
+    setFrameCount(prev => prev + 1);
+    
+    if (frameCount % 10 === 0) { // Update FPS every 10 frames
+      setFps(Math.round(1000 / deltaTime));
+    }
     
     setRacers(prevRacers => 
       prevRacers.map(racer => {
@@ -727,6 +767,7 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
     );
     
     setRaceTime(prev => prev + 20);
+    setTotalDistance(prev => prev + 0.5); // Arbitrary distance units
     
     setRacers(prevRacers => {
       if (prevRacers.some(r => r.progress >= 1)) {
@@ -734,7 +775,7 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
       }
       return prevRacers;
     });
-  }, [isRacing]);
+  }, [isRacing, lastFrameTime, frameCount]);
 
   useEffect(() => {
     if (isRacing) {
@@ -749,12 +790,19 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
 
   const startRace = () => {
     setIsRacing(true);
+    setFrameCount(0);
+    setFps(0);
+    setTotalDistance(0);
     setRacers(prev => prev.map(r => ({ ...r, progress: 0 })));
     setRaceTime(0);
+    setLastFrameTime(Date.now());
   };
 
   const resetRace = () => {
     setIsRacing(false);
+    setFrameCount(0);
+    setFps(0);
+    setTotalDistance(0);
     initializeRace();
   };
 
@@ -774,7 +822,7 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
         <HeaderContent>
           <BroadcastInfo>
             <Radio size={24} style={{ color: '#ef4444' }} />
-            <Title>Amdahl's Law: Parallel Processing Simulator</Title>
+            <Title>Amdahl's Law: Mars Mission Simulator</Title>
             <LiveBadge>Live</LiveBadge>
           </BroadcastInfo>
           
@@ -786,6 +834,14 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
             <StatBadge $color="#06b6d4">
               <Zap size={16} />
               {Math.round(P * 100)}% Parallel
+            </StatBadge>
+            <StatBadge $color="#f59e0b">
+              <Activity size={16} />
+              {fps} FPS
+            </StatBadge>
+            <StatBadge $color="#ef4444">
+              <span>📊</span>
+              {Math.round(totalDistance)}km
             </StatBadge>
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
@@ -828,6 +884,20 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
                 <span className="metric-value">{Math.round(P * 100)}%</span>
               </div>
               <div className="metric">
+                <span className="metric-label">Mission Progress:</span>
+                <span className="metric-value">
+                  {racers.length > 0 ? Math.round(Math.max(...racers.map(r => r.progress)) * 100) : 0}%
+                </span>
+              </div>
+              <div className="metric">
+                <span className="metric-label">Distance to Mars:</span>
+                <span className="metric-value">{Math.round(225000 * (1 - (racers.length > 0 ? Math.max(...racers.map(r => r.progress)) : 0)))}km</span>
+              </div>
+              <div className="metric">
+                <span className="metric-label">Render FPS:</span>
+                <span className="metric-value">{fps}</span>
+              </div>
+              <div className="metric">
                 <span className="metric-label">Max Speedup:</span>
                 <span className="metric-value">{theoreticalMax.toFixed(2)}×</span>
               </div>
@@ -850,8 +920,14 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
             {racers.map(racer => (
               <RocketStatus key={racer.config.id} $speedup={racer.currentSpeedup} $color={racer.config.color}>
                 <div className="rocket-info">
-                  <div className="rocket-name">{racer.config.name}</div>
-                  <div className="rocket-specs">{racer.config.cores} cores • {racer.efficiency.toFixed(1)}% efficient</div>
+                  <div className="rocket-name">
+                    {racer.config.name}
+                    {racer.progress >= 1 && <span style={{ marginLeft: '0.5rem' }}>🏆</span>}
+                    {racer.progress >= 0.9 && racer.progress < 1 && <span style={{ marginLeft: '0.5rem' }}>🔥</span>}
+                  </div>
+                  <div className="rocket-specs">
+                    {racer.config.cores} cores • {racer.efficiency.toFixed(1)}% efficient • {Math.round(racer.progress * 100)}% complete
+                  </div>
                 </div>
                 <div className="speedup-value">{racer.currentSpeedup.toFixed(1)}×</div>
               </RocketStatus>
@@ -864,10 +940,10 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
           <SpaceHeader>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <span>🚀</span>
-              Parallel Processing Race
+              Mission to Mars: Parallel Processing Race
             </div>
             <div style={{ fontSize: '0.75rem', opacity: 0.9 }}>
-              {racers.length} Rockets Active
+              {racers.length} Rockets Racing • Destination: Mars 🔴
             </div>
           </SpaceHeader>
           
@@ -888,20 +964,22 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
             {/* Rocket processors */}
             {racers.map((racer, index) => (
               <div key={racer.config.id}>
-                {/* Processor name */}
+                {/* Processor name - positioned above the rocket trail to avoid overlap */}
                 <div style={{
                   position: 'absolute',
-                  top: `${15 + index * 18}%`,
-                  left: '8%',
-                  fontSize: '0.875rem',
+                  top: `${12 + index * 18}%`,
+                  left: '2%',
+                  fontSize: '0.75rem',
                   fontWeight: 'bold',
                   color: racer.config.color,
-                  textShadow: '0 0 8px rgba(0,0,0,0.8)',
+                  textShadow: '0 0 8px rgba(0,0,0,0.9)',
                   zIndex: 12,
-                  background: 'rgba(0, 0, 0, 0.7)',
-                  padding: '4px 8px',
+                  background: 'rgba(0, 0, 0, 0.85)',
+                  padding: '2px 6px',
                   borderRadius: '4px',
-                  border: `1px solid ${racer.config.color}44`
+                  border: `1px solid ${racer.config.color}66`,
+                  backdropFilter: 'blur(4px)',
+                  whiteSpace: 'nowrap'
                 }}>
                   {racer.config.name}
                 </div>
@@ -916,32 +994,55 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
                   }}
                 />
                 
-                {/* Speedup indicator */}
+                {/* Speedup indicator - positioned to the right of rocket, not overlapping */}
                 <div style={{
                   position: 'absolute',
-                  right: `${85 - racer.progress * 75}%`,
-                  top: `${20 + index * 18}%`,
-                  fontSize: '0.875rem',
+                  left: `${Math.min(racer.progress * 75 + 25, 85)}%`,
+                  top: `${12 + index * 18}%`,
+                  fontSize: '0.7rem',
                   fontWeight: 'bold',
-                  color: racer.config.color,
+                  color: 'white',
                   fontFamily: 'JetBrains Mono, monospace',
-                  background: 'rgba(0, 0, 0, 0.8)',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
+                  background: `linear-gradient(45deg, ${racer.config.color}ee 0%, ${racer.config.color}aa 100%)`,
+                  padding: '2px 5px',
+                  borderRadius: '3px',
                   textShadow: 'none',
                   zIndex: 11,
-                  border: `1px solid ${racer.config.color}66`,
-                  boxShadow: `0 0 10px ${racer.config.color}33`
+                  border: `1px solid ${racer.config.color}`,
+                  boxShadow: `0 2px 8px ${racer.config.color}44`,
+                  whiteSpace: 'nowrap',
+                  transform: 'translateX(-50%)'
                 }}>
-                  {racer.currentSpeedup.toFixed(1)}× SPEED
+                  {racer.currentSpeedup.toFixed(1)}×
                 </div>
               </div>
             ))}
 
-            {/* Space Station (Destination) */}
-            <SpaceStation>🛰️</SpaceStation>
+            {/* Mars Destination */}
+            <MarsDestination>🔴</MarsDestination>
             
-            {/* Launch Pad */}
+            {/* Mars Label */}
+            <div style={{
+              position: 'absolute',
+              right: '2%',
+              top: '40%',
+              fontSize: '0.8rem',
+              fontWeight: 'bold',
+              color: '#ef4444',
+              textShadow: '0 0 8px rgba(239, 68, 68, 0.8)',
+              zIndex: 12,
+              background: 'rgba(0, 0, 0, 0.85)',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              border: '1px solid rgba(239, 68, 68, 0.6)',
+              backdropFilter: 'blur(4px)',
+              textAlign: 'center'
+            }}>
+              MARS<br/>
+              <span style={{ fontSize: '0.6rem', opacity: 0.8 }}>DESTINATION</span>
+            </div>
+            
+            {/* Earth Launch Pad */}
             <LaunchPad />
 
             {/* Cosmic Background Elements */}
@@ -963,13 +1064,13 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
           <PanelContent>
             <InfoDisplay>
               <div style={{ marginBottom: '1rem' }}>
-                <strong>What This Simulation Shows</strong><br/>
-                Each rocket represents a processor configuration racing to complete the same computational workload.
+                <strong>🚀 Mars Mission = Computing Task</strong><br/>
+                Each rocket represents a different processor configuration racing to Mars. The winner isn't always who you'd expect!
               </div>
               
               <div style={{ marginBottom: '1rem' }}>
-                <strong>Why More Cores ≠ Always Faster</strong><br/>
-                The <span className="highlight">{Math.round((1 - P) * 100)}% serial portion</span> acts like mission control - only one processor can handle it at a time.
+                <strong>🤔 Why More Cores ≠ Always Faster</strong><br/>
+                The <span className="highlight">{Math.round((1 - P) * 100)}% serial portion</span> acts like mission control - only one processor can handle it at a time, creating a bottleneck.
               </div>
 
               <div className="formula">
@@ -979,8 +1080,8 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
               </div>
 
               <div style={{ marginBottom: '1rem' }}>
-                <strong>Key Insight:</strong><br/>
-                With <span className="highlight">{Math.round(P * 100)}%</span> parallelizable work, maximum speedup is <span className="highlight">{theoreticalMax.toFixed(2)}×</span> regardless of core count!
+                <strong>🎯 Key Learning:</strong><br/>
+                With <span className="highlight">{Math.round(P * 100)}%</span> parallelizable work, maximum speedup is <span className="highlight">{theoreticalMax.toFixed(2)}×</span> no matter how many cores you add!
               </div>
 
               {P < 0.5 && (
@@ -992,7 +1093,8 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
                   border: '1px solid rgba(239, 68, 68, 0.3)',
                   marginBottom: '1rem'
                 }}>
-                  ⚠️ High serial bottleneck! This workload won't benefit much from parallel processing.
+                  ⚠️ <strong>Serial Bottleneck Alert!</strong><br/>
+                  This workload is mostly sequential - adding more cores won't help much. Sometimes a faster single core beats many slower ones!
                 </div>
               )}
 
@@ -1005,15 +1107,31 @@ export default function AmdahlsLawSimulator({ isDark = false, isRunning: externa
                   border: '1px solid rgba(16, 185, 129, 0.3)',
                   marginBottom: '1rem'
                 }}>
-                  🚀 Excellent parallelization! This workload scales well with more cores.
+                  🚀 <strong>Parallelization Paradise!</strong><br/>
+                  This workload scales beautifully with more cores. Watch those multi-core rockets fly to Mars!
+                </div>
+              )}
+
+              {P >= 0.5 && P <= 0.9 && (
+                <div style={{ 
+                  padding: '0.75rem', 
+                  background: 'rgba(6, 182, 212, 0.1)', 
+                  borderRadius: '8px',
+                  fontSize: '0.8rem',
+                  border: '1px solid rgba(6, 182, 212, 0.3)',
+                  marginBottom: '1rem'
+                }}>
+                  ⚖️ <strong>Balanced Workload</strong><br/>
+                  This shows the classic trade-off - more cores help, but there's still a serial bottleneck limiting speedup.
                 </div>
               )}
 
               <div style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '1rem' }}>
-                <strong>Real-world Applications:</strong><br/>
-                • Web servers (high parallelization)<br/>
-                • Video encoding (medium parallelization)<br/>
-                • Sequential algorithms (low parallelization)
+                <strong>🌍 Real-world Examples:</strong><br/>
+                • Web servers: Highly parallel (like our 95% scenario)<br/>
+                • Video encoding: Moderately parallel (85% scenario)<br/>
+                • Database queries: Mixed parallel/serial (70% scenario)<br/>
+                • File compression: Often sequential (30% scenario)
               </div>
             </InfoDisplay>
           </PanelContent>
