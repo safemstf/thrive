@@ -657,7 +657,7 @@ const ANTIBIOTIC_PROFILES = {
 };
 
 // ============= MAIN COMPONENT =============
-export default function AdvancedBacteremiaSimulator({ isDark = true }) {
+export default function AdvancedBacteremiaSimulator({ isDark = true, isRunning: externalRunning = true, speed: externalSpeed = 1}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const frameCountRef = useRef(0);
