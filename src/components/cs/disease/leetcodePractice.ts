@@ -656,3 +656,41 @@ function lenLongestFibSubseq(arr: number[]): number {
 
     return maxLen >= 3 ? maxLen : 0;
 }
+
+
+function robotSim(commands: number[], obstacles: number[][]): number {
+    // Directions: north, east, south, west
+    const dirs = [
+        [0, 1],   // north
+        [1, 0],   // east
+        [0, -1],  // south
+        [-1, 0]   // west
+    ];
+    let d = 0; // starting facing north
+
+    // Store obstacles in a set of strings for fast lookup
+    const obs = new Set(obstacles.map(o => `${o[0]},${o[1]}`));
+
+    let x = 0, y = 0;
+    let maxDist = 0;
+
+    for (const cmd of commands) {
+        if (cmd === -2) {          // turn left
+            d = (d + 3) % 4;       // equivalent to -1 mod 4
+        } else if (cmd === -1) {   // turn right
+            d = (d + 1) % 4;
+        } else {                   // move forward step by step
+            const [dx, dy] = dirs[d];
+            for (let step = 0; step < cmd; step++) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (obs.has(`${nx},${ny}`)) break; // obstacle ahead
+                x = nx;
+                y = ny;
+                maxDist = Math.max(maxDist, x*x + y*y);
+            }
+        }
+    }
+
+    return maxDist;
+}
