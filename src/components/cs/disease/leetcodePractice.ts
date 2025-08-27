@@ -694,3 +694,255 @@ function robotSim(commands: number[], obstacles: number[][]): number {
 
     return maxDist;
 }
+
+function longestValidParentheses(s: string): number {
+    const stack: number[] = [-1];
+    let maxLen = 0;
+
+    for (let i = 0; i < s.length; i++) {
+        if (s[i] === '(') {
+            stack.push(i);
+        } else {
+            stack.pop();
+            if (stack.length === 0) {
+                stack.push(i);
+            } else {
+                maxLen = Math.max(maxLen, i - stack[stack.length - 1]);
+            }
+        }
+    }
+    return maxLen;
+};
+
+// Tests
+console.log(longestValidParentheses("(()"));      // 2
+console.log(longestValidParentheses(")()())"));   // 4
+console.log(longestValidParentheses(""));         // 0
+console.log(longestValidParentheses("()(())"));   // 6
+
+
+function findSubstring(s: string, words: string[]): number[] {
+    
+    const result: number[] = [];
+    if (s.length === 0 || words.length === 0) return result;
+
+    const wordLen = words[0].length;
+    const totalLen = wordLen * words.length;
+
+    // frequency map for words
+    const wordCount: Record<string, number> = {};
+    for (const w of words) {
+        wordCount[w] = (wordCount[w] || 0) + 1;
+    }
+
+    // iterate over each offset in word length
+    for (let i = 0; i < wordLen; i++) {
+        let left = i;
+        let count = 0;
+        let currCount: Record<string, number> = {};
+
+        for (let j=i; j + wordLen <= s.length; j += wordLen) {
+            const word = s.slice(j, j + wordLen);
+
+            if (wordCount[word] !== undefined) {
+                currCount[word] = (currCount[word] || 0) + 1;
+                count++;
+
+                while (currCount[word] > wordCount[word]) {
+                    const leftWord = s.slice(left, left + wordLen);
+                    currCount[leftWord]--;
+                    left += wordLen;
+                    count--;
+                }
+
+                // valid concatenation
+                if (count === words.length) result.push(left);
+            } else {
+                // rest window
+                currCount = {};
+                count = 0;
+                left = j + wordLen;
+            }
+        }
+    }
+    return result;
+};
+
+console.log(findSubstring("barfoothefoobarman", ["foo","bar"])); // [0,9]
+console.log(findSubstring("wordgoodgoodgoodbestword", ["word","good","best","word"])); // []
+console.log(findSubstring("barfoofoobarthefoobarman", ["bar","foo","the"])); // [6,9,12]
+
+
+function isMatch(s: string, p: string): boolean {
+    let i = 0, j = 0;
+    let starIdx = -1, sTmpIdx = -1;
+
+    while (i < s.length) {
+        // Match single char or '?'
+        if (j < p.length && (p[j] === '?' || p[j] === s[i])) {
+            i++;
+            j++;
+        }
+        else if (j < p.length && p[j] === '*') {
+            starIdx = j;
+            sTmpIdx = i;
+            j++;
+        }
+
+        else if (starIdx !== -1) {
+            j = starIdx + 1;
+            sTmpIdx++;
+            i = sTmpIdx;
+        }
+        else {
+            return false;
+        }
+    }
+    while (j < p.length && p[j] === '*') j++;
+    
+    return j === p.length; 
+};
+
+// Tests
+console.log(isMatch("aa", "a"));          // false
+console.log(isMatch("aa", "*"));          // true
+console.log(isMatch("cb", "?a"));         // false
+console.log(isMatch("adceb", "*a*b"));    // true
+console.log(isMatch("acdcb", "a*c?b"));   // false
+
+function isNumber(s: string): boolean {
+    s = s.trim();
+    let num = false, dot = false, exp = false;
+
+    for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (c >= '0' && c <= '9') {
+            num = true;
+        } else if (c === '.') {
+            if (dot || exp) return false;
+            dot = true; 
+        } else if (c === 'e' || c === 'E') {
+            if (!num || exp) return false;
+            exp = true;
+            num = false; // reset for the exponent part
+        } else if (c === '+' || c === '-') {
+            if (i !== 0 && s[i - 1] !== 'e' && s[i - 1] !== 'E') return false;
+        } else {
+            return false;
+        }
+    }
+    return num;
+};
+
+// Tests
+console.log(isNumber("0"));           // true
+console.log(isNumber("e"));           // false
+console.log(isNumber("."));           // false
+console.log(isNumber("2e10"));        // true
+console.log(isNumber("-90E3"));       // true
+console.log(isNumber("53.5e93"));     // true
+console.log(isNumber("95a54e53"));    // false
+
+
+function fullJustify(words: string[], maxWidth: number): string[] {
+    let res: string[] = [];
+    let line: string[] = [];
+    let lineLen = 0;
+
+    for (let word of words) {
+        // if adding this word would exceed maxWidth, flush the line
+        if (lineLen + line.length + word.length > maxWidth) {
+            let spaces = maxWidth - lineLen;
+            let gaps = line.length - 1;
+
+            if (gaps === 0) {
+                // only one word --  justify left
+                res.push(line[0] + " ".repeat(spaces));
+            } else {
+                let spaceEach = Math.floor(spaces / gaps);
+                let extra = spaces % gaps;
+                let justified = "";
+
+                for (let i = 0; i < gaps; i++) {
+                    justified += line[i];
+                    justified += " ".repeat(spaceEach + (i < extra ? 1 : 0));
+                }
+                justified += line[line.length - 1];
+                res.push(justified);
+            }
+            // Reset for new line
+            line = [];
+            lineLen = 0;
+        }
+        // add word to current line
+        line.push(word);
+        lineLen += word.length;
+    }
+    // Last line -- left justified
+    let lastLine = line.join(" ");
+    lastLine += " ".repeat(maxWidth - lastLine.length);
+    res.push(lastLine);
+
+    return res;
+};
+
+// test cases
+console.log(fullJustify(["This","is","an","example","of","text","justification."], 16));
+console.log(fullJustify(["What","must","be","acknowledgment","shall","be"], 16));
+console.log(fullJustify(["Science","is","what","we","understand","well","enough","to","explain","to","a","computer.","Art","is","everything","else","we","do"], 20));
+
+function minWindow(s: string, t: string): string {
+    if (t.length > s.length) return "";
+
+    const need: Map<string, number> = new Map();
+    for (let ch of t) {
+        need.set(ch, (need.get(ch) || 0) + 1);
+    }
+
+    let haveCount = 0;
+    let needCount = need.size;
+    const window: Map<string, number> = new Map();
+
+    let res = [-1, -1];
+    let resLen = Infinity;
+    let left = 0;
+
+    for (let right = 0; right < s.length; right++) {
+        let ch = s[right];
+        window.set(ch, (window.get(ch) || 0) + 1);
+
+        if (need.has(ch) && window.get(ch) === need.get(ch)) {
+            haveCount++;
+        }
+
+        while (haveCount === needCount) {
+            // update result
+            if ((right - left + 1) < resLen) {
+                res = [left, right];
+                resLen = right - left + 1;
+            }
+
+            let leftChar = s[left];
+            window.set(leftChar, window.get(leftChar)! - 1);
+            if (need.has(leftChar) && window.get(leftChar)! < need.get(leftChar)!) {
+                haveCount--;
+            }
+            left++;
+        }
+    }
+
+    let[l, r] = res;
+    return resLen === Infinity ? "" : s.substring(l, r + 1);
+};
+
+// Tests
+console.log(minWindow("AAABBBCCCABC", "ABC"));    // "ABC"
+console.log(minWindow("AXYBZC", "ABC"));          // "AXYBZC"
+console.log(minWindow("AAAAAA", "AAA"));          // "AAA"
+console.log(minWindow("HELLO", "WORLD"));         // ""
+console.log(minWindow("XYZ", "Z"));               // "Z"
+console.log(minWindow("abcdef", "fa"));           // "abcdef"
+console.log(minWindow("BACDGABCDA", "ABCD"));     // "ABCD"
+console.log(minWindow("aAbBcC", "abc"));          // ""
+console.log(minWindow("ab", "abc"));              // ""
+console.log(minWindow("xyz", "xyzabc"));          // ""
