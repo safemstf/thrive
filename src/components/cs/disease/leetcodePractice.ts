@@ -10,6 +10,9 @@
  * 5. Heap / Median from Stream
  ******************************************************/
 
+import { Josefin_Slab } from "next/font/google";
+import { MdMoney } from "react-icons/md";
+
 /**********************
  * 1️⃣ Bit Manipulation
  **********************/
@@ -946,3 +949,410 @@ console.log(minWindow("BACDGABCDA", "ABCD"));     // "ABCD"
 console.log(minWindow("aAbBcC", "abc"));          // ""
 console.log(minWindow("ab", "abc"));              // ""
 console.log(minWindow("xyz", "xyzabc"));          // ""
+
+
+function numDistinct(s: string, t: string): number {
+    const n = s.length, m = t.length;
+    if (m > n) return 0;
+
+    // Quick multiset prune: if some char appears more times in t than in s, impossible.
+    const countS = new Map<string, number>();
+    for (const ch of s) countS.set(ch, (countS.get(ch) || 0) + 1);
+    const countT = new Map<string, number>();
+    for (const ch of t) countT.set(ch, (countT.get(ch) || 0) + 1);
+    for (const [ch, cntT] of countT) {
+        if ((countS.get(ch) || 0) < cntT) return 0;
+    }
+
+    // Use a typed array for slight performance/stability (values fit 32-bit per problem).
+    const dp = new Array<number>(m + 1).fill(0);
+    dp[0] = 1;
+
+    for (let i = 1; i <= n; i++) {
+        const si = s[i - 1];
+        // iterate j backward to avoid overwriting dp[j-1] for this row
+        for (let j = m; j >= 1; j--) {
+            if (si === t[j - 1]) {
+                dp[j] = dp[j] + dp[j - 1];
+            }
+        }
+    }
+
+    return dp[m];
+};
+
+console.log(numDistinct("aaaa", "aa")); // 6 ways to match
+console.log(numDistinct("abc", "abc")); // 1 way to match
+console.log(numDistinct("abc", "abcd")); // 0 ways to match
+console.log(numDistinct("banana", "ban")); // 3 ways to match
+
+
+
+class TreeNode {
+     val: number
+     left: TreeNode | null
+     right: TreeNode | null
+     constructor(val?: number, left?: TreeNode | null, right?: TreeNode | null) {
+         this.val = (val===undefined ? 0 : val)
+         this.left = (left===undefined ? null : left)
+         this.right = (right===undefined ? null : right)
+     }
+}
+ 
+
+function maxPathSum(root: TreeNode | null): number {
+    // Global best path sum seen so far.
+    let best = Number.NEGATIVE_INFINITY; // +1
+
+    function dfs(node: TreeNode | null): number {
+        if (node === null) return 0;              // +1
+
+        // Recursive exploration
+        const leftGain = Math.max(dfs(node.left), 0);   // +T(left) +1
+        const rightGain = Math.max(dfs(node.right), 0); // +T(right) +1
+
+        // Path through current node
+        const priceNewPath = node.val + leftGain + rightGain; // +3
+
+        // Update best
+        if (priceNewPath > best) best = priceNewPath;   // +2
+
+        // Return extendable gain
+        return node.val + Math.max(leftGain, rightGain); // +3
+    }
+
+    dfs(root); // +T(root)
+    return best; // +1
+}
+
+
+
+// helper to print test result
+function runAndLog(name: string, root: TreeNode | null) {
+  console.log(`${name}:`, maxPathSum(root));
+}
+
+// Example 1: [1,2,3] -> 2 -> 1 -> 3 = 6
+const ex1 = new TreeNode(1, new TreeNode(2), new TreeNode(3));
+runAndLog("ex1 [1,2,3]", ex1); // expected 6
+
+// Example 2: [-10,9,20,null,null,15,7] -> 15 + 20 + 7 = 42
+const ex2 = new TreeNode(
+  -10,
+  new TreeNode(9),
+  new TreeNode(20, new TreeNode(15), new TreeNode(7))
+);
+runAndLog("ex2 [-10,9,20,...]", ex2); // expected 42
+
+// Extra 1: single negative node -> [-3] => -3
+const singleNeg = new TreeNode(-3);
+runAndLog("singleNeg [-3]", singleNeg); // expected -3
+
+// Extra 2: mix with two positive children => [2, -1, 2] => best: 2 + 2 = 4
+const mix = new TreeNode(2, new TreeNode(-1), new TreeNode(2));
+runAndLog("mix [2,-1,2]", mix); // expected 4
+
+// Extra 3: skewed left chain: 1 <- 2 <- 3 (as left children)
+// path best is sum of all: 3 + 2 + 1 = 6
+const skewed = new TreeNode(1, new TreeNode(2, new TreeNode(3), null), null);
+runAndLog("skewed left [1,2,null,3]", skewed); // expected 6
+
+// Extra 4: more mixed values for coverage
+const tricky = new TreeNode(
+  -2,
+  new TreeNode(-1),
+  new TreeNode(3, new TreeNode(-4), new TreeNode(5))
+);
+runAndLog("tricky mixed", tricky); // sanity check
+
+// -----------------------------------------------------
+// Complexity Summary
+// Each node visited once: O(n)
+// Per node: O(1) work (adds, max, compare)
+// Total: T(n) = O(n)
+
+// -----------------------------------------------------
+// Quick test cases (copy/paste friendly):
+// Input: [1,2,3]              -> Output: 6
+// Input: [-10,9,20,null,null,15,7] -> Output: 42
+// Input: [1]                  -> Output: 1
+// Input: [-3]                 -> Output: -3
+// Input: [2,-1]               -> Output: 2
+
+
+function findLadders(beginWord: string, endWord: string, wordList: string[]): string[][] {
+    const dict = new Set(wordList);
+    if (!dict.has(endWord)) return [];
+
+    const parents = new Map<string, string[]>(); // child -> [parents at previous level]
+    let queue: string[] = [beginWord];
+    const visited = new Set<string>([beginWord]);
+    let foundEnd = false;
+
+    while (queue.length && !foundEnd) {
+        const nextLevel = new Set<string>();
+        const localVisited = new Set<string>();
+
+        for (const word of queue) {
+            for (const nei of getNeighbors(word, dict)) {
+                if (!visited.has(nei)) {
+                    if (!parents.has(nei)) parents.set(nei, []); // <-- FIX (was checking visited)
+                    parents.get(nei)!.push(word);                 // collect ALL shortest-level parents
+                    localVisited.add(nei);
+                    nextLevel.add(nei);
+                    if (nei === endWord) foundEnd = true;
+                }
+            }
+        }
+
+        for (const w of localVisited) visited.add(w);
+        queue = Array.from(nextLevel);
+    }
+
+    if (!foundEnd) return [];
+
+    const res: string[][] = [];
+    const path: string[] = [];
+
+    // backtrack from endWord using parents to generate all shortest sequences
+    function backtrack(word: string) {
+        if (word === beginWord) {
+            res.push([beginWord, ...path.slice().reverse()]);
+            return;
+        }
+        for (const p of parents.get(word) || []) {
+            path.push(word);
+            backtrack(p);
+            path.pop();
+        }
+    }
+
+    backtrack(endWord);
+    return res;
+}
+
+// generate neighbors that differ by exactly 1 letter
+function getNeighbors(word: string, dict: Set<string>): string[] {
+    const out: string[] = [];
+    const arr = word.split("");
+    for (let i = 0; i < arr.length; i++) {
+        const old = arr[i];
+        for (let c = 97; c <= 122; c++) {
+            const ch = String.fromCharCode(c);
+            if (ch === old) continue;
+            arr[i] = ch;
+            const w = arr.join("");
+            if (dict.has(w)) out.push(w);
+        }
+        arr[i] = old;
+    }
+    return out;
+}
+
+// tests
+console.log(findLadders("hit", "cog", ["hot","dot","dog","lot","log","cog"]));
+// expected: [["hit","hot","dot","dog","cog"],["hit","hot","lot","log","cog"]]
+
+console.log(findLadders("hit", "cog", ["hot","dot","dog","lot","log"]));
+// expected: []
+
+
+/**
+ * Definition for a binary tree node.
+ * class TreeNode {
+ *     val: number
+ *     left: TreeNode | null
+ *     right: TreeNode | null
+ *     constructor(val?: number, left?: TreeNode | null, right?: TreeNode | null) {
+ *         this.val = (val===undefined ? 0 : val)
+ *         this.left = (left===undefined ? null : left)
+ *         this.right = (right===undefined ? null : right)
+ *     }
+ * }
+ */
+
+function preorderTraversal(root: TreeNode | null): number[] {
+    // Morris preorder traversal amazing solution
+    // time O(n), space O(1)
+    const res: number[] = [];
+    let curr = root;
+
+    while (curr) {
+        if (!curr.left) {
+            // no left subtree: visit node and move right
+            res.push(curr.val);
+            curr = curr.right;
+        } else {
+            // find predecessor
+            let pred = curr.left;
+            while (pred.right && pred.right !== curr) pred = pred.right;
+
+            if (!pred.right) {
+                // create temporary thread, visit current, go left
+                res.push(curr.val);
+                pred.right = curr;
+                curr = curr.left;
+            } else {
+                pred.right = null;
+                curr = curr.right;
+            }
+        }
+    }
+    return res;
+};
+
+function postorderTraversal(root: TreeNode | null): number[] {
+  if (!root) return [];
+
+  const stack: TreeNode[] = [root];
+  const res: number[] = [];
+
+  while (stack.length) {
+    const node = stack.pop()!;
+    res.push(node.val); // visit root first
+    if (node.left) stack.push(node.left);   // left child later
+    if (node.right) stack.push(node.right); // right child earlier
+  }
+
+  return res.reverse(); // reverse to get Left->Right->Root
+}
+
+
+function finalPositionOfSnake(n: number, commands: string[]): number {
+    let row = 0;
+    let col = 0;
+
+    // process each command
+    for (const cmd of commands) {
+        if (cmd === "UP") row -= 1;
+        else if (cmd === "DOWN") row += 1;
+        else if (cmd === "LEFT") col -= 1;
+        else if (cmd === "RIGHT") col += 1;
+    }
+
+    return row * n + col;
+};
+
+// tests
+console.log(finalPositionOfSnake(4, ["RIGHT","RIGHT","DOWN","LEFT"])); // row=1,col=1 -> 1*4+1=5
+console.log(finalPositionOfSnake(5, [])); // no moves -> 0
+
+
+function restoreIpAddresses(s: string): string[] {
+    const n = s.length;
+    const res: string[] = [];
+
+    // Quick pruning: impossible length
+    if ( n < 4 || n > 12) return res;
+
+    // check if its a valid segment
+    function isValid(start: number, len: number): boolean {
+      // leading zero rule
+      if(len > 1 && s[start] === '0') return false; 
+
+      let val = 0;
+      for (let i = 0; i < len; i++) {
+        val = val * 10 + (s.charCodeAt(start + i) - 48);
+      }
+      return val <= 255;
+    }
+
+    function backtrack(start: number, parts: string[]): void {
+      const segmentsLeft = 4 - parts.length;
+      const remainingChars = n - start;
+
+      if (remainingChars < segmentsLeft || remainingChars > 3 * segmentsLeft) return;
+      
+      if (parts.length === 4) {
+        if (start === n) res.push(parts.join('.')); // found one
+        return;
+      }
+
+      for (let len = 1; len <= 3 && start + len <= n; len++) {
+        if (!isValid(start, len)) continue;
+        parts.push(s.substring(start, start + len));
+        backtrack(start + len, parts);
+        parts.pop();
+      }
+    }
+
+    backtrack(0, []);
+    return res;
+};
+
+// test
+console.log(restoreIpAddresses("25525511135")); // ["255.255.11.135","255.255.111.35"]
+console.log(restoreIpAddresses("0000"));        // ["0.0.0.0"]
+console.log(restoreIpAddresses("101023"));      // ["1.0.10.23","1.0.102.3","10.1.0.23","10.10.2.3","101.0.2.3"]
+
+function sortPeople(names: string[], heights: number[]): string[] {
+    const n = names.length
+
+    const people: { name: string; h: number}[] = new Array(n);
+    for (let i = 0; i < n; i++) {
+      people[i] = {name: names[i], h: heights[i] }; 
+    }
+
+    people.sort((a, b) => b.h - a.h);
+
+    //extract sorted names
+    const result: string[] = new Array(n);
+    for (let i = 0; i < n; i++) {
+      result[i] = people[i].name;
+    }
+    return result;
+};
+
+function commonFactors(a: number, b: number): number {
+    function gcd(x: number, y: number): number {
+        while (y !== 0) {
+            [x, y] = [y, x % y];
+        }
+        return x;
+    }
+
+    const g = gcd(a, b);
+    let count = 0;
+
+    // count divisor of g
+    for (let i = 1; i * i <= g; i++) {
+        if (g % i === 0) {
+            count++;
+            if(i !== g / i){
+                count++;
+            }
+        }
+    }
+    return count;
+};
+
+console.log(commonFactors(7, 13));  // 1 → {1}
+console.log(commonFactors(1000, 1000)); // 16 (all divisors of 1000)
+
+type Job = [number /*time*/, number /*money*/];
+
+function maximizeDoorDash(jobs: Job[], totalTime: number): number {
+const m = jobs.length; // + 1 const 
+if (totalTime <= 0|| m === 0) return 0; // + 2
+// dp[t] = max money achievable using time exactly t (or <= t if we look at all dp <= t)
+// we use 1D reversed iteration for 0/1 knapsack
+
+const dp = new Array<number>(totalTime + 1).fill(0); // + 3
+
+for (let i = 0; i <m; i++) { // + 3n
+  const [time, money] = jobs[i];
+  if (time <= 0) { 
+    continue;
+  }
+
+  for ( let t = totalTime; t >= time; t--) {
+    const cand = dp[t - time] + money;
+    if (cand > dp[t]) dp[t] = cand;
+  }
+}
+
+return dp[totalTime];
+};
+
+
+// Youtube Video: https://leetcode.com/problems/maximum-number-of-events-that-can-be-attended-ii/submissions/

@@ -1,7 +1,7 @@
 // app/layout.tsx - Server-Safe Layout
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
-import ogImage from '../../public/assets/og-preview.png';
+import ogImage from '../../public/assets/logo3.jpeg';
 import './globals.css';
 
 // Import client components

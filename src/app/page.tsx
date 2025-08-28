@@ -536,7 +536,7 @@ export default function HomePage() {
           </Section>
 
           {/* Quick Actions */}
-          <Section style={{ background: 'var(--glass-background)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--glass-border)' }}>
+          <Section style={{ background: 'var(--glass-background)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--glass-border)', marginBottom: '2rem' }}>
             <ContentWrapper>
               <Heading2 style={{ textAlign: 'center', marginBottom: 'var(--spacing-2xl)' }}>
                 Quick Actions

@@ -38,7 +38,7 @@ const AlgorithmVisualizer = dynamic(() => import('@/components/cs/algorithms/alg
   loading: () => <SimulationLoader>Loading Algorithm Explorer...</SimulationLoader>
 });
 
-const BacteriaPhageSimulation = dynamic(() => import('@/components/cs/bacteria/bacteria'), {
+const AdvancedBacteremiaSimulator = dynamic(() => import('@/components/cs/bacteria/bacteria'), {
   ssr: false,
   loading: () => <SimulationLoader>Loading Bacteria & Phages...</SimulationLoader>
 });
@@ -764,9 +764,9 @@ export default function SimulationsPage() {
 
       case 'bacteria-phage':
         return (
-          <BacteriaPhageSimulation
-            isRunning={isRunning}
-            speed={speed}
+          <AdvancedBacteremiaSimulator
+            initialRunning={isRunning}
+            initialSpeed={speed}
             isDark={true}
           />
         );

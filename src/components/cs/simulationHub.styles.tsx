@@ -60,7 +60,7 @@ export const SimulationContainer = styled.div<{ $isDark?: boolean }>`
 
 // Video section with enhanced visual depth
 export const VideoSection = styled.div`
-  width: 100%;
+  width: 97%;
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(10, 20, 40, 0.9));
   position: relative;
   aspect-ratio: 16 / 9;
@@ -356,57 +356,128 @@ export const StatCard = styled.div<{ $color?: string; $alert?: boolean }>`
 `;
 
 // Parameter controls with Matrix styling - simplified
-export const ParameterControl = styled.div`
+export const ParameterControl = styled.div<{ $isDark?: boolean }>`
+  --accent: #3b82f6; /* blue-500 */
+  --accent-strong: #1d4ed8; /* blue-700 */
+  --track-dark: rgba(59,130,246,0.18);
+  --track-light: rgba(15,23,42,0.06);
+
+  /* adapt to theme */
+  --bg: ${({ $isDark = true }) => ($isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)')};
+  --label: ${({ $isDark = true }) => ($isDark ? '#e6eef8' : '#0f172a')};       /* higher contrast label */
+  --muted: ${({ $isDark = true }) => ($isDark ? '#94a3b8' : '#475569')};       /* muted text */
+  --thumb-border: ${({ $isDark = true }) => ($isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)')};
+
+  display: block;
+  padding: 0.25rem 0;
   margin-bottom: 1.5rem;
-  
+  background: var(--bg);
+  border-radius: 8px;
+
   .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.75rem;
   }
-  
+
   .label {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #e2e8f0;
-    font-family: 'Courier New', monospace;
-  }
-  
-  .value {
-    color: #3b82f6;
-    font-family: 'Courier New', monospace;
+    font-size: 0.95rem;
     font-weight: 700;
-    font-size: 0.9rem;
-    text-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    color: var(--label);
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.2px;
   }
-  
+
+  .value {
+    color: var(--accent);
+    font-family: 'Courier New', monospace;
+    font-weight: 800;
+    font-size: 0.95rem;
+    text-shadow: 0 0 4px rgba(59, 130, 246, 0.25);
+    margin-left: 0.5rem;
+  }
+
+  /* Range slider: larger thumb, accessible focus ring */
   input[type="range"] {
     width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background: rgba(59, 130, 246, 0.2);
-    outline: none;
+    height: 12px;
     -webkit-appearance: none;
-    
-    &::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.4);
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      
-      &:hover {
-        transform: scale(1.2);
-        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.6);
-      }
+    background: ${({ $isDark = true }) => ($isDark ? 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.02))' : 'transparent')};
+    outline: none;
+    border-radius: 999px;
+  }
+
+  /* Track for webkit */
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: ${({ $isDark = true }) => ($isDark ? 'var(--track-dark)' : 'var(--track-light)')};
+  }
+
+  /* Thumb for webkit */
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -7px; /* centers the thumb on the track */
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    border: 2px solid var(--thumb-border);
+    box-shadow: 0 4px 14px rgba(13, 42, 148, 0.25);
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.06);
+    box-shadow: 0 6px 20px rgba(13, 42, 148, 0.32);
+  }
+
+  /* Focus visible for keyboard users */
+  input[type="range"]:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 6px rgba(59,130,246,0.14), 0 6px 20px rgba(13, 42, 148, 0.28);
+    transform: scale(1.06);
+  }
+
+  /* Firefox styles */
+  input[type="range"]::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: ${({ $isDark = true }) => ($isDark ? 'var(--track-dark)' : 'var(--track-light)')};
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    border: 2px solid var(--thumb-border);
+    box-shadow: 0 4px 14px rgba(13, 42, 148, 0.25);
+    cursor: pointer;
+  }
+
+  /* Reduced-motion / prefers-contrast */
+  @media (prefers-reduced-motion: reduce) {
+    input[type="range"]::-webkit-slider-thumb,
+    input[type="range"]::-moz-range-thumb {
+      transition: none;
+    }
+  }
+
+  @media (prefers-contrast: more) {
+    --label: ${({ $isDark = true }) => ($isDark ? '#ffffff' : '#0b1220')};
+    --muted: ${({ $isDark = true }) => ($isDark ? '#cbd5e1' : '#334155')};
+    input[type="range"]::-webkit-slider-track,
+    input[type="range"]::-moz-range-track {
+      background: rgba(59,130,246,0.28);
+    }
+    input[type="range"]::-webkit-slider-thumb,
+    input[type="range"]::-moz-range-thumb {
+      box-shadow: 0 0 0 5px rgba(59,130,246,0.16);
     }
   }
 `;
+
 
 // Intervention components with default props
 export const InterventionGrid = styled.div`

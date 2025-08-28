@@ -355,58 +355,6 @@ const MobileDarkModeButton = styled.button`
   }
 `;
 
-/* Skip buttons */
-const SkipButton = styled.button<{ $isScrolled?: boolean }>`
-  background: none;
-  border: 1px solid var(--color-primary-500);
-  color: var(--color-primary-500);
-  padding: ${({ $isScrolled }) => ($isScrolled ? '0.6rem 1.2rem' : '0.75rem 1.5rem')};
-  font-size: ${({ $isScrolled }) => ($isScrolled ? '0.9rem' : '1rem')};
-  font-family: 'Work Sans', sans-serif;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  white-space: nowrap;
-
-  &:hover {
-    background: var(--color-primary-500);
-    color: var(--color-background-secondary);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-`;
-
-const MobileSkipButton = styled.button`
-  background: var(--color-background-secondary);
-  border: 1px solid var(--color-primary-500);
-  color: var(--color-primary-500);
-  padding: 0.875rem 1.5rem;
-  font-size: 0.95rem;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: 300;
-  width: 100%;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-
-  &:hover {
-    background: var(--color-primary-500);
-    color: var(--color-background-secondary);
-  }
-`;
 
 const DebugHandle = styled.button<{ $open: boolean }>`
   position: fixed;
@@ -651,11 +599,6 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
               </MobileNavButton>
             );
           })}
-          
-          <MobileSkipButton onClick={handleSkipClick} ref={skipButtonRef} aria-label="Skip to main content">
-            <ArrowDownToLine size={16} />
-            Skip to Content
-          </MobileSkipButton>
 
           <MobileDarkModeButton onClick={toggleDarkMode}>
             {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
@@ -792,11 +735,6 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
             </DebugPanel>
           </>
         )}
-
-        <SkipButton onClick={handleSkipClick} $isScrolled={isScrolled} ref={skipButtonRef} title="Skip to main content" aria-label="Skip to main content">
-          <ArrowDownToLine size={16} />
-          {!isScrolled && 'Skip'}
-        </SkipButton>
 
         <DarkModeButton $isScrolled={isScrolled} $isDark={isDarkMode} onClick={toggleDarkMode} title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
           {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
