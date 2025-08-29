@@ -3,10 +3,189 @@
 import { ArtworkCategory, ArtworkSize, ArtworkStatus, GalleryPiece, GalleryVisibility } from "@/types/gallery.types";
 import { ConceptProgress, Portfolio, PortfolioKind, PortfolioReview, PortfolioSettings, PortfolioStats } from "@/types/portfolio.types";
 import type { TopPerformer, AssessmentLeaderboard, RankingPlatformStats } from '@/types/thrive.types';
+import { Users, Zap, Brain, Target, Heart, Timer, Lightbulb, Palette, Puzzle, PenTool, TrendingUp, BookOpen } from "lucide-react";
 
 // ==============================================
 // THRIVE RANKING DATA (moved to top for better organization)
 // ==============================================
+
+// Assessment metadata
+export const PROFESSIONAL_ASSESSMENTS = [
+  {
+    id: 'professional-communication',
+    title: 'Professional Communication Evaluation',
+    description: 'Assesses clarity, tone, and adaptability in workplace communication.',
+    icon: Users,
+    color: '#3b82f6',
+  },
+  {
+    id: 'innovative-problem-solving',
+    title: 'Innovation & Creative Problem Solving',
+    description: 'Measures creative thinking, ideation, and innovative solution development.',
+    icon: Zap,
+    color: '#8b5cf6',
+  },
+  {
+    id: 'technical-problem-solving',
+    title: 'Technical Problem-Solving Skills',
+    description: 'Evaluates analytical thinking, coding, and debugging capabilities.',
+    icon: Brain,
+    color: '#06b6d4',
+  },
+  {
+    id: 'leadership-assessment',
+    title: 'Leadership & Team Collaboration',
+    description: 'Analyzes decision-making, motivation, and conflict resolution skills.',
+    icon: Target,
+    color: '#f59e0b',
+  },
+  {
+    id: 'emotional-intelligence',
+    title: 'Emotional Intelligence Assessment',
+    description: 'Assesses empathy, self-awareness, and interpersonal relationship skills.',
+    icon: Heart,
+    color: '#ec4899',
+  },
+  {
+    id: 'time-management',
+    title: 'Time Management & Productivity',
+    description: 'Measures organization, prioritization, and execution efficiency.',
+    icon: Timer,
+    color: '#10b981',
+  }
+];
+
+// Psychological assessments metadata
+export const PSYCHOLOGICAL_ASSESSMENTS = {
+  personality: [
+    {
+      id: 'big-five-50',
+      title: 'Big Five Personality (50-item)',
+      description: 'Goldberg\'s Big Five Factor Markers - comprehensive personality assessment.',
+      items: 50,
+      duration: '10-15 min',
+      category: 'personality',
+      validated: true,
+    },
+    {
+      id: 'mini-ipip',
+      title: 'Mini-IPIP (20-item)',
+      description: 'Quick Big Five assessment - ideal for rapid screening.',
+      items: 20,
+      duration: '3-5 min',
+      category: 'personality',
+      validated: true,
+    },
+    {
+      id: 'hexaco-60',
+      title: 'HEXACO-60',
+      description: 'Six-factor personality model including Honesty-Humility.',
+      items: 60,
+      duration: '10-15 min',
+      category: 'personality',
+      validated: true,
+    },
+  ],
+  clinical: [
+    {
+      id: 'gad-7',
+      title: 'GAD-7 Anxiety Scale',
+      description: 'Generalized Anxiety Disorder screening tool.',
+      items: 7,
+      duration: '2-3 min',
+      category: 'anxiety',
+      validated: true,
+    },
+    {
+      id: 'phq-9',
+      title: 'PHQ-9 Depression Scale',
+      description: 'Patient Health Questionnaire for depression screening.',
+      items: 9,
+      duration: '3-5 min',
+      category: 'depression',
+      validated: true,
+    },
+  ],
+  wellbeing: [
+    {
+      id: 'via-character',
+      title: 'VIA Character Strengths',
+      description: 'Identify your top character strengths and virtues.',
+      items: 120,
+      duration: '15-20 min',
+      category: 'strengths',
+      validated: true,
+    },
+    {
+      id: 'perma',
+      title: 'PERMA Wellbeing Scale',
+      description: 'Measures five pillars of wellbeing and flourishing.',
+      items: 23,
+      duration: '5-7 min',
+      category: 'wellbeing',
+      validated: true,
+    },
+  ],
+};
+
+// Creativity & Critical Thinking assessments
+export const CREATIVITY_ASSESSMENTS = [
+  {
+    id: 'divergent-thinking',
+    title: 'Divergent Thinking Assessment',
+    description: 'Measures ability to generate creative ideas and see multiple solutions.',
+    icon: Lightbulb,
+    color: '#fbbf24',
+    items: 30,
+    duration: '15-20 min',
+  },
+  {
+    id: 'creative-personality',
+    title: 'Creative Personality Scale',
+    description: 'Assesses personality traits associated with creativity.',
+    icon: Palette,
+    color: '#f472b6',
+    items: 30,
+    duration: '10 min',
+  },
+  {
+    id: 'critical-thinking',
+    title: 'Watson-Glaser Critical Thinking',
+    description: 'Evaluates ability to analyze information and make logical decisions.',
+    icon: Puzzle,
+    color: '#818cf8',
+    items: 40,
+    duration: '20-30 min',
+  },
+  {
+    id: 'creative-problem-solving',
+    title: 'Creative Problem Solving Profile',
+    description: 'Identifies your creative problem-solving style and preferences.',
+    icon: PenTool,
+    color: '#34d399',
+    items: 35,
+    duration: '15 min',
+  },
+  {
+    id: 'systems-thinking',
+    title: 'Systems Thinking Scale',
+    description: 'Measures ability to understand complex relationships and patterns.',
+    icon: TrendingUp,
+    color: '#60a5fa',
+    items: 25,
+    duration: '12 min',
+  },
+  {
+    id: 'cognitive-reflection',
+    title: 'Cognitive Reflection Test',
+    description: 'Quick assessment of analytical vs. intuitive thinking.',
+    icon: BookOpen,
+    color: '#c084fc',
+    items: 10,
+    duration: '5 min',
+  },
+];
+
 
 export const MOCK_TOP_PERFORMERS: TopPerformer[] = [
   {

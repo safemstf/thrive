@@ -1,305 +1,361 @@
-// src/app/thrive/thriveLogic.tsx - Separated logic for better organization
+// src/components/thrive/thriveLogic.tsx
 'use client';
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/providers/authProvider';
+
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
-  Calculator,
-  PenTool,
-  Brain,
-  BarChart3
+  Target, Trophy, BarChart3, Eye, Sparkles, CheckCircle, Timer,
+  Brain, AlertCircle, Lightbulb, Shield, Users, Activity,
+  Code, TrendingUp, Calculator, Star, Globe, Award
 } from 'lucide-react';
 
-// Types
-export interface SkillChallenge {
+// Import all data from mockData
+import {
+  PROFESSIONAL_ASSESSMENTS,
+  PSYCHOLOGICAL_ASSESSMENTS,
+  CREATIVITY_ASSESSMENTS,
+  MOCK_TOP_PERFORMERS,
+  PLATFORM_RANKING_STATS,
+  MOCK_ASSESSMENT_LEADERBOARDS,
+  WEEKLY_TRENDING_PERFORMERS,
+  ASSESSMENT_COMPLETION_TRENDS,
+  EMPLOYER_TOOLS,
+  EMPLOYER_PLATFORM_METRICS
+} from '@/data/mockData';
+
+// ==============================================
+// TYPES & INTERFACES
+// ==============================================
+
+export interface Assessment {
   id: string;
   title: string;
   description: string;
-  icon: any;
-  participants: number;
-  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
-  category: string;
-  featured: boolean;
-  component: React.ComponentType;
-}
-
-export interface LiveSession {
-  title: string;
-  host: string;
-  time: string;
-  participants: number;
+  skillType?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'expert';
+  duration?: number | string;
+  participants?: number;
+  averageScore?: number;
+  route?: string;
+  icon?: any;
+  color?: string;
+  items?: number;
+  validated?: boolean;
+  category?: string;
 }
 
 export interface LeaderboardEntry {
-  name: string;
-  score: string;
   rank: number;
+  name: string;
+  username?: string;
+  score: number;
+  verified?: boolean;
+  completedAt?: Date;
+  timeSpent?: number;
 }
 
-// Challenge Components
-export const MathChallenge = () => {
-  const [problem, setProblem] = useState('');
-  const [answer, setAnswer] = useState('');
-  const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(60);
-  
-  const generateProblem = () => {
-    const operations = [
-      { op: '+', fn: (a: number, b: number) => a + b },
-      { op: '-', fn: (a: number, b: number) => a - b },
-      { op: '×', fn: (a: number, b: number) => a * b }
-    ];
-    const { op, fn } = operations[Math.floor(Math.random() * operations.length)];
-    const a = Math.floor(Math.random() * 50) + 1;
-    const b = Math.floor(Math.random() * 50) + 1;
-    setProblem(`${a} ${op} ${b} = ${fn(a, b)}`);
-  };
-  
-  useEffect(() => {
-    generateProblem();
-    const timer = setInterval(() => {
-      setTimeLeft(prev => prev > 0 ? prev - 1 : 0);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const [expression, correctAnswer] = problem.split(' = ');
-    if (parseInt(answer) === parseInt(correctAnswer)) {
-      setScore(prev => prev + 1);
-      generateProblem();
-      setAnswer('');
-    }
-  };
-  
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <h3 style={{ marginBottom: '2rem', color: '#2c2c2c' }}>Mathematical Reasoning</h3>
-      <div style={{ 
-        fontSize: '1.5rem', 
-        marginBottom: '1.5rem', 
-        fontWeight: '600',
-        padding: '1rem',
-        background: '#f8f9fa',
-        borderRadius: '8px',
-        border: '1px solid #e9ecef'
-      }}>
-        Verify: {problem.split(' = ')[0]} = ?
-      </div>
-      <form onSubmit={handleSubmit} style={{ marginBottom: '1.5rem' }}>
-        <input
-          type="number"
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          style={{
-            padding: '0.75rem',
-            fontSize: '1rem',
-            border: '1px solid #e0e0e0',
-            borderRadius: '8px',
-            textAlign: 'center',
-            width: '120px',
-            marginRight: '1rem',
-            fontFamily: 'Work Sans, sans-serif'
-          }}
-          placeholder="Answer"
-          autoFocus
-        />
-        <button
-          type="submit"
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: '#2c2c2c',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontFamily: 'Work Sans, sans-serif',
-            fontWeight: '500'
-          }}
-        >
-          Verify
-        </button>
-      </form>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        maxWidth: '200px', 
-        margin: '0 auto',
-        padding: '1rem',
-        background: '#f8f9fa',
-        borderRadius: '8px',
-        fontSize: '0.9rem',
-        color: '#666'
-      }}>
-        <div><strong>{score}</strong> Correct</div>
-        <div><strong>{timeLeft}s</strong> Remaining</div>
-      </div>
-    </div>
-  );
+export interface PlatformStats {
+  totalParticipants: number;
+  activeThisWeek: number;
+  completionsToday: number;
+  averageScore: number;
+  verifiedProfessionals?: number;
+  activeSessions?: number;
+  employerTrust?: number;
+}
+
+export type ViewMode = 'assessments' | 'rankings' | 'analytics' | 'employer-tools';
+export type AssessmentCategory = 'professional' | 'psychological' | 'creativity';
+export type PsychCategory = 'personality' | 'clinical' | 'wellbeing';
+
+// ==============================================
+// DATA TRANSFORMATION FUNCTIONS
+// ==============================================
+
+// Transform professional assessments to add missing fields for dashboard
+const transformProfessionalAssessments = (): Assessment[] => {
+  return PROFESSIONAL_ASSESSMENTS.map((assessment, index) => ({
+    ...assessment,
+    duration: 45 + (index * 5), // Mock duration
+    participants: 5000 + (index * 2000), // Mock participants
+    averageScore: 70 + (index * 3), // Mock average score
+    difficulty: ['intermediate', 'expert', 'intermediate', 'expert', 'beginner', 'expert'][index] as any,
+    skillType: ['code', 'analytics', 'management', 'design', 'marketing', 'cloud'][index],
+    route: `/dashboard/thrive/assessments/${assessment.id}`
+  }));
 };
 
-export const WritingChallenge = () => {
-  const [prompt] = useState('Describe a technological innovation that could improve remote collaboration');
-  const [response, setResponse] = useState('');
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes
-  
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(prev => prev > 0 ? prev - 1 : 0);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-  
-  const wordCount = response.trim().split(/\s+/).filter(word => word.length > 0).length;
-  
-  return (
-    <div>
-      <h3 style={{ marginBottom: '1.5rem', color: '#2c2c2c' }}>Professional Writing</h3>
-      <div style={{ 
-        background: '#f8f9fa', 
-        padding: '1.5rem', 
-        borderRadius: '8px', 
-        marginBottom: '1.5rem',
-        border: '1px solid #e9ecef'
-      }}>
-        <strong>Prompt:</strong> {prompt}
-      </div>
-      <textarea
-        value={response}
-        onChange={(e) => setResponse(e.target.value)}
-        placeholder="Write your response here..."
-        style={{
-          width: '100%',
-          minHeight: '200px',
-          padding: '1rem',
-          border: '1px solid #e0e0e0',
-          borderRadius: '8px',
-          fontSize: '1rem',
-          fontFamily: 'Work Sans, sans-serif',
-          lineHeight: '1.5',
-          resize: 'vertical'
-        }}
-      />
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        marginTop: '1rem',
-        padding: '1rem',
-        background: '#f8f9fa',
-        borderRadius: '8px',
-        fontSize: '0.9rem',
-        color: '#666'
-      }}>
-        <div><strong>{wordCount}</strong> words</div>
-        <div><strong>{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</strong> remaining</div>
-      </div>
-    </div>
-  );
+// Transform psychological assessments for consistent interface
+const transformPsychologicalAssessments = () => {
+  const transformed: Record<PsychCategory, Assessment[]> = {
+    personality: [],
+    clinical: [],
+    wellbeing: []
+  };
+
+  Object.entries(PSYCHOLOGICAL_ASSESSMENTS).forEach(([category, assessments]) => {
+    if (category in transformed) {
+      transformed[category as PsychCategory] = assessments.map(assessment => ({
+        ...assessment,
+        icon: Brain,
+        color: '#8b5cf6',
+        duration: assessment.duration || '10-15 min',
+        route: `/dashboard/thrive/assessments/${assessment.id}`
+      }));
+    }
+  });
+
+  return transformed;
 };
 
-export const ComingSoonChallenge = ({ title }: { title: string }) => (
-  <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
-    <h3>{title}</h3>
-    <p>Coming soon - Advanced exercises and professional development challenges</p>
-  </div>
-);
+// Transform creativity assessments
+const transformCreativityAssessments = (): Assessment[] => {
+  return CREATIVITY_ASSESSMENTS.map(assessment => ({
+    ...assessment,
+    route: `/dashboard/thrive/assessments/${assessment.id}`
+  }));
+};
 
-// Main hook for thrive logic
-export const useThriveLogic = () => {
-  const { user } = useAuth();
-  const [selectedChallenge, setSelectedChallenge] = useState<string | null>(null);
-  const [onlineUsers] = useState(247);
-  const [activeSessions] = useState(12);
-  const [completedToday] = useState(89);
-  
-  const skillChallenges: SkillChallenge[] = [
-    {
-      id: 'math-reasoning',
-      title: 'Mathematical Reasoning',
-      description: 'Sharpen analytical thinking with mathematical problem-solving exercises',
-      icon: Calculator,
-      participants: 45,
-      difficulty: 'Intermediate',
-      category: 'Analytics',
-      featured: true,
-      component: MathChallenge
-    },
-    {
-      id: 'professional-writing',
-      title: 'Professional Writing',
-      description: 'Develop clear, persuasive communication skills for business contexts',
-      icon: PenTool,
-      participants: 67,
-      difficulty: 'Advanced',
-      category: 'Communication',
-      featured: false,
-      component: WritingChallenge
-    },
-    {
-      id: 'logic-puzzles',
-      title: 'Logic & Strategy',
-      description: 'Enhance critical thinking through structured problem-solving',
-      icon: Brain,
-      participants: 34,
-      difficulty: 'Intermediate',
-      category: 'Strategy',
-      featured: false,
-      component: () => <ComingSoonChallenge title="Logic & Strategy Challenge" />
-    },
-    {
-      id: 'data-interpretation',
-      title: 'Data Analysis',
-      description: 'Practice interpreting charts, graphs, and statistical information',
-      icon: BarChart3,
-      participants: 28,
-      difficulty: 'Advanced',
-      category: 'Analytics',
-      featured: false,
-      component: () => <ComingSoonChallenge title="Data Analysis Challenge" />
-    }
-  ];
-  
-  const liveSessions: LiveSession[] = [
-    { title: 'Advanced Excel Techniques', host: 'Sarah Chen', time: '2:30 PM', participants: 18 },
-    { title: 'Design Thinking Workshop', host: 'Michael Torres', time: '3:00 PM', participants: 12 },
-    { title: 'Technical Writing Masterclass', host: 'Dr. Amanda Foster', time: '4:00 PM', participants: 22 },
-    { title: 'Project Management Essentials', host: 'David Kim', time: '5:00 PM', participants: 15 }
-  ];
-  
-  const leaderboard: LeaderboardEntry[] = [
-    { name: 'Alexandra M.', score: '2,840 pts', rank: 1 },
-    { name: 'Robert C.', score: '2,756 pts', rank: 2 },
-    { name: 'Jennifer L.', score: '2,623 pts', rank: 3 },
-    { name: 'Marcus T.', score: '2,445 pts', rank: 4 },
-    { name: 'Elena R.', score: '2,381 pts', rank: 5 }
-  ];
-  
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
-  };
-  
-  const openChallenge = (challengeId: string) => {
-    setSelectedChallenge(challengeId);
-  };
-  
-  const closeChallenge = () => {
-    setSelectedChallenge(null);
-  };
-  
-  const selectedChallengeData = skillChallenges.find(c => c.id === selectedChallenge);
-  
+// Transform leaderboard data
+const transformLeaderboard = (): LeaderboardEntry[] => {
+  return MOCK_TOP_PERFORMERS.slice(0, 8).map(performer => ({
+    rank: performer.rank,
+    name: performer.name,
+    username: performer.username,
+    score: performer.totalScore,
+    verified: performer.verified
+  }));
+};
+
+// Transform platform stats
+const transformPlatformStats = (): PlatformStats => {
   return {
-    user,
-    selectedChallenge,
-    onlineUsers,
-    activeSessions,
-    completedToday,
-    skillChallenges,
-    liveSessions,
-    leaderboard,
-    selectedChallengeData,
-    getInitials,
-    openChallenge,
-    closeChallenge
+    totalParticipants: PLATFORM_RANKING_STATS.totalParticipants,
+    activeThisWeek: PLATFORM_RANKING_STATS.activeThisWeek,
+    completionsToday: PLATFORM_RANKING_STATS.completionsToday,
+    averageScore: PLATFORM_RANKING_STATS.averageScore,
+    verifiedProfessionals: PLATFORM_RANKING_STATS.totalParticipants,
+    activeSessions: Math.floor(PLATFORM_RANKING_STATS.activeThisWeek / 10),
+    employerTrust: 94
   };
+};
+
+// ==============================================
+// CONTEXT & PROVIDER
+// ==============================================
+
+interface ThriveContextType {
+  // State
+  mainView: ViewMode;
+  assessmentCategory: AssessmentCategory;
+  psychCategory: PsychCategory;
+  loading: boolean;
+  isAuthenticated: boolean;
+  
+  // Data
+  professionalAssessments: Assessment[];
+  psychologicalAssessments: Record<PsychCategory, Assessment[]>;
+  creativityAssessments: Assessment[];
+  leaderboard: LeaderboardEntry[];
+  topPerformers: typeof MOCK_TOP_PERFORMERS;
+  platformStats: PlatformStats;
+  assessmentLeaderboards: typeof MOCK_ASSESSMENT_LEADERBOARDS;
+  weeklyTrending: typeof WEEKLY_TRENDING_PERFORMERS;
+  completionTrends: typeof ASSESSMENT_COMPLETION_TRENDS;
+  employerTools: typeof EMPLOYER_TOOLS;
+  employerMetrics: typeof EMPLOYER_PLATFORM_METRICS;
+  
+  // Actions
+  setMainView: (view: ViewMode) => void;
+  setAssessmentCategory: (category: AssessmentCategory) => void;
+  setPsychCategory: (category: PsychCategory) => void;
+  setLoading: (loading: boolean) => void;
+  handleStartAssessment: (route: string) => void;
+  handleAssessmentClick: (assessmentId: string) => void;
+  handleCreateAccount: () => void;
+  handleSignIn: () => void;
+  
+  // Search params
+  requestedAssessment: string | null;
+  fromPublic: boolean;
+}
+
+const ThriveContext = createContext<ThriveContextType | undefined>(undefined);
+
+export const useThrive = () => {
+  const context = useContext(ThriveContext);
+  if (!context) {
+    throw new Error('useThrive must be used within ThriveProvider');
+  }
+  return context;
+};
+
+interface ThriveProviderProps {
+  children: ReactNode;
+  isAuthenticated?: boolean;
+}
+
+export const ThriveProvider: React.FC<ThriveProviderProps> = ({ 
+  children, 
+  isAuthenticated = false 
+}) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // State
+  const [mainView, setMainView] = useState<ViewMode>('assessments');
+  const [assessmentCategory, setAssessmentCategory] = useState<AssessmentCategory>('professional');
+  const [psychCategory, setPsychCategory] = useState<PsychCategory>('personality');
+  const [loading, setLoading] = useState(false);
+  
+  // Transform data on mount
+  const [professionalAssessments] = useState(() => transformProfessionalAssessments());
+  const [psychologicalAssessments] = useState(() => transformPsychologicalAssessments());
+  const [creativityAssessments] = useState(() => transformCreativityAssessments());
+  const [leaderboard] = useState(() => transformLeaderboard());
+  const [platformStats] = useState(() => transformPlatformStats());
+  
+  // Search params
+  const requestedAssessment = searchParams.get('assessment');
+  const fromPublic = searchParams.get('from') === 'public';
+  
+  // Check for redirect after login
+  useEffect(() => {
+    if (isAuthenticated && requestedAssessment) {
+      const assessment = professionalAssessments.find(a => a.title === requestedAssessment);
+      if (assessment) {
+        // Auto-start the requested assessment after login
+        setTimeout(() => {
+          router.push(`/dashboard/thrive/assessments/${assessment.id}`);
+        }, 1000);
+      }
+    }
+  }, [isAuthenticated, requestedAssessment, professionalAssessments, router]);
+  
+  // Handlers
+  const handleStartAssessment = useCallback((route: string) => {
+    setLoading(true);
+    if (isAuthenticated) {
+      router.push(route);
+    } else {
+      router.push(`/auth/register?redirect=${route}`);
+    }
+  }, [router, isAuthenticated]);
+  
+  const handleAssessmentClick = useCallback((assessmentId: string) => {
+    setLoading(true);
+    
+    // Find the assessment across all categories
+    const allAssessments = [
+      ...professionalAssessments,
+      ...creativityAssessments,
+      ...Object.values(psychologicalAssessments).flat()
+    ];
+    
+    const assessment = allAssessments.find(a => a.id === assessmentId);
+    
+    if (isAuthenticated) {
+      // Direct navigation for authenticated users
+      router.push(`/dashboard/thrive/assessments/${assessmentId}`);
+    } else {
+      // Redirect to register with assessment info for non-authenticated
+      const title = assessment?.title || assessmentId;
+      router.push(`/auth/register?redirect=/dashboard/thrive/assessments/${assessmentId}&assessment=${encodeURIComponent(title)}`);
+    }
+  }, [router, isAuthenticated, professionalAssessments, creativityAssessments, psychologicalAssessments]);
+  
+  const handleCreateAccount = useCallback(() => {
+    router.push('/auth/register?redirect=/dashboard/thrive&from=public');
+  }, [router]);
+  
+  const handleSignIn = useCallback(() => {
+    router.push('/auth/login?redirect=/dashboard/thrive');
+  }, [router]);
+  
+  const value: ThriveContextType = {
+    // State
+    mainView,
+    assessmentCategory,
+    psychCategory,
+    loading,
+    isAuthenticated,
+    
+    // Data
+    professionalAssessments,
+    psychologicalAssessments,
+    creativityAssessments,
+    leaderboard,
+    topPerformers: MOCK_TOP_PERFORMERS,
+    platformStats,
+    assessmentLeaderboards: MOCK_ASSESSMENT_LEADERBOARDS,
+    weeklyTrending: WEEKLY_TRENDING_PERFORMERS,
+    completionTrends: ASSESSMENT_COMPLETION_TRENDS,
+    employerTools: EMPLOYER_TOOLS,
+    employerMetrics: EMPLOYER_PLATFORM_METRICS,
+    
+    // Actions
+    setMainView,
+    setAssessmentCategory,
+    setPsychCategory,
+    setLoading,
+    handleStartAssessment,
+    handleAssessmentClick,
+    handleCreateAccount,
+    handleSignIn,
+    
+    // Search params
+    requestedAssessment,
+    fromPublic
+  };
+  
+  return (
+    <ThriveContext.Provider value={value}>
+      {children}
+    </ThriveContext.Provider>
+  );
+};
+
+// ==============================================
+// UTILITY FUNCTIONS
+// ==============================================
+
+export const getAssessmentIcon = (type: string) => {
+  const icons: Record<string, any> = {
+    code: Code,
+    analytics: BarChart3,
+    management: Users,
+    design: Lightbulb,
+    marketing: TrendingUp,
+    cloud: Globe,
+    brain: Brain,
+    creativity: Lightbulb,
+    critical: Calculator
+  };
+  
+  return icons[type] || Target;
+};
+
+export const getDifficultyColor = (difficulty: string) => {
+  const colors: Record<string, string> = {
+    beginner: 'linear-gradient(135deg, #10b981, #059669)',
+    intermediate: 'linear-gradient(135deg, #f59e0b, #d97706)',
+    expert: 'linear-gradient(135deg, #ef4444, #dc2626)'
+  };
+  
+  return colors[difficulty] || '#6b7280';
+};
+
+export const formatNumber = (num: number): string => {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M';
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K';
+  }
+  return num.toLocaleString();
+};
+
+export const formatDuration = (duration: string | number): string => {
+  if (typeof duration === 'string') return duration;
+  return `${duration} min`;
 };
