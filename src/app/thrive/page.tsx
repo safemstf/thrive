@@ -1,76 +1,110 @@
-// src/app/thrive/page.tsx - Enhanced with Professional Design Vision
+// src/app/thrive/page.tsx 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
+import React, { useState, useEffect, Suspense } from 'react';
+import {
   Target, TrendingUp, Users, Trophy, Star, CheckCircle,
   ArrowRight, Shield, Globe, Loader2, Activity, Award,
   Lock, Sparkles, Timer, Brain, AlertCircle, Lightbulb,
-  Heart, Zap, Palette, PenTool, BookOpen, Puzzle
+  Heart
 } from 'lucide-react';
 
 // Import mock data
-import { 
-  PROFESSIONAL_ASSESSMENTS, 
-  PSYCHOLOGICAL_ASSESSMENTS, 
-  CREATIVITY_ASSESSMENTS 
+import {
+  PROFESSIONAL_ASSESSMENTS,
+  PSYCHOLOGICAL_ASSESSMENTS,
+  CREATIVITY_ASSESSMENTS
 } from '@/data/mockData';
 
 // Import shared components and logic
-import { 
-  ThriveProvider, 
-  useThrive, 
-  formatNumber,
-  formatDuration
+import {
+  ThriveProvider,
+  useThrive,
+  formatNumber
 } from '@/components/thrive/thriveLogic';
 
+// Import ALL components from the styled-components hub
 import {
-  PageWrapper,
-  ContentContainer,
+  // Layout
+  PageContainer,
+  ContentWrapper,
+  Section,
+  Container,
+  FlexRow,
+  FlexColumn,
+  Grid,
+
+  // Typography
+  Heading1,
+  Heading2,
+  BodyText,
+
+  // Interactive
+  BaseButton,
+  Card,
+  CardContent,
+  Badge,
+
+  // Utility
+  LoadingContainer,
+  LoadingSpinner,
+  Spacer,
+  Divider,
+
+  // Animations
+  animationUtils,
+
+  // Theme utilities
+  utils,
+  media
+} from '@/styles/styled-components';
+
+// Import ONLY the thrive-specific styled components
+import {
   EnhancedHeroSection,
+  HeroBadge,
+  HeroTitle,
+  HeroSubtitle,
+  GradientText,
   StatsOverview,
   StatCard,
   StatNumber,
   StatLabel,
+  StatIcon,
+  LiveIndicator,
+  ProgressIndicator,
   AssessmentGrid,
   AssessmentCardWrapper,
+  AssessmentIcon,
+  AssessmentIconInner,
   AssessmentTitle,
   AssessmentDescription,
   AssessmentMeta,
-  DifficultyBadge,
-  SkillIcon,
+  AssessmentAction,
+  PopularBadge,
+  ValidatedBadge,
+  CategoryTabs,
+  CategoryTab,
   LeaderboardCard,
   LeaderboardItem,
   RankBadge,
-  GlassSection,
   CTASection,
-  ProgressIndicator
+  FeatureCard,
+  FeatureIcon,
+  MetricRow,
+  MetricItem,
+  PlayerInfo,
+  PlayerName,
+  PlayerScore,
+  AnimatedCounter
 } from '@/components/thrive/styles';
-
-// Import from styled-components hub
-import {
-  ContentWrapper,
-  Section,
-  Heading1,
-  Heading2,
-  BodyText,
-  BaseButton,
-  Card,
-  CardContent,
-  Grid,
-  FlexRow,
-  FlexColumn,
-  Badge,
-  LoadingContainer
-} from '@/styles/styled-components';
 
 // ==============================================
 // ANIMATED COUNTER COMPONENT
 // ==============================================
-
-const AnimatedCounter: React.FC<{ value: number; duration?: number }> = ({ 
-  value, 
-  duration = 2000 
+const AnimatedCounterComponent: React.FC<{ value: number; duration?: number }> = ({
+  value,
+  duration = 2000
 }) => {
   const [count, setCount] = useState(0);
 
@@ -90,51 +124,46 @@ const AnimatedCounter: React.FC<{ value: number; duration?: number }> = ({
     return () => clearInterval(timer);
   }, [value, duration]);
 
-  return <span>{count.toLocaleString()}</span>;
+  return <AnimatedCounter>{count.toLocaleString()}</AnimatedCounter>;
 };
 
 // ==============================================
 // ASSESSMENT CATEGORY NAVIGATION
 // ==============================================
-
 type AssessmentCategoryType = 'professional' | 'psychological' | 'creativity';
 
 const AssessmentCategoryTabs = ({ activeCategory, onCategoryChange }: {
   activeCategory: AssessmentCategoryType;
   onCategoryChange: (category: AssessmentCategoryType) => void;
 }) => (
-  <FlexRow $justify="center" $gap="var(--spacing-md)" style={{ 
-    marginBottom: 'var(--spacing-2xl)',
-    flexWrap: 'wrap'
-  }}>
-    <BaseButton
-      $variant={activeCategory === 'professional' ? 'primary' : 'secondary'}
+  <CategoryTabs>
+    <CategoryTab
+      $isActive={activeCategory === 'professional'}
       onClick={() => onCategoryChange('professional')}
     >
       <Target size={18} />
       Professional Skills
-    </BaseButton>
-    <BaseButton
-      $variant={activeCategory === 'psychological' ? 'primary' : 'secondary'}
+    </CategoryTab>
+    <CategoryTab
+      $isActive={activeCategory === 'psychological'}
       onClick={() => onCategoryChange('psychological')}
     >
       <Brain size={18} />
       Psychological Assessments
-    </BaseButton>
-    <BaseButton
-      $variant={activeCategory === 'creativity' ? 'primary' : 'secondary'}
+    </CategoryTab>
+    <CategoryTab
+      $isActive={activeCategory === 'creativity'}
       onClick={() => onCategoryChange('creativity')}
     >
       <Lightbulb size={18} />
       Creativity & Critical Thinking
-    </BaseButton>
-  </FlexRow>
+    </CategoryTab>
+  </CategoryTabs>
 );
 
 // ==============================================
 // PUBLIC CONTENT COMPONENT
 // ==============================================
-
 const PublicContent = () => {
   const [loading, setLoading] = useState(true);
   const [assessmentCategory, setAssessmentCategory] = useState<'professional' | 'psychological' | 'creativity'>('professional');
@@ -160,14 +189,14 @@ const PublicContent = () => {
 
   if (loading) {
     return (
-      <PageWrapper>
-        <ContentContainer>
+      <PageContainer>
+        <ContentWrapper>
           <LoadingContainer>
-            <Loader2 size={48} className="animate-spin" />
+            <LoadingSpinner $size="lg" />
             <BodyText>Loading professional assessments...</BodyText>
           </LoadingContainer>
-        </ContentContainer>
-      </PageWrapper>
+        </ContentWrapper>
+      </PageContainer>
     );
   }
 
@@ -176,176 +205,66 @@ const PublicContent = () => {
     <AssessmentGrid>
       {professionalAssessments.map((assessment, index) => {
         const IconComponent = assessment.icon || Target;
-        const isPopular = index < 3; // First three are "most popular"
-        
+        const isPopular = index < 3;
+
         return (
           <AssessmentCardWrapper
             key={assessment.id}
             $borderColor={assessment.color}
             onClick={() => handleAssessmentClick(assessment.id)}
-            style={{
-              background: isPopular 
-                ? 'var(--color-background-secondary)'
-                : 'var(--color-background-secondary)',
-              border: isPopular 
-                ? `2px solid ${assessment.color}`
-                : `1px solid var(--color-border-light)`,
-              position: 'relative',
-              transition: 'all 0.3s ease',
-              cursor: 'pointer'
-            }}
+            className="assessment-card"
           >
-            {/* Popular Badge */}
             {isPopular && (
-              <div style={{
-                position: 'absolute',
-                top: 'var(--spacing-md)',
-                right: 'var(--spacing-md)',
-                background: 'var(--color-background-secondary)',
-                color: assessment.color,
-                border: `1px solid ${assessment.color}`,
-                padding: 'var(--spacing-xs) var(--spacing-sm)',
-                borderRadius: 'var(--radius-full)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                zIndex: 2
-              }}>
-                <Star size={12} style={{ marginRight: '4px' }} />
+              <PopularBadge $color={assessment.color}>
+                <Star size={12} />
                 Popular
-              </div>
+              </PopularBadge>
             )}
 
-            {/* Professional Icon */}
-            <div style={{
-              width: '80px',
-              height: '80px',
-              margin: '0 auto var(--spacing-lg)',
-              background: `radial-gradient(circle, ${assessment.color}20 0%, ${assessment.color}10 70%, transparent 100%)`,
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              position: 'relative',
-              transition: 'transform 0.4s ease'
-            }}>
-              <div style={{
-                width: '56px',
-                height: '56px',
-                background: 'rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: `1px solid ${assessment.color}40`
-              }}>
-                <IconComponent size={28} style={{ color: assessment.color }} />
-              </div>
-            </div>
+            <AssessmentIcon $color={assessment.color}>
+              <AssessmentIconInner $color={assessment.color}>
+                <IconComponent size={28} />
+              </AssessmentIconInner>
+            </AssessmentIcon>
 
-            <AssessmentTitle style={{ 
-              fontSize: '1.25rem', 
-              fontWeight: 700,
-              lineHeight: 1.3,
-              marginBottom: 'var(--spacing-md)'
-            }}>
-              {assessment.title}
-            </AssessmentTitle>
-            
-            <AssessmentDescription style={{ 
-              fontSize: '0.95rem',
-              lineHeight: 1.5,
-              marginBottom: 'var(--spacing-lg)'
-            }}>
-              {assessment.description}
-            </AssessmentDescription>
+            <AssessmentTitle>{assessment.title}</AssessmentTitle>
+            <AssessmentDescription>{assessment.description}</AssessmentDescription>
 
-            {/* Enhanced Meta Information */}
-            <div style={{ 
-              background: 'rgba(255, 255, 255, 0.03)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: 'var(--radius-xl)',
-              padding: 'var(--spacing-lg)',
-              marginBottom: 'var(--spacing-lg)',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              <FlexRow $justify="space-between" style={{ marginBottom: 'var(--spacing-sm)' }}>
-                <div style={{
+            <AssessmentMeta>
+              <MetricRow>
+                <Badge style={{
                   background: `linear-gradient(135deg, ${assessment.color}20, ${assessment.color}10)`,
                   color: assessment.color,
-                  padding: 'var(--spacing-xs) var(--spacing-sm)',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  border: `1px solid ${assessment.color}30`
+                  border: `1px solid ${assessment.color}30`,
+                  fontSize: '0.75rem'
                 }}>
                   Professional Level
-                </div>
-                <span style={{ 
-                  fontSize: '0.875rem', 
-                  color: 'var(--color-text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-xs)',
-                  fontWeight: 600
-                }}>
+                </Badge>
+                <MetricItem>
                   <Timer size={14} />
                   45-60 min
-                </span>
-              </FlexRow>
+                </MetricItem>
+              </MetricRow>
 
-              <FlexRow $justify="space-between">
-                <span style={{ 
-                  fontSize: '0.875rem', 
-                  color: 'var(--color-text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-xs)'
-                }}>
+              <MetricRow>
+                <MetricItem>
                   <Users size={14} />
                   {(Math.floor(Math.random() * 5000) + 1000).toLocaleString()} certified
-                </span>
-                <span style={{ 
-                  fontSize: '0.875rem', 
-                  color: '#059669',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-xs)'
-                }}>
+                </MetricItem>
+                <MetricItem style={{ color: 'var(--color-success-600)', fontWeight: 600 }}>
                   <TrendingUp size={14} />
                   {Math.floor(Math.random() * 15) + 80}% avg
-                </span>
-              </FlexRow>
-            </div>
+                </MetricItem>
+              </MetricRow>
+            </AssessmentMeta>
 
-            {/* Elegant Action Area */}
-            <div style={{ 
-              background: `linear-gradient(135deg, ${assessment.color}08, ${assessment.color}04)`,
-              padding: 'var(--spacing-lg)',
-              borderRadius: 'var(--radius-xl)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              transition: 'all 0.3s ease',
-              border: `1px solid ${assessment.color}20`
-            }}>
+            <AssessmentAction $color={assessment.color}>
               <FlexRow $gap="var(--spacing-md)">
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  backdropFilter: 'blur(10px)',
-                  borderRadius: 'var(--radius-lg)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: `1px solid ${assessment.color}40`
-                }}>
-                  <Lock size={20} style={{ color: assessment.color }} />
-                </div>
+                <AssessmentIconInner $color={assessment.color} style={{ width: '48px', height: '48px' }}>
+                  <Lock size={20} />
+                </AssessmentIconInner>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '2px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '2px', color: 'var(--color-text-primary)' }}>
                     Start Assessment
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
@@ -354,7 +273,7 @@ const PublicContent = () => {
                 </div>
               </FlexRow>
               <ArrowRight size={20} style={{ color: assessment.color }} />
-            </div>
+            </AssessmentAction>
           </AssessmentCardWrapper>
         );
       })}
@@ -363,17 +282,17 @@ const PublicContent = () => {
 
   const renderPsychologicalAssessments = () => (
     <>
-      <BodyText style={{ 
-        textAlign: 'center', 
+      <BodyText style={{
+        textAlign: 'center',
         marginBottom: 'var(--spacing-lg)',
         maxWidth: '600px',
         margin: '0 auto var(--spacing-lg)'
       }}>
-        Explore scientifically validated psychological assessments to understand your personality, 
+        Explore scientifically validated psychological assessments to understand your personality,
         mental health, and wellbeing patterns.
       </BodyText>
 
-      <FlexRow $justify="center" $gap="var(--spacing-sm)" style={{ 
+      <FlexRow $justify="center" $gap="var(--spacing-sm)" style={{
         marginBottom: 'var(--spacing-xl)',
         flexWrap: 'wrap'
       }}>
@@ -402,107 +321,50 @@ const PublicContent = () => {
           Wellbeing
         </BaseButton>
       </FlexRow>
-      
+
       <AssessmentGrid>
         {psychologicalAssessments[psychCategory]?.map((assessment) => (
           <AssessmentCardWrapper
             key={assessment.id}
             $borderColor="#8b5cf6"
             onClick={() => handleAssessmentClick(assessment.id)}
-            style={{
-              background: 'var(--color-background-secondary)',
-              border: '1px solid var(--color-border-light)',
-              transition: 'all 0.3s ease'
-            }}
           >
             {assessment.validated && (
-              <Badge $variant="success" style={{ 
-                position: 'absolute', 
-                top: 'var(--spacing-md)', 
-                right: 'var(--spacing-md)',
-                zIndex: 2
-              }}>
+              <ValidatedBadge>
                 <Shield size={12} />
                 Validated
-              </Badge>
+              </ValidatedBadge>
             )}
 
-            <div style={{
-              width: '64px',
-              height: '64px',
-              margin: '0 auto var(--spacing-lg)',
-              background: 'var(--color-background-tertiary)',
-              borderRadius: 'var(--radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid #8b5cf6'
-            }}>
-              <Brain size={28} style={{ color: '#8b5cf6' }} />
-            </div>
+            <AssessmentIcon $color="#8b5cf6">
+              <AssessmentIconInner $color="#8b5cf6">
+                <Brain size={28} />
+              </AssessmentIconInner>
+            </AssessmentIcon>
 
-            <AssessmentTitle style={{ fontSize: '1.25rem', fontWeight: 700 }}>
-              {assessment.title}
-            </AssessmentTitle>
-            <AssessmentDescription style={{ fontSize: '0.95rem', lineHeight: 1.5 }}>
-              {assessment.description}
-            </AssessmentDescription>
-            
-            <div style={{ 
-              background: 'var(--color-background-tertiary)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--spacing-md)',
-              marginBottom: 'var(--spacing-lg)',
-              border: '1px solid var(--color-border-light)'
-            }}>
-              <FlexRow $justify="space-between">
-                <span style={{ 
-                  fontSize: '0.875rem', 
-                  color: 'var(--color-text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-xs)'
-                }}>
+            <AssessmentTitle>{assessment.title}</AssessmentTitle>
+            <AssessmentDescription>{assessment.description}</AssessmentDescription>
+
+            <AssessmentMeta>
+              <MetricRow>
+                <MetricItem>
                   <AlertCircle size={14} />
                   {assessment.items} items
-                </span>
-                <span style={{ 
-                  fontSize: '0.875rem', 
-                  color: 'var(--color-text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-xs)'
-                }}>
+                </MetricItem>
+                <MetricItem>
                   <Timer size={14} />
                   {assessment.duration}
-                </span>
-              </FlexRow>
-            </div>
+                </MetricItem>
+              </MetricRow>
+            </AssessmentMeta>
 
-            <div style={{ 
-              background: 'var(--color-background-tertiary)',
-              padding: 'var(--spacing-lg)',
-              borderRadius: 'var(--radius-lg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              border: '1px solid var(--color-border-light)'
-            }}>
+            <AssessmentAction $color="#8b5cf6">
               <FlexRow $gap="var(--spacing-md)">
-                <div style={{
-                  width: '44px',
-                  height: '44px',
-                  background: 'var(--color-background-secondary)',
-                  borderRadius: 'var(--radius-md)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '2px solid #8b5cf6'
-                }}>
-                  <Lock size={20} style={{ color: '#8b5cf6' }} />
-                </div>
+                <AssessmentIconInner $color="#8b5cf6" style={{ width: '48px', height: '48px' }}>
+                  <Lock size={20} />
+                </AssessmentIconInner>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '2px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '2px', color: 'var(--color-text-primary)' }}>
                     Scientific Assessment
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
@@ -511,7 +373,7 @@ const PublicContent = () => {
                 </div>
               </FlexRow>
               <ArrowRight size={20} style={{ color: '#8b5cf6' }} />
-            </div>
+            </AssessmentAction>
           </AssessmentCardWrapper>
         ))}
       </AssessmentGrid>
@@ -520,13 +382,13 @@ const PublicContent = () => {
 
   const renderCreativityAssessments = () => (
     <>
-      <BodyText style={{ 
-        textAlign: 'center', 
+      <BodyText style={{
+        textAlign: 'center',
         marginBottom: 'var(--spacing-xl)',
         maxWidth: '600px',
         margin: '0 auto var(--spacing-xl)'
       }}>
-        Unlock your creative potential and critical thinking skills with assessments designed 
+        Unlock your creative potential and critical thinking skills with assessments designed
         to measure innovation, problem-solving, and analytical abilities.
       </BodyText>
 
@@ -538,88 +400,36 @@ const PublicContent = () => {
               key={assessment.id}
               $borderColor={assessment.color}
               onClick={() => handleAssessmentClick(assessment.id)}
-              style={{
-                background: 'var(--color-background-secondary)',
-                border: '1px solid var(--color-border-light)',
-                transition: 'all 0.3s ease'
-              }}
             >
-              <div style={{
-                width: '64px',
-                height: '64px',
-                margin: '0 auto var(--spacing-lg)',
-                background: 'var(--color-background-tertiary)',
-                borderRadius: 'var(--radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: `2px solid ${assessment.color}`
-              }}>
-                <IconComponent size={28} style={{ color: assessment.color }} />
-              </div>
+              <AssessmentIcon $color={assessment.color}>
+                <AssessmentIconInner $color={assessment.color}>
+                  <IconComponent size={28} />
+                </AssessmentIconInner>
+              </AssessmentIcon>
 
-              <AssessmentTitle style={{ fontSize: '1.25rem', fontWeight: 700 }}>
-                {assessment.title}
-              </AssessmentTitle>
-              <AssessmentDescription style={{ fontSize: '0.95rem', lineHeight: 1.5 }}>
-                {assessment.description}
-              </AssessmentDescription>
-              
-              <div style={{ 
-                background: 'var(--color-background-tertiary)',
-                borderRadius: 'var(--radius-lg)',
-                padding: 'var(--spacing-md)',
-                marginBottom: 'var(--spacing-lg)',
-                border: '1px solid var(--color-border-light)'
-              }}>
-                <FlexRow $justify="space-between">
-                  <span style={{ 
-                    fontSize: '0.875rem', 
-                    color: 'var(--color-text-secondary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--spacing-xs)'
-                  }}>
+              <AssessmentTitle>{assessment.title}</AssessmentTitle>
+              <AssessmentDescription>{assessment.description}</AssessmentDescription>
+
+              <AssessmentMeta>
+                <MetricRow>
+                  <MetricItem>
                     <AlertCircle size={14} />
                     {assessment.items} items
-                  </span>
-                  <span style={{ 
-                    fontSize: '0.875rem', 
-                    color: 'var(--color-text-secondary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--spacing-xs)'
-                  }}>
+                  </MetricItem>
+                  <MetricItem>
                     <Timer size={14} />
                     {assessment.duration}
-                  </span>
-                </FlexRow>
-              </div>
+                  </MetricItem>
+                </MetricRow>
+              </AssessmentMeta>
 
-              <div style={{ 
-                background: 'var(--color-background-tertiary)',
-                padding: 'var(--spacing-lg)',
-                borderRadius: 'var(--radius-lg)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                border: '1px solid var(--color-border-light)'
-              }}>
+              <AssessmentAction $color={assessment.color}>
                 <FlexRow $gap="var(--spacing-md)">
-                  <div style={{
-                    width: '44px',
-                    height: '44px',
-                    background: 'var(--color-background-secondary)',
-                    borderRadius: 'var(--radius-md)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: `2px solid ${assessment.color}`
-                  }}>
-                    <Lock size={20} style={{ color: assessment.color }} />
-                  </div>
+                  <AssessmentIconInner $color={assessment.color} style={{ width: '44px', height: '44px' }}>
+                    <Lock size={20} />
+                  </AssessmentIconInner>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '2px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '2px', color: 'var(--color-text-primary)' }}>
                       Creative Challenge
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
@@ -628,7 +438,7 @@ const PublicContent = () => {
                   </div>
                 </FlexRow>
                 <ArrowRight size={20} style={{ color: assessment.color }} />
-              </div>
+              </AssessmentAction>
             </AssessmentCardWrapper>
           );
         })}
@@ -637,166 +447,69 @@ const PublicContent = () => {
   );
 
   return (
-    <PageWrapper>
-      {/* Hero Section */}
-      <EnhancedHeroSection style={{
-        background: `
-          radial-gradient(ellipse at top, rgba(139, 92, 246, 0.08) 0%, transparent 70%),
-          radial-gradient(ellipse at bottom left, rgba(59, 130, 246, 0.06) 0%, transparent 70%),
-          radial-gradient(ellipse at bottom right, rgba(16, 185, 129, 0.04) 0%, transparent 70%),
-          linear-gradient(135deg, var(--color-background-primary) 0%, var(--color-background-tertiary) 100%)
-        `,
-        borderBottom: '1px solid var(--color-border-light)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        {/* Subtle floating elements */}
-        <div style={{
-          position: 'absolute',
-          top: '10%',
-          right: '10%',
-          width: '200px',
-          height: '200px',
-          background: 'radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%)',
-          borderRadius: '50%',
-          filter: 'blur(40px)',
-          animation: 'float 20s ease-in-out infinite',
-          zIndex: 0
-        }} />
-        <div style={{
-          position: 'absolute',
-          bottom: '10%',
-          left: '5%',
-          width: '150px',
-          height: '150px',
-          background: 'radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%)',
-          borderRadius: '50%',
-          filter: 'blur(30px)',
-          animation: 'float 15s ease-in-out infinite reverse',
-          zIndex: 0
-        }} />
-        
-        <ContentWrapper style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ textAlign: 'center', maxWidth: '800px', margin: '0 auto' }}>
-            <Badge style={{ 
-              marginBottom: 'var(--spacing-lg)',
-              background: 'rgba(255, 255, 255, 0.1)',
-              backdropFilter: 'blur(10px)',
-              color: 'var(--color-text-primary)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              padding: 'var(--spacing-sm) var(--spacing-lg)',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)'
-            }}>
+    <PageContainer>
+      {/* HERO SECTION */}
+      <EnhancedHeroSection>
+        <ContentWrapper>
+          <Container $maxWidth="800px" $padding={false}>
+            <HeroBadge>
               <Sparkles size={16} />
               Trusted by 500+ Companies
-              <Shield size={12} style={{ marginLeft: 'var(--spacing-xs)' }} />
-            </Badge>
+              <Shield size={12} />
+            </HeroBadge>
 
-            <Heading1 $responsive>
-              Prove Your Professional Skills with 
-              <span style={{ 
-                background: 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600))',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}> Industry-Recognized</span> Assessments
-            </Heading1>
+            <HeroTitle $responsive>
+              Unlock Your Complete
+              <GradientText> Professional Enneagram</GradientText> in Minutes
+            </HeroTitle>
 
-            <BodyText $size="xl" style={{ 
-              marginBottom: 'var(--spacing-2xl)',
-              maxWidth: '600px',
-              margin: '0 auto var(--spacing-2xl)'
-            }}>
-              Join thousands of professionals who have validated their capabilities through our 
-              comprehensive assessment platform covering skills, psychology, and creativity.
-            </BodyText>
+            <HeroSubtitle>
+              The only platform that maps your complete professional identity—from core skills
+              and psychological profile to creative potential. Trusted by Fortune 500 companies worldwide.
+            </HeroSubtitle>
 
             {/* Elegant Stats */}
-            <Grid $columns={3} $gap="var(--spacing-xl)" style={{ marginBottom: 'var(--spacing-2xl)' }}>
-              <Card style={{ 
-                textAlign: 'center',
-                background: 'rgba(255, 255, 255, 0.05)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-              }}>
+            <StatsOverview $columns={3} $gap="var(--spacing-xl)">
+              <StatCard>
                 <CardContent>
-                  <div style={{ 
-                    width: '56px', 
-                    height: '56px',
-                    margin: '0 auto var(--spacing-md)',
-                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1))',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <Shield size={28} style={{ color: '#10b981' }} />
-                  </div>
-                  <StatNumber style={{ fontSize: '2rem', fontWeight: 800 }}>
-                    <AnimatedCounter value={45230} />
+                  <StatIcon $color="var(--color-success-600)">
+                    <Shield size={28} />
+                  </StatIcon>
+                  <StatNumber>
+                    <AnimatedCounterComponent value={45230} />
                   </StatNumber>
-                  <StatLabel style={{ fontWeight: 600 }}>Professionals Certified</StatLabel>
+                  <StatLabel>Professionals Certified</StatLabel>
                 </CardContent>
-              </Card>
+              </StatCard>
 
-              <Card style={{ 
-                textAlign: 'center',
-                background: 'rgba(255, 255, 255, 0.05)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-              }}>
+              <StatCard>
                 <CardContent>
-                  <div style={{ 
-                    width: '56px', 
-                    height: '56px',
-                    margin: '0 auto var(--spacing-md)',
-                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1))',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <Activity size={28} style={{ color: '#3b82f6' }} />
-                  </div>
+                  <StatIcon $color="var(--color-primary-600)">
+                    <Activity size={28} />
+                  </StatIcon>
                   <ProgressIndicator style={{ justifyContent: 'center', marginBottom: 'var(--spacing-sm)' }}>
                     <span className="pulse" />
                     LIVE
                   </ProgressIndicator>
-                  <StatNumber style={{ fontSize: '2rem', fontWeight: 800 }}>
-                    <AnimatedCounter value={342} duration={1500} />
+                  <StatNumber>
+                    <AnimatedCounterComponent value={342} duration={1500} />
                   </StatNumber>
-                  <StatLabel style={{ fontWeight: 600 }}>Taking Assessments Now</StatLabel>
+                  <StatLabel>Taking Assessments Now</StatLabel>
                 </CardContent>
-              </Card>
+              </StatCard>
 
-              <Card style={{ 
-                textAlign: 'center',
-                background: 'rgba(255, 255, 255, 0.05)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-              }}>
+              <StatCard>
                 <CardContent>
-                  <div style={{ 
-                    width: '56px', 
-                    height: '56px',
-                    margin: '0 auto var(--spacing-md)',
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.1))',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <TrendingUp size={28} style={{ color: '#8b5cf6' }} />
-                  </div>
-                  <StatNumber style={{ fontSize: '2rem', fontWeight: 800 }}>
-                    <AnimatedCounter value={94} />%
+                  <StatIcon $color="#8b5cf6">
+                    <TrendingUp size={28} />
+                  </StatIcon>
+                  <StatNumber>
+                    <AnimatedCounterComponent value={94} />%
                   </StatNumber>
-                  <StatLabel style={{ fontWeight: 600 }}>Employer Trust Rate</StatLabel>
+                  <StatLabel>Employer Trust Rate</StatLabel>
                 </CardContent>
-              </Card>
-            </Grid>
+              </StatCard>
+            </StatsOverview>
 
             <FlexRow $justify="center" $gap="var(--spacing-md)" style={{ marginBottom: 'var(--spacing-xl)' }}>
               <BaseButton $variant="primary" onClick={handleCreateAccount}>
@@ -809,501 +522,540 @@ const PublicContent = () => {
             </FlexRow>
 
             <FlexRow $justify="center" $gap="var(--spacing-lg)" style={{ fontSize: '0.875rem' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                <CheckCircle size={16} color="#10b981" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', color: 'var(--color-text-secondary)' }}>
+                <CheckCircle size={16} color="var(--color-success-600)" />
                 Free to start
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                <CheckCircle size={16} color="#10b981" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', color: 'var(--color-text-secondary)' }}>
+                <CheckCircle size={16} color="var(--color-success-600)" />
                 Instant results
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                <CheckCircle size={16} color="#10b981" />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)', color: 'var(--color-text-secondary)' }}>
+                <CheckCircle size={16} color="var(--color-success-600)" />
                 Industry recognized
               </span>
             </FlexRow>
-          </div>
+          </Container>
         </ContentWrapper>
       </EnhancedHeroSection>
 
+      {/* MAIN CONTENT */}
       <ContentWrapper>
-        {/* Assessments Section */}
+        {/* Strategic Assessment Selection */}
         <Section>
-          <FlexRow $gap="var(--spacing-sm)" style={{ marginBottom: 'var(--spacing-lg)' }}>
-            <Target size={28} />
-            <Heading2 style={{ margin: 0 }}>Choose Your Assessment Category</Heading2>
-          </FlexRow>
-          
-          <BodyText style={{ 
-            textAlign: 'center', 
-            marginBottom: 'var(--spacing-2xl)',
-            maxWidth: '800px',
-            margin: '0 auto var(--spacing-2xl)'
-          }}>
-            Explore our comprehensive suite of assessments designed to validate your professional skills, 
-            understand your psychological profile, and unlock your creative potential.
-          </BodyText>
-
-          {/* Category Navigation */}
-          <AssessmentCategoryTabs 
-            activeCategory={assessmentCategory} 
-            onCategoryChange={setAssessmentCategory} 
-          />
-
-          {/* Assessment Content */}
-          {assessmentCategory === 'professional' && renderProfessionalAssessments()}
-          {assessmentCategory === 'psychological' && renderPsychologicalAssessments()}
-          {assessmentCategory === 'creativity' && renderCreativityAssessments()}
-        </Section>
-
-        {/* Assessment Categories Overview */}
-        <Section>
-          <Heading2 style={{ textAlign: 'center', marginBottom: 'var(--spacing-2xl)' }}>
-            Three Pillars of Professional Assessment
-          </Heading2>
-          
-          <Grid $columns={3} $gap="var(--spacing-xl)">
-            <Card $hover onClick={() => setAssessmentCategory('professional')} style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              backdropFilter: 'blur(15px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              cursor: 'pointer',
-              transition: 'all 0.4s ease',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-            }}>
-              <CardContent>
-                <div style={{ 
-                  width: 80, 
-                  height: 80, 
-                  borderRadius: '50%',
-                  background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.1) 70%, transparent 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 'var(--spacing-lg)',
-                  position: 'relative'
-                }}>
-                  <div style={{
-                    width: '56px',
-                    height: '56px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(10px)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '1px solid rgba(59, 130, 246, 0.3)'
-                  }}>
-                    <Target size={28} style={{ color: '#3b82f6' }} />
-                  </div>
-                </div>
-                <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Professional Skills</h3>
-                <BodyText style={{ marginBottom: 'var(--spacing-md)' }}>
-                  Industry-validated assessments for communication, leadership, technical problem-solving, 
-                  and emotional intelligence.
-                </BodyText>
-                <FlexRow $gap="var(--spacing-xs)" style={{ 
-                  fontSize: '0.875rem',
-                  color: 'var(--color-text-secondary)'
-                }}>
-                  <CheckCircle size={14} color="#10b981" />
-                  <span>Employer Recognized</span>
-                </FlexRow>
-              </CardContent>
-            </Card>
-
-            <Card $hover onClick={() => setAssessmentCategory('psychological')} style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              backdropFilter: 'blur(15px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              cursor: 'pointer',
-              transition: 'all 0.4s ease',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-            }}>
-              <CardContent>
-                <div style={{ 
-                  width: 80, 
-                  height: 80, 
-                  borderRadius: '50%',
-                  background: 'radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.1) 70%, transparent 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 'var(--spacing-lg)',
-                  position: 'relative'
-                }}>
-                  <div style={{
-                    width: '56px',
-                    height: '56px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(10px)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '1px solid rgba(139, 92, 246, 0.3)'
-                  }}>
-                    <Brain size={28} style={{ color: '#8b5cf6' }} />
-                  </div>
-                </div>
-                <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Psychological Profile</h3>
-                <BodyText style={{ marginBottom: 'var(--spacing-md)' }}>
-                  Research-validated assessments covering personality traits, clinical screening, 
-                  and wellbeing indicators.
-                </BodyText>
-                <FlexRow $gap="var(--spacing-xs)" style={{ 
-                  fontSize: '0.875rem',
-                  color: 'var(--color-text-secondary)'
-                }}>
-                  <Shield size={14} color="#8b5cf6" />
-                  <span>Scientifically Validated</span>
-                </FlexRow>
-              </CardContent>
-            </Card>
-
-            <Card $hover onClick={() => setAssessmentCategory('creativity')} style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              backdropFilter: 'blur(15px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              cursor: 'pointer',
-              transition: 'all 0.4s ease',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
-            }}>
-              <CardContent>
-                <div style={{ 
-                  width: 80, 
-                  height: 80, 
-                  borderRadius: '50%',
-                  background: 'radial-gradient(circle, rgba(245, 158, 11, 0.3) 0%, rgba(245, 158, 11, 0.1) 70%, transparent 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 'var(--spacing-lg)',
-                  position: 'relative'
-                }}>
-                  <div style={{
-                    width: '56px',
-                    height: '56px',
-                    background: 'rgba(255, 255, 255, 0.1)',
-                    backdropFilter: 'blur(10px)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '1px solid rgba(245, 158, 11, 0.3)'
-                  }}>
-                    <Lightbulb size={28} style={{ color: '#f59e0b' }} />
-                  </div>
-                </div>
-                <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Creativity & Critical Thinking</h3>
-                <BodyText style={{ marginBottom: 'var(--spacing-md)' }}>
-                  Innovative assessments measuring divergent thinking, creative problem-solving, 
-                  and analytical reasoning.
-                </BodyText>
-                <FlexRow $gap="var(--spacing-xs)" style={{ 
-                  fontSize: '0.875rem',
-                  color: 'var(--color-text-secondary)'
-                }}>
-                  <Sparkles size={14} color="#f59e0b" />
-                  <span>Innovation Focused</span>
-                </FlexRow>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Section>
-
-        {/* Leaderboard Section */}
-        <Section>
-          <FlexRow $gap="var(--spacing-sm)" style={{ marginBottom: 'var(--spacing-xl)' }}>
-            <Trophy size={28} />
-            <Heading2 style={{ margin: 0 }}>Global Professional Leaderboard</Heading2>
-            <ProgressIndicator style={{ marginLeft: 'var(--spacing-sm)' }}>
-              <span className="pulse" />
-            </ProgressIndicator>
-          </FlexRow>
-
-          <Grid $columns={2} $gap="var(--spacing-xl)">
-            <div>
-              <FlexRow $justify="space-between" style={{ marginBottom: 'var(--spacing-lg)' }}>
-                <h3 style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 'var(--spacing-sm)', 
-                  margin: 0 
-                }}>
-                  <Star size={20} color="#f59e0b" />
-                  Top Performers
-                </h3>
-                <span style={{ 
-                  fontSize: '0.875rem', 
-                  color: 'var(--color-text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-xs)'
-                }}>
-                  <Globe size={14} />
-                  Live rankings
-                </span>
+          <Container $maxWidth="100%" $padding={false}>
+            <div style={{ textAlign: 'center', marginBottom: 'var(--spacing-2xl)' }}>
+              <FlexRow $justify="center" $gap="var(--spacing-sm)" style={{ marginBottom: 'var(--spacing-lg)' }}>
+                <Target size={32} color="var(--color-primary-600)" />
+                <Heading2 style={{ margin: 0 }}>Your Professional DNA Mapping</Heading2>
               </FlexRow>
 
-              <LeaderboardCard $padding="sm">
-                {leaderboard.map((player) => (
-                  <LeaderboardItem key={player.rank} $rank={player.rank}>
-                    <RankBadge $rank={player.rank}>
-                      {player.rank <= 3 ? ['🥇', '🥈', '🥉'][player.rank - 1] : player.rank}
-                    </RankBadge>
-                    
-                    <FlexColumn $gap="0" style={{ flex: 1 }}>
-                      <FlexRow $gap="var(--spacing-sm)">
-                        <span style={{ fontWeight: 600 }}>{player.name}</span>
-                        {player.verified && (
-                          <Badge $variant="success" style={{ fontSize: '0.75rem' }}>
-                            <Shield size={10} />
-                            Verified
-                          </Badge>
-                        )}
-                        {player.rank <= 3 && (
-                          <Badge style={{ 
-                            background: '#f59e0b', 
-                            color: 'white',
-                            fontSize: '0.7rem'
-                          }}>
-                            Top Performer
-                          </Badge>
-                        )}
-                      </FlexRow>
-                      <div style={{ 
-                        fontSize: '0.875rem', 
-                        color: 'var(--color-text-secondary)' 
-                      }}>
-                        {formatNumber(player.score)} points
-                      </div>
-                    </FlexColumn>
-                    
-                    <div style={{ 
-                      fontSize: '0.875rem', 
-                      color: '#059669', 
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--spacing-xs)'
-                    }}>
-                      <TrendingUp size={14} />
-                      +{Math.floor(Math.random() * 50) + 10}
-                    </div>
-                  </LeaderboardItem>
-                ))}
-              </LeaderboardCard>
+              <BodyText style={{
+                fontSize: 'var(--font-size-lg)',
+                maxWidth: '700px',
+                margin: '0 auto',
+                color: 'var(--color-text-secondary)'
+              }}>
+                Don't guess at your potential. Get the complete picture with our three-pillar assessment system
+                used by Google, Microsoft, and 500+ top companies.
+              </BodyText>
             </div>
 
-            <Card style={{ 
-              background: 'var(--color-background-secondary)', 
-              textAlign: 'center',
-              border: '1px solid var(--color-border-light)'
-            }}>
-              <CardContent>
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  gap: 'var(--spacing-sm)', 
-                  marginBottom: 'var(--spacing-md)' 
-                }}>
-                  <Award size={24} color="#f59e0b" />
-                  <Badge style={{ 
-                    background: '#f59e0b', 
-                    color: 'white',
-                    border: 'none'
-                  }}>
-                    JOIN NOW
-                  </Badge>
-                </div>
-                
-                <h3 style={{ marginBottom: 'var(--spacing-md)' }}>Your Name Could Be Here</h3>
-                
-                <p style={{ 
-                  marginBottom: 'var(--spacing-lg)', 
-                  color: 'var(--color-text-secondary)' 
-                }}>
-                  Complete assessments to earn points and climb the global leaderboard across all categories.
-                </p>
-                
-                <div style={{ 
-                  color: '#059669', 
-                  fontWeight: 600, 
-                  marginBottom: 'var(--spacing-lg)' 
-                }}>
-                  Next assessment: +{Math.floor(Math.random() * 500) + 100} points
-                </div>
-                
-                <BaseButton $variant="primary" onClick={handleCreateAccount} $fullWidth>
-                  Start Earning Points
-                  <ArrowRight size={16} />
-                </BaseButton>
-                
-                <div style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--color-text-secondary)',
-                  marginTop: 'var(--spacing-md)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--spacing-xs)',
-                  justifyContent: 'center'
-                }}>
-                  <Users size={12} />
-                  {Math.floor(Math.random() * 50) + 20} people joined this week
-                </div>
-              </CardContent>
-            </Card>
-          </Grid>
+            {/* Category Navigation */}
+            <AssessmentCategoryTabs
+              activeCategory={assessmentCategory}
+              onCategoryChange={setAssessmentCategory}
+            />
+
+            {/* Assessment Content */}
+            {assessmentCategory === 'professional' && renderProfessionalAssessments()}
+            {assessmentCategory === 'psychological' && renderPsychologicalAssessments()}
+            {assessmentCategory === 'creativity' && renderCreativityAssessments()}
+          </Container>
         </Section>
 
-        {/* Features Section */}
+        {/* The Science Behind Your Success */}
         <Section>
-          <FlexRow $gap="var(--spacing-sm)" style={{ marginBottom: 'var(--spacing-xl)' }}>
-            <Shield size={28} />
-            <Heading2 style={{ margin: 0 }}>Trusted by Industry Leaders</Heading2>
-          </FlexRow>
+          <Container $maxWidth="100%" $padding={false}>
+            <div style={{ textAlign: 'center', marginBottom: 'var(--spacing-2xl)' }}>
+              <Heading2 style={{ marginBottom: 'var(--spacing-md)' }}>
+                The Science Behind Your Success
+              </Heading2>
+              <BodyText style={{
+                fontSize: 'var(--font-size-lg)',
+                maxWidth: '650px',
+                margin: '0 auto',
+                color: 'var(--color-text-secondary)'
+              }}>
+                Why top companies use our three-dimensional assessment approach to identify and develop talent.
+              </BodyText>
+            </div>
 
-          <Grid $columns={2} $gap="var(--spacing-lg)">
-            <Card style={{
-              background: 'var(--color-background-secondary)',
-              border: '1px solid var(--color-border-light)'
-            }}>
-              <CardContent>
-                <div style={{ 
-                  width: 50, 
-                  height: 50, 
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-background-tertiary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 'var(--spacing-md)',
-                  border: '2px solid #3b82f6'
-                }}>
-                  <Activity size={24} style={{ color: '#3b82f6' }} />
-                </div>
-                <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Real-time Analytics</h3>
-                <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                  Get instant insights with AI-powered analysis and industry benchmarking across all assessment types.
-                </p>
-              </CardContent>
-            </Card>
+            <Grid $columns={3} $gap="var(--spacing-xl)">
+              <FeatureCard onClick={() => setAssessmentCategory('professional')}>
+                <CardContent>
+                  <div style={{
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--spacing-md)',
+                    marginBottom: 'var(--spacing-lg)'
+                  }}>
+                    <FeatureIcon $color="var(--color-primary-600)">
+                      <Target size={28} />
+                    </FeatureIcon>
+                    <Badge style={{
+                      background: 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700))',
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      border: 'none'
+                    }}>
+                      CORE PILLAR
+                    </Badge>
+                  </div>
 
-            <Card style={{
-              background: 'var(--color-background-secondary)',
-              border: '1px solid var(--color-border-light)'
-            }}>
-              <CardContent>
-                <div style={{ 
-                  width: 50, 
-                  height: 50, 
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-background-tertiary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 'var(--spacing-md)',
-                  border: '2px solid #10b981'
-                }}>
-                  <Shield size={24} style={{ color: '#10b981' }} />
-                </div>
-                <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Verified Credentials</h3>
-                <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                  Blockchain-verified certificates that employers can instantly verify for all completed assessments.
-                </p>
-              </CardContent>
-            </Card>
+                  <h3 style={{ marginBottom: 'var(--spacing-sm)', fontSize: '1.25rem', color: 'var(--color-text-primary)' }}>
+                    Professional Excellence
+                  </h3>
+                  <BodyText style={{ marginBottom: 'var(--spacing-md)', lineHeight: '1.6' }}>
+                    Six critical competencies that predict 89% of workplace success: communication mastery,
+                    innovative problem-solving, and emotional intelligence.
+                  </BodyText>
 
-            <Card style={{
-              background: 'var(--color-background-secondary)',
-              border: '1px solid var(--color-border-light)'
-            }}>
-              <CardContent>
-                <div style={{ 
-                  width: 50, 
-                  height: 50, 
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-background-tertiary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 'var(--spacing-md)',
-                  border: '2px solid #f59e0b'
-                }}>
-                  <TrendingUp size={24} style={{ color: '#f59e0b' }} />
-                </div>
-                <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Market-Relevant</h3>
-                <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                  Continuously updated assessments reflecting current industry demands and psychological research.
-                </p>
-              </CardContent>
-            </Card>
+                  <div style={{
+                    background: 'var(--color-primary-600)10',
+                    padding: 'var(--spacing-md)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid var(--color-primary-600)30',
+                    marginBottom: 'var(--spacing-md)'
+                  }}>
+                    <FlexRow $justify="space-between" style={{ marginBottom: 'var(--spacing-xs)' }}>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Employer Confidence</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--color-primary-600)' }}>94%</span>
+                    </FlexRow>
+                    <div style={{
+                      background: 'var(--color-background-tertiary)',
+                      height: '6px',
+                      borderRadius: '3px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        background: 'var(--color-primary-600)',
+                        height: '100%',
+                        width: '94%',
+                        borderRadius: '3px',
+                        transition: 'width 1s ease-out'
+                      }} />
+                    </div>
+                  </div>
 
-            <Card style={{
-              background: 'var(--color-background-secondary)',
-              border: '1px solid var(--color-border-light)'
-            }}>
-              <CardContent>
-                <div style={{ 
-                  width: 50, 
-                  height: 50, 
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-background-tertiary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 'var(--spacing-md)',
-                  border: '2px solid #8b5cf6'
-                }}>
-                  <Globe size={24} style={{ color: '#8b5cf6' }} />
-                </div>
-                <h3 style={{ marginBottom: 'var(--spacing-sm)' }}>Global Recognition</h3>
-                <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                  Accepted by 500+ companies worldwide including Fortune 500 firms across multiple industries.
-                </p>
-              </CardContent>
-            </Card>
-          </Grid>
+                  <FlexRow $gap="var(--spacing-xs)" style={{ fontSize: '0.875rem' }}>
+                    <CheckCircle size={14} color="var(--color-success-600)" />
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Fortune 500 Validated</span>
+                  </FlexRow>
+                </CardContent>
+              </FeatureCard>
+
+              <FeatureCard onClick={() => setAssessmentCategory('psychological')}>
+                <CardContent>
+                  <div style={{
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--spacing-md)',
+                    marginBottom: 'var(--spacing-lg)'
+                  }}>
+                    <FeatureIcon $color="#8b5cf6">
+                      <Brain size={28} />
+                    </FeatureIcon>
+                    <Badge style={{
+                      background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      border: 'none'
+                    }}>
+                      RESEARCH BACKED
+                    </Badge>
+                  </div>
+
+                  <h3 style={{ marginBottom: 'var(--spacing-sm)', fontSize: '1.25rem', color: 'var(--color-text-primary)' }}>
+                    Psychological Intelligence
+                  </h3>
+                  <BodyText style={{ marginBottom: 'var(--spacing-md)', lineHeight: '1.6' }}>
+                    Clinical-grade assessments including Big Five personality, wellbeing indicators,
+                    and cognitive patterns used by leading researchers.
+                  </BodyText>
+
+                  <div style={{
+                    background: '#8b5cf610',
+                    padding: 'var(--spacing-md)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid #8b5cf630',
+                    marginBottom: 'var(--spacing-md)'
+                  }}>
+                    <FlexRow $justify="space-between" style={{ marginBottom: 'var(--spacing-xs)' }}>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Scientific Validity</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#8b5cf6' }}>99.2%</span>
+                    </FlexRow>
+                    <div style={{
+                      background: 'var(--color-background-tertiary)',
+                      height: '6px',
+                      borderRadius: '3px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        background: '#8b5cf6',
+                        height: '100%',
+                        width: '99.2%',
+                        borderRadius: '3px',
+                        transition: 'width 1s ease-out'
+                      }} />
+                    </div>
+                  </div>
+
+                  <FlexRow $gap="var(--spacing-xs)" style={{ fontSize: '0.875rem' }}>
+                    <Shield size={14} color="#8b5cf6" />
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Peer-Reviewed Standards</span>
+                  </FlexRow>
+                </CardContent>
+              </FeatureCard>
+
+              <FeatureCard onClick={() => setAssessmentCategory('creativity')}>
+                <CardContent>
+                  <div style={{
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--spacing-md)',
+                    marginBottom: 'var(--spacing-lg)'
+                  }}>
+                    <FeatureIcon $color="#f59e0b">
+                      <Lightbulb size={28} />
+                    </FeatureIcon>
+                    <Badge style={{
+                      background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      border: 'none'
+                    }}>
+                      INNOVATION EDGE
+                    </Badge>
+                  </div>
+
+                  <h3 style={{ marginBottom: 'var(--spacing-sm)', fontSize: '1.25rem', color: 'var(--color-text-primary)' }}>
+                    Creative Potential
+                  </h3>
+                  <BodyText style={{ marginBottom: 'var(--spacing-md)', lineHeight: '1.6' }}>
+                    Breakthrough assessments measuring divergent thinking, creative problem-solving,
+                    and innovation capacity—the X-factor employers crave.
+                  </BodyText>
+
+                  <div style={{
+                    background: '#f59e0b10',
+                    padding: 'var(--spacing-md)',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid #f59e0b30',
+                    marginBottom: 'var(--spacing-md)'
+                  }}>
+                    <FlexRow $justify="space-between" style={{ marginBottom: 'var(--spacing-xs)' }}>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>Innovation Predictor</span>
+                      <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#f59e0b' }}>87%</span>
+                    </FlexRow>
+                    <div style={{
+                      background: 'var(--color-background-tertiary)',
+                      height: '6px',
+                      borderRadius: '3px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        background: '#f59e0b',
+                        height: '100%',
+                        width: '87%',
+                        borderRadius: '3px',
+                        transition: 'width 1s ease-out'
+                      }} />
+                    </div>
+                  </div>
+
+                  <FlexRow $gap="var(--spacing-xs)" style={{ fontSize: '0.875rem' }}>
+                    <Sparkles size={14} color="#f59e0b" />
+                    <span style={{ color: 'var(--color-text-secondary)' }}>Future-Skills Focused</span>
+                  </FlexRow>
+                </CardContent>
+              </FeatureCard>
+            </Grid>
+          </Container>
         </Section>
 
-        {/* Final CTA */}
-        <CTASection style={{
-          background: 'var(--color-background-secondary)',
-          border: '1px solid var(--color-border-light)',
-          borderRadius: 'var(--radius-xl)'
-        }}>
-          <ContentWrapper>
+        {/* Elite Performance Rankings */}
+        <Section>
+          <Container $maxWidth="100%" $padding={false}>
+            <div style={{ textAlign: 'center', marginBottom: 'var(--spacing-2xl)' }}>
+              <FlexRow $justify="center" $gap="var(--spacing-sm)" style={{ marginBottom: 'var(--spacing-md)' }}>
+                <Trophy size={32} color="#f59e0b" />
+                <Heading2 style={{ margin: 0 }}>Elite Performance Rankings</Heading2>
+                <LiveIndicator />
+              </FlexRow>
+
+              <BodyText style={{
+                fontSize: 'var(--font-size-lg)',
+                maxWidth: '600px',
+                margin: '0 auto',
+                color: 'var(--color-text-secondary)'
+              }}>
+                Where the world's top talent competes. Join the ranks of verified professionals
+                climbing our global performance leaderboard.
+              </BodyText>
+            </div>
+
+            <Grid $columns={2} $gap="var(--spacing-2xl)">
+              <div>
+                <div style={{
+                  background: '#f59e0b15',
+                  padding: 'var(--spacing-lg)',
+                  borderRadius: 'var(--radius-xl)',
+                  border: '1px solid #f59e0b30',
+                  marginBottom: 'var(--spacing-lg)'
+                }}>
+                  <FlexRow $justify="space-between" $align="center">
+                    <div>
+                      <h3 style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--spacing-sm)',
+                        margin: '0 0 var(--spacing-xs) 0',
+                        color: '#f59e0b'
+                      }}>
+                        <Star size={20} />
+                        Global Champions
+                      </h3>
+                      <p style={{
+                        margin: 0,
+                        fontSize: '0.875rem',
+                        color: 'var(--color-text-secondary)'
+                      }}>
+                        Live rankings across all assessment categories
+                      </p>
+                    </div>
+                    <div style={{
+                      background: '#f59e0b20',
+                      padding: 'var(--spacing-sm) var(--spacing-md)',
+                      borderRadius: 'var(--radius-lg)',
+                      border: '1px solid #f59e0b30'
+                    }}>
+                      <FlexRow $gap="var(--spacing-xs)" style={{ fontSize: '0.875rem', fontWeight: 600, color: '#f59e0b' }}>
+                        <Globe size={14} />
+                        <span>Updated live</span>
+                      </FlexRow>
+                    </div>
+                  </FlexRow>
+                </div>
+
+                <LeaderboardCard>
+                  {leaderboard.map((player, index) => (
+                    <LeaderboardItem key={player.rank} $rank={player.rank}>
+                      <RankBadge $rank={player.rank}>
+                        {player.rank <= 3 ? ['🥇', '🥈', '🥉'][player.rank - 1] : player.rank}
+                      </RankBadge>
+
+                      <PlayerInfo $gap="0" style={{ flex: 1 }}>
+                        <FlexRow $gap="var(--spacing-sm)" $align="center">
+                          <PlayerName>{player.name}</PlayerName>
+                          {player.verified && (
+                            <Badge $variant="success" style={{ fontSize: '0.75rem' }}>
+                              <Shield size={10} />
+                              Verified
+                            </Badge>
+                          )}
+                          {player.rank <= 3 && (
+                            <Badge style={{
+                              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                              color: 'white',
+                              fontSize: '0.7rem',
+                              border: 'none'
+                            }}>
+                              Elite
+                            </Badge>
+                          )}
+                        </FlexRow>
+                        <FlexRow $gap="var(--spacing-md)" style={{ fontSize: '0.875rem' }}>
+                          <PlayerScore>
+                            {formatNumber(player.score)} points
+                          </PlayerScore>
+                          <span style={{ color: 'var(--color-text-tertiary)' }}>•</span>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>
+                            {['Professional', 'Psychological', 'Creative'][Math.floor(Math.random() * 3)]} Leader
+                          </span>
+                        </FlexRow>
+                      </PlayerInfo>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <MetricItem style={{ color: 'var(--color-success-600)', fontWeight: 600, marginBottom: '2px' }}>
+                          <TrendingUp size={14} />
+                          +{Math.floor(Math.random() * 50) + 10}
+                        </MetricItem>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-tertiary)' }}>
+                          {Math.floor(Math.random() * 60) + 5}m ago
+                        </div>
+                      </div>
+                    </LeaderboardItem>
+                  ))}
+                </LeaderboardCard>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' }}>
+                <FeatureCard style={{
+                  background: 'var(--color-primary-600)15',
+                  border: '1px solid var(--color-primary-600)30'
+                }}>
+                  <CardContent style={{ textAlign: 'center' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 'var(--spacing-sm)',
+                      marginBottom: 'var(--spacing-lg)'
+                    }}>
+                      <Award size={28} color="var(--color-primary-600)" />
+                      <Badge style={{
+                        background: 'linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700))',
+                        color: 'white',
+                        border: 'none'
+                      }}>
+                        YOUR TURN
+                      </Badge>
+                    </div>
+
+                    <h3 style={{ marginBottom: 'var(--spacing-md)', fontSize: '1.4rem', color: 'var(--color-text-primary)' }}>
+                      Claim Your Ranking
+                    </h3>
+
+                    <p style={{
+                      marginBottom: 'var(--spacing-lg)',
+                      color: 'var(--color-text-secondary)',
+                      lineHeight: '1.5'
+                    }}>
+                      Every assessment completed adds to your global ranking. Top performers get priority
+                      access to exclusive opportunities and recognition.
+                    </p>
+
+                    <div style={{
+                      background: 'var(--color-primary-600)10',
+                      padding: 'var(--spacing-lg)',
+                      borderRadius: 'var(--radius-lg)',
+                      border: '1px solid var(--color-primary-600)30',
+                      marginBottom: 'var(--spacing-lg)'
+                    }}>
+                      <FlexRow $justify="space-between" style={{ marginBottom: 'var(--spacing-sm)' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Next Assessment Value:</span>
+                        <span style={{ color: 'var(--color-success-600)', fontWeight: 700, fontSize: '1.1rem' }}>
+                          +{Math.floor(Math.random() * 400) + 150} pts
+                        </span>
+                      </FlexRow>
+                      <FlexRow $justify="space-between" style={{ marginBottom: 'var(--spacing-sm)' }}>
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
+                          Estimated ranking jump:
+                        </span>
+                        <span style={{ color: 'var(--color-primary-600)', fontWeight: 600, fontSize: '0.875rem' }}>
+                          +{Math.floor(Math.random() * 50) + 10} positions
+                        </span>
+                      </FlexRow>
+                    </div>
+
+                    <BaseButton $variant="primary" onClick={handleCreateAccount} $fullWidth style={{ marginBottom: 'var(--spacing-md)' }}>
+                      Start Climbing
+                      <ArrowRight size={16} />
+                    </BaseButton>
+
+                    <MetricItem style={{
+                      justifyContent: 'center',
+                      fontSize: '0.75rem',
+                      color: 'var(--color-text-tertiary)'
+                    }}>
+                      <Users size={12} />
+                      {Math.floor(Math.random() * 100) + 50} professionals joined in the last 24h
+                    </MetricItem>
+                  </CardContent>
+                </FeatureCard>
+
+                <FeatureCard>
+                  <CardContent style={{ textAlign: 'center' }}>
+                    <div style={{ marginBottom: 'var(--spacing-md)' }}>
+                      <Sparkles size={24} color="#f59e0b" style={{ marginBottom: 'var(--spacing-sm)' }} />
+                      <h4 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--color-text-primary)' }}>Elite Status Benefits</h4>
+                    </div>
+
+                    <div style={{ textAlign: 'left' }}>
+                      <FlexRow $gap="var(--spacing-sm)" style={{ marginBottom: 'var(--spacing-sm)' }}>
+                        <CheckCircle size={16} color="var(--color-success-600)" />
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>Priority recruiter visibility</span>
+                      </FlexRow>
+                      <FlexRow $gap="var(--spacing-sm)" style={{ marginBottom: 'var(--spacing-sm)' }}>
+                        <CheckCircle size={16} color="var(--color-success-600)" />
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>Exclusive opportunity access</span>
+                      </FlexRow>
+                      <FlexRow $gap="var(--spacing-sm)" style={{ marginBottom: 'var(--spacing-sm)' }}>
+                        <CheckCircle size={16} color="var(--color-success-600)" />
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>Professional networking events</span>
+                      </FlexRow>
+                      <FlexRow $gap="var(--spacing-sm)">
+                        <CheckCircle size={16} color="var(--color-success-600)" />
+                        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>Advanced analytics dashboard</span>
+                      </FlexRow>
+                    </div>
+                  </CardContent>
+                </FeatureCard>
+              </div>
+            </Grid>
+          </Container>
+        </Section>
+
+        {/* FINAL CTA */}
+        <Section>
+          <CTASection>
             <Heading2>Ready to Prove Your Complete Professional Profile?</Heading2>
             <BodyText $size="lg" style={{ marginBottom: 'var(--spacing-xl)' }}>
-              Join 45,000+ professionals who have advanced their careers with comprehensive 
+              Join 45,000+ professionals who have advanced their careers with comprehensive
               skill, psychological, and creativity certifications.
             </BodyText>
 
-            <BaseButton 
-              $variant="primary" 
+            <BaseButton
+              $variant="primary"
               $size="lg"
               onClick={handleCreateAccount}
             >
               <Target size={20} />
               Start Your Journey
             </BaseButton>
-          </ContentWrapper>
-        </CTASection>
+          </CTASection>
+        </Section>
       </ContentWrapper>
-    </PageWrapper>
+    </PageContainer>
   );
 };
+
+// ==============================================
+// SUSPENSE WRAPPER COMPONENT
+// ==============================================
+const ThrivePageWithSuspense = () => (
+  <Suspense fallback={
+    <PageContainer>
+      <ContentWrapper>
+        <LoadingContainer>
+          <LoadingSpinner $size="lg" />
+          <BodyText>Loading professional assessments...</BodyText>
+        </LoadingContainer>
+      </ContentWrapper>
+    </PageContainer>
+  }>
+    <ThriveProvider isAuthenticated={false}>
+      <PublicContent />
+    </ThriveProvider>
+  </Suspense>
+);
 
 // ==============================================
 // MAIN EXPORT WITH PROVIDER
 // ==============================================
 
-export default function ThrivePage() {
-  return (
-    <ThriveProvider isAuthenticated={false}>
-      <PublicContent />
-    </ThriveProvider>
-  );
-}
+export default ThrivePageWithSuspense;

@@ -1,8 +1,9 @@
-// src/styles/theme.ts - Just remove the React Context part
+'use client';
+// src/styles/theme.ts - Keep Your Blue Scheme
 import { createGlobalStyle } from 'styled-components';
 
 // ==============================================
-// 1. DESIGN TOKENS (Single Source of Truth)
+// 1. DESIGN TOKENS - Keep Exactly What You Have
 // ==============================================
 
 export const designTokens = {
@@ -95,54 +96,40 @@ export const designTokens = {
 };
 
 // ==============================================
-// 2. THEME GENERATOR 
+// 2. SINGLE THEME - Keep Current Working Theme
 // ==============================================
 
-export function generateTheme(mode: 'light' | 'dark') {
-  const isLight = mode === 'light';
-  
+export function generateTheme() {
   return {
-    // Colors object that matches your styled.d.ts exactly
     colors: {
-      // Primary colors as Record<string, string>
       primary: designTokens.colors.primary,
-      
-      // Accent colors - match your styled.d.ts exactly
       accent: {
         blue: designTokens.colors.accent.blue,
-        lightBlue: designTokens.colors.accent.cyan, // Map cyan to lightBlue
-        muted: isLight ? designTokens.colors.primary[400] : designTokens.colors.primary[500]
+        lightBlue: designTokens.colors.accent.cyan,
+        muted: designTokens.colors.primary[400]
       },
-      
-      // Background colors
       background: {
-        primary: isLight ? designTokens.colors.primary[50] : designTokens.colors.primary[950],
-        secondary: isLight ? '#ffffff' : designTokens.colors.primary[900],
-        tertiary: isLight ? designTokens.colors.primary[100] : designTokens.colors.primary[800]
+        primary: designTokens.colors.primary[50],
+        secondary: '#ffffff',
+        tertiary: designTokens.colors.primary[100]
       },
-      
-      // Text colors
       text: {
-        primary: isLight ? designTokens.colors.primary[900] : designTokens.colors.primary[50],
-        secondary: isLight ? designTokens.colors.primary[700] : designTokens.colors.primary[300],
-        muted: isLight ? designTokens.colors.primary[400] : designTokens.colors.primary[500],
-        light: isLight ? designTokens.colors.primary[300] : designTokens.colors.primary[200]
+        primary: designTokens.colors.primary[900],
+        secondary: designTokens.colors.primary[700],
+        muted: designTokens.colors.primary[400],
+        light: designTokens.colors.primary[300]
       },
-      
-      // Border colors
       border: {
-        light: isLight ? designTokens.colors.primary[200] : designTokens.colors.primary[800],
-        medium: isLight ? designTokens.colors.primary[300] : designTokens.colors.primary[700],
-        dark: isLight ? designTokens.colors.primary[400] : designTokens.colors.primary[600]
+        light: designTokens.colors.primary[200],
+        medium: designTokens.colors.primary[300],
+        dark: designTokens.colors.primary[400]
       }
     },
-    
-    // Typography - match your styled.d.ts exactly
     typography: {
       fonts: {
         display: designTokens.typography.fonts.display,
         body: designTokens.typography.fonts.body,
-        accent: designTokens.typography.fonts.display // Add missing 'accent' font
+        accent: designTokens.typography.fonts.display
       },
       sizes: designTokens.typography.sizes,
       weights: {
@@ -153,8 +140,6 @@ export function generateTheme(mode: 'light' | 'dark') {
         bold: 700
       }
     },
-    
-    // Spacing - match your styled.d.ts exactly
     spacing: {
       xs: designTokens.spacing.xs,
       sm: designTokens.spacing.sm,
@@ -164,8 +149,6 @@ export function generateTheme(mode: 'light' | 'dark') {
       '2xl': designTokens.spacing['2xl'],
       '3xl': designTokens.spacing['3xl']
     },
-    
-    // Border radius - match your styled.d.ts exactly
     borderRadius: {
       sm: designTokens.borderRadius.sm,
       md: designTokens.borderRadius.md,
@@ -173,63 +156,58 @@ export function generateTheme(mode: 'light' | 'dark') {
       xl: designTokens.borderRadius.xl,
       full: designTokens.borderRadius.full
     },
-    
-    // Shadows - match your styled.d.ts exactly
     shadows: {
       sm: designTokens.shadows.sm,
       md: designTokens.shadows.md,
       lg: designTokens.shadows.lg,
-      glass: isLight ? '0 8px 32px rgba(0, 0, 0, 0.1)' : '0 8px 32px rgba(0, 0, 0, 0.5)'
+      glass: '0 8px 32px rgba(0, 0, 0, 0.1)'
     },
-    
-    // Transitions - match your styled.d.ts exactly
     transitions: {
       fast: designTokens.transitions.fast,
       normal: designTokens.transitions.normal,
       slow: designTokens.transitions.slow
     },
-    
-    // Glass effects - match your styled.d.ts exactly
     glass: {
-      background: isLight ? 'rgba(255, 255, 255, 0.9)' : 'rgba(26, 26, 26, 0.9)',
-      border: isLight ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+      background: 'rgba(255, 255, 255, 0.9)',
+      border: 'rgba(255, 255, 255, 0.3)',
       blur: '20px'
     }
   };
 }
 
 // ==============================================
-// 3. CSS CUSTOM PROPERTIES GENERATOR
+// 3. CSS VARIABLES - Keep Your Current Names
 // ==============================================
 
-export function generateCSSVariables(theme: ReturnType<typeof generateTheme>) {
+export function generateCSSVariables() {
+  const theme = generateTheme();
   return `
     :root {
-      /* Background colors - match your existing variable names */
+      /* Background colors */
       --color-background-primary: ${theme.colors.background.primary};
       --color-background-secondary: ${theme.colors.background.secondary};
       --color-background-tertiary: ${theme.colors.background.tertiary};
       
-      /* Text colors - match your existing variable names */
+      /* Text colors */
       --color-text-primary: ${theme.colors.text.primary};
       --color-text-secondary: ${theme.colors.text.secondary};
       --color-text-muted: ${theme.colors.text.muted};
       
-      /* Border colors - match your existing variable names */
+      /* Border colors */
       --color-border-light: ${theme.colors.border.light};
       --color-border-medium: ${theme.colors.border.medium};
       --color-border-dark: ${theme.colors.border.dark};
       
-      /* Primary colors - match your existing variable names */
+      /* Primary colors */
       --color-primary-500: ${theme.colors.primary[500]};
       --color-primary-600: ${theme.colors.primary[600]};
       
-      /* Typography - match your existing variable names */
+      /* Typography */
       --font-display: ${theme.typography.fonts.display};
       --font-body: ${theme.typography.fonts.body};
       --font-mono: ${theme.typography.fonts.accent};
       
-      /* Spacing - match your existing variable names */
+      /* Spacing */
       --spacing-xs: ${theme.spacing.xs};
       --spacing-sm: ${theme.spacing.sm};
       --spacing-md: ${theme.spacing.md};
@@ -238,22 +216,22 @@ export function generateCSSVariables(theme: ReturnType<typeof generateTheme>) {
       --spacing-2xl: ${theme.spacing['2xl']};
       --spacing-3xl: ${theme.spacing['3xl']};
       
-      /* Border Radius - match your existing variable names */
+      /* Border Radius */
       --radius-sm: ${theme.borderRadius.sm};
       --radius-md: ${theme.borderRadius.md};
       --radius-lg: ${theme.borderRadius.lg};
       
-      /* Shadows - match your existing variable names */
+      /* Shadows */
       --shadow-sm: ${theme.shadows.sm};
       --shadow-md: ${theme.shadows.md};
       --shadow-lg: ${theme.shadows.lg};
       
-      /* Transitions - match your existing variable names */
+      /* Transitions */
       --transition-fast: ${theme.transitions.fast};
       --transition-normal: ${theme.transitions.normal};
       --transition-slow: ${theme.transitions.slow};
       
-      /* Glass effects - match your existing variable names */
+      /* Glass effects */
       --glass-background: ${theme.glass.background};
       --glass-border: ${theme.glass.border};
       --glass-blur: ${theme.glass.blur};
@@ -262,13 +240,12 @@ export function generateCSSVariables(theme: ReturnType<typeof generateTheme>) {
 }
 
 // ==============================================
-// 4. GLOBAL STYLES
+// 4. GLOBAL STYLES - Simplified
 // ==============================================
 
-export const GlobalStyles = createGlobalStyle<{ $isDark: boolean }>`
-  ${({ $isDark }) => generateCSSVariables(generateTheme($isDark ? 'dark' : 'light'))}
+export const GlobalStyles = createGlobalStyle`
+  ${generateCSSVariables()}
   
-  /* Your existing global styles go here */
   *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -284,7 +261,7 @@ export const GlobalStyles = createGlobalStyle<{ $isDark: boolean }>`
   
   body {
     font-family: var(--font-body);
-    background: var(--color-bg-primary);
+    background: var(--color-background-primary);
     color: var(--color-text-primary);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
@@ -295,9 +272,9 @@ export const GlobalStyles = createGlobalStyle<{ $isDark: boolean }>`
 `;
 
 // ==============================================
-// 5. EXPORTS
+// 5. EXPORTS - Keep Compatibility
 // ==============================================
 
 export { designTokens as tokens };
-export const lightTheme = generateTheme('light');
-export const darkTheme = generateTheme('dark');
+export const lightTheme = generateTheme();
+export const darkTheme = generateTheme(); // Same as light to maintain compatibility

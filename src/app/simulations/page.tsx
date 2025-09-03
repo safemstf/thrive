@@ -1,4 +1,4 @@
-// src/app/simulations/page.tsx
+// src/app/simulations/page.tsx - Complete Professional Simulation Platform
 'use client';
 
 import React, { useState, useCallback } from 'react';
@@ -12,7 +12,7 @@ import {
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
 
-// Dynamically import ALL simulations with loading states for future-proofing
+// Dynamically import ALL simulations with loading states
 const TSPAlgorithmRace = dynamic(() => import("@/components/cs/ants/ants"), {
   ssr: false,
   loading: () => <SimulationLoader>Loading TSP Algorithm Race...</SimulationLoader>
@@ -61,21 +61,20 @@ interface SimulationItem {
 }
 
 // Animations
-const matrixGlow = keyframes`
-  0% { box-shadow: 0 0 0px rgba(59, 130, 246, 0.1); transform: translateY(0); opacity: 0.95; }
-  50% { box-shadow: 0 0 24px rgba(59, 130, 246, 0.3); transform: translateY(-2px); opacity: 1; }
-  100% { box-shadow: 0 0 0px rgba(59, 130, 246, 0.1); transform: translateY(0); opacity: 0.95; }
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
+const gentleGlow = keyframes`
+  0%, 100% { box-shadow: 0 4px 20px rgba(59, 130, 246, 0.08); }
+  50% { box-shadow: 0 8px 30px rgba(59, 130, 246, 0.15); }
 `;
 
 const shimmer = keyframes`
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
-`;
-
-const pulse = keyframes`
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
 `;
 
 const spin = keyframes`
@@ -91,57 +90,35 @@ const SimulationLoader = styled.div`
   justify-content: center;
   height: 100%;
   min-height: 300px;
-  color: #00ff00;
-  font-family: 'Courier New', monospace;
-  text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+  color: #64748b;
+  font-family: 'Inter', system-ui, sans-serif;
   
   &::before {
     content: '';
-    width: 40px;
-    height: 40px;
-    border: 3px solid rgba(0, 255, 0, 0.1);
-    border-top: 3px solid #00ff00;
+    width: 32px;
+    height: 32px;
+    border: 2px solid #e2e8f0;
+    border-top: 2px solid #3b82f6;
     border-radius: 50%;
     margin-bottom: 1rem;
     animation: ${spin} 1s linear infinite;
   }
 `;
 
-// Main Container with darker background for matrix effect
+// Professional container
 const PageContainer = styled.div`
   min-height: 100vh;
-  background: #000000;
-  color: #e2e8f0;
+  background: linear-gradient(135deg, #fafbfc 0%, #f8fafc 50%, #f1f5f9 100%);
   position: relative;
   overflow-x: hidden;
 `;
 
-// Matrix Rain Container - positioned behind content
-const MatrixRainContainer = styled.div`
+// Subtle matrix background
+const MatrixBackground = styled.div`
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 0;
-  opacity: 0.6;
-  filter: blur(0.5px);
-`;
-
-// Overlay gradient to make content more readable
-const ContentOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(0, 0, 0, 0.3) 0%,
-    rgba(0, 0, 0, 0.7) 50%,
-    rgba(0, 0, 0, 0.85) 100%
-  );
-  z-index: 1;
+  opacity: 0.3;
   pointer-events: none;
 `;
 
@@ -159,151 +136,124 @@ const ContentWrapper = styled.div`
 
 const PageHeader = styled.div`
   text-align: center;
-  margin-bottom: 3rem;
+  margin-bottom: 4rem;
   position: relative;
-  z-index: 10;
 `;
 
 const PageTitle = styled.h1`
-  font-size: 3.5rem;
-  font-weight: 900;
-  background: linear-gradient(135deg, #00ff00, #3b82f6, #00ff00);
+  font-size: 3rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #1e293b, #475569, #64748b);
   background-size: 200% 200%;
   animation: ${shimmer} 3s ease infinite;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 1rem;
-  font-family: 'Courier New', monospace;
-  letter-spacing: -1px;
-  text-shadow: 0 0 40px rgba(0, 255, 0, 0.5);
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.025em;
   
   @media (max-width: 768px) {
-    font-size: 2.5rem;
+    font-size: 2.25rem;
   }
 `;
 
 const PageSubtitle = styled.p`
-  font-size: 1.1rem;
-  color: #00ff00;
-  max-width: 700px;
+  font-size: 1.125rem;
+  color: #64748b;
+  max-width: 600px;
   margin: 0 auto;
-  line-height: 1.7;
-  font-family: 'Courier New', monospace;
-  opacity: 0.8;
-  text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+  line-height: 1.6;
+  font-family: 'Inter', system-ui, sans-serif;
 `;
 
-// Tab Navigation
+// Professional tab system
 const TabContainer = styled.div`
   display: flex;
   justify-content: center;
   margin-bottom: 3rem;
-  position: relative;
-  z-index: 10;
 `;
 
 const TabWrapper = styled.div`
   display: flex;
-  background: rgba(0, 0, 0, 0.9);
-  border: 1px solid rgba(0, 255, 0, 0.3);
-  border-radius: 16px;
-  padding: 0.5rem;
-  backdrop-filter: blur(20px);
-  box-shadow: 0 0 30px rgba(0, 255, 0, 0.15);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 4px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 1rem 2rem;
+  padding: 0.875rem 1.75rem;
   border: none;
-  border-radius: 12px;
-  background: ${({ $active }) => $active 
-    ? 'linear-gradient(135deg, #00ff00, #3b82f6)' 
-    : 'transparent'
-  };
-  color: ${({ $active }) => $active ? 'black' : '#00ff00'};
-  font-family: 'Courier New', monospace;
-  font-weight: 700;
-  font-size: 0.95rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  border-radius: 8px;
+  background: ${({ $active }) => $active ? 'white' : 'transparent'};
+  color: ${({ $active }) => $active ? '#1e293b' : '#64748b'};
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s ease;
   
   ${({ $active }) => $active && css`
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
-    animation: ${matrixGlow} 3s ease-in-out infinite;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   `}
 
   &:hover {
-    background: ${({ $active }) => $active 
-      ? 'linear-gradient(135deg, #00ff00, #3b82f6)' 
-      : 'rgba(0, 255, 0, 0.1)'
-    };
-    transform: translateY(-1px);
+    background: ${({ $active }) => $active ? 'white' : 'rgba(59, 130, 246, 0.05)'};
+    color: ${({ $active }) => $active ? '#1e293b' : '#3b82f6'};
   }
 `;
 
-// Grid Layout
+// Professional card grid
 const ItemsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 1.5rem;
   margin-bottom: 3rem;
-  position: relative;
-  z-index: 10;
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
 `;
 
-// Item Card with matrix theme
+// Clean, professional cards
 const ItemCard = styled.div<{ $active?: boolean; $featured?: boolean; $comingSoon?: boolean }>`
-  cursor: ${({ $comingSoon }) => $comingSoon ? 'default' : 'pointer'};
   position: relative;
-  padding: 1.5rem;
+  padding: 2rem;
+  background: white;
   border-radius: 16px;
-  backdrop-filter: blur(12px);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: ${({ $comingSoon }) => $comingSoon ? 0.7 : 1};
-
-  background: ${({ $active, $featured, $comingSoon }) => {
-    if ($comingSoon) return 'rgba(50, 50, 50, 0.2)';
-    if ($featured && $active) return 'rgba(0, 255, 0, 0.15)';
-    if ($active) return 'rgba(59, 130, 246, 0.15)';
-    return 'rgba(0, 0, 0, 0.8)';
-  }};
-
-  border: 2px solid ${({ $active, $featured, $comingSoon }) => {
-    if ($comingSoon) return 'rgba(100, 100, 100, 0.3)';
-    if ($featured && $active) return '#00ff00';
+  border: 1px solid ${({ $active, $featured }) => {
+    if ($featured && $active) return '#3b82f6';
     if ($active) return '#3b82f6';
-    return 'rgba(0, 255, 0, 0.2)';
+    return 'rgba(148, 163, 184, 0.2)';
   }};
+  cursor: ${({ $comingSoon }) => $comingSoon ? 'default' : 'pointer'};
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: ${({ $comingSoon }) => $comingSoon ? 0.6 : 1};
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  
+  ${({ $active }) => $active && css`
+    box-shadow: 0 8px 30px rgba(59, 130, 246, 0.15);
+    transform: translateY(-2px);
+  `}
 
   &:hover {
-    transform: ${({ $comingSoon }) => 
-      $comingSoon ? 'none' : 'translateY(-8px) scale(1.02)'
-    };
+    transform: ${({ $comingSoon }) => $comingSoon ? 'none' : 'translateY(-4px)'};
     box-shadow: ${({ $comingSoon }) => 
-      $comingSoon 
-        ? 'none' 
-        : '0 25px 50px rgba(0, 255, 0, 0.1)'
-    };
-    border-color: ${({ $comingSoon }) => 
-      $comingSoon ? 'rgba(100, 100, 100, 0.3)' : '#00ff00'
-    };
+      $comingSoon ? '0 4px 20px rgba(0, 0, 0, 0.05)' : '0 12px 40px rgba(0, 0, 0, 0.1)'};
+    border-color: ${({ $comingSoon }) => $comingSoon ? 'rgba(148, 163, 184, 0.2)' : '#3b82f6'};
   }
 `;
 
 const ItemHeader = styled.div`
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 `;
 
 const ItemIcon = styled.div<{ $color: string; $comingSoon?: boolean }>`
@@ -314,133 +264,126 @@ const ItemIcon = styled.div<{ $color: string; $comingSoon?: boolean }>`
   height: 48px;
   border-radius: 12px;
   background: ${({ $color, $comingSoon }) =>
-    $comingSoon 
-      ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.3), rgba(75, 85, 99, 0.1))'
-      : `linear-gradient(135deg, ${$color}30, rgba(0, 255, 0, 0.1))`
-  };
-  color: ${({ $color, $comingSoon }) => $comingSoon ? '#9ca3af' : $color};
-  border: 2px solid ${({ $color, $comingSoon }) =>
-    $comingSoon ? 'rgba(107, 114, 128, 0.4)' : `${$color}50`
-  };
+    $comingSoon ? '#f1f5f9' : `${$color}15`};
+  color: ${({ $color, $comingSoon }) => $comingSoon ? '#94a3b8' : $color};
+  flex-shrink: 0;
+`;
+
+const ItemContent = styled.div`
+  flex: 1;
+  min-width: 0;
 `;
 
 const ItemTitle = styled.h3<{ $comingSoon?: boolean }>`
-  font-weight: 900;
-  margin: 0;
-  font-size: 1.1rem;
-  color: ${({ $comingSoon }) => $comingSoon ? '#9ca3af' : '#00ff00'};
-  text-shadow: ${({ $comingSoon }) => 
-    $comingSoon ? 'none' : '0 0 5px rgba(0, 255, 0, 0.5)'
-  };
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.125rem;
+  margin: 0 0 0.5rem 0;
+  color: ${({ $comingSoon }) => $comingSoon ? '#94a3b8' : '#1e293b'};
+  line-height: 1.3;
 `;
 
 const ItemDescription = styled.p`
+  font-family: 'Inter', system-ui, sans-serif;
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   line-height: 1.6;
-  opacity: 0.9;
-  color: #94a3b8;
+  color: #64748b;
 `;
 
-// Badges
+// Clean badge system
 const BadgeContainer = styled.div`
   position: absolute;
   top: 1rem;
   right: 1rem;
   display: flex;
-  gap: 0.5rem;
   flex-direction: column;
+  gap: 0.5rem;
   align-items: flex-end;
 `;
 
 const Badge = styled.div<{ $variant?: string }>`
-  padding: 0.375rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.625rem;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: 'Inter', system-ui, sans-serif;
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  font-family: 'Courier New', monospace;
-  backdrop-filter: blur(10px);
   
   ${({ $variant }) => {
     switch ($variant) {
       case 'featured':
         return css`
-          background: linear-gradient(135deg, rgba(0, 255, 0, 0.8), rgba(59, 130, 246, 0.6));
-          color: black;
-          animation: ${pulse} 2s infinite;
-          box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
+          background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+          color: white;
+        `;
+      case 'optimized':
+        return css`
+          background: #f0fdf4;
+          color: #16a34a;
+          border: 1px solid #bbf7d0;
         `;
       case 'social':
         return css`
-          background: linear-gradient(135deg, rgba(251, 191, 36, 0.8), rgba(245, 158, 11, 0.6));
-          color: black;
-          box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+          background: #fefce8;
+          color: #ca8a04;
+          border: 1px solid #fef08a;
         `;
       case 'coming-soon':
         return css`
-          background: linear-gradient(135deg, rgba(107, 114, 128, 0.6), rgba(75, 85, 99, 0.4));
-          color: #94a3b8;
+          background: #f8fafc;
+          color: #64748b;
+          border: 1px solid #e2e8f0;
         `;
       default:
         return css`
-          background: linear-gradient(135deg, rgba(0, 255, 0, 0.8), rgba(29, 78, 216, 0.6));
-          color: black;
-          box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+          background: #eff6ff;
+          color: #2563eb;
+          border: 1px solid #dbeafe;
         `;
     }
   }}
 `;
 
-// Controls
+// Professional controls
 const ControlsContainer = styled.div`
   display: flex;
   gap: 1rem;
   margin-bottom: 2rem;
   flex-wrap: wrap;
   justify-content: center;
-  position: relative;
-  z-index: 10;
 `;
 
 const ControlButton = styled.button<{ $variant?: string }>`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
+  padding: 0.875rem 1.5rem;
+  border-radius: 8px;
   border: 1px solid ${({ $variant }) => 
-    $variant === 'danger' ? '#ef4444' : '#00ff00'
+    $variant === 'danger' ? '#f87171' : '#3b82f6'
   };
   background: ${({ $variant }) => 
-    $variant === 'danger' 
-      ? 'rgba(239, 68, 68, 0.1)' 
-      : 'rgba(0, 255, 0, 0.1)'
+    $variant === 'danger' ? '#fef2f2' : '#eff6ff'
   };
   color: ${({ $variant }) => 
-    $variant === 'danger' ? '#ef4444' : '#00ff00'
+    $variant === 'danger' ? '#dc2626' : '#2563eb'
   };
-  font-family: 'Courier New', monospace;
+  font-family: 'Inter', system-ui, sans-serif;
   font-weight: 600;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.3s;
-  backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 20px ${({ $variant }) => 
-      $variant === 'danger' 
-        ? 'rgba(239, 68, 68, 0.3)' 
-        : 'rgba(0, 255, 0, 0.3)'
-    };
     background: ${({ $variant }) => 
-      $variant === 'danger' 
-        ? 'rgba(239, 68, 68, 0.2)' 
-        : 'rgba(0, 255, 0, 0.2)'
+      $variant === 'danger' ? '#fee2e2' : '#dbeafe'
+    };
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px ${({ $variant }) => 
+      $variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)'
     };
   }
 `;
@@ -449,79 +392,90 @@ const SpeedControl = styled.div`
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 255, 0, 0.3);
-  background: rgba(0, 255, 0, 0.05);
-  backdrop-filter: blur(10px);
+  padding: 0.875rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
   
   span {
-    font-family: 'Courier New', monospace;
+    font-family: 'Inter', system-ui, sans-serif;
     font-weight: 600;
-    color: #00ff00;
+    font-size: 0.875rem;
+    color: #475569;
   }
   
-  input {
-    width: 100px;
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(0, 255, 0, 0.3);
-    border-radius: 4px;
+  input[type="range"] {
+    width: 120px;
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 2px;
+    outline: none;
+    -webkit-appearance: none;
     
     &::-webkit-slider-thumb {
-      background: #00ff00;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      
+      &:hover {
+        transform: scale(1.1);
+      }
     }
   }
   
   .value {
-    color: #00ff00;
+    color: #3b82f6;
+    font-weight: 700;
     min-width: 40px;
-    text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
   }
 `;
 
-// Simulation Container
+// Professional simulation window
 const SimulationWindow = styled.div`
-  background: rgba(0, 0, 0, 0.95);
-  border: 2px solid rgba(0, 255, 0, 0.3);
+  background: white;
+  border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 16px;
   padding: 2rem;
-  min-height: 500px;
+  min-height: 600px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(20px);
-  box-shadow: 
-    0 0 40px rgba(0, 255, 0, 0.15),
-    inset 0 0 20px rgba(0, 255, 0, 0.05);
-  z-index: 10;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 `;
 
 const SimulationContent = styled.div`
   width: 100%;
   height: 100%;
-  min-height: 450px;
+  min-height: 550px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 8px;
+  background: #fafbfc;
 `;
 
 const PlaceholderContent = styled.div`
   text-align: center;
-  color: #94a3b8;
-  font-family: 'Courier New', monospace;
+  color: #64748b;
+  font-family: 'Inter', system-ui, sans-serif;
   
   h3 {
-    color: #00ff00;
+    color: #1e293b;
     font-size: 1.5rem;
+    font-weight: 600;
     margin-bottom: 1rem;
-    text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
   }
   
   p {
-    font-size: 0.9rem;
-    opacity: 0.8;
+    font-size: 0.875rem;
+    line-height: 1.6;
   }
 `;
 
@@ -531,16 +485,37 @@ const StatusBar = styled.div`
   right: 1rem;
   display: flex;
   gap: 1rem;
-  font-family: 'Courier New', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
-  color: #00ff00;
-  text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+  color: #475569;
+  font-weight: 600;
+  
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 6px;
+    backdrop-filter: blur(10px);
+  }
+  
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    
+    &.running { background: #10b981; }
+    &.paused { background: #f59e0b; }
+    &.optimized { background: #3b82f6; }
+  }
 `;
 
-// Data
+// Data - Complete simulation items
 const allItems: SimulationItem[] = [
   // Simulations
-    {
+  {
     key: 'life',
     label: "Conway's Game of Life",
     icon: <Activity size={24} />,
@@ -626,7 +601,6 @@ const allItems: SimulationItem[] = [
     comingSoon: true,
     category: 'simulations'
   },
-
   // Algorithms
   {
     key: 'algorithms',
@@ -721,7 +695,7 @@ export default function SimulationsPage() {
 
   const activeItem = allItems.find(item => item.key === activeSimulation);
 
-  // Render the actual simulation component or placeholder
+  // Render the actual simulation component
   const renderSimulation = () => {
     switch (activeSimulation) {
       case 'ants':
@@ -740,14 +714,14 @@ export default function SimulationsPage() {
           <DiseaseSimulation 
             isRunning={isRunning} 
             speed={speed} 
-            isDark={true} 
+            isDark={false} // Light mode
           />
         );
       
       case 'life':
         return (
           <LifeSimulation 
-            isDark={true}
+            isDark={false}
             isRunning={isRunning}
             speed={speed}
           />
@@ -758,7 +732,7 @@ export default function SimulationsPage() {
           <AlgorithmVisualizer 
             isRunning={isRunning} 
             speed={speed}
-            isDark={true}
+            isDark={false}
           />
         );
 
@@ -767,7 +741,7 @@ export default function SimulationsPage() {
           <AdvancedBacteremiaSimulator
             initialRunning={isRunning}
             initialSpeed={speed}
-            isDark={true}
+            isDark={false}
           />
         );
 
@@ -776,24 +750,24 @@ export default function SimulationsPage() {
           <AmdahlsLawSimulator
             isRunning={isRunning}
             speed={speed}
-            isDark={true}
-            />  
-        )
+            isDark={false}
+          />  
+        );
+      
       default:
-        // Placeholder for simulations that aren't imported yet
         return (
           <PlaceholderContent>
             <div style={{ 
               fontSize: '48px', 
               marginBottom: '1rem',
-              color: activeItem?.color || '#00ff00'
+              color: activeItem?.color || '#3b82f6'
             }}>
               {activeItem?.icon}
             </div>
             <h3>{activeItem?.label}</h3>
             <p>{activeItem?.description}</p>
             {activeItem?.comingSoon && (
-              <p style={{ marginTop: '2rem', color: '#fbbf24' }}>
+              <p style={{ marginTop: '2rem', color: '#f59e0b' }}>
                 Coming Soon...
               </p>
             )}
@@ -804,23 +778,19 @@ export default function SimulationsPage() {
 
   return (
     <PageContainer>
-      {/* Matrix Rain Background */}
-      <MatrixRainContainer>
+      {/* Subtle Matrix Background */}
+      <MatrixBackground>
         <MatrixRain 
-          fontSize={14}
-          layers={4}
-          style={{ opacity: 1 }}
+          fontSize={32}
+          layers={3}
         />
-      </MatrixRainContainer>
-      
-      {/* Overlay for better readability */}
-      <ContentOverlay />
+      </MatrixBackground>
       
       <ContentWrapper>
         <PageHeader>
-          <PageTitle>AIs are friends not foods</PageTitle>
+          <PageTitle>Computational Simulations</PageTitle>
           <PageSubtitle>
-            Hi friend!
+            Professional-grade algorithms and simulations for research and education
           </PageSubtitle>
         </PageHeader>
 
@@ -830,14 +800,14 @@ export default function SimulationsPage() {
               $active={activeTab === 'simulations'}
               onClick={() => setActiveTab('simulations')}
             >
-              <Beaker size={20} />
+              <Microscope size={18} />
               Simulations
             </TabButton>
             <TabButton 
               $active={activeTab === 'algorithms'}
               onClick={() => setActiveTab('algorithms')}
             >
-              <Monitor size={20} />
+              <Cpu size={18} />
               Algorithms
             </TabButton>
           </TabWrapper>
@@ -854,27 +824,16 @@ export default function SimulationsPage() {
             >
               <BadgeContainer>
                 {item.featured && !item.comingSoon && (
-                  <Badge $variant="featured">
-                    <Crown size={10} />
-                    Featured
-                  </Badge>
+                  <Badge $variant="featured">Featured</Badge>
                 )}
                 {item.optimized && (
-                  <Badge $variant="optimized">
-                    <Zap size={10} />
-                    60 FPS
-                  </Badge>
+                  <Badge $variant="optimized">60 FPS</Badge>
                 )}
                 {item.special && (
-                  <Badge $variant="social">
-                    <Users size={10} />
-                    Social
-                  </Badge>
+                  <Badge $variant="social">Interactive</Badge>
                 )}
                 {item.comingSoon && (
-                  <Badge $variant="coming-soon">
-                    Coming Soon
-                  </Badge>
+                  <Badge $variant="coming-soon">Coming Soon</Badge>
                 )}
               </BadgeContainer>
               
@@ -885,12 +844,13 @@ export default function SimulationsPage() {
                 >
                   {item.icon}
                 </ItemIcon>
-                <ItemTitle $comingSoon={item.comingSoon}>
-                  {item.label}
-                </ItemTitle>
+                <ItemContent>
+                  <ItemTitle $comingSoon={item.comingSoon}>
+                    {item.label}
+                  </ItemTitle>
+                  <ItemDescription>{item.description}</ItemDescription>
+                </ItemContent>
               </ItemHeader>
-
-              <ItemDescription>{item.description}</ItemDescription>
             </ItemCard>
           ))}
         </ItemsGrid>
@@ -902,12 +862,12 @@ export default function SimulationsPage() {
               $variant={isRunning ? 'danger' : 'primary'}
             >
               {isRunning ? <Pause size={18} /> : <Play size={18} />} 
-              {isRunning ? 'Pause' : 'Execute'}
+              {isRunning ? 'Pause' : 'Run'}
             </ControlButton>
 
             <ControlButton onClick={handleReset}>
               <RotateCcw size={18} /> 
-              Reset Matrix
+              Reset
             </ControlButton>
 
             <SpeedControl>
@@ -937,12 +897,18 @@ export default function SimulationsPage() {
           {activeItem && (
             <>
               <StatusBar>
-                <span style={{ color: isRunning ? '#00ff00' : '#fbbf24' }}>
-                  {isRunning ? '● RUNNING' : '● PAUSED'}
-                </span>
-                <span>SPEED: {speed.toFixed(1)}x</span>
+                <div className="status-item">
+                  <div className={`status-dot ${isRunning ? 'running' : 'paused'}`} />
+                  {isRunning ? 'Running' : 'Paused'}
+                </div>
+                <div className="status-item">
+                  Speed: {speed.toFixed(1)}x
+                </div>
                 {activeItem.optimized && (
-                  <span style={{ color: '#00ff00' }}>GPU ACCELERATED</span>
+                  <div className="status-item">
+                    <div className="status-dot optimized" />
+                    GPU Accelerated
+                  </div>
                 )}
               </StatusBar>
               

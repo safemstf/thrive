@@ -7,7 +7,6 @@ import Link from 'next/link';
 import styled from 'styled-components';
 import { useAuth } from '@/providers/authProvider';
 import { Eye, EyeOff, Loader2, AlertCircle, ChevronLeft, User, Mail, Lock } from 'lucide-react';
-import { useDarkMode } from '@/providers/darkModeProvider';
 
 // Import everything from the central hub!
 import {
@@ -184,7 +183,6 @@ const BackLink = styled(Link)`
 
 export default function LoginPage() {
   const router = useRouter();
-  const { isDarkMode } = useDarkMode();
   const { login, signup, user } = useAuth();
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);

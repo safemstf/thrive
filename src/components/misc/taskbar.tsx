@@ -1,4 +1,4 @@
-// src/components/Taskbar.tsx
+// src/components/Taskbar.tsx - Cleaned (No Dark Mode)
 'use client';
 
 import React, { useRef, useState, useEffect, useMemo } from 'react';
@@ -6,32 +6,22 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import styled from 'styled-components';
 import { useAuth } from '@/providers/authProvider';
-import { LogOut, User, Moon, Sun, ArrowDownToLine } from 'lucide-react';
-import { useDarkMode as useDarkModeHook } from '@/providers/darkModeProvider';
-import { useMatrix } from '@/hooks/useMatrix';
+import { LogOut, User } from 'lucide-react';
 
-/* ---------- Safe hook wrappers ---------- */
 function useMatrixSafe() {
   try {
-    return useMatrix();
+    // If you have a matrix hook, import it here
+    // return useMatrix();
+    return {
+      isMatrixOn: false,
+      setMatrixOn: (value: boolean) => { },
+      isHydrated: true
+    };
   } catch (error) {
     return {
       isMatrixOn: false,
-      toggleMatrix: () => {},
-      setMatrixOn: () => {},
+      setMatrixOn: (value: boolean) => { },
       isHydrated: true
-    };
-  }
-}
-
-function useDarkModeSafe() {
-  try {
-    return useDarkModeHook();
-  } catch (error) {
-    return {
-      isDarkMode: false,
-      isLoaded: true,
-      toggleDarkMode: () => {}
     };
   }
 }
@@ -78,14 +68,14 @@ const NavContainer = styled.nav<{ $isScrolled?: boolean }>`
   transition: all 0.3s ease;
 `;
 
-const NavButton = styled(Link)<{ $active?: boolean; $isScrolled?: boolean }>`
+const NavButton = styled(Link) <{ $active?: boolean; $isScrolled?: boolean }>`
   background: none;
   border: 1px solid var(--color-primary-500);
   color: ${props => (props.$active ? 'var(--color-background-secondary)' : 'var(--color-primary-500)')};
   background-color: ${props => (props.$active ? 'var(--color-primary-500)' : 'transparent')};
   padding: ${props => (props.$isScrolled ? '0.6rem 1.2rem' : '0.75rem 1.5rem')};
   font-size: ${props => (props.$isScrolled ? '0.9rem' : '1rem')};
-  font-family: 'Work Sans', sans-serif;
+  font-family: var(--font-body);
   letter-spacing: 1px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -94,14 +84,14 @@ const NavButton = styled(Link)<{ $active?: boolean; $isScrolled?: boolean }>`
   text-decoration: none;
   display: inline-block;
   white-space: nowrap;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
 
   &:hover {
     background: var(--color-primary-500);
     color: var(--color-background-secondary);
     text-decoration: none;
     transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
+    box-shadow: var(--shadow-sm);
   }
 
   &:active {
@@ -133,7 +123,7 @@ const UserInfo = styled.div<{ $isScrolled?: boolean }>`
   align-items: center;
   gap: 0.5rem;
   color: var(--color-text-secondary);
-  font-family: 'Work Sans', sans-serif;
+  font-family: var(--font-body);
   font-size: ${props => (props.$isScrolled ? '0.85rem' : '0.9rem')};
   padding: ${props => (props.$isScrolled ? '0.4rem 0.8rem' : '0.5rem 1rem')};
   background: var(--color-background-tertiary);
@@ -177,7 +167,7 @@ const LogoutButton = styled.button<{ $isScrolled?: boolean }>`
   color: #dc2626;
   padding: ${props => (props.$isScrolled ? '0.6rem 1.2rem' : '0.75rem 1.5rem')};
   font-size: ${props => (props.$isScrolled ? '0.9rem' : '1rem')};
-  font-family: 'Work Sans', sans-serif;
+  font-family: var(--font-body);
   letter-spacing: 1px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -187,7 +177,7 @@ const LogoutButton = styled.button<{ $isScrolled?: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  border-radius: 2px;
+  border-radius: var(--radius-sm);
 
   &:hover {
     background: #dc2626;
@@ -225,14 +215,14 @@ const MobileNavContainer = styled.nav`
   gap: 0.75rem;
 `;
 
-const MobileNavButton = styled(Link)<{ $active?: boolean }>`
+const MobileNavButton = styled(Link) <{ $active?: boolean }>`
   background: var(--color-background-secondary);
   border: 1px solid ${props => (props.$active ? 'var(--color-primary-500)' : 'var(--color-border-medium)')};
   color: ${props => (props.$active ? 'var(--color-primary-500)' : 'var(--color-text-secondary)')};
   background-color: ${props => (props.$active ? 'var(--color-background-tertiary)' : 'var(--color-background-secondary)')};
   padding: 1rem 1.5rem;
   font-size: 0.95rem;
-  font-family: 'Work Sans', sans-serif;
+  font-family: var(--font-body);
   letter-spacing: 0.5px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -242,7 +232,7 @@ const MobileNavButton = styled(Link)<{ $active?: boolean }>`
   display: block;
   text-align: left;
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 
   &:hover {
     border-color: var(--color-primary-500);
@@ -266,9 +256,9 @@ const MobileUserInfo = styled.div`
   gap: 0.75rem;
   padding: 1rem;
   background: var(--color-background-tertiary);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   color: var(--color-text-secondary);
-  font-family: 'Work Sans', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.9rem;
 `;
 
@@ -289,13 +279,13 @@ const MobileLogoutButton = styled.button`
   color: #dc2626;
   padding: 0.875rem 1.5rem;
   font-size: 0.95rem;
-  font-family: 'Work Sans', sans-serif;
+  font-family: var(--font-body);
   letter-spacing: 0.5px;
   cursor: pointer;
   transition: all 0.2s ease;
   font-weight: 300;
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -307,55 +297,7 @@ const MobileLogoutButton = styled.button`
   }
 `;
 
-/* Control buttons */
-const DarkModeButton = styled.button<{ $isScrolled?: boolean; $isDark?: boolean }>`
-  background: none;
-  border: 1px solid var(--color-primary-500);
-  color: var(--color-primary-500);
-  padding: ${({ $isScrolled }) => ($isScrolled ? '0.6rem 1.2rem' : '0.75rem 1.5rem')};
-  font-size: ${({ $isScrolled }) => ($isScrolled ? '0.9rem' : '1rem')};
-  font-family: 'Work Sans', sans-serif;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-radius: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-
-  &:hover {
-    background: var(--color-primary-500);
-    color: var(--color-background-secondary);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(44, 44, 44, 0.1);
-  }
-`;
-
-const MobileDarkModeButton = styled.button`
-  background: var(--color-background-secondary);
-  border: 1px solid var(--color-primary-500);
-  color: var(--color-primary-500);
-  padding: 0.875rem 1.5rem;
-  font-size: 0.95rem;
-  font-family: 'Work Sans', sans-serif;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: 300;
-  width: 100%;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-
-  &:hover {
-    background: var(--color-primary-500);
-    color: var(--color-background-secondary);
-  }
-`;
-
-
+/* Debug components */
 const DebugHandle = styled.button<{ $open: boolean }>`
   position: fixed;
   right: 16px;
@@ -363,12 +305,12 @@ const DebugHandle = styled.button<{ $open: boolean }>`
   z-index: 100000;
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-medium);
   background: var(--color-background-secondary);
   color: var(--color-text-primary);
   cursor: pointer;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   box-shadow: var(--shadow-sm);
   display: flex;
@@ -390,7 +332,7 @@ const DebugPanel = styled.div<{ $open: boolean }>`
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 96px);
   overflow: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-medium);
   background: var(--color-background-secondary);
   box-shadow: var(--shadow-lg);
@@ -414,7 +356,7 @@ const DebugPanel = styled.div<{ $open: boolean }>`
     pointer-events: auto;
   `}
 
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
 
   @media (max-width: 480px) {
@@ -452,7 +394,7 @@ const DebugHeaderRow = styled.div`
 const DebugAction = styled.button`
   padding: 6px 8px;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border-medium);
   background: var(--color-background-tertiary);
   cursor: pointer;
@@ -472,12 +414,10 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
   // ✅ ALL HOOKS CALLED AT TOP LEVEL - ALWAYS THE SAME ORDER
   const pathname = usePathname();
   const { user, logout, loading } = useAuth();
-  const { toggleDarkMode, isDarkMode, isLoaded: isDarkModeLoaded } = useDarkModeSafe();
   const { setMatrixOn } = useMatrixSafe();
-  const [debugOpen, setDebugOpen] = useState<boolean>(false); // Start closed to avoid hydration
+  const [debugOpen, setDebugOpen] = useState<boolean>(false);
   const [viewport, setViewport] = useState({ w: 0, h: 0 });
-  const [isClient, setIsClient] = useState(false); // For debug panel only
-  const skipButtonRef = useRef<HTMLButtonElement>(null);
+  const [isClient, setIsClient] = useState(false);
 
   // ✅ ALL useEffects in consistent order
   useEffect(() => {
@@ -487,19 +427,19 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
       if (typeof window !== 'undefined' && localStorage.getItem('taskbarDebug')) {
         setDebugOpen(true);
       }
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
-    if (!isClient) return; // Only save to localStorage on client
+    if (!isClient) return;
     try {
       if (debugOpen) localStorage.setItem('taskbarDebug', '1');
       else localStorage.removeItem('taskbarDebug');
-    } catch {}
+    } catch { }
   }, [debugOpen, isClient]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !isClient) return; // Wait for client
+    if (typeof window === 'undefined' || !isClient) return;
     const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
     onResize();
     window.addEventListener('resize', onResize, { passive: true });
@@ -512,16 +452,6 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
   const navLinks = useMemo(() => getNavLinks(isAuthenticated, isAdmin), [isAuthenticated, isAdmin]);
 
   // ✅ Event handlers
-  const handleSkipClick = () => {
-    const mainContent = document.getElementById('main-content');
-    if (mainContent) {
-      mainContent.tabIndex = -1;
-      mainContent.focus();
-      mainContent.scrollIntoView({ behavior: 'smooth' });
-      setTimeout(() => mainContent.removeAttribute('tabindex'), 1000);
-    }
-  };
-
   const handleLogout = async () => {
     try {
       await logout();
@@ -538,18 +468,14 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
   const copyDebug = async () => {
     const payload = {
       time: new Date().toISOString(),
-      darkMode: { isDarkMode, isDarkModeLoaded },
-      htmlClass: isClient && typeof document !== 'undefined' 
-        ? document.documentElement.className 
-        : 'server-render',
       pathname,
       isScrolled,
       viewport: isClient ? viewport : { w: 0, h: 0 },
-      user: user ? { 
-        id: user.id ?? null, 
-        name: user.name ?? user.username ?? null, 
-        email: user.email ?? null, 
-        role: user.role ?? null 
+      user: user ? {
+        id: user.id ?? null,
+        name: user.name ?? user.username ?? null,
+        email: user.email ?? null,
+        role: user.role ?? null
       } : null,
       navLinks,
       isClient
@@ -557,7 +483,6 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-        setDebugOpen(true);
       } else {
         const ta = document.createElement('textarea');
         ta.value = JSON.stringify(payload, null, 2);
@@ -600,11 +525,6 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
             );
           })}
 
-          <MobileDarkModeButton onClick={toggleDarkMode}>
-            {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-          </MobileDarkModeButton>
-
           {isAuthenticated && user && (
             <MobileUserSection>
               <MobileUserInfo>
@@ -628,7 +548,7 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
         {shouldShowDebug && (
           <>
             <DebugHandle $open={debugOpen} onClick={() => setDebugOpen(v => !v)}>
-              {debugOpen ? 'Close' : 'DBG'}
+              {debugOpen ? 'X' : 'DBG'}
             </DebugHandle>
             <DebugPanel $open={debugOpen} aria-hidden={!debugOpen}>
               <DebugContent>
@@ -640,23 +560,19 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
                   </div>
                 </DebugHeaderRow>
 
-                <KeyRow><div>Mode</div><div>{isDarkMode ? 'Dark' : 'Light'}</div></KeyRow>
-                <KeyRow><div>Loaded</div><div>{String(isDarkModeLoaded)}</div></KeyRow>
-                <KeyRow><div>HTML class</div><div style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {isClient ? (document.documentElement.className || 'none') : 'loading...'}
-                </div></KeyRow>
                 <KeyRow><div>Path</div><div>{pathname}</div></KeyRow>
                 <KeyRow><div>isScrolled</div><div>{String(isScrolled)}</div></KeyRow>
                 <KeyRow><div>Viewport</div><div>{isClient ? `${viewport.w}×${viewport.h}` : 'loading...'}</div></KeyRow>
-                
+                <KeyRow><div>User</div><div>{user ? user.name : 'None'}</div></KeyRow>
+
                 <div style={{ marginTop: 8 }}>
                   <details>
                     <summary>More</summary>
                     <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 220, overflow: 'auto' }}>
-{isClient ? JSON.stringify({
-  user: user ? { name: user.name, email: user.email, role: user.role } : null,
-  navLinks
-}, null, 2) : 'Loading debug info...'}
+                      {isClient ? JSON.stringify({
+                        user: user ? { name: user.name, email: user.email, role: user.role } : null,
+                        navLinks
+                      }, null, 2) : 'Loading debug info...'}
                     </pre>
                   </details>
                 </div>
@@ -698,7 +614,7 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
         {shouldShowDebug && (
           <>
             <DebugHandle $open={debugOpen} onClick={() => setDebugOpen(v => !v)}>
-              {debugOpen ? 'Close' : 'DBG'}
+              {debugOpen ? 'X' : 'DBG'}
             </DebugHandle>
 
             <DebugPanel $open={debugOpen} aria-hidden={!debugOpen}>
@@ -711,23 +627,19 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
                   </div>
                 </DebugHeaderRow>
 
-                <KeyRow><div>Mode</div><div>{isDarkMode ? 'Dark' : 'Light'}</div></KeyRow>
-                <KeyRow><div>Loaded</div><div>{String(isDarkModeLoaded)}</div></KeyRow>
-                <KeyRow><div>HTML class</div><div style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {isClient ? (document.documentElement.className || 'none') : 'loading...'}
-                </div></KeyRow>
                 <KeyRow><div>Path</div><div>{pathname}</div></KeyRow>
                 <KeyRow><div>isScrolled</div><div>{String(isScrolled)}</div></KeyRow>
                 <KeyRow><div>Viewport</div><div>{isClient ? `${viewport.w}×${viewport.h}` : 'loading...'}</div></KeyRow>
-                
+                <KeyRow><div>User</div><div>{user ? user.name : 'None'}</div></KeyRow>
+
                 <div style={{ marginTop: 8 }}>
                   <details>
                     <summary>More</summary>
                     <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 220, overflow: 'auto' }}>
-{JSON.stringify({
-  user: user ? { name: user.name, email: user.email, role: user.role } : null,
-  navLinks
-}, null, 2)}
+                      {JSON.stringify({
+                        user: user ? { name: user.name, email: user.email, role: user.role } : null,
+                        navLinks
+                      }, null, 2)}
                     </pre>
                   </details>
                 </div>
@@ -735,11 +647,6 @@ export function Taskbar({ isMobile = false, onNavigate, isScrolled = false }: Ta
             </DebugPanel>
           </>
         )}
-
-        <DarkModeButton $isScrolled={isScrolled} $isDark={isDarkMode} onClick={toggleDarkMode} title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
-          {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-          {!isScrolled && (isDarkMode ? 'Light' : 'Dark')}
-        </DarkModeButton>
 
         {isAuthenticated && user && (
           <UserSection $isScrolled={isScrolled}>

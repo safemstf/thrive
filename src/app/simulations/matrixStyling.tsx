@@ -6,7 +6,7 @@ export const MatrixRainCanvas = styled.canvas`
   position: fixed;
   inset: 0;
   z-index: -1; /* Always behind your app */
-  background: black;
+  background: transparent; /* Changed from black to transparent */
   pointer-events: none;
   display: block; /* Prevent hydration issues */
 `;
@@ -39,7 +39,7 @@ export const MatrixRain: React.FC<{
         font: `${size}px monospace`,
         drops: Array(cols).fill(0),
         speed: 1 + i * 0.5,
-        color: `rgba(59, 130, 246, ${0.2 + i * 0.15})`, // subtle blue shades
+        color: `rgba(30, 64, 175, ${0.15 + i * 0.1})`, // Darker blue for light background
         size,
       };
     });
@@ -47,8 +47,8 @@ export const MatrixRain: React.FC<{
     const draw = () => {
       if (!ctx || !canvas) return;
 
-      // fade previous frame slightly for trailing effect
-      ctx.fillStyle = "rgba(0,0,0,0.15)";
+      // fade previous frame with white for light mode trailing effect
+      ctx.fillStyle = "rgba(255,255,255,0.12)"; // Changed from black to white fade
       ctx.fillRect(0, 0, width, height);
 
       layerConfigs.forEach(layer => {

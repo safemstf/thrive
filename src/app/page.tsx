@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/authProvider';
-import { 
+import {
   Search, Grid3X3, User, Play, Target, BookOpen, Trophy,
   Eye, Star, Image as ImageIcon, ArrowRight, Loader2, Zap,
   WifiOff, RefreshCw, AlertCircle, CheckCircle
@@ -37,6 +37,8 @@ const GlobalPageWrapper = styled.div`
   width: 100%;
   min-height: 100vh;
   overflow-x: hidden; /* Prevent horizontal scroll */
+  overflow: visible !important;
+
   
   /* Ensure no global margins interfere */
   & > * {
@@ -81,7 +83,7 @@ const usePortfolios = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<'online' | 'offline' | 'error'>('online');
-  
+
   const isOnline = useNetworkStatus();
 
   const fetchPortfolios = useCallback(async () => {
@@ -96,10 +98,10 @@ const usePortfolios = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const apiClient = getApiClient();
       const portfolioData = await apiClient.portfolio?.discover?.({}, 1, 6);
-      
+
       if (Array.isArray(portfolioData)) {
         setPortfolios(portfolioData.map(normalizePortfolio));
       } else if (portfolioData?.portfolios) {
@@ -108,7 +110,7 @@ const usePortfolios = () => {
         // Convert mock data object to array when API fails
         setPortfolios(Object.values(MOCK_PORTFOLIOS));
       }
-      
+
       setConnectionState('online');
     } catch (err) {
       console.error('Failed to fetch portfolios:', err);
@@ -204,7 +206,7 @@ const PortfolioCard = styled(Card)`
 
 const CoverImage = styled.div<{ $bgImage?: string; $kind: string }>`
   height: 200px;
-  background: ${({ $bgImage, $kind }) => 
+  background: ${({ $bgImage, $kind }) =>
     $bgImage || `linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600))`
   };
   background-size: cover;
@@ -267,7 +269,7 @@ const STATS_DATA = { users: 1247, portfolios: 120, pieces: 900, active: 45 };
 // COMPONENTS
 // ==============================================
 
-const ConnectionBanner: React.FC<{ 
+const ConnectionBanner: React.FC<{
   state: 'online' | 'offline' | 'error';
   onRetry: () => void;
 }> = ({ state, onRetry }) => {
@@ -281,8 +283,8 @@ const ConnectionBanner: React.FC<{
   const { icon: Icon, title, color } = config[state];
 
   return (
-    <div style={{ 
-      background: `rgba(239, 68, 68, 0.1)`, 
+    <div style={{
+      background: `rgba(239, 68, 68, 0.1)`,
       borderBottom: `1px solid ${color}`,
       padding: 'var(--spacing-md) 0'
     }}>
@@ -320,9 +322,9 @@ const PortfolioGrid: React.FC<{ portfolios: Portfolio[] }> = ({ portfolios }) =>
       {portfolios.map((portfolio) => {
         const portfolioId = getPortfolioId(portfolio);
         if (!portfolioId) return null;
-        
+
         return (
-          <PortfolioCard 
+          <PortfolioCard
             key={`${portfolioId}-${portfolio.username}`}
             $padding="none"
             onClick={() => handlePortfolioClick(portfolio.username)}
@@ -331,7 +333,7 @@ const PortfolioGrid: React.FC<{ portfolios: Portfolio[] }> = ({ portfolios }) =>
               <Badge style={{ position: 'absolute', top: 'var(--spacing-md)', right: 'var(--spacing-md)', zIndex: 2 }}>
                 {portfolio.kind}
               </Badge>
-              
+
               {portfolio.coverImage ? (
                 <Image
                   src={portfolio.coverImage}
@@ -346,7 +348,7 @@ const PortfolioGrid: React.FC<{ portfolios: Portfolio[] }> = ({ portfolios }) =>
                 </FlexColumn>
               )}
             </CoverImage>
-            
+
             <CardContent>
               <FlexRow $gap="var(--spacing-md)" style={{ marginBottom: 'var(--spacing-md)' }}>
                 <div style={{
@@ -375,9 +377,9 @@ const PortfolioGrid: React.FC<{ portfolios: Portfolio[] }> = ({ portfolios }) =>
                   </p>
                 </FlexColumn>
               </FlexRow>
-              
+
               {portfolio.bio && (
-                <p style={{ 
+                <p style={{
                   fontSize: '0.875rem', color: 'var(--color-text-secondary)',
                   margin: '0 0 var(--spacing-md)', lineHeight: 1.4,
                   display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
@@ -386,9 +388,9 @@ const PortfolioGrid: React.FC<{ portfolios: Portfolio[] }> = ({ portfolios }) =>
                   {portfolio.bio}
                 </p>
               )}
-              
-              <FlexRow style={{ 
-                paddingTop: 'var(--spacing-md)', 
+
+              <FlexRow style={{
+                paddingTop: 'var(--spacing-md)',
                 borderTop: '1px solid var(--color-border-light)',
                 justifyContent: 'space-between',
                 fontSize: '0.875rem'
@@ -454,13 +456,13 @@ export default function HomePage() {
           <ContentWrapper>
             <div style={{ maxWidth: 800, margin: '0 auto', textAlign: 'center' }}>
               <Heading1 $responsive>Discover Creative Excellence</Heading1>
-              <BodyText $size="xl" style={{ 
+              <BodyText $size="xl" style={{
                 marginBottom: 'var(--spacing-2xl)',
                 maxWidth: 600, marginLeft: 'auto', marginRight: 'auto'
               }}>
                 Connect with talented creators, develop your skills, and showcase your work
               </BodyText>
-              
+
               <SearchForm onSubmit={handleSearch}>
                 <SearchIcon />
                 <SearchInput
@@ -499,8 +501,8 @@ export default function HomePage() {
                     <StatNumber>{utils.data.formatNumber(value)}</StatNumber>
                     <StatLabel>{
                       key === 'users' ? 'Active Creators' :
-                      key === 'portfolios' ? 'Portfolios' :
-                      key === 'pieces' ? 'Creative Works' : 'Online Now'
+                        key === 'portfolios' ? 'Portfolios' :
+                          key === 'pieces' ? 'Creative Works' : 'Online Now'
                     }</StatLabel>
                   </CardContent>
                 </StatCard>
@@ -518,7 +520,7 @@ export default function HomePage() {
                   </Badge>
                 )}
               </FlexRow>
-              <Link href="/explore" style={{ 
+              <Link href="/explore" style={{
                 color: 'var(--color-text-secondary)', textDecoration: 'none',
                 display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)'
               }}>

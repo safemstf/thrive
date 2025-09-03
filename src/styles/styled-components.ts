@@ -1,4 +1,5 @@
-// src/styles/styled-components.ts - Central Hub for All Styled Components
+'use client';
+// src/styles/styled-components.ts - Remove Dark Mode Logic Only
 import styled, { css, keyframes } from 'styled-components';
 
 // ==============================================
@@ -10,12 +11,6 @@ export { generateTheme, lightTheme, darkTheme } from './theme';
 
 // BACKWARD COMPATIBILITY: Export default theme for existing files
 export { lightTheme as theme } from './theme';
-
-// Theme-aware helper function
-export const useThemeProps = (lightValue: string, darkValue: string) => css`
-  /* This automatically uses CSS variables, no need for theme prop */
-  ${lightValue}
-`;
 
 // ==============================================
 // 2. ANIMATIONS (Enhanced with missing animations)
@@ -53,7 +48,6 @@ export const scaleIn = keyframes`
   to { transform: scale(1); opacity: 1; }
 `;
 
-// Missing animations from simulations
 export const pulse = keyframes`
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
@@ -93,7 +87,6 @@ export const bounce = keyframes`
   }
 `;
 
-
 export const hoverLift = (amount: number = 4) => css`
   transition: transform 0.3s ease, box-shadow 0.3s ease;
   &:hover {
@@ -126,7 +119,6 @@ export const glassEffect = css`
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
 `;
-
 
 export const focusRing = css`
   &:focus-visible {
@@ -683,7 +675,7 @@ export const NavBar = styled.nav`
   transition: background 0.3s ease;
 `;
 
-// Login/Page Wrapper - Consolidates your duplicated PageWrappers
+// Login/Page Wrapper
 export const AuthPageWrapper = styled(PageContainer)<{ $variant?: 'login' | 'register' | 'default' }>`
   min-height: 100vh;
   display: flex;
@@ -716,17 +708,15 @@ export const AuthPageWrapper = styled(PageContainer)<{ $variant?: 'login' | 'reg
   }
 `;
 
-// Simulation Canvas - Consolidates your simulation styles
-export const SimulationCanvas = styled.canvas<{ $isDark?: boolean }>`
+// Simulation Canvas
+export const SimulationCanvas = styled.canvas`
   width: 100%;
   height: 500px;
   border-radius: var(--radius-lg);
   border: 2px solid var(--color-border-medium);
   box-shadow: var(--shadow-md);
   transition: all 0.3s ease;
-  background-color: ${({ $isDark }) => 
-    $isDark ? 'var(--color-background-primary)' : 'var(--color-background-secondary)'
-  };
+  background-color: var(--color-background-secondary);
 
   &:hover {
     border-color: var(--color-primary-500);
@@ -835,7 +825,7 @@ export const TabButton = styled.button<{ $active: boolean }>`
 `;
 
 // Control Button (for simulations)
-export const ControlButton = styled(BaseButton)<{ $isDark?: boolean }>`
+export const ControlButton = styled(BaseButton)`
   position: relative;
   overflow: hidden;
   
@@ -997,9 +987,12 @@ export const DifficultyBadge = styled(Badge)<{ $difficulty?: 'beginner' | 'inter
       advanced: '#8b5cf6',
       expert: '#ef4444'
     };
+    const color = colors[$difficulty];
+    const rgb = color.slice(1).match(/.{2}/g)?.map(hex => parseInt(hex, 16)).join(', ') || '59, 130, 246';
+    
     return css`
-      background: rgba(${colors[$difficulty].slice(1).match(/.{2}/g)?.map(hex => parseInt(hex, 16)).join(', ')}, 0.1);
-      color: ${colors[$difficulty]};
+      background: rgba(${rgb}, 0.1);
+      color: ${color};
     `;
   }}
 `;
@@ -1079,15 +1072,6 @@ export const StatusBadge = styled(Badge)<{ $status: 'active' | 'inactive' | 'sus
   }}
 `;
 
-
-// ==============================================
-// 8. QUICK ACCESS THEME HOOK
-// ==============================================
-
-export const withTheme = (Component: any) => styled(Component)`
-  /* Automatically theme-aware */
-`;
-
 // ==============================================
 // 9. RESPONSIVE BREAKPOINTS
 // ==============================================
@@ -1120,6 +1104,33 @@ export const responsive = {
     md: `@media (min-width: ${breakpoints.md})`,
     lg: `@media (min-width: ${breakpoints.lg})`,
     xl: `@media (min-width: ${breakpoints.xl})`
+  }
+};
+
+export const utils = {
+  // Text utilities
+  textGradient,
+  
+  // Layout utilities
+  responsiveContainer,
+  glassEffect,
+  focusRing,
+  
+  // Animation utilities
+  hoverLift,
+  
+  // Responsive utilities
+  breakpoints,
+  responsive,
+  media: responsive,
+  
+  // CSS mixins
+  mixins: {
+    glassEffect,
+    focusRing,
+    responsiveContainer,
+    textGradient,
+    hoverLift
   }
 };
 
@@ -1179,7 +1190,6 @@ export const TextArea = styled.textarea<{
 // ==============================================
 // MODAL COMPONENTS
 // ==============================================
-// Update Modal component to accept $isOpen prop
 export const Modal = styled.div<{ $isOpen: boolean }>`
   position: fixed;
   top: 0;
@@ -1193,7 +1203,6 @@ export const Modal = styled.div<{ $isOpen: boolean }>`
   pointer-events: ${({ $isOpen }) => ($isOpen ? 'auto' : 'none')};
 `;
 
-// Update ModalOverlay to also accept $isOpen prop
 export const ModalOverlay = styled.div<{ $isOpen: boolean }>`
   position: fixed;
   top: 0;
@@ -1246,9 +1255,9 @@ export const ModalFooter = styled.div`
   justify-content: flex-end;
   gap: var(--spacing-md);
 `;
+
 // ==============================================
-// 4.B HEADER + PAGE WRAPPERS
-// (Keep this AFTER responsiveContainer and PageContainer are declared.)
+// HEADER COMPONENTS
 // ==============================================
 
 export const Header = styled.header`
@@ -1284,8 +1293,6 @@ export const ProgressFill = styled.div<{ $percentage: number }>`
   background: linear-gradient(90deg, var(--color-primary-500), var(--color-primary-600));
   transition: width 0.6s ease;
   border-radius: var(--radius-full);
-  $color || 'linear-gradient(90deg, var(--color-primary-500), var(--color-primary-600))'};
-
 `;
 
 export const ProgressBar = styled.div`
@@ -1295,5 +1302,6 @@ export const ProgressBar = styled.div`
   overflow: hidden;
   margin-bottom: var(--spacing-xs);
 `;
+
 // Export everything for easy importing
 export * from './theme';

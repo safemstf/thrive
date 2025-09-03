@@ -1,15 +1,16 @@
-// src/app/dashboard/page.tsx - Redesigned with Golden Ratio & Minimalist Layout
+// src/app/dashboard/page.tsx - Fixed for styled-components v4+
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ProtectedRoute } from '@/components/auth/protectedRoute';
+import { useDashboardContext } from './layout';
 import { usePortfolioManagement } from '@/hooks/usePortfolioManagement';
 import { useDashboardLogic } from '@/components/dashboard/dashboardLogic';
 import { useOffline } from '@/hooks/useOffline';
-import { 
-  LayoutDashboard, 
-  Image as GalleryIcon, 
+import styled, { keyframes, css } from 'styled-components'; // Added css import
+import {
+  LayoutDashboard,
+  Image as GalleryIcon,
   Brush,
   Brain,
   Layers,
@@ -28,10 +29,22 @@ import {
   Plus,
   Wifi,
   WifiOff,
-  RefreshCw
+  RefreshCw,
+  ArrowRight,
+  Calendar,
+  Clock,
+  Users,
+  Zap,
+  Trophy,
+  Star,
+  Play,
+  BookOpen,
+  PieChart,
+  LineChart,
+  MousePointer
 } from "lucide-react";
 
-// Import view components
+// Import view components (keep existing)
 import { GalleryView } from '@/components/dashboard/views/GalleryView';
 import { LearningView } from '@/components/dashboard/views/learningView';
 import { AnalyticsView } from '@/components/dashboard/views/analyticsView';
@@ -39,318 +52,76 @@ import { AnalyticsView } from '@/components/dashboard/views/analyticsView';
 // Import mock data for fallback
 import { createMockPortfolio, createMockGalleryPieces } from '@/data/mockData';
 
-// Import styled components
-import styled, { css } from 'styled-components';
-import {
-  PageContainer,
-  LoadingContainer,
-  LoadingSpinner,
-  ErrorContainer,
-  Card,
-  CardContent,
-  BaseButton,
-  Heading1,
-  Heading2,
-  BodyText,
-  FlexRow,
-  FlexColumn,
-  responsive,
-  fadeIn,
-  float
-} from '@/styles/styled-components';
+// ============================================
+// TYPES
+// ============================================
 
-// ===========================================
-// GOLDEN RATIO DESIGN SYSTEM
-// ===========================================
-const GOLDEN_RATIO = 1.618;
+interface MockGalleryPiece {
+  id: string;
+  status: string;
+  views: number;
+  title: string;
+}
 
-// Golden ratio spacing scale
-const GOLDEN_SCALE = {
-  xs: `${0.618}rem`,      // 1/φ
-  sm: `${1}rem`,          // 1
-  md: `${1.618}rem`,      // φ
-  lg: `${2.618}rem`,      // φ²
-  xl: `${4.236}rem`,      // φ³
-  xxl: `${6.854}rem`,     // φ⁴
-  xxxl: `${11.09}rem`     // φ⁵
-};
+// ============================================
+// ANIMATIONS - Matching Header Style
+// ============================================
 
-// ===========================================
-// REDESIGNED DASHBOARD COMPONENTS
-// ===========================================
+const fadeInUp = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
 
-const DashboardContainer = styled(PageContainer)`
-  background: var(--color-background-primary);
+const pulse = keyframes`
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+`;
+
+const shimmer = keyframes`
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+`;
+
+// ============================================
+// STYLED COMPONENTS - Fixed with css helper
+// ============================================
+
+const DashboardContainer = styled.div`
   min-height: 100vh;
-  position: relative;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(248, 250, 252, 0.95) 50%,
+    rgba(241, 245, 249, 0.9) 100%
+  );
+  padding: 2rem 1rem 4rem;
+  overflow-x: hidden; /* Prevent horizontal scroll */
   
-  /* Subtle texture overlay using golden ratio positioning */
-  &::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: 
-      radial-gradient(circle at 38.2% 61.8%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 61.8% 38.2%, rgba(139, 92, 246, 0.02) 0%, transparent 50%);
-    pointer-events: none;
-    z-index: 0;
+  @media (max-width: 768px) {
+    padding: 1rem 0.5rem 2rem;
   }
 `;
 
 const DashboardContent = styled.div`
-  position: relative;
-  z-index: 1;
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: ${GOLDEN_SCALE.lg} ${GOLDEN_SCALE.md};
-  
-  /* Golden ratio grid structure */
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: ${GOLDEN_SCALE.xl};
-  min-height: 100vh;
-  
-  ${responsive.below.lg} {
-    padding: ${GOLDEN_SCALE.md} ${GOLDEN_SCALE.sm};
-    gap: ${GOLDEN_SCALE.lg};
-  }
-  
-  ${responsive.below.md} {
-    padding: ${GOLDEN_SCALE.sm};
-    gap: ${GOLDEN_SCALE.md};
-  }
+  ${css`animation: ${fadeInUp} 0.6s ease-out;`}
 `;
 
-const StatusBar = styled.div<{ $isOffline: boolean }>`
-  position: fixed;
-  top: ${GOLDEN_SCALE.sm};
-  right: ${GOLDEN_SCALE.sm};
-  z-index: 1000;
-  padding: ${GOLDEN_SCALE.xs} ${GOLDEN_SCALE.sm};
-  background: ${props => 
-    props.$isOffline 
-      ? 'linear-gradient(135deg, var(--color-error-500), var(--color-error-600))' 
-      : 'linear-gradient(135deg, var(--color-success-500), var(--color-success-600))'
-  };
-  color: white;
-  border-radius: ${GOLDEN_SCALE.xs};
-  font-size: 0.875rem;
-  font-weight: 600;
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(10px);
-  
-  display: flex;
-  align-items: center;
-  gap: ${GOLDEN_SCALE.xs};
-  
-  opacity: ${props => props.$isOffline ? 1 : 0};
-  transform: translateY(${props => props.$isOffline ? '0' : '-100%'});
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-`;
-
-const HeaderSection = styled.header`
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: ${GOLDEN_SCALE.lg};
-  margin-bottom: ${GOLDEN_SCALE.md};
-  
-  ${responsive.below.md} {
-    grid-template-columns: 1fr;
-    gap: ${GOLDEN_SCALE.md};
-    text-align: center;
-  }
-`;
-
-const TitleGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${GOLDEN_SCALE.xs};
-`;
-
-const MainTitle = styled(Heading1)`
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 3.5rem);
-  font-weight: 300;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--color-text-primary), var(--color-primary-600));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-`;
-
-const Subtitle = styled.div`
-  font-size: 1.125rem;
-  color: var(--color-text-secondary);
-  font-weight: 400;
-  display: flex;
-  align-items: center;
-  gap: ${GOLDEN_SCALE.xs};
-  
-  .status-badge {
-    padding: 0.25rem 0.75rem;
-    background: var(--color-background-tertiary);
-    border: 1px solid var(--color-border-light);
-    border-radius: ${GOLDEN_SCALE.xs};
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-`;
-
-const SyncIndicator = styled.div<{ $syncing: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${GOLDEN_SCALE.xs};
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  
-  ${props => props.$syncing && css`
-    .sync-icon {
-      animation: spin 1s linear infinite;
-    }
-    
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-  `}
-`;
-
-// REDESIGNED VIEW NAVIGATION WITH PROPER CONTRAST
-const ViewNavigation = styled.nav`
-  display: flex;
-  background: var(--color-background-secondary);
-  border: 2px solid var(--color-border-light);
-  border-radius: ${GOLDEN_SCALE.sm};
-  padding: 0.375rem;
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(10px);
-  
-  ${responsive.below.md} {
-    width: 100%;
-    justify-self: center;
-  }
-`;
-
-const ViewTab = styled.button<{ $active: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: ${GOLDEN_SCALE.xs};
-  padding: ${GOLDEN_SCALE.sm} ${GOLDEN_SCALE.md};
-  border: none;
-  border-radius: calc(${GOLDEN_SCALE.sm} - 0.375rem);
-  background: ${({ $active }) => 
-    $active 
-      ? 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600))' 
-      : 'transparent'
-  };
-  color: ${({ $active }) => 
-    $active 
-      ? 'white' 
-      : 'var(--color-text-secondary)'
-  };
-  font-weight: ${({ $active }) => $active ? '600' : '500'};
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-  
-  /* Ensure proper contrast */
-  ${({ $active }) => !$active && css`
-    &:hover {
-      background: var(--color-background-tertiary);
-      color: var(--color-text-primary);
-      transform: translateY(-1px);
-    }
-  `}
-  
-  ${({ $active }) => $active && css`
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-    
-    &:hover {
-      background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
-    }
-  `}
-  
-  &:active {
-    transform: translateY(0);
-  }
-  
-  /* Ripple effect */
-  &::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    transition: width 0.3s, height 0.3s;
-  }
-  
-  &:active::after {
-    width: 100px;
-    height: 100px;
-  }
-  
-  ${responsive.below.md} {
-    flex: 1;
-    justify-content: center;
-    padding: ${GOLDEN_SCALE.sm};
-  }
-`;
-
-// GOLDEN RATIO CONTENT LAYOUT
-const MainContent = styled.main`
-  display: grid;
-  gap: ${GOLDEN_SCALE.xl};
-  animation: ${fadeIn} 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both;
-`;
-
-// OVERVIEW LAYOUT WITH GOLDEN RATIO PROPORTIONS
-const OverviewGrid = styled.div`
-  display: grid;
-  grid-template-columns: ${GOLDEN_RATIO}fr 1fr;
-  gap: ${GOLDEN_SCALE.xl};
-  
-  ${responsive.below.lg} {
-    grid-template-columns: 1fr;
-    gap: ${GOLDEN_SCALE.lg};
-  }
-`;
-
-const MainStatsSection = styled.section`
-  display: flex;
-  flex-direction: column;
-  gap: ${GOLDEN_SCALE.lg};
-`;
-
-const StatsGrid = styled.div`
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap: ${GOLDEN_SCALE.md};
-  
-  ${responsive.below.md} {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const PrimaryStatCard = styled(Card)`
+const WelcomeSection = styled.div`
   background: linear-gradient(135deg, 
-    var(--color-background-secondary) 0%, 
-    var(--color-background-tertiary) 100%
+    rgba(59, 130, 246, 0.08) 0%,
+    rgba(139, 92, 246, 0.05) 100%
   );
-  border: 1px solid var(--color-border-light);
-  padding: ${GOLDEN_SCALE.lg};
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  margin-bottom: 2rem;
   position: relative;
   overflow: hidden;
   
@@ -358,1188 +129,654 @@ const PrimaryStatCard = styled(Card)`
     content: '';
     position: absolute;
     top: 0;
-    right: 0;
-    width: 100px;
-    height: 100px;
-    background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
-    opacity: 0.1;
-    border-radius: 50%;
-    transform: translate(30%, -30%);
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+      transparent, 
+      rgba(255, 255, 255, 0.1), 
+      transparent
+    );
+    ${css`animation: ${shimmer} 3s ease-in-out infinite;`}
   }
   
-  .stat-header {
-    display: flex;
-    align-items: center;
-    gap: ${GOLDEN_SCALE.sm};
-    margin-bottom: ${GOLDEN_SCALE.md};
-  }
-  
-  .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: ${GOLDEN_SCALE.xs};
-    background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow-sm);
-  }
-  
-  .stat-info h3 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-  }
-  
-  .stat-info .badge {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-    background: var(--color-primary-50);
-    color: var(--color-primary-600);
-    border-radius: ${GOLDEN_SCALE.xs};
-    border: 1px solid var(--color-primary-200);
-    margin-top: 0.25rem;
-  }
-  
-  .stat-value {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--color-text-primary);
-    font-family: var(--font-mono);
-    margin-bottom: ${GOLDEN_SCALE.xs};
-  }
-  
-  .stat-label {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-    margin-bottom: ${GOLDEN_SCALE.sm};
-  }
-  
-  .progress-container {
-    .progress-bar {
-      height: 6px;
-      background: var(--color-background-tertiary);
-      border-radius: 3px;
-      overflow: hidden;
-      margin-bottom: ${GOLDEN_SCALE.xs};
-    }
-    
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--color-primary-500), var(--color-primary-600));
-      border-radius: 3px;
-      transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    .progress-text {
-      font-size: 0.75rem;
-      color: var(--color-text-secondary);
-      text-align: right;
-      font-weight: 500;
-    }
+  @media (max-width: 768px) {
+    padding: 1.5rem 1rem;
+    border-radius: 16px;
   }
 `;
 
-const SecondaryStatCard = styled(Card)`
-  background: var(--color-background-secondary);
-  border: 1px solid var(--color-border-light);
-  padding: ${GOLDEN_SCALE.md};
+const WelcomeHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+`;
+
+const WelcomeIcon = styled.div`
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+`;
+
+const WelcomeText = styled.div`
+  flex: 1;
+`;
+
+const WelcomeTitle = styled.h1`
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 0.5rem 0;
+  
+  @media (max-width: 768px) {
+    font-size: 1.4rem;
+  }
+`;
+
+const WelcomeSubtitle = styled.p`
+  font-size: 1rem;
+  color: #666666;
+  margin: 0;
+  opacity: 0.9;
+`;
+
+const StatusIndicator = styled.div<{ $type: 'online' | 'offline' }>`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  padding: 8px 16px;
+  border-radius: 24px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  
+  background: ${props => props.$type === 'online'
+    ? 'linear-gradient(135deg, #10b981, #059669)'
+    : 'linear-gradient(135deg, #ef4444, #dc2626)'
+  };
+  color: white;
+  box-shadow: 0 4px 12px ${props => props.$type === 'online'
+    ? 'rgba(16, 185, 129, 0.3)'
+    : 'rgba(239, 68, 68, 0.3)'
+  };
+  
+  svg {
+    ${css`animation: ${pulse} 2s ease infinite;`}
+  }
+`;
+
+const DashboardGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+`;
+
+const StatCard = styled.div<{ $color: string }>`
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   
   &:hover {
     transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--color-primary-300);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+    border-color: ${props => `${props.$color}20`};
   }
   
-  .stat-header {
-    display: flex;
-    align-items: center;
-    gap: ${GOLDEN_SCALE.sm};
-    margin-bottom: ${GOLDEN_SCALE.sm};
-  }
-  
-  .stat-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: ${GOLDEN_SCALE.xs};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .stat-title {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  
-  .stat-value {
-    font-size: 1.875rem;
-    font-weight: 700;
-    color: var(--color-text-primary);
-    font-family: var(--font-mono);
-    margin-bottom: ${GOLDEN_SCALE.xs};
-  }
-  
-  .stat-label {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    margin-bottom: ${GOLDEN_SCALE.xs};
-  }
-  
-  .stat-change {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 600;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, 
+      ${props => props.$color}, 
+      ${props => `${props.$color}80`}
+    );
   }
 `;
 
-const SidebarSection = styled.aside`
+const StatHeader = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: ${GOLDEN_SCALE.lg};
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
 `;
 
-const ActivityCard = styled(Card)`
-  background: var(--color-background-secondary);
-  border: 1px solid var(--color-border-light);
-  padding: ${GOLDEN_SCALE.md};
+const StatIcon = styled.div<{ $color: string }>`
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, 
+    ${props => `${props.$color}10`}, 
+    ${props => `${props.$color}05`}
+  );
+  border: 1px solid ${props => `${props.$color}20`};
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${props => props.$color};
+`;
+
+const StatValue = styled.div`
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 0.25rem;
+`;
+
+const StatLabel = styled.div`
+  font-size: 0.9rem;
+  color: #666666;
+  font-weight: 500;
+`;
+
+const StatTrend = styled.div<{ $positive?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: ${props => props.$positive ? '#10b981' : '#ef4444'};
+  margin-top: 0.5rem;
+`;
+
+const SectionGrid = styled.div`
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
   
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: ${GOLDEN_SCALE.xs};
-    margin-bottom: ${GOLDEN_SCALE.md};
-    padding-bottom: ${GOLDEN_SCALE.sm};
-    border-bottom: 1px solid var(--color-border-light);
-  }
-  
-  .section-title {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-  }
-  
-  .activity-list {
-    display: flex;
-    flex-direction: column;
-    gap: ${GOLDEN_SCALE.sm};
-  }
-  
-  .activity-item {
-    display: flex;
-    align-items: flex-start;
-    gap: ${GOLDEN_SCALE.sm};
-    padding: ${GOLDEN_SCALE.sm};
-    border-radius: ${GOLDEN_SCALE.xs};
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    
-    &:hover {
-      background: var(--color-background-tertiary);
-      transform: translateX(4px);
-    }
-  }
-  
-  .activity-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: ${GOLDEN_SCALE.xs};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    flex-shrink: 0;
-  }
-  
-  .activity-content {
-    flex: 1;
-    min-width: 0;
-  }
-  
-  .activity-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    margin-bottom: 0.125rem;
-  }
-  
-  .activity-description {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    line-height: 1.4;
-    margin-bottom: 0.25rem;
-  }
-  
-  .activity-time {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    font-weight: 500;
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
 `;
 
-const QuickActionsCard = styled(Card)`
-  background: var(--color-background-secondary);
-  border: 1px solid var(--color-border-light);
-  padding: ${GOLDEN_SCALE.md};
+const Section = styled.div`
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+`;
+
+const SectionHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+`;
+
+const SectionTitle = styled.h2`
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+  flex: 1;
+`;
+
+const SectionAction = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #3b82f6;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
   
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: ${GOLDEN_SCALE.xs};
-    margin-bottom: ${GOLDEN_SCALE.md};
-    padding-bottom: ${GOLDEN_SCALE.sm};
-    border-bottom: 1px solid var(--color-border-light);
-  }
-  
-  .section-title {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-  }
-  
-  .actions-grid {
-    display: flex;
-    flex-direction: column;
-    gap: ${GOLDEN_SCALE.xs};
-  }
-  
-  .action-item {
-    display: flex;
-    align-items: center;
-    gap: ${GOLDEN_SCALE.sm};
-    padding: ${GOLDEN_SCALE.sm};
-    border: 1px solid var(--color-border-light);
-    border-radius: ${GOLDEN_SCALE.xs};
-    text-decoration: none;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
-    background: var(--color-background-primary);
-    
-    &:hover:not(:disabled) {
-      border-color: var(--color-primary-500);
-      background: var(--color-background-tertiary);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-sm);
-    }
-    
-    &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-  }
-  
-  .action-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: ${GOLDEN_SCALE.xs};
-    background: var(--color-primary-50);
-    color: var(--color-primary-600);
-    border: 1px solid var(--color-primary-200);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .action-item:hover .action-icon {
-    background: var(--color-primary-100);
-    border-color: var(--color-primary-300);
-  }
-  
-  .action-content {
-    flex: 1;
-  }
-  
-  .action-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    margin-bottom: 0.125rem;
-  }
-  
-  .action-description {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    line-height: 1.3;
-  }
-  
-  .action-arrow {
-    color: var(--color-text-secondary);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  .action-item:hover .action-arrow {
-    color: var(--color-primary-600);
+  &:hover {
+    background: rgba(59, 130, 246, 0.08);
     transform: translateX(2px);
   }
 `;
 
-// PORTFOLIO CREATION SCREEN
-const CreatePortfolioContainer = styled.div`
+const ActivityList = styled.div`
   display: flex;
   flex-direction: column;
+  gap: 1rem;
+`;
+
+const ActivityItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, 
+    rgba(248, 250, 252, 0.8) 0%,
+    rgba(241, 245, 249, 0.6) 100%
+  );
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: linear-gradient(135deg, 
+      rgba(59, 130, 246, 0.05) 0%,
+      rgba(59, 130, 246, 0.02) 100%
+    );
+    border-color: rgba(59, 130, 246, 0.15);
+  }
+`;
+
+const ActivityIcon = styled.div<{ $color: string }>`
+  width: 40px;
+  height: 40px;
+  background: ${props => `${props.$color}15`};
+  color: ${props => props.$color};
+  border-radius: 10px;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 60vh;
-  text-align: center;
-  padding: ${GOLDEN_SCALE.xl} ${GOLDEN_SCALE.md};
+  flex-shrink: 0;
 `;
 
-const CreateHeader = styled.div`
-  margin-bottom: ${GOLDEN_SCALE.xxl};
-  
-  .create-icon {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto ${GOLDEN_SCALE.lg};
-    box-shadow: var(--shadow-xl);
-    animation: ${float} 4s ease-in-out infinite;
-  }
-  
-  .create-title {
-    margin: 0 0 ${GOLDEN_SCALE.md} 0;
-    font-size: clamp(2rem, 5vw, 2.5rem);
-    font-weight: 300;
-    color: var(--color-text-primary);
-  }
-  
-  .create-description {
-    max-width: 500px;
-    margin: 0 auto;
-    color: var(--color-text-secondary);
-    font-size: 1.125rem;
-    line-height: 1.6;
-  }
+const ActivityContent = styled.div`
+  flex: 1;
+  min-width: 0;
 `;
 
-const PortfolioTypesGrid = styled.div`
+const ActivityTitle = styled.div`
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 0.25rem;
+`;
+
+const ActivityDescription = styled.div`
+  font-size: 0.8rem;
+  color: #666666;
+  opacity: 0.8;
+`;
+
+const ActivityTime = styled.div`
+  font-size: 0.75rem;
+  color: #666666;
+  opacity: 0.6;
+  flex-shrink: 0;
+`;
+
+const QuickActionGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: ${GOLDEN_SCALE.lg};
-  max-width: 1000px;
-  width: 100%;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
 `;
 
-const PortfolioTypeCard = styled(Card)<{ $disabled?: boolean }>`
-  background: var(--color-background-secondary);
-  border: 1px solid var(--color-border-light);
-  padding: ${GOLDEN_SCALE.lg};
-  cursor: ${props => props.$disabled ? 'not-allowed' : 'pointer'};
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: ${props => props.$disabled ? 0.6 : 1};
+const QuickActionCard = styled.button<{ $color: string }>`
+  background: linear-gradient(135deg, 
+    ${props => `${props.$color}08`}, 
+    ${props => `${props.$color}03`}
+  );
+  border: 1px solid ${props => `${props.$color}15`};
+  border-radius: 12px;
+  padding: 1.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  color: #1a1a1a;
+  position: relative;
+  overflow: hidden;
   
-  &:hover:not([disabled]) {
-    border-color: var(--color-primary-500);
-    transform: translateY(-8px);
-    box-shadow: var(--shadow-xl);
+  &:hover {
+    border-color: ${props => `${props.$color}30`};
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px ${props => `${props.$color}12`};
   }
   
-  .type-header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: ${GOLDEN_SCALE.md};
-    margin-bottom: ${GOLDEN_SCALE.lg};
+  .action-icon {
+    width: 24px;
+    height: 24px;
+    color: ${props => props.$color};
+    margin: 0 auto 0.75rem;
   }
   
-  .type-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: ${GOLDEN_SCALE.sm};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    box-shadow: var(--shadow-md);
-  }
-  
-  .type-title {
+  .action-title {
+    font-size: 0.9rem;
+    font-weight: 600;
     margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-  }
-  
-  .type-description {
-    text-align: center;
-    margin: 0 0 ${GOLDEN_SCALE.lg} 0;
-    color: var(--color-text-secondary);
-    line-height: 1.6;
-  }
-  
-  .type-features {
-    display: flex;
-    flex-direction: column;
-    gap: ${GOLDEN_SCALE.xs};
-    margin-bottom: ${GOLDEN_SCALE.lg};
-  }
-  
-  .feature {
-    display: flex;
-    align-items: center;
-    gap: ${GOLDEN_SCALE.xs};
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-    
-    svg {
-      color: var(--color-primary-600);
-    }
-  }
-  
-  .create-button {
-    width: 100%;
-    padding: ${GOLDEN_SCALE.sm} ${GOLDEN_SCALE.md};
-    border: none;
-    border-radius: ${GOLDEN_SCALE.xs};
-    font-weight: 600;
-    cursor: ${props => props.$disabled ? 'not-allowed' : 'pointer'};
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    
-    &:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-    }
+    line-height: 1.3;
   }
 `;
 
-type DashboardView = 'overview' | 'gallery' | 'learning' | 'analytics';
-
-// Utility function to safely convert to Date
-const ensureDate = (dateInput: any): Date => {
-  if (dateInput instanceof Date) return dateInput;
-  if (typeof dateInput === 'string' || typeof dateInput === 'number') {
-    const date = new Date(dateInput);
-    return isNaN(date.getTime()) ? new Date() : date;
-  }
-  return new Date();
-};
-
-export default function Dashboard() {
-  const router = useRouter();
-  const { portfolio, loading, error, hasPortfolio, galleryPieces } = usePortfolioManagement();
-  const { portfolioTypeConfig, formatTimeAgo } = useDashboardLogic();
-  const { 
-    isOffline, 
-    isSyncing, 
-    hasOfflineData, 
-    initializeOfflineMode,
-    syncData, 
-    getOfflineData 
-  } = useOffline();
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: #666666;
   
-  const [activeView, setActiveView] = useState<DashboardView>('overview');
-  const [useOfflineMode, setUseOfflineMode] = useState(false);
-  const [loadingTimeout, setLoadingTimeout] = useState(false);
-  const hasSyncedRef = useRef<boolean>(false);
-  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hasInitializedOfflineRef = useRef<boolean>(false);
+  .empty-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 1rem;
+    opacity: 0.5;
+  }
+  
+  .empty-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    color: #1a1a1a;
+  }
+  
+  .empty-description {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin: 0;
+  }
+`;
 
-  // Enhanced loading timeout
-  useEffect(() => {
-    if (loading && !hasOfflineData && !loadingTimeout) {
-      loadingTimeoutRef.current = setTimeout(() => {
-        console.log('⏰ Loading timeout - switching to offline mode');
-        setLoadingTimeout(true);
-      }, 2000);
-    } else {
-      setLoadingTimeout(false);
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
-    }
+// Fixed loading spinner component
+const LoadingSpinner = styled(RefreshCw)`
+  ${css`animation: ${pulse} 1.5s ease infinite;`}
+`;
 
-    return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const { isOffline } = useOffline();
+
+  // Use hooks properly without destructuring non-existent properties
+  const portfolioManagement = usePortfolioManagement();
+  const dashboardLogic = useDashboardLogic();
+
+  // Extract what we need safely
+  const currentPortfolio = portfolioManagement.portfolio;
+  const isLoading = portfolioManagement.loading;
+  const hasPortfolio = portfolioManagement.hasPortfolio;
+
+  // Create mock data for stats
+  const mockGalleryPieces = useMemo((): MockGalleryPiece[] => {
+    const portfolioId = currentPortfolio?.id || 'default-portfolio';
+    const pieces = createMockGalleryPieces();
+    return pieces.map(piece => ({
+      id: piece._id, // use _id from your interface
+      status: piece.status ?? 'completed', // fallback if status might be missing
+      views: Math.floor(Math.random() * 500) + 50,
+      title: piece.title || `Piece ${piece._id}`
+    }));
+
+  }, [currentPortfolio?.id]);
+
+  // Calculate dashboard stats
+  const stats = useMemo(() => {
+    const totalPieces = mockGalleryPieces.length;
+    const completedPieces = mockGalleryPieces.filter(piece => piece.status === 'completed').length;
+    const viewCount = mockGalleryPieces.reduce((sum, piece) => sum + piece.views, 0);
+
+    return {
+      totalPieces,
+      completedPieces,
+      viewCount,
+      portfolios: hasPortfolio ? 1 : 0
     };
-  }, [loading, hasOfflineData, loadingTimeout]);
+  }, [mockGalleryPieces, hasPortfolio]);
 
-  // Auto-switch to offline mode when needed
-  useEffect(() => {
-    if (!hasPortfolio && !useOfflineMode && !hasInitializedOfflineRef.current) {
-      if ((isOffline || loadingTimeout) && !loading) {
-        console.log('🔧 Auto-switching to offline mode');
-        initializeOfflineMode();
-        setUseOfflineMode(true);
-        hasInitializedOfflineRef.current = true;
-      }
-    }
-  }, [hasPortfolio, useOfflineMode, isOffline, loadingTimeout, loading, initializeOfflineMode]);
-
-  // Portfolio type configuration
-  const PORTFOLIO_TYPES = [
+  // Recent activity data
+  const recentActivity = [
     {
-      key: 'creative',
-      ...portfolioTypeConfig.creative,
-      icon: <Brush size={20} />,
-      features: ['Gallery showcase', 'Visual projects'],
-      path: '/dashboard/profile?create=creative',
-      gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+      id: '1',
+      title: 'Updated portfolio theme',
+      description: 'Changed to modern dark theme',
+      time: '2 hours ago',
+      icon: <Brush size={16} />,
+      color: '#8b5cf6'
     },
     {
-      key: 'educational', 
-      ...portfolioTypeConfig.educational,
-      icon: <Brain size={20} />,
-      features: ['Learning progress', 'Achievement tracking'],
-      path: '/dashboard/profile?create=educational',
-      gradient: 'linear-gradient(135deg, #10b981, #059669)'
+      id: '2',
+      title: 'New piece published',
+      description: 'Added "Digital Landscape" to gallery',
+      time: '1 day ago',
+      icon: <GalleryIcon size={16} />,
+      color: '#3b82f6'
     },
     {
-      key: 'professional',
-      ...portfolioTypeConfig.professional,
-      icon: <Code size={20} />,
-      features: ['Technical skills', 'Project showcase'],
-      path: '/dashboard/profile?create=professional',
-      gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)'
+      id: '3',
+      title: 'Analytics milestone',
+      description: 'Reached 1,000 total views',
+      time: '3 days ago',
+      icon: <TrendingUp size={16} />,
+      color: '#10b981'
     },
     {
-      key: 'hybrid',
-      ...portfolioTypeConfig.hybrid,
-      icon: <Layers size={20} />,
-      features: ['Multi-disciplinary', 'Flexible format'],
-      path: '/dashboard/profile?create=hybrid',
-      gradient: 'linear-gradient(135deg, #f59e0b, #d97706)'
+      id: '4',
+      title: 'Profile completed',
+      description: 'Added bio and contact information',
+      time: '1 week ago',
+      icon: <CheckCircle size={16} />,
+      color: '#f59e0b'
     }
   ];
 
-  // Determine current data source
-  const getCurrentDataSource = () => {
-    if (hasPortfolio && !isOffline) {
-      return { type: 'live', portfolio, galleryPieces: galleryPieces || [] };
-    }
-    
-    if (hasOfflineData || useOfflineMode) {
-      const offlineData = getOfflineData();
-      if (offlineData) {
-        return { 
-          type: 'offline', 
-          portfolio: offlineData.portfolio, 
-          galleryPieces: offlineData.galleryPieces 
-        };
-      }
-    }
-    
-    return { 
-      type: 'demo', 
-      portfolio: createMockPortfolio(), 
-      galleryPieces: createMockGalleryPieces() 
-    };
-  };
-
-  const dataSource = getCurrentDataSource();
-  const currentPortfolio = dataSource.portfolio;
-  const currentGalleryPieces = dataSource.galleryPieces;
-
-  // View availability check
-  const isViewAvailable = (view: DashboardView): boolean => {
-    if (!currentPortfolio) return view === 'overview';
-    
-    switch (view) {
-      case 'overview':
-      case 'analytics':
-        return true;
-      case 'gallery':
-        return currentPortfolio.kind === 'creative' || currentPortfolio.kind === 'hybrid';
-      case 'learning':
-        return currentPortfolio.kind === 'educational' || currentPortfolio.kind === 'hybrid';
-      default:
-        return false;
-    }
-  };
-
-  // Navigation items
-  const navigationItems = useMemo(() => [
-    { key: 'overview', label: 'Overview', icon: <LayoutDashboard size={16} /> },
-    { key: 'gallery', label: 'Gallery', icon: <GalleryIcon size={16} />, condition: isViewAvailable('gallery') },
-    { key: 'learning', label: 'Learning', icon: <Brain size={16} />, condition: isViewAvailable('learning') },
-    { key: 'analytics', label: 'Analytics', icon: <BarChart3 size={16} /> }
-  ].filter(item => item.condition !== false), [currentPortfolio?.kind]);
-
-  // Dashboard stats
-  const dashboardStats = useMemo(() => {
-    if (dataSource.type === 'live') {
-      return {
-        portfolioType: currentPortfolio?.kind,
-        totalItems: currentGalleryPieces?.length || 0,
-        recentActivity: 0,
-        completionRate: 75,
-        weeklyGrowth: 12,
-        averageScore: 85,
-        totalViews: 1234,
-        uniqueVisitors: 567,
-        engagementRate: 78
-      };
-    }
-    
-    if (dataSource.type === 'offline') {
-      const offlineData = getOfflineData();
-      return offlineData?.dashboardStats || null;
-    }
-    
-    return {
-      portfolioType: currentPortfolio?.kind,
-      totalItems: currentGalleryPieces?.length || 0,
-      recentActivity: 3,
-      completionRate: 75,
-      weeklyGrowth: 12,
-      averageScore: 85,
-      totalViews: 1234,
-      uniqueVisitors: 567,
-      engagementRate: 78
-    };
-  }, [dataSource.type, currentPortfolio?.kind, currentGalleryPieces?.length]);
-
-  // Achievements with proper date handling
-  const achievements = useMemo(() => {
-    if (dataSource.type === 'offline') {
-      const offlineData = getOfflineData();
-      const offlineAchievements = offlineData?.achievements || [];
-      
-      return offlineAchievements.map(achievement => ({
-        ...achievement,
-        unlockedAt: ensureDate(achievement.unlockedAt)
-      }));
-    }
-    
-    const now = new Date();
-    const portfolioCreatedAt = ensureDate(currentPortfolio?.createdAt) || new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-
-    return [
-      {
-        id: 'portfolio-created',
-        title: 'Portfolio Created',
-        description: `Successfully created your ${currentPortfolio?.kind || 'professional'} portfolio`,
-        unlockedAt: portfolioCreatedAt,
-        type: 'milestone' as const,
-        icon: '🎯'
-      },
-      {
-        id: 'content-creator',
-        title: 'Content Creator',
-        description: `Added ${dashboardStats?.totalItems || 0} pieces to your portfolio`,
-        unlockedAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
-        type: 'content' as const,
-        icon: '✨'
-      }
-    ];
-  }, [dataSource.type, currentPortfolio?.kind, currentPortfolio?.createdAt, dashboardStats?.totalItems, getOfflineData]);
-
-  // Sync data when we have live data
-  useEffect(() => {
-    if (dataSource.type === 'live' && dashboardStats && achievements.length > 0 && !hasSyncedRef.current) {
-      console.log('💾 Syncing live data for offline use');
-      syncData({
-        dashboardStats,
-        achievements,
-        galleryPieces: currentGalleryPieces,
-        portfolio: currentPortfolio
-      });
-      hasSyncedRef.current = true;
-    }
-  }, [dataSource.type, !!dashboardStats, achievements.length, syncData]);
-
   // Quick actions
-  const quickActions = useMemo(() => {
-    const canEdit = dataSource.type === 'live';
-    const canViewPublic = dataSource.type === 'live' && !isOffline;
-    
-    return [
-      {
-        title: 'Portfolio Hub',
-        description: canEdit ? 'Manage & edit' : 'View only',
-        icon: <Settings size={20} />,
-        href: canEdit ? '/dashboard/profile' : undefined,
-        disabled: !canEdit
-      },
-      ...(isViewAvailable('gallery') ? [{
-        title: 'Gallery',
-        description: 'View artwork', 
-        icon: <GalleryIcon size={20} />,
-        onClick: () => setActiveView('gallery')
-      }] : []),
-      {
-        title: 'Analytics',
-        description: 'View insights',
-        icon: <BarChart3 size={20} />,
-        onClick: () => setActiveView('analytics')
-      },
-      {
-        title: 'View Public',
-        description: canViewPublic ? 'See your portfolio' : 'Offline',
-        icon: <ExternalLink size={20} />,
-        href: canViewPublic ? `/portfolio/${currentPortfolio?.id}` : undefined,
-        external: true,
-        disabled: !canViewPublic
-      }
-    ];
-  }, [dataSource.type, isOffline, currentPortfolio?.id, isViewAvailable]);
+  const quickActions = [
+    {
+      id: 'create',
+      title: 'Create New Piece',
+      icon: <Plus size={20} />,
+      color: '#3b82f6',
+      onClick: () => router.push('/dashboard/gallery/create')
+    },
+    {
+      id: 'analytics',
+      title: 'View Analytics',
+      icon: <BarChart3 size={20} />,
+      color: '#10b981',
+      onClick: () => router.push('/dashboard/analytics')
+    },
+    {
+      id: 'settings',
+      title: 'Settings',
+      icon: <Settings size={20} />,
+      color: '#8b5cf6',
+      onClick: () => router.push('/dashboard/settings')
+    },
+    {
+      id: 'portfolio',
+      title: 'Edit Portfolio',
+      icon: <Brush size={20} />,
+      color: '#f59e0b',
+      onClick: () => router.push('/dashboard/portfolio')
+    }
+  ];
 
-  // Recent activities
-  const recentActivities = useMemo(() => {
-    const portfolioCreatedAt = ensureDate(currentPortfolio?.createdAt);
-
-    const baseActivities = [
-      {
-        id: '1',
-        title: 'Portfolio created',
-        description: `Your ${currentPortfolio?.kind} portfolio is now active`,
-        timestamp: portfolioCreatedAt,
-        type: 'portfolio' as const,
-        metadata: { category: 'Portfolio' }
-      }
-    ];
-
-    const achievementActivities = achievements.slice(0, 2).map((achievement, index) => {
-      const unlockedAt = ensureDate(achievement.unlockedAt);
-
-      return {
-        id: `achievement-${index + 2}`,
-        title: `Achievement unlocked: ${achievement.title}`,
-        description: achievement.description,
-        timestamp: unlockedAt,
-        type: 'achievement' as const,
-        metadata: { category: 'Achievement', icon: achievement.icon }
-      };
-    });
-
-    return [...baseActivities, ...achievementActivities];
-  }, [currentPortfolio?.kind, currentPortfolio?.createdAt, achievements]);
-
-  console.log('Dashboard render:', { 
-    loading, 
-    error, 
-    hasPortfolio, 
-    hasOfflineData, 
-    isOffline,
-    useOfflineMode,
-    loadingTimeout,
-    dataSource: dataSource.type,
-    dashboardStats: !!dashboardStats
-  });
-
-  // Loading state
-  if (loading && !hasOfflineData && !loadingTimeout && !useOfflineMode) {
+  // Show loading state
+  if (isLoading) {
     return (
-      <ProtectedRoute>
-        <DashboardContainer>
-          <LoadingContainer>
-            <LoadingSpinner />
-            <BodyText>Loading dashboard...</BodyText>
-            <div style={{ marginTop: GOLDEN_SCALE.md, textAlign: 'center' }}>
-              <BodyText style={{ fontSize: '0.875rem', marginBottom: GOLDEN_SCALE.xs }}>
-                This is taking longer than usual...
-              </BodyText>
-              <BaseButton 
-                onClick={() => {
-                  initializeOfflineMode();
-                  setUseOfflineMode(true);
-                }}
-                $variant="ghost"
-              >
-                Continue in offline mode
-              </BaseButton>
-            </div>
-          </LoadingContainer>
-        </DashboardContainer>
-      </ProtectedRoute>
-    );
-  }
-
-  // Error state
-  if (error && !hasOfflineData && !useOfflineMode) {
-    return (
-      <ProtectedRoute>
-        <DashboardContainer>
-          <ErrorContainer>
-            <Card>
-              <CardContent>
-                <Heading2>Something went wrong</Heading2>
-                <BodyText>{error}</BodyText>
-                <FlexRow $gap={GOLDEN_SCALE.md} style={{ marginTop: GOLDEN_SCALE.md }}>
-                  <BaseButton onClick={() => window.location.reload()}>
-                    Try Again
-                  </BaseButton>
-                  <BaseButton 
-                    $variant="ghost"
-                    onClick={() => {
-                      initializeOfflineMode();
-                      setUseOfflineMode(true);
-                    }}
-                  >
-                    Continue Offline
-                  </BaseButton>
-                </FlexRow>
-              </CardContent>
-            </Card>
-          </ErrorContainer>
-        </DashboardContainer>
-      </ProtectedRoute>
-    );
-  }
-
-  // No portfolio and no offline data - show creation flow
-  if (!currentPortfolio) {
-    return (
-      <ProtectedRoute>
-        <DashboardContainer>
-          <StatusBar $isOffline={isOffline}>
-            {isOffline ? <WifiOff size={16} /> : <Wifi size={16} />}
-            {isOffline ? 'You are offline' : 'Online'}
-          </StatusBar>
-
-          <DashboardContent>
-            <CreatePortfolioContainer>
-              <CreateHeader>
-                <div className="create-icon">
-                  <Sparkles size={32} />
-                </div>
-                <h1 className="create-title">Welcome to Your Dashboard</h1>
-                <p className="create-description">
-                  {isOffline 
-                    ? 'You are currently offline. Portfolio creation requires an internet connection.'
-                    : 'Create your first portfolio to start tracking your professional journey and showcase your work.'
-                  }
-                </p>
-              </CreateHeader>
-              
-              <PortfolioTypesGrid>
-                {PORTFOLIO_TYPES.map((type) => (
-                  <PortfolioTypeCard 
-                    key={type.key} 
-                    $disabled={isOffline}
-                    onClick={() => !isOffline && router.push(type.path)}
-                  >
-                    <div className="type-header">
-                      <div 
-                        className="type-icon"
-                        style={{ background: type.gradient }}
-                      >
-                        {type.icon}
-                      </div>
-                      <h3 className="type-title">{type.title}</h3>
-                    </div>
-                    
-                    <p className="type-description">{type.description}</p>
-                    
-                    <div className="type-features">
-                      {type.features.map((feature, index) => (
-                        <div key={index} className="feature">
-                          <CheckCircle size={14} />
-                          {feature}
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <button 
-                      className="create-button"
-                      style={{ 
-                        background: isOffline ? 'var(--color-background-tertiary)' : type.gradient,
-                        color: isOffline ? 'var(--color-text-secondary)' : 'white'
-                      }}
-                      disabled={isOffline}
-                    >
-                      {isOffline ? 'Requires connection' : `Create ${type.title}`}
-                    </button>
-                  </PortfolioTypeCard>
-                ))}
-              </PortfolioTypesGrid>
-            </CreatePortfolioContainer>
-          </DashboardContent>
-        </DashboardContainer>
-      </ProtectedRoute>
-    );
-  }
-
-  // Main dashboard with portfolio
-  return (
-    <ProtectedRoute>
       <DashboardContainer>
-        <StatusBar $isOffline={isOffline || dataSource.type !== 'live'}>
-          {isOffline ? <WifiOff size={16} /> : <Wifi size={16} />}
-          <span>
-            {dataSource.type === 'demo' ? 'Demo mode' :
-             dataSource.type === 'offline' ? 'Offline mode' :
-             isOffline ? 'You are offline' : 'Online'}
-          </span>
-          {(dataSource.type === 'demo' || dataSource.type === 'offline') && (
-            <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>
-              • Limited functionality
-            </span>
-          )}
-        </StatusBar>
-
         <DashboardContent>
-          <HeaderSection>
-            <TitleGroup>
-              <MainTitle>Your Dashboard</MainTitle>
-              <Subtitle>
-                {currentPortfolio?.title || 'Portfolio'}
-                <span className="status-badge">
-                  {dataSource.type}
-                </span>
-              </Subtitle>
-            </TitleGroup>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: GOLDEN_SCALE.sm }}>
-              <SyncIndicator $syncing={isSyncing}>
-                {isSyncing && <RefreshCw size={14} className="sync-icon" />}
-                <span>
-                  {isSyncing ? 'Syncing...' : 
-                   dataSource.type === 'live' ? 'Synced' : 
-                   dataSource.type === 'offline' ? 'Cached data' : 'Demo data'}
-                </span>
-              </SyncIndicator>
-              
-              <ViewNavigation>
-                {navigationItems.map((item) => (
-                  <ViewTab
-                    key={item.key}
-                    $active={activeView === item.key}
-                    onClick={() => setActiveView(item.key as DashboardView)}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </ViewTab>
-                ))}
-              </ViewNavigation>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '400px',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <LoadingSpinner size={32} />
+            <div style={{ color: '#666666', fontSize: '1.1rem', fontWeight: 500 }}>
+              Loading your dashboard...
             </div>
-          </HeaderSection>
-
-          <MainContent>
-            {activeView === 'overview' && (
-              <OverviewGrid>
-                <MainStatsSection>
-                  <StatsGrid>
-                    <PrimaryStatCard>
-                      <div className="stat-header">
-                        <div className="stat-icon">
-                          {currentPortfolio?.icon || <LayoutDashboard size={20} />}
-                        </div>
-                        <div className="stat-info">
-                          <h3>Portfolio Performance</h3>
-                          <div className="badge">
-                            {dataSource.type === 'live' ? 'Live' : 
-                             dataSource.type === 'offline' ? 'Cached' : 'Demo'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="stat-value">
-                        {dashboardStats?.totalViews?.toLocaleString() || '1,234'}
-                      </div>
-                      <div className="stat-label">Total Views</div>
-                      <div className="progress-container">
-                        <div className="progress-bar">
-                          <div 
-                            className="progress-fill"
-                            style={{ width: `${dashboardStats?.completionRate || 75}%` }}
-                          />
-                        </div>
-                        <div className="progress-text">
-                          {dashboardStats?.completionRate || 75}% completion
-                        </div>
-                      </div>
-                    </PrimaryStatCard>
-
-                    <SecondaryStatCard>
-                      <div className="stat-header">
-                        <div 
-                          className="stat-icon"
-                          style={{ 
-                            background: 'var(--color-success-50)',
-                            color: 'var(--color-success-600)'
-                          }}
-                        >
-                          <Target size={16} />
-                        </div>
-                        <div className="stat-title">Portfolio Items</div>
-                      </div>
-                      <div className="stat-value">{dashboardStats?.totalItems || 0}</div>
-                      <div className="stat-label">Total Pieces</div>
-                      
-                      {/* Enhanced content with breakdown */}
-                      <div className="items-breakdown">
-                        <div className="breakdown-row">
-                          <div className="breakdown-item">
-                            <GalleryIcon size={12} />
-                            <span>{Math.floor((dashboardStats?.totalItems || 0) * 0.6)}</span>
-                            <span className="item-type">Gallery</span>
-                          </div>
-                          <div className="breakdown-item">
-                            <Code size={12} />
-                            <span>{Math.floor((dashboardStats?.totalItems || 0) * 0.4)}</span>
-                            <span className="item-type">Projects</span>
-                          </div>
-                        </div>
-                        <div className="recent-activity">
-                          <div className="activity-dot active"></div>
-                          <span>2 added this week</span>
-                        </div>
-                      </div>
-                      
-                      <div className="stat-change" style={{ color: 'var(--color-success-600)' }}>
-                        <TrendingUp size={12} />
-                        +{dashboardStats?.weeklyGrowth || 12}% this week
-                      </div>
-                    </SecondaryStatCard>
-
-                    <SecondaryStatCard>
-                      <div className="stat-header">
-                        <div 
-                          className="stat-icon"
-                          style={{ 
-                            background: 'var(--color-primary-50)',
-                            color: 'var(--color-primary-600)'
-                          }}
-                        >
-                          <Eye size={16} />
-                        </div>
-                        <div className="stat-title">Engagement</div>
-                      </div>
-                      <div className="stat-value">{dashboardStats?.engagementRate || 85}%</div>
-                      <div className="stat-label">Avg Rate</div>
-                      
-                      {/* Enhanced engagement metrics */}
-                      <div className="engagement-metrics">
-                        <div className="metric-row">
-                          <div className="metric-item">
-                            <Eye size={10} />
-                            <span className="metric-value">{dashboardStats?.totalViews || 1234}</span>
-                            <span className="metric-label">Views</span>
-                          </div>
-                          <div className="metric-item">
-                            <Activity size={10} />
-                            <span className="metric-value">{Math.floor((dashboardStats?.totalViews || 1234) * 0.1)}</span>
-                            <span className="metric-label">Actions</span>
-                          </div>
-                        </div>
-                        <div className="engagement-trend">
-                          <div className="trend-bar">
-                            <div className="trend-fill" style={{ width: `${dashboardStats?.engagementRate || 85}%` }}></div>
-                          </div>
-                          <span className="trend-label">vs industry avg</span>
-                        </div>
-                      </div>
-                      
-                      <div className="stat-change" style={{ color: 'var(--color-success-600)' }}>
-                        <TrendingUp size={12} />
-                        Excellent performance
-                      </div>
-                    </SecondaryStatCard>
-                  </StatsGrid>
-                </MainStatsSection>
-                
-                <SidebarSection>
-                  <ActivityCard>
-                    <div className="section-header">
-                      <Activity size={18} />
-                      <h3 className="section-title">Recent Activity</h3>
-                    </div>
-                    <div className="activity-list">
-                      {recentActivities.map((activity) => (
-                        <div key={activity.id} className="activity-item">
-                          <div 
-                            className="activity-icon"
-                            style={{
-                              background: activity.type === 'portfolio' 
-                                ? 'linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600))'
-                                : 'linear-gradient(135deg, var(--color-warning-500), var(--color-warning-600))'
-                            }}
-                          >
-                            {activity.type === 'portfolio' && <LayoutDashboard size={16} />}
-                            {activity.type === 'achievement' && <Award size={16} />}
-                          </div>
-                          <div className="activity-content">
-                            <div className="activity-title">{activity.title}</div>
-                            <div className="activity-description">{activity.description}</div>
-                            <div className="activity-time">{formatTimeAgo(ensureDate(activity.timestamp))}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </ActivityCard>
-                  
-                  <QuickActionsCard>
-                    <div className="section-header">
-                      <Plus size={18} />
-                      <h3 className="section-title">Quick Actions</h3>
-                    </div>
-                    <div className="actions-grid">
-                      {quickActions.map((action, index) => (
-                        <div
-                          key={index}
-                          className="action-item"
-                          style={{ opacity: action.disabled ? 0.6 : 1 }}
-                          onClick={action.onClick}
-                          {...(action.href && !action.disabled ? {
-                            as: 'a',
-                            href: action.href,
-                            target: action.external ? '_blank' : undefined
-                          } : {})}
-                        >
-                          <div className="action-icon">
-                            {action.icon}
-                          </div>
-                          <div className="action-content">
-                            <div className="action-title">{action.title}</div>
-                            <div className="action-description">{action.description}</div>
-                          </div>
-                          <div className="action-arrow">
-                            <ChevronRight size={16} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </QuickActionsCard>
-                </SidebarSection>
-              </OverviewGrid>
-            )}
-
-            {activeView === 'gallery' && isViewAvailable('gallery') && (
-              <GalleryView 
-                galleryItems={currentGalleryPieces}
-                portfolioId={currentPortfolio?.id || 'demo'}
-              />
-            )}
-
-            {activeView === 'learning' && isViewAvailable('learning') && (
-              <LearningView 
-                conceptProgress={currentPortfolio?.conceptProgress || []}
-                stats={dashboardStats || { 
-                  totalItems: 0, 
-                  recentActivity: 0, 
-                  completionRate: 0, 
-                  weeklyGrowth: 0,
-                  averageScore: 0
-                }}
-              />
-            )}
-
-            {activeView === 'analytics' && (
-              <AnalyticsView 
-                stats={dashboardStats}
-                achievements={achievements}
-                formatTimeAgo={formatTimeAgo}
-              />
-            )}
-          </MainContent>
+          </div>
         </DashboardContent>
       </DashboardContainer>
-    </ProtectedRoute>
+    );
+  }
+
+  return (
+    <DashboardContainer>
+      <DashboardContent>
+        {/* Welcome Section */}
+        <WelcomeSection>
+          <WelcomeHeader>
+            <WelcomeIcon>
+              <LayoutDashboard size={24} />
+            </WelcomeIcon>
+            <WelcomeText>
+              <WelcomeTitle>Welcome back to your Dashboard</WelcomeTitle>
+              <WelcomeSubtitle>
+                Manage your portfolio, track progress, and create amazing content
+              </WelcomeSubtitle>
+            </WelcomeText>
+            <StatusIndicator $type={isOffline ? 'offline' : 'online'}>
+              {isOffline ? <WifiOff size={12} /> : <Wifi size={12} />}
+              {isOffline ? 'Offline' : 'Online'}
+            </StatusIndicator>
+          </WelcomeHeader>
+        </WelcomeSection>
+
+        {/* Stats Cards */}
+        <DashboardGrid>
+          <StatCard $color="#3b82f6">
+            <StatHeader>
+              <StatIcon $color="#3b82f6">
+                <GalleryIcon size={20} />
+              </StatIcon>
+              <StatTrend $positive={true}>
+                <TrendingUp size={12} />
+                +12%
+              </StatTrend>
+            </StatHeader>
+            <StatValue>{stats.totalPieces}</StatValue>
+            <StatLabel>Total Pieces</StatLabel>
+          </StatCard>
+
+          <StatCard $color="#10b981">
+            <StatHeader>
+              <StatIcon $color="#10b981">
+                <CheckCircle size={20} />
+              </StatIcon>
+              <StatTrend $positive={true}>
+                <TrendingUp size={12} />
+                +8%
+              </StatTrend>
+            </StatHeader>
+            <StatValue>{stats.completedPieces}</StatValue>
+            <StatLabel>Completed</StatLabel>
+          </StatCard>
+
+          <StatCard $color="#8b5cf6">
+            <StatHeader>
+              <StatIcon $color="#8b5cf6">
+                <Eye size={20} />
+              </StatIcon>
+              <StatTrend $positive={true}>
+                <TrendingUp size={12} />
+                +24%
+              </StatTrend>
+            </StatHeader>
+            <StatValue>{stats.viewCount.toLocaleString()}</StatValue>
+            <StatLabel>Total Views</StatLabel>
+          </StatCard>
+
+          <StatCard $color="#f59e0b">
+            <StatHeader>
+              <StatIcon $color="#f59e0b">
+                <Target size={20} />
+              </StatIcon>
+              <StatTrend $positive={false}>
+                <TrendingUp size={12} style={{ transform: 'rotate(180deg)' }} />
+                -2%
+              </StatTrend>
+            </StatHeader>
+            <StatValue>{stats.portfolios}</StatValue>
+            <StatLabel>Active Portfolios</StatLabel>
+          </StatCard>
+        </DashboardGrid>
+
+        {/* Main Content Grid */}
+        <SectionGrid>
+          {/* Recent Activity */}
+          <Section>
+            <SectionHeader>
+              <SectionTitle>Recent Activity</SectionTitle>
+              <SectionAction>
+                View All
+                <ArrowRight size={14} />
+              </SectionAction>
+            </SectionHeader>
+
+            {recentActivity.length > 0 ? (
+              <ActivityList>
+                {recentActivity.map((activity) => (
+                  <ActivityItem key={activity.id}>
+                    <ActivityIcon $color={activity.color}>
+                      {activity.icon}
+                    </ActivityIcon>
+                    <ActivityContent>
+                      <ActivityTitle>{activity.title}</ActivityTitle>
+                      <ActivityDescription>{activity.description}</ActivityDescription>
+                    </ActivityContent>
+                    <ActivityTime>{activity.time}</ActivityTime>
+                  </ActivityItem>
+                ))}
+              </ActivityList>
+            ) : (
+              <EmptyState>
+                <Activity className="empty-icon" />
+                <div className="empty-title">No recent activity</div>
+                <div className="empty-description">
+                  Your recent actions will appear here
+                </div>
+              </EmptyState>
+            )}
+          </Section>
+
+          {/* Quick Actions */}
+          <Section>
+            <SectionHeader>
+              <SectionTitle>Quick Actions</SectionTitle>
+            </SectionHeader>
+
+            <QuickActionGrid>
+              {quickActions.map((action) => (
+                <QuickActionCard
+                  key={action.id}
+                  $color={action.color}
+                  onClick={action.onClick}
+                >
+                  <div className="action-icon">{action.icon}</div>
+                  <div className="action-title">{action.title}</div>
+                </QuickActionCard>
+              ))}
+            </QuickActionGrid>
+          </Section>
+        </SectionGrid>
+      </DashboardContent>
+    </DashboardContainer>
   );
 }

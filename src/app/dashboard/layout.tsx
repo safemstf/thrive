@@ -1,513 +1,359 @@
-// src/app/dashboard/layout.tsx - Enhanced with Offline Support
+// src/app/dashboard/layout.tsx - Coordinated Dashboard with Centralized State Management
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
-import styled, { css } from 'styled-components';
-import Link from 'next/link';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import styled from 'styled-components';
 import { ProtectedRoute } from '@/components/auth/protectedRoute';
 import { useAuth } from '@/providers/authProvider';
 import { useApiClient } from '@/lib/api-client';
 import { useOffline } from '@/hooks/useOffline';
+import { Header } from '@/components/misc/header';
 import type { Portfolio } from '@/types/portfolio.types';
-
-// Import existing styled components - no duplication!
 import {
-  PageContainer,
-  FlexRow,
-  FlexColumn,
-  Card,
-  BaseButton,
-  DevBadge,
-  responsive,
-  focusRing,
-  hoverLift
-} from '@/styles/styled-components';
-
-// Import utilities for logic
+  Target, BarChart3, Award, BookOpen,
+  Brush, GraduationCap, Code, FolderOpen,
+  FlaskConical,
+  LayoutDashboard,
+  User2
+} from 'lucide-react';
+import { PageContainer, responsive } from '@/styles/styled-components';
 import { utils } from '@/utils';
 
-import { 
-  User, Target, Home, Settings, Shield, ChevronLeft, Menu, X, Plus, ArrowLeft,
-  GraduationCap, FolderOpen, Code, Brush, Circle, WifiOff, Wifi
-} from 'lucide-react';
-
 // ===========================================
-// DASHBOARD-SPECIFIC COMPONENTS ONLY
+// TYPES
 // ===========================================
 
-const spinAnimation = css`
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+interface DashboardContextType {
+  portfolio: Portfolio | null;
+  portfolioLoading: boolean;
+  portfolioError: string | null;
+  hasPortfolio: boolean;
+  dataSource: 'live' | 'offline' | 'demo' | 'dev';
+  refetchPortfolio: () => Promise<void>;
+}
+
+// Create context for centralized state management
+const DashboardContext = React.createContext<DashboardContextType | null>(null);
+
+export const useDashboardContext = () => {
+  const context = React.useContext(DashboardContext);
+  if (!context) {
+    throw new Error('useDashboardContext must be used within DashboardLayout');
   }
-`;
+  return context;
+};
 
-const LoadingSpinner = styled.div`
-  ${spinAnimation}
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--color-border-light);
-  border-top: 2px solid var(--color-primary-500);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-`;
+// ===========================================
+// STYLED COMPONENTS
+// ===========================================
 
 const DashboardContainer = styled(PageContainer)`
   display: flex;
-  min-height: 100vh;
-`;
-
-const MobileHeader = styled.header`
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: var(--color-background-secondary);
-  border-bottom: 1px solid var(--color-border-medium);
-  padding: 0 var(--spacing-lg);
-  align-items: center;
-  justify-content: space-between;
-  z-index: 50;
-  
-  ${responsive.below.md} {
-    display: flex;
-  }
-`;
-
-const Sidebar = styled.aside<{ $collapsed: boolean; $mobileOpen: boolean }>`
-  width: ${props => props.$collapsed ? '72px' : '280px'};
-  background: var(--color-background-secondary);
-  border-right: 1px solid var(--color-border-medium);
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  transition: width var(--transition-normal);
-  z-index: 45;
-  display: flex;
   flex-direction: column;
-  
-  ${responsive.below.md} {
-    width: 280px;
-    transform: ${props => props.$mobileOpen ? 'translateX(0)' : 'translateX(-100%)'};
-    top: 60px;
-    height: calc(100vh - 60px);
-  }
-`;
-
-const SidebarSection = styled.div<{ $collapsed?: boolean }>`
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid var(--color-border-light);
-  flex-shrink: 0;
-`;
-
-const CollapseButton = styled(BaseButton).attrs({ $variant: 'ghost', $size: 'sm' })<{ $collapsed: boolean }>`
-  position: absolute;
-  top: var(--spacing-lg);
-  right: var(--spacing-lg);
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  transform: ${props => props.$collapsed ? 'rotate(180deg)' : 'rotate(0deg)'};
-  
-  ${responsive.below.md} {
-    display: none;
-  }
-`;
-
-const UserInfo = styled(FlexRow).attrs({ $gap: 'var(--spacing-md)', $align: 'center' })``;
-
-const Avatar = styled.div`
-  width: 44px;
-  height: 44px;
-  background: var(--color-background-tertiary);
-  border: 1px solid var(--color-border-medium);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-`;
-
-const PortfolioIndicator = styled.div<{ $color: string }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  color: ${props => props.$color};
-  flex-shrink: 0;
-  margin-top: 2px;
-`;
-
-const NavItem = styled(Link)<{ $active: boolean; $collapsed: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  color: ${props => props.$active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'};
-  background: ${props => props.$active ? 'var(--color-background-tertiary)' : 'transparent'};
-  border: 1px solid ${props => props.$active ? 'var(--color-border-medium)' : 'transparent'};
-  border-radius: var(--radius-sm);
-  text-decoration: none;
-  transition: var(--transition-fast);
-  justify-content: ${props => props.$collapsed ? 'center' : 'flex-start'};
-  min-height: 44px;
-
-  ${focusRing}
-  
-  &:hover {
-    background: var(--color-background-tertiary);
-    border-color: var(--color-border-medium);
-    color: var(--color-text-primary);
-  }
-`;
-
-const Badge = styled.span`
-  font-size: var(--font-size-xs);
-  padding: 2px var(--spacing-xs);
-  background: var(--color-accent-blue);
-  color: white;
-  border-radius: var(--radius-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: var(--font-weight-medium);
-  flex-shrink: 0;
-`;
-
-const OfflineBadge = styled.span<{ $isOffline: boolean }>`
-  font-size: var(--font-size-xs);
-  padding: 2px var(--spacing-xs);
-  background: ${props => props.$isOffline ? '#ef4444' : '#10b981'};
-  color: white;
-  border-radius: var(--radius-sm);
-  font-weight: var(--font-weight-medium);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-`;
-
-const MainContent = styled.main<{ $sidebarCollapsed: boolean }>`
-  flex: 1;
-  margin-left: ${props => props.$sidebarCollapsed ? '72px' : '280px'};
   min-height: 100vh;
-  transition: margin-left var(--transition-normal);
+  position: relative;
+  overflow-x: hidden; /* Prevent horizontal scrolling during animations */
+`;
+
+const DashboardContent = styled.div<{ $sidebarCollapsed?: boolean }>`
+  display: flex;
+  flex: 1;
+  position: relative;
+  
+  /* Create a coordinated sliding effect */
+  transform: ${props => props.$sidebarCollapsed
+    ? 'translateX(-104px)' /* Slide content left when sidebar collapses */
+    : 'translateX(0)'
+  };
+  transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform;
+  
+  ${responsive.below.lg} {
+    transform: none; /* Disable on mobile */
+    transition: none;
+  }
+  
+  /* Add subtle scale effect during transition */
+  & > * {
+    transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transform-origin: left center;
+  }
+`;
+
+const MainContent = styled.main<{ $withSidebar?: boolean; $sidebarCollapsed?: boolean }>`
+  flex: 1;
+  min-height: calc(100vh - 80px);
   background: var(--color-background-primary);
+  position: relative;
   
-  ${responsive.below.md} {
-    margin-left: 0;
-    padding-top: 60px;
+  /* Synchronized animation with sidebar - same timing and easing */
+  transition: margin-left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: margin-left;
+  
+  /* Coordinate with sidebar transform animation */
+  ${props => props.$withSidebar && `
+    margin-left: ${props.$sidebarCollapsed ? '72px' : '280px'};
+    
+    ${responsive.below.lg} {
+      margin-left: 0;
+      transition: none; /* Disable on mobile where sidebar overlays */
+    }
+  `}
+  
+  /* Add subtle content shift animation for better visual flow */
+  & > * {
+    transition: padding 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 `;
 
-const MobileOverlay = styled.div`
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 40;
-  backdrop-filter: blur(4px);
+const ContentWrapper = styled.div`
+  padding: 2rem;
+  max-width: 1200px;  /* Reduced from your likely larger value */
+  margin: 0 auto;
+  width: 100%;
   
   ${responsive.below.md} {
-    display: block;
+    padding: 1.5rem;
+  }
+  
+  ${responsive.below.sm} {
+    padding: 1rem;
   }
 `;
-
 // ===========================================
-// DEV MODE TOGGLE - Easy Auth Bypass
+// CONFIGURATION
 // ===========================================
 
-// 🚨 DEVELOPMENT MODE SETTINGS 🚨
-// Set SKIP_AUTH to true to bypass authentication during development
-// Set to false for production builds
 const SKIP_AUTH = process.env.NODE_ENV === 'development' && true;
 
-// Quick toggle: Change 'true' to 'false' above to enable auth
-// Or use environment variable: SKIP_AUTH=false npm run dev
 
-// ===========================================
-// COMPONENT LOGIC
-// ===========================================
-
-interface NavItemConfig {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
+type QuickAction = {
+  id: "home" | "thrive" | "profile" | "api-test";
+  title: string;
   description: string;
-  requiresPortfolio?: boolean;
-  portfolioTypes?: string[];
-  isAdmin?: boolean;
-  badge?: string;
-}
+  icon: React.ReactNode;
+  color: string;
+  href: string;
+  adminOnly?: boolean;
+};
 
-const NAV_ITEMS: NavItemConfig[] = [
+export const QUICK_ACTIONS: QuickAction[] = [
   {
-    href: '/dashboard',
-    label: 'Overview',
-    icon: <Home size={18} />,
-    description: 'Dashboard home'
+    id: "home",
+    title: "Dashboard",
+    description: "Overview & widgets",
+    icon: <LayoutDashboard size={24} />,
+    color: "#06b6d4",
+    href: "/dashboard"
   },
   {
-    href: '/dashboard/thrive',
-    label: 'Survival of the Fittest',
-    icon: <Target size={18} />,
-    description: 'Challenges & skill development',
-    badge: 'New'
+    id: "thrive",
+    title: "Thrive",
+    description: "Skill assessments",
+    icon: <Target size={24} />,
+    color: "#3b82f6",
+    href: "/dashboard/thrive"
   },
   {
-    href: '/dashboard/profile',
-    label: 'Portfolio Hub',
-    icon: <User size={18} />,
-    description: 'Manage your portfolio & profile'
+    id: "profile",
+    title: "Profile",
+    description: "Manage your profile",
+    icon: <User2 size={24} />,
+    color: "#10b981",
+    href: "/dashboard/profile"
   },
   {
-    href: '/dashboard/gallery',
-    label: 'Creative Studio',
-    icon: <Brush size={18} />,
-    description: 'Art, photography & design portfolio',
-    requiresPortfolio: true,
-    portfolioTypes: ['creative', 'hybrid']
-  },
-  {
-    href: '/dashboard/writing',
-    label: 'Teaching Portfolio',
-    icon: <GraduationCap size={18} />,
-    description: 'Educational content & curriculum',
-    requiresPortfolio: true,
-    portfolioTypes: ['educational', 'hybrid']
-  },
-  {
-    href: '/dashboard/projects',
-    label: 'Tech Portfolio',
-    icon: <Code size={18} />,
-    description: 'Software projects & development',
-    requiresPortfolio: true,
-    portfolioTypes: ['professional', 'hybrid']
-  },
-  {
-    href: '/dashboard/api-test',
-    label: 'Admin Panel',
-    icon: <Shield size={18} />,
-    description: 'System administration',
-    isAdmin: true
-  },
-  {
-    href: '/',
-    label: 'Homepage',
-    icon: <Home size={18} />,
-    description: 'Return to main site'
+    id: "api-test",
+    title: "API Test",
+    description: "Internal tools",
+    icon: <FlaskConical size={24} />,
+    color: "#ef4444",
+    href: "/dashboard/api-test",
+    adminOnly: true
   }
 ];
 
+// filter helper
+export const getQuickActions = (isAdmin: boolean) =>
+  QUICK_ACTIONS.filter(a => !a.adminOnly || isAdmin);
+
+
+const PORTFOLIO_SECTIONS = [
+  {
+    id: 'creative',
+    title: 'Creative Studio',
+    href: '/dashboard/gallery',
+    icon: <Brush size={18} />,
+    types: ['creative', 'hybrid']
+  },
+  {
+    id: 'teaching',
+    title: 'Teaching Hub',
+    href: '/dashboard/writing',
+    icon: <GraduationCap size={18} />,
+    types: ['educational', 'hybrid']
+  },
+  {
+    id: 'tech',
+    title: 'Tech Projects',
+    href: '/dashboard/projects',
+    icon: <Code size={18} />,
+    types: ['professional', 'hybrid']
+  }
+];
+
+// ===========================================
+// HOOKS FOR SMOOTH SCROLL TRACKING
+// ===========================================
+
+const useScrollState = () => {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+
+      rafRef.current = requestAnimationFrame(() => {
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+        const newIsScrolled = scrollY > 50;
+
+        if (newIsScrolled !== isScrolled) {
+          setIsScrolled(newIsScrolled);
+        }
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Initialize state
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [isScrolled]);
+
+  return isScrolled;
+};
+
+// ===========================================
+// MAIN COMPONENT
+// ===========================================
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuth();
   const apiClient = useApiClient();
-  
-  // Enhanced offline support
-  const { 
-    isOffline, 
-    hasOfflineData, 
+
+  const {
+    isOffline,
+    hasOfflineData,
     initializeOfflineMode,
-    getOfflineData 
+    getOfflineData
   } = useOffline();
-  
-  // Mock user data for dev mode
+
+  // Centralized state management
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [portfolioLoading, setPortfolioLoading] = useState(true);
+  const [portfolioError, setPortfolioError] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // UI state
+  const isScrolled = useScrollState();
+
+  // Handle SSR hydration
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   const currentUser = SKIP_AUTH ? {
     name: 'Dev User',
     email: 'dev@example.com',
     role: 'admin'
   } : user;
-  
-  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
-  const [portfolioLoading, setPortfolioLoading] = useState(true);
-  const [useOfflineMode, setUseOfflineMode] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hasInitializedOfflineRef = useRef<boolean>(false);
 
-  // Enhanced portfolio fetching with offline support
-  useEffect(() => {
-    const fetchPortfolio = async () => {
-      if (!currentUser) return;
-      
-      try {
-        // Skip API call in dev mode or use mock data
-        if (SKIP_AUTH) {
-          setPortfolio({
-            kind: 'hybrid',
-            title: 'Development Portfolio',
-            id: 'dev-portfolio',
-            username: 'devuser'
-            // Add other mock portfolio properties as needed
-          } as Portfolio);
-          setPortfolioLoading(false);
-          return;
-        }
-        
-        // Set a timeout for real API calls
-        loadingTimeoutRef.current = setTimeout(() => {
-          console.log('⏰ Portfolio loading timeout - checking offline data');
-          
-          // Check if we have offline data available
-          if (hasOfflineData) {
-            const offlineData = getOfflineData();
-            if (offlineData?.portfolio) {
-              console.log('📱 Using offline portfolio data');
-              setPortfolio(offlineData.portfolio);
-              setUseOfflineMode(true);
-              setPortfolioLoading(false);
-              return;
-            }
-          }
-          
-          // Initialize offline mode if no data available
-          if (!hasInitializedOfflineRef.current) {
-            console.log('🔧 Initializing offline mode for layout');
-            initializeOfflineMode();
-            setUseOfflineMode(true);
-            hasInitializedOfflineRef.current = true;
-            
-            // Set mock portfolio for offline mode
-            setTimeout(() => {
-              const offlineData = getOfflineData();
-              if (offlineData?.portfolio) {
-                setPortfolio(offlineData.portfolio);
-                setPortfolioLoading(false);
-              }
-            }, 500);
-          }
-        }, 3000); // 3 second timeout
-        
-        const portfolioData = await apiClient.portfolio.getMyPortfolio();
-        
-        // Clear timeout if API call succeeds
-        if (loadingTimeoutRef.current) {
-          clearTimeout(loadingTimeoutRef.current);
-        }
-        
-        setPortfolio(portfolioData);
+  // Centralized portfolio loading logic with stable dependencies
+  const fetchPortfolio = useCallback(async () => {
+    if (!currentUser || !isClient) return;
+
+    setPortfolioLoading(true);
+    setPortfolioError(null);
+
+    try {
+      if (SKIP_AUTH) {
+        setPortfolio({
+          kind: 'hybrid',
+          title: 'Development Portfolio',
+          id: 'dev-portfolio',
+          username: 'devuser',
+          createdAt: new Date()
+        } as Portfolio);
         setPortfolioLoading(false);
-        console.log('✅ Portfolio loaded from API');
-        
-      } catch (error: any) {
-        console.log('❌ Portfolio API failed:', error?.message || error);
-        
-        // Clear timeout
-        if (loadingTimeoutRef.current) {
-          clearTimeout(loadingTimeoutRef.current);
-        }
-        
-        if (error?.status !== 404) {
-          console.error('Error fetching portfolio:', error);
-        }
-        
-        // Try to use offline data on error
-        if (hasOfflineData) {
-          const offlineData = getOfflineData();
-          if (offlineData?.portfolio) {
-            console.log('📱 Falling back to offline portfolio data');
-            setPortfolio(offlineData.portfolio);
-            setUseOfflineMode(true);
-          }
-        } else if (!hasInitializedOfflineRef.current) {
-          // Initialize offline mode if no cached data
-          console.log('🔧 API failed - initializing offline mode');
-          initializeOfflineMode();
-          setUseOfflineMode(true);
-          hasInitializedOfflineRef.current = true;
-          
-          // Wait for offline data to be ready
-          setTimeout(() => {
-            const offlineData = getOfflineData();
-            if (offlineData?.portfolio) {
-              setPortfolio(offlineData.portfolio);
-            }
-          }, 500);
-        }
-        
-        setPortfolioLoading(false);
+        return;
       }
-    };
 
-    // Only fetch if we haven't already started
-    if (portfolioLoading && !hasInitializedOfflineRef.current) {
+      const portfolioData = await apiClient.portfolio.getMyPortfolio();
+      setPortfolio(portfolioData);
+      setPortfolioLoading(false);
+
+    } catch (error) {
+      console.error('Portfolio fetch error:', error);
+      setPortfolioError(error instanceof Error ? error.message : 'Failed to load portfolio');
+      setPortfolioLoading(false);
+
+      // Fallback to offline mode if available
+      if (hasOfflineData) {
+        const offlineData = getOfflineData();
+        if (offlineData?.portfolio) {
+          setPortfolio(offlineData.portfolio);
+          setPortfolioError(null);
+        }
+      }
+    }
+  }, [currentUser?.email, isClient, hasOfflineData]); // Stable dependencies only
+
+  // Initial portfolio fetch
+  useEffect(() => {
+    if (isClient) {
       fetchPortfolio();
     }
-    
-    // Cleanup timeout on unmount
-    return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
-    };
-  }, [currentUser, portfolioLoading]); // Simplified dependencies
+  }, [fetchPortfolio, isClient]);
 
-  // Auto-initialize offline mode when offline (separate effect)
-  useEffect(() => {
-    if (isOffline && !hasOfflineData && !useOfflineMode && !hasInitializedOfflineRef.current) {
-      console.log('🌐 Offline detected - initializing offline mode');
-      initializeOfflineMode();
-      setUseOfflineMode(true);
-      hasInitializedOfflineRef.current = true;
+  // Determine data source and portfolio state
+  const dashboardContext = useMemo<DashboardContextType>(() => {
+    let dataSource: DashboardContextType['dataSource'] = 'live';
+
+    if (SKIP_AUTH) {
+      dataSource = 'dev';
+    } else if (isOffline || portfolioError) {
+      dataSource = hasOfflineData ? 'offline' : 'demo';
     }
-  }, [isOffline, hasOfflineData, useOfflineMode, initializeOfflineMode]);
 
-  // Use utility functions for logic
-  const getVisibleNavItems = () => {
-    return NAV_ITEMS.filter(item => {
-      if (item.requiresPortfolio && !portfolio) return false;
-      if (item.portfolioTypes && portfolio) {
-        return item.portfolioTypes.includes(portfolio.kind);
-      }
-      if (item.isAdmin && currentUser?.role !== 'admin') return false;
-      return true;
-    });
-  };
-
-  const getPortfolioTypeInfo = (type?: string) => {
-    const portfolioTypes = {
-      creative: { 
-        color: '#8b5cf6', 
-        label: 'Creative Portfolio',
-        icon: <Brush size={14} />,
-        description: 'Art • Photography • Design'
-      },
-      educational: { 
-        color: '#3b82f6', 
-        label: 'Teaching Portfolio',
-        icon: <GraduationCap size={14} />,
-        description: 'Education • Curriculum • Training'
-      },
-      professional: { 
-        color: '#059669', 
-        label: 'Tech Portfolio',
-        icon: <Code size={14} />,
-        description: 'Software • Development • Engineering'
-      },
-      hybrid: { 
-        color: '#10b981', 
-        label: 'Multi-Portfolio',
-        icon: <FolderOpen size={14} />,
-        description: 'Creative • Teaching • Professional'
-      }
+    return {
+      portfolio,
+      portfolioLoading,
+      portfolioError,
+      hasPortfolio: !!portfolio,
+      dataSource,
+      refetchPortfolio: fetchPortfolio
     };
+  }, [portfolio, portfolioLoading, portfolioError, isOffline, hasOfflineData, fetchPortfolio]);
 
-    return portfolioTypes[type as keyof typeof portfolioTypes] || {
-      color: '#666666', 
-      label: 'Portfolio',
-      icon: <User size={14} />,
-      description: 'Professional Portfolio'
-    };
+  // Helper functions
+  const getDataSourceStatus = () => {
+    const { dataSource } = dashboardContext;
+    switch (dataSource) {
+      case 'dev': return { type: 'dev' as const, label: 'DEV' };
+      case 'offline': return { type: 'offline' as const, label: 'OFFLINE' };
+      case 'demo': return { type: 'offline' as const, label: 'DEMO' };
+      default: return { type: 'live' as const, label: 'LIVE' };
+    }
   };
 
   const handleLogout = utils.performance.debounce(async () => {
@@ -522,308 +368,67 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, 300);
 
-  const visibleNavItems = getVisibleNavItems();
-
-  // Determine data source status for display
-  const getDataSourceStatus = () => {
-    if (SKIP_AUTH) return { type: 'dev', label: 'DEV MODE' };
-    if (useOfflineMode || isOffline) return { type: 'offline', label: 'OFFLINE' };
-    return { type: 'live', label: 'LIVE' };
+  const handleSettingsClick = () => {
+    router.push('/dashboard/settings');
   };
 
-  const dataStatus = getDataSourceStatus();
+  const getVisiblePortfolioSections = () => {
+    if (!portfolio) return [];
+    return PORTFOLIO_SECTIONS.filter(section =>
+      section.types.includes(portfolio.kind)
+    );
+  };
 
-  // Conditional auth wrapper based on dev mode
-  const AuthWrapper = SKIP_AUTH ? 
-    ({ children }: { children: React.ReactNode }) => <>{children}</> : 
+  // Prepare sidebar configuration
+  const sidebarConfig = useMemo(() => {
+    const isAdmin = currentUser?.role === 'admin' || SKIP_AUTH;
+
+    return {
+      user: currentUser ? {
+        name: currentUser.name || 'User',
+        email: currentUser.email || 'member@example.com',
+        role: currentUser.role
+      } : undefined,
+      portfolio: portfolio ? {
+        kind: portfolio.kind,
+        title: portfolio.title
+      } : undefined,
+      quickActions: getQuickActions(isAdmin), // Filter admin actions
+      portfolioSections: getVisiblePortfolioSections(),
+      dataStatus: getDataSourceStatus(),
+      onLogout: handleLogout,
+      onSettingsClick: handleSettingsClick
+    };
+  }, [currentUser, portfolio, handleLogout]);
+
+  const AuthWrapper = SKIP_AUTH ?
+    ({ children }: { children: React.ReactNode }) => <>{children}</> :
     ProtectedRoute;
 
   return (
-    <AuthWrapper>
-      <DashboardContainer>
-        {/* Mobile Header */}
-        <MobileHeader>
-          <BaseButton 
-            $variant="ghost" 
-            $size="sm"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-          </BaseButton>
-          
-          <FlexRow $gap="var(--spacing-sm)" $align="center">
-            <h1 style={{ 
-              fontSize: 'var(--font-size-lg)', 
-              fontWeight: 'var(--font-weight-normal)', 
-              color: 'var(--color-text-primary)', 
-              margin: 0,
-              fontFamily: 'var(--font-display)'
-            }}>
-              Dashboard
-            </h1>
-            
-            {dataStatus.type === 'dev' && <DevBadge>[DEV]</DevBadge>}
-            
-            <OfflineBadge $isOffline={dataStatus.type !== 'live'}>
-              {dataStatus.type === 'live' ? <Wifi size={10} /> : <WifiOff size={10} />}
-              {dataStatus.label}
-            </OfflineBadge>
-          </FlexRow>
-          
-          {portfolio && (
-            <PortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color}>
-              <Circle size={8} fill="currentColor" />
-            </PortfolioIndicator>
-          )}
-        </MobileHeader>
+    <DashboardContext.Provider value={dashboardContext}>
+      <AuthWrapper>
+        <DashboardContainer>
+          {/* Enhanced Header with smooth sidebar */}
+          <Header
+            title="Learn Morra"
+            subtitle="Professional Development Dashboard"
+            withSidebar={true}
+            sidebarConfig={sidebarConfig}
+          />
 
-        {/* Sidebar */}
-        <Sidebar $collapsed={sidebarCollapsed} $mobileOpen={mobileMenuOpen}>
-          {/* Header Section */}
-          <SidebarSection>
-            <CollapseButton 
-              $collapsed={sidebarCollapsed}
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          <DashboardContent $sidebarCollapsed={isScrolled}>
+            <MainContent
+              $withSidebar={true}
+              $sidebarCollapsed={isScrolled}
             >
-              <ChevronLeft size={14} />
-            </CollapseButton>
-            
-            {!sidebarCollapsed && (
-              <FlexColumn $gap="var(--spacing-md)">
-                <UserInfo>
-                  <Avatar>
-                    <User size={20} />
-                  </Avatar>
-                  <FlexColumn $gap="var(--spacing-xs)">
-                    <div style={{ 
-                      fontSize: 'var(--font-size-base)', 
-                      fontWeight: 'var(--font-weight-medium)', 
-                      color: 'var(--color-text-primary)',
-                      fontFamily: 'var(--font-display)' 
-                    }}>
-                      {currentUser?.name || 'User'}
-                    </div>
-                    <div style={{ 
-                      fontSize: 'var(--font-size-sm)', 
-                      color: 'var(--color-text-secondary)' 
-                    }}>
-                      {currentUser?.email || currentUser?.role || 'member'}
-                    </div>
-                  </FlexColumn>
-                </UserInfo>
-                
-                {/* Status indicator in sidebar */}
-                <FlexRow $justify="space-between" $align="center">
-                  <OfflineBadge $isOffline={dataStatus.type !== 'live'}>
-                    {dataStatus.type === 'live' ? <Wifi size={10} /> : <WifiOff size={10} />}
-                    {dataStatus.label}
-                  </OfflineBadge>
-                  {dataStatus.type === 'dev' && <DevBadge>[DEV]</DevBadge>}
-                </FlexRow>
-              </FlexColumn>
-            )}
-          </SidebarSection>
-
-          {/* Portfolio Status */}
-          {!portfolioLoading && (
-            <SidebarSection>
-              {portfolio ? (
-                <FlexRow $gap="var(--spacing-md)" $align="flex-start">
-                  <PortfolioIndicator $color={getPortfolioTypeInfo(portfolio.kind).color}>
-                    <Circle size={6} fill="currentColor" />
-                  </PortfolioIndicator>
-                  {!sidebarCollapsed && (
-                    <FlexColumn $gap="var(--spacing-sm)">
-                      <div style={{ 
-                        fontSize: 'var(--font-size-xs)', 
-                        color: 'var(--color-text-secondary)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        fontWeight: 'var(--font-weight-medium)'
-                      }}>
-                        Active Portfolio {useOfflineMode && '(Offline)'}
-                      </div>
-                      <FlexRow $gap="var(--spacing-sm)" $align="flex-start">
-                        {getPortfolioTypeInfo(portfolio.kind).icon}
-                        <FlexColumn $gap="var(--spacing-xs)">
-                          <div style={{ 
-                            fontSize: 'var(--font-size-sm)', 
-                            fontWeight: 'var(--font-weight-medium)', 
-                            color: 'var(--color-text-primary)',
-                            fontFamily: 'var(--font-display)' 
-                          }}>
-                            {getPortfolioTypeInfo(portfolio.kind).label}
-                          </div>
-                          <div style={{ 
-                            fontSize: 'var(--font-size-xs)', 
-                            color: 'var(--color-text-secondary)',
-                            lineHeight: 1.4 
-                          }}>
-                            {getPortfolioTypeInfo(portfolio.kind).description}
-                          </div>
-                        </FlexColumn>
-                      </FlexRow>
-                    </FlexColumn>
-                  )}
-                </FlexRow>
-              ) : (
-                !sidebarCollapsed && (
-                  <Card $padding="md" $hover>
-                    <FlexRow $gap="var(--spacing-md)" $align="flex-start">
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '28px',
-                        height: '28px',
-                        background: 'var(--color-background-secondary)',
-                        color: 'var(--color-text-secondary)',
-                        border: '1px solid var(--color-border-medium)',
-                        borderRadius: 'var(--radius-sm)',
-                        flexShrink: 0
-                      }}>
-                        <Plus size={14} />
-                      </div>
-                      <FlexColumn $gap="var(--spacing-sm)">
-                        <div style={{ 
-                          fontSize: 'var(--font-size-sm)', 
-                          fontWeight: 'var(--font-weight-medium)', 
-                          color: 'var(--color-text-primary)',
-                          fontFamily: 'var(--font-display)' 
-                        }}>
-                          Create Portfolio
-                        </div>
-                        <div style={{ 
-                          fontSize: 'var(--font-size-xs)', 
-                          color: 'var(--color-text-secondary)' 
-                        }}>
-                          {isOffline || useOfflineMode ? 'Requires connection' : 'Choose your focus'}
-                        </div>
-                        <Link href="/dashboard/profile" style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          fontSize: 'var(--font-size-xs)',
-                          color: (isOffline || useOfflineMode) ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
-                          textDecoration: 'none',
-                          fontWeight: 'var(--font-weight-medium)',
-                          background: 'var(--color-background-secondary)',
-                          border: `1px solid ${(isOffline || useOfflineMode) ? 'var(--color-border-light)' : 'var(--color-primary-600)'}`,
-                          padding: 'var(--spacing-sm) var(--spacing-md)',
-                          borderRadius: 'var(--radius-sm)',
-                          transition: 'var(--transition-fast)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          opacity: (isOffline || useOfflineMode) ? 0.6 : 1,
-                          pointerEvents: (isOffline || useOfflineMode) ? 'none' : 'auto'
-                        }}>
-                          {isOffline || useOfflineMode ? 'Offline' : 'Get Started'}
-                        </Link>
-                      </FlexColumn>
-                    </FlexRow>
-                  </Card>
-                )
-              )}
-            </SidebarSection>
-          )}
-
-          {/* Loading state for portfolio */}
-          {portfolioLoading && !sidebarCollapsed && (
-            <SidebarSection>
-              <FlexRow $gap="var(--spacing-md)" $align="center">
-                <LoadingSpinner />
-                <div style={{ 
-                  fontSize: 'var(--font-size-sm)', 
-                  color: 'var(--color-text-secondary)' 
-                }}>
-                  Loading portfolio...
-                </div>
-              </FlexRow>
-            </SidebarSection>
-          )}
-
-          {/* Navigation */}
-          <div style={{ flex: 1, padding: 'var(--spacing-lg) 0' }}>
-            <FlexColumn $gap="var(--spacing-xs)" style={{ padding: '0 var(--spacing-md)' }}>
-              {visibleNavItems.map((item) => (
-                <NavItem
-                  key={item.href}
-                  href={item.href}
-                  $active={pathname === item.href}
-                  $collapsed={sidebarCollapsed}
-                  title={sidebarCollapsed ? `${item.label} - ${item.description}` : undefined}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '18px', height: '18px', flexShrink: 0 }}>
-                    {item.icon}
-                  </div>
-                  {!sidebarCollapsed && (
-                    <FlexColumn $gap="2px" style={{ flex: 1, minWidth: 0 }}>
-                      <FlexRow $justify="space-between" $align="center">
-                        <div style={{ 
-                          fontWeight: 'var(--font-weight-medium)', 
-                          fontSize: 'var(--font-size-sm)',
-                          fontFamily: 'var(--font-display)' 
-                        }}>
-                          {item.label}
-                        </div>
-                        {item.badge && <Badge>{item.badge}</Badge>}
-                      </FlexRow>
-                      <div style={{ 
-                        fontSize: 'var(--font-size-xs)', 
-                        color: 'var(--color-text-tertiary)',
-                        lineHeight: 1.2 
-                      }}>
-                        {item.description}
-                      </div>
-                    </FlexColumn>
-                  )}
-                </NavItem>
-              ))}
-            </FlexColumn>
-          </div>
-
-          {/* Footer */}
-          <SidebarSection>
-            <FlexColumn $gap="var(--spacing-xs)">
-              <Link href="/dashboard/settings" style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--spacing-md)',
-                padding: 'var(--spacing-md)',
-                color: 'var(--color-text-secondary)',
-                textDecoration: 'none',
-                fontSize: 'var(--font-size-sm)',
-                border: '1px solid transparent',
-                borderRadius: 'var(--radius-sm)',
-                transition: 'var(--transition-fast)',
-                minHeight: '40px'
-              }}>
-                <Settings size={16} />
-                {!sidebarCollapsed && <span>Settings</span>}
-              </Link>
-              <BaseButton 
-                $variant="secondary" 
-                $size="sm" 
-                $fullWidth 
-                onClick={handleLogout}
-                style={{ justifyContent: sidebarCollapsed ? 'center' : 'flex-start', gap: 'var(--spacing-md)' }}
-              >
-                <ArrowLeft size={16} />
-                {!sidebarCollapsed && <span>Sign Out</span>}
-              </BaseButton>
-            </FlexColumn>
-          </SidebarSection>
-        </Sidebar>
-
-        {/* Mobile Overlay */}
-        {mobileMenuOpen && <MobileOverlay onClick={() => setMobileMenuOpen(false)} />}
-
-        {/* Main Content */}
-        <MainContent $sidebarCollapsed={sidebarCollapsed}>
-          {children}
-        </MainContent>
-      </DashboardContainer>
-    </AuthWrapper>
+              <ContentWrapper>
+                {children}
+              </ContentWrapper>
+            </MainContent>
+          </DashboardContent>
+        </DashboardContainer>
+      </AuthWrapper>
+    </DashboardContext.Provider>
   );
 }
