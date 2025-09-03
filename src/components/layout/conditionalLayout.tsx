@@ -6,7 +6,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Header } from '@/components/misc/header';
 import { Footer } from '@/components/misc/footer';
 import { MatrixProvider, useMatrix } from '@/hooks/useMatrix';
-import { MatrixRain } from '@/app/simulations/matrixStyling';
 
 interface ConditionalLayoutProps {
   children: React.ReactNode;
@@ -84,23 +83,6 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen relative">
-      {/* Render MatrixRain canvas behind UI when enabled */}
-      {isMatrixOn && (
-        <MatrixRain
-          fontSize={14}
-          layers={2}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 0,
-            opacity: 0.85,
-            pointerEvents: 'none',
-          }}
-        />
-      )}
 
       {/* Header - hidden on fullscreen-ish routes */}
       {!isFullscreen && <Header title="LearnMorra" subtitle="Brag Responsibly" />}
