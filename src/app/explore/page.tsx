@@ -13,28 +13,28 @@ import type { Portfolio } from "@/types/portfolio.types";
 const GOLDEN_RATIO = 1.618;
 const scale = 600;
 const sizes = {
-  featured: scale,                         // Largest planet
-  orbit1: scale / (GOLDEN_RATIO* 2),            // ~482
-  orbit2: scale / (GOLDEN_RATIO ** 2.5),     // ~298
-  orbit3: scale / (GOLDEN_RATIO ** 3.5),     // ~184
+  featured: scale,
+  orbit1: scale / (GOLDEN_RATIO * 2),
+  orbit2: scale / (GOLDEN_RATIO ** 2.5),
+  orbit3: scale / (GOLDEN_RATIO ** 3.5),
 };
 
 const breakpoints = {
-    xs: '375px',
-    sm: '640px',
-    md: '768px',
-    lg: '1024px',
-    xl: '1280px',
-    xxl: '1536px'
+  xs: '375px',
+  sm: '640px',
+  md: '768px',
+  lg: '1024px',
+  xl: '1280px',
+  xxl: '1536px'
 };
 
 const media = {
-    xs: `@media (max-width: ${breakpoints.xs})`,
-    sm: `@media (max-width: ${breakpoints.sm})`,
-    md: `@media (max-width: ${breakpoints.md})`,
-    lg: `@media (max-width: ${breakpoints.lg})`,
-    xl: `@media (max-width: ${breakpoints.xl})`,
-    xxl: `@media (min-width: ${breakpoints.xxl})`
+  xs: `@media (max-width: ${breakpoints.xs})`,
+  sm: `@media (max-width: ${breakpoints.sm})`,
+  md: `@media (max-width: ${breakpoints.md})`,
+  lg: `@media (max-width: ${breakpoints.lg})`,
+  xl: `@media (max-width: ${breakpoints.xl})`,
+  xxl: `@media (min-width: ${breakpoints.xxl})`
 };
 
 /* ---------------------------
@@ -50,7 +50,6 @@ const floatGentle = keyframes`
   50% { transform: translateY(-10px); }
 `;
 
-
 const pulse = keyframes`
   0%, 100% { transform: scale(1); opacity: 0.8; }
   50% { transform: scale(1.05); opacity: 1; }
@@ -60,14 +59,15 @@ const LoadingDiv = styled.div`
   text-align: center;
   animation: ${pulse} 2s ease-in-out infinite;
 `;
+
 const fadeInUp = keyframes`
-  from { 
-    opacity: 0; 
-    transform: translateY(30px) scale(0.95); 
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
   }
-  to { 
-    opacity: 1; 
-    transform: translateY(0) scale(1); 
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 `;
 
@@ -81,11 +81,11 @@ const shimmer = keyframes`
    --------------------------- */
 const CosmicPage = styled.main`
   min-height: 100vh;
-  background: linear-gradient(180deg, 
-    #ffffffff 0%, 
-    #f3f3f3ff 28%, 
+  background: linear-gradient(180deg,
+    #ffffffff 0%,
+    #f3f3f3ff 28%,
     #81a5dfff 50%,
-    #f3f3f3ff 88%, 
+    #f3f3f3ff 88%,
     #ffffffff 100%
   );
   color: var(--color-text-primary);
@@ -100,7 +100,7 @@ const CosmicPage = styled.main`
     left: 0;
     right: 0;
     bottom: 0;
-    background: 
+    background:
       radial-gradient(circle at 20% 20%, rgba(59,130,246,0.06) 0%, transparent 40%),
       radial-gradient(circle at 80% 60%, rgba(139,92,246,0.04) 0%, transparent 40%);
     pointer-events: none;
@@ -137,7 +137,6 @@ const SearchSection = styled.div`
   position: relative;
   border-radius: 9999px;
   background: rgba(64, 93, 221, 0.67)
-
 `;
 
 const SearchContainer = styled.div<{ $focused: boolean }>`
@@ -145,11 +144,11 @@ const SearchContainer = styled.div<{ $focused: boolean }>`
   background: rgba(255, 255, 255, 0.67)
   backdrop-filter: blur(10px);
   border: 2px solid ${({ $focused }) =>
-        $focused ? 'rgba(255, 255, 255, 0.67)' : 'rgba(255,255,255,0.08)'};
+    $focused ? 'rgba(255, 255, 255, 0.67)' : 'rgba(255,255,255,0.08)'};
   box-shadow: ${({ $focused }) =>
-        $focused ? '0 0 0 3px rgba(59,130,246,0.1)' : 'none'};
+    $focused ? '0 0 0 3px rgba(59,130,246,0.1)' : 'none'};
   transition: all 200ms ease;
-  
+
   &:hover {
     border-color: rgba(255, 255, 255, 0.2);
   }
@@ -224,9 +223,9 @@ const CosmicTitle = styled.h1`
   font-size: clamp(2rem, 4vw, 3rem);
   font-weight: 800;
   font-family: var(--font-display);
-  background: linear-gradient(135deg, 
-    #60A5FA 0%, 
-    #A78BFA 50%, 
+  background: linear-gradient(135deg,
+    #60A5FA 0%,
+    #A78BFA 50%,
     #F472B6 100%
   );
   background-clip: text;
@@ -263,11 +262,11 @@ const FilterStar = styled.button<{ $active: boolean }>`
   padding: 8px 16px;
   border-radius: 9999px;
   border: 1px solid ${({ $active }) =>
-        $active ? 'transparent' : 'rgba(255,255,255,0.1)'};
+    $active ? 'transparent' : 'rgba(255,255,255,0.1)'};
   background: ${({ $active }) =>
-        $active
-            ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)'
-            : 'rgba(145, 65, 134, 0.58)'};
+    $active
+      ? 'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)'
+      : 'rgba(145, 65, 134, 0.4)'};
   color: ${({ $active }) => $active ? 'white' : 'rgba(255,255,255,0.6)'};
   font-weight: ${({ $active }) => $active ? 600 : 500};
   font-size: 13px;
@@ -290,7 +289,7 @@ const StatsGalaxy = styled.div`
   margin-bottom: 2.5rem;
   font-size: 14px;
   color: rgba(255,255,255,0.4);
-  
+
   strong {
     color: #60A5FA;
     font-weight: 600;
@@ -327,12 +326,12 @@ const FeaturedOrb = styled.div`
   border-radius: 50%;
   position: relative;
   overflow: visible;
-  background: linear-gradient(145deg, 
-    rgba(59,130,246,0.08) 0%, 
+  background: linear-gradient(145deg,
+    rgba(59,130,246,0.08) 0%,
     rgba(139,92,246,0.04) 100%
   );
   border: 2px solid rgba(255,255,255,0.08);
-  box-shadow: 
+  box-shadow:
     0 20px 60px rgba(59,130,246,0.15),
     inset 0 0 60px rgba(139,92,246,0.05);
   ${css`animation: ${floatGentle} 8s ease-in-out infinite;`}
@@ -345,10 +344,10 @@ const FeaturedOrb = styled.div`
     right: -2px;
     bottom: -2px;
     background: conic-gradient(
-      from 0deg, 
+      from 0deg,
       transparent,
-      rgba(59,130,246,0.3), 
-      rgba(139,92,246,0.2), 
+      rgba(59,130,246,0.3),
+      rgba(139,92,246,0.2),
       transparent
     );
     border-radius: 50%;
@@ -568,7 +567,7 @@ const UserPlanet = styled.article<{ $size: number; $delay: number; $tier: number
   position: relative;
   cursor: pointer;
   ${({ $delay, $tier }) => css`
-    animation: 
+    animation:
       ${fadeInUp} 600ms ease both,
       ${floatGentle} ${8 + $tier * 2}s ease-in-out infinite;
     animation-delay: ${$delay * 100}ms, ${$delay * 200}ms;
@@ -581,12 +580,12 @@ const UserPlanet = styled.article<{ $size: number; $delay: number; $tier: number
     inset: -3px;
     border-radius: 50%;
     background: ${({ $tier }) =>
-        $tier === 1
-            ? 'linear-gradient(135deg, rgba(96,165,250,0.3), rgba(167,139,250,0.2))'
-            : $tier === 2
-                ? 'linear-gradient(135deg, rgba(167,139,250,0.25), rgba(244,114,182,0.2))'
-                : 'linear-gradient(135deg, rgba(244,114,182,0.2), rgba(96,165,250,0.15))'
-    };
+    $tier === 1
+      ? 'linear-gradient(135deg, rgba(96,165,250,0.3), rgba(167,139,250,0.2))'
+      : $tier === 2
+        ? 'linear-gradient(135deg, rgba(167,139,250,0.25), rgba(244,114,182,0.2))'
+        : 'linear-gradient(135deg, rgba(244,114,182,0.2), rgba(96,165,250,0.15))'
+  };
     opacity: 0;
     transition: opacity 300ms ease;
     z-index: -1;
@@ -621,6 +620,9 @@ const UserPlanet = styled.article<{ $size: number; $delay: number; $tier: number
   }
 `;
 
+/* ---------------------------
+   CHANGED PlanetSurface: layered cover + replacement
+   --------------------------- */
 const PlanetSurface = styled.div<{ $hasImage: boolean; $tier: number }>`
   position: relative;
   width: 100%;
@@ -628,21 +630,82 @@ const PlanetSurface = styled.div<{ $hasImage: boolean; $tier: number }>`
   border-radius: 50%;
   overflow: hidden;
   background: ${({ $hasImage, $tier }) =>
-        $hasImage
-            ? 'transparent'
-            : $tier === 1
-                ? 'linear-gradient(145deg, rgba(96,165,250,0.08), rgba(167,139,250,0.04))'
-                : $tier === 2
-                    ? 'linear-gradient(145deg, rgba(167,139,250,0.08), rgba(244,114,182,0.04))'
-                    : 'linear-gradient(145deg, rgba(244,114,182,0.08), rgba(96,165,250,0.04))'
-    };
+    $hasImage
+      ? 'transparent'
+      : $tier === 1
+        ? 'linear-gradient(145deg, rgba(96,165,250,0.08), rgba(167,139,250,0.04))'
+        : $tier === 2
+          ? 'linear-gradient(145deg, rgba(167,139,250,0.08), rgba(244,114,182,0.04))'
+          : 'linear-gradient(145deg, rgba(244,114,182,0.08), rgba(96,165,250,0.04))'
+  };
   border: 2px solid rgba(255,255,255,0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 
+  box-shadow:
     0 10px 30px rgba(0,0,0,0.2),
     inset 0 0 30px rgba(255,255,255,0.03);
+
+  /* layering to support hover-replace */
+  .cover,
+  .replacement {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 260ms cubic-bezier(0.4,0,0.2,1), transform 260ms cubic-bezier(0.4,0,0.2,1);
+    will-change: opacity, transform;
+    backface-visibility: hidden;
+  }
+
+  /* .cover contains the Image (Next/Image with fill will work) or initials */
+  .cover {
+    z-index: 1;
+    opacity: 1;
+    transform: scale(1);
+    background: transparent;
+  }
+
+  /* .replacement is the card that replaces the cover on hover */
+  .replacement {
+    z-index: 3;
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+    pointer-events: none;
+    padding: 8px;
+    text-align: center;
+    color: rgba(255,255,255,0.95);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  /* show replacement when parent is hovered */
+  ${UserPlanet}:hover &,
+  &:hover {
+    .cover {
+      opacity: 0;
+      transform: scale(1.05);
+      pointer-events: none;
+    }
+    .replacement {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cover, .replacement { transition: none; }
+    ${UserPlanet}:hover &,
+    &:hover {
+      .cover { opacity: 0; }
+      .replacement { opacity: 1; }
+    }
+  }
 `;
 
 const PlanetTag = styled.div`
@@ -689,14 +752,14 @@ const MiniAvatar = styled.div`
 
 const TagInfo = styled.div`
   padding-right: 4px;
-  
+
   .name {
     font-size: 12px;
     font-weight: 600;
     color: rgba(255,255,255,0.9);
     line-height: 1.1;
   }
-  
+
   .role {
     font-size: 10px;
     color: rgba(255,255,255,0.4);
@@ -708,7 +771,7 @@ const TagInfo = styled.div`
     .name {
       font-size: 11px;
     }
-    
+
     .role {
       font-size: 9px;
     }
@@ -719,7 +782,7 @@ const EmptyVoid = styled.div`
   grid-column: 1 / -1;
   text-align: center;
   padding: 4rem 2rem;
-  
+
   h3 {
     font-size: 1.75rem;
     background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%);
@@ -729,7 +792,7 @@ const EmptyVoid = styled.div`
     margin: 0 0 1rem 0;
     font-weight: 600;
   }
-  
+
   p {
     color: rgba(255,255,255,0.4);
     font-size: 1rem;
@@ -743,473 +806,524 @@ const EmptyVoid = styled.div`
    Helper functions
    --------------------------- */
 function useDebounce<T>(value: T, delay: number): T {
-    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
-    useEffect(() => {
-        const handler = setTimeout(() => {
-            setDebouncedValue(value);
-        }, delay);
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
 
-        return () => {
-            clearTimeout(handler);
-        };
-    }, [value, delay]);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
 
-    return debouncedValue;
+  return debouncedValue;
 }
 
 const getInitials = (name?: string) => {
-    if (!name) return "U";
-    return name.trim().split(/\s+/).map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+  if (!name) return "U";
+  return name.trim().split(/\s+/).map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 };
 
-// Larger circles with better variation
 const getPlanetSizeAndTier = (index: number): { size: number; tier: number } => {
-    const pattern = index % 9;
-    if (pattern < 3) return { size: sizes.orbit1, tier: 1 }; // Large (200px)
-    if (pattern < 6) return { size: sizes.orbit2, tier: 2 }; // Medium (160px)
-    return { size: sizes.orbit3, tier: 3 }; // Small (120px)
+  const pattern = index % 9;
+  if (pattern < 3) return { size: sizes.orbit1, tier: 1 };
+  if (pattern < 6) return { size: sizes.orbit2, tier: 2 };
+  return { size: sizes.orbit3, tier: 3 };
 };
 
 const getItemKey = (p: Partial<Portfolio> & { id?: string; username?: string; name?: string }, i: number) => {
-    if (p.username) return p.username;
-    if ((p as any).id) return String((p as any).id);
-    const slug = (p.name || 'user').toString().trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
-    return `${slug}-${i}`;
+  if (p.username) return p.username;
+  if ((p as any).id) return String((p as any).id);
+  const slug = (p.name || 'user').toString().trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+  return `${slug}-${i}`;
 };
 
 const getProfileHref = (p: Partial<Portfolio> & { id?: string; username?: string; name?: string }) => {
-    const handle = p.username ?? (p.id ? String(p.id) : (p.name || 'user').toString().trim().toLowerCase().replace(/\s+/g, '-'));
-    return `/portfolio/${encodeURIComponent(handle)}`;
+  const handle = p.username ?? (p.id ? String(p.id) : (p.name || 'user').toString().trim().toLowerCase().replace(/\s+/g, '-'));
+  return `/portfolio/${encodeURIComponent(handle)}`;
 };
 
 /* ---------------------------
    Components
    --------------------------- */
 function EnhancedSearch({ query, setQuery, isSearching }: {
-    query: string;
-    setQuery: (s: string) => void;
-    isSearching: boolean;
+  query: string;
+  setQuery: (s: string) => void;
+  isSearching: boolean;
 }) {
-    const [focused, setFocused] = useState(false);
-    const inputRef = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-    const handleClear = useCallback((e: React.MouseEvent) => {
-        e.stopPropagation();
-        setQuery("");
-        inputRef.current?.focus();
-    }, [setQuery]);
+  const handleClear = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setQuery("");
+    inputRef.current?.focus();
+  }, [setQuery]);
 
-    return (
-        <SearchSection>
-            <SearchContainer $focused={focused}>
-                <SearchInputWrapper>
-                    <SearchInput
-                        ref={inputRef}
-                        placeholder="Search creators..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        onFocus={() => setFocused(true)}
-                        onBlur={() => setFocused(false)}
-                        aria-label="Search portfolios"
-                    />
+  return (
+    <SearchSection>
+      <SearchContainer $focused={focused}>
+        <SearchInputWrapper>
+          <SearchInput
+            ref={inputRef}
+            placeholder="Search creators..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            aria-label="Search portfolios"
+          />
 
-                    <ClearButton
-                        $visible={!!query}
-                        onClick={handleClear}
-                        aria-label="Clear search"
-                        type="button"
-                    >
-                        ✕
-                    </ClearButton>
-                </SearchInputWrapper>
+          <ClearButton
+            $visible={!!query}
+            onClick={handleClear}
+            aria-label="Clear search"
+            type="button"
+          >
+            ✕
+          </ClearButton>
+        </SearchInputWrapper>
 
-                {isSearching && (
-                    <div style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: '2px',
-                        background: 'linear-gradient(90deg, #3B82F6, #8B5CF6)',
-                        borderRadius: '0 0 999px 999px',
-                        overflow: 'hidden'
-                    }}>
-                        <div style={{
-                            width: '50%',
-                            height: '100%',
-                            background: 'rgba(255,255,255,0.5)',
-                            animation: `${shimmer} 1s infinite`
-                        }} />
-                    </div>
-                )}
-            </SearchContainer>
-        </SearchSection>
-    );
+        {isSearching && (
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: 'linear-gradient(90deg, #3B82F6, #8B5CF6)',
+            borderRadius: '0 0 999px 999px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: '50%',
+              height: '100%',
+              background: 'rgba(255,255,255,0.5)',
+              animation: `${shimmer} 1s infinite`
+            }} />
+          </div>
+        )}
+      </SearchContainer>
+    </SearchSection>
+  );
 }
 
 function FeaturedPlanet({ profiles }: { profiles: Portfolio[] }) {
-    const [currentIndex, setCurrentIndex] = useState(0);
-    const [isPlaying, setIsPlaying] = useState(true);
-    const [showConnectFeedback, setShowConnectFeedback] = useState(false);
-    const intervalRef = useRef<number | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [showConnectFeedback, setShowConnectFeedback] = useState(false);
+  const intervalRef = useRef<number | null>(null);
 
-    const nextSlide = useCallback(() => {
-        setCurrentIndex(i => profiles.length ? (i + 1) % profiles.length : 0);
-    }, [profiles.length]);
+  const nextSlide = useCallback(() => {
+    setCurrentIndex(i => profiles.length ? (i + 1) % profiles.length : 0);
+  }, [profiles.length]);
 
-    const prevSlide = useCallback(() => {
-        setCurrentIndex(i => profiles.length ? (i - 1 + profiles.length) % profiles.length : 0);
-    }, [profiles.length]);
+  const prevSlide = useCallback(() => {
+    setCurrentIndex(i => profiles.length ? (i - 1 + profiles.length) % profiles.length : 0);
+  }, [profiles.length]);
 
-    const handleConnect = useCallback(() => {
-        setShowConnectFeedback(true);
-        setTimeout(() => setShowConnectFeedback(false), 2000);
-    }, []);
+  const handleConnect = useCallback(() => {
+    setShowConnectFeedback(true);
+    setTimeout(() => setShowConnectFeedback(false), 2000);
+  }, []);
 
-    useEffect(() => {
-        if (!isPlaying || profiles.length <= 1) return;
+  useEffect(() => {
+    if (!isPlaying || profiles.length <= 1) return;
 
-        intervalRef.current = window.setInterval(nextSlide, 5000);
-        return () => {
-            if (intervalRef.current) {
-                window.clearInterval(intervalRef.current);
-            }
-        };
-    }, [isPlaying, profiles.length, nextSlide]);
+    intervalRef.current = window.setInterval(nextSlide, 5000);
+    return () => {
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+      }
+    };
+  }, [isPlaying, profiles.length, nextSlide]);
 
-    if (!profiles.length) {
-        return (
-            <CentralPlanetWrapper>
-                <FeaturedOrb>
-                    <div style={{
-                        display: 'grid',
-                        placeItems: 'center',
-                        height: '100%',
-                        color: 'rgba(255,255,255,0.3)',
-                        fontSize: '16px'
-                    }}>
-                        Discovering creators...
-                    </div>
-                </FeaturedOrb>
-            </CentralPlanetWrapper>
-        );
-    }
-
-    const current = profiles[currentIndex];
-
+  if (!profiles.length) {
     return (
-        <CentralPlanetWrapper>
-            <FeaturedOrb role="region" aria-label="Featured profiles">
-                <PlanetNavigation>
-                    <NavButton onClick={prevSlide} aria-label="Previous profile" type="button">
-                        ‹
-                    </NavButton>
-                    <NavButton onClick={nextSlide} aria-label="Next profile" type="button">
-                        ›
-                    </NavButton>
-                </PlanetNavigation>
-
-                <PlayButton
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    aria-label={isPlaying ? 'Pause' : 'Play'}
-                    type="button"
-                >
-                    {isPlaying ? '❚❚' : '▶'}
-                </PlayButton>
-
-                {profiles.map((profile, idx) => {
-                    const isActive = idx === currentIndex;
-                    const imageSrc = profile.profileImage || profile.coverImage;
-
-                    return (
-                        <PlanetSlide
-                            key={getItemKey(profile, idx)}
-                            $active={isActive}
-                            aria-hidden={!isActive}
-                        >
-                            {imageSrc ? (
-                                <Image
-                                    src={imageSrc}
-                                    alt={`${profile.name || profile.username} profile`}
-                                    fill
-                                    style={{ objectFit: 'cover' }}
-                                    priority={idx === 0}
-                                    sizes="(max-width: 640px) 280px, (max-width: 768px) 340px, (max-width: 1024px) 400px, 480px"
-                                />
-                            ) : (
-                                <div style={{
-                                    fontSize: '72px',
-                                    fontWeight: 800,
-                                    background: 'linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)',
-                                    backgroundClip: 'text',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent'
-                                }}>
-                                    {getInitials(profile.name || profile.username)}
-                                </div>
-                            )}
-                        </PlanetSlide>
-                    );
-                })}
-
-                <PlanetInfo>
-                    <h3>{current?.name || `@${current?.username}`}</h3>
-                    <p>{current?.title || current?.tagline || current?.kind}</p>
-                    <PlanetActions>
-                        <Link href={getProfileHref(current)} style={{ textDecoration: 'none' }}>
-                            <ActionButton type="button">Explore</ActionButton>
-                        </Link>
-                        <ActionButton
-                            className="secondary"
-                            type="button"
-                            onClick={handleConnect}
-                        >
-                            {showConnectFeedback ? '✓ Sent' : 'Connect'}
-                        </ActionButton>
-                    </PlanetActions>
-                </PlanetInfo>
-            </FeaturedOrb>
-        </CentralPlanetWrapper>
+      <CentralPlanetWrapper>
+        <FeaturedOrb>
+          <div style={{
+            display: 'grid',
+            placeItems: 'center',
+            height: '100%',
+            color: 'rgba(255,255,255,0.3)',
+            fontSize: '16px'
+          }}>
+            Discovering creators...
+          </div>
+        </FeaturedOrb>
+      </CentralPlanetWrapper>
     );
+  }
+
+  const current = profiles[currentIndex];
+
+  return (
+    <CentralPlanetWrapper>
+      <FeaturedOrb role="region" aria-label="Featured profiles">
+        <PlanetNavigation>
+          <NavButton onClick={prevSlide} aria-label="Previous profile" type="button">
+            ‹
+          </NavButton>
+          <NavButton onClick={nextSlide} aria-label="Next profile" type="button">
+            ›
+          </NavButton>
+        </PlanetNavigation>
+
+        <PlayButton
+          onClick={() => setIsPlaying(!isPlaying)}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+          type="button"
+        >
+          {isPlaying ? '❚❚' : '▶'}
+        </PlayButton>
+
+        {profiles.map((profile, idx) => {
+          const isActive = idx === currentIndex;
+          const imageSrc = profile.profileImage || profile.coverImage;
+
+          return (
+            <PlanetSlide
+              key={getItemKey(profile, idx)}
+              $active={isActive}
+              aria-hidden={!isActive}
+            >
+              {imageSrc ? (
+                <Image
+                  src={imageSrc}
+                  alt={`${profile.name || profile.username} profile`}
+                  fill
+                  style={{ objectFit: 'cover' }}
+                  priority={idx === 0}
+                  sizes="(max-width: 640px) 280px, (max-width: 768px) 340px, (max-width: 1024px) 400px, 480px"
+                />
+              ) : (
+                <div style={{
+                  fontSize: '72px',
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
+                }}>
+                  {getInitials(profile.name || profile.username)}
+                </div>
+              )}
+            </PlanetSlide>
+          );
+        })}
+
+        <PlanetInfo>
+          <h3>{current?.name || `@${current?.username}`}</h3>
+          <p>{current?.title || current?.tagline || current?.kind}</p>
+          <PlanetActions>
+            <Link href={getProfileHref(current)} style={{ textDecoration: 'none' }}>
+              <ActionButton type="button">Explore</ActionButton>
+            </Link>
+            <ActionButton
+              className="secondary"
+              type="button"
+              onClick={handleConnect}
+            >
+              {showConnectFeedback ? '✓ Sent' : 'Connect'}
+            </ActionButton>
+          </PlanetActions>
+        </PlanetInfo>
+      </FeaturedOrb>
+    </CentralPlanetWrapper>
+  );
 }
 
 const OrbitingUser = React.memo(function _OrbitingUser({
-    profile,
-    index
+  profile,
+  index
 }: {
-    profile: Portfolio;
-    index: number;
+  profile: Portfolio;
+  index: number;
 }) {
-    const { size, tier } = getPlanetSizeAndTier(index);
-    const delay = (index % 8) * 0.15;
-    const initials = getInitials(profile.name || profile.username);
+  const { size, tier } = getPlanetSizeAndTier(index);
+  const delay = (index % 8) * 0.15;
+  const initials = getInitials(profile.name || profile.username);
 
-    return (
-        <Link
-            href={getProfileHref(profile)}
-            style={{ textDecoration: 'none' }}
-            aria-label={`Visit ${profile.name || profile.username}'s profile`}
-        >
-            <UserPlanet $size={size} $delay={delay} $tier={tier}>
-                <PlanetSurface $hasImage={!!profile.coverImage} $tier={tier}>
-                    {profile.coverImage ? (
-                        <Image
-                            src={profile.coverImage}
-                            alt={`${profile.name || profile.username}'s cover`}
-                            fill
-                            style={{ objectFit: 'cover' }}
-                            loading="lazy"
-                            sizes="(max-width: 640px) 120px, (max-width: 768px) 160px, 200px"
-                        />
-                    ) : (
-                        <div style={{
-                            fontSize: `${Math.round(size / 3.5)}px`,
-                            fontWeight: 700,
-                            background: `linear-gradient(135deg, 
-                ${tier === 1 ? '#60A5FA 0%, #A78BFA' :
-                                    tier === 2 ? '#A78BFA 0%, #F472B6' :
-                                        '#F472B6 0%, #60A5FA'} 100%)`,
-                            backgroundClip: 'text',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent'
-                        }}>
-                            {initials}
-                        </div>
-                    )}
-                </PlanetSurface>
+  return (
+    <Link
+      href={getProfileHref(profile)}
+      style={{ textDecoration: 'none' }}
+      aria-label={`Visit ${profile.name || profile.username}'s profile`}
+    >
+      <UserPlanet $size={size} $delay={delay} $tier={tier}>
+        <PlanetSurface $hasImage={!!profile.coverImage} $tier={tier}>
+          {/* COVER LAYER (image or initials) */}
+          <div className="cover" aria-hidden="false">
+            {profile.coverImage ? (
+              <Image
+                src={profile.coverImage}
+                alt={`${profile.name || profile.username}'s cover`}
+                fill
+                style={{ objectFit: 'cover' }}
+                loading="lazy"
+                sizes="(max-width: 640px) 120px, (max-width: 768px) 160px, 200px"
+              />
+            ) : (
+              <div style={{
+                fontSize: `${Math.round(size / 3.5)}px`,
+                fontWeight: 700,
+                background: `linear-gradient(135deg,
+                  ${tier === 1 ? '#60A5FA 0%, #A78BFA' :
+                    tier === 2 ? '#A78BFA 0%, #F472B6' :
+                      '#F472B6 0%, #60A5FA'} 100%)`,
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}>
+                {initials}
+              </div>
+            )}
+          </div>
 
-                <PlanetTag>
-                    <MiniAvatar>
-                        {profile.profileImage ? (
-                            <Image
-                                src={profile.profileImage}
-                                alt={profile.name || profile.username}
-                                fill
-                                style={{ objectFit: 'cover' }}
-                                loading="lazy"
-                                sizes="20px"
-                            />
-                        ) : (
-                            <div style={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'grid',
-                                placeItems: 'center',
-                                fontSize: '10px',
-                                fontWeight: 600,
-                                color: 'rgba(255,255,255,0.7)'
-                            }}>
-                                {initials.charAt(0)}
-                            </div>
-                        )}
-                    </MiniAvatar>
+          {/* REPLACEMENT LAYER (shown on hover; centered card inside planet) */}
+          <div className="replacement" aria-hidden="true">
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                width: Math.min(56, size * 0.4),
+                height: Math.min(56, size * 0.4),
+                borderRadius: '50%',
+                overflow: 'hidden',
+                border: '2px solid rgba(255,255,255,0.12)',
+                boxShadow: '0 6px 18px rgba(0,0,0,0.35)',
+                background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(167,139,250,0.08))',
+                position: 'relative'
+              }}>
+                {profile.profileImage ? (
+                  <Image
+                    src={profile.profileImage}
+                    alt={profile.name || profile.username}
+                    fill
+                    style={{ objectFit: 'cover' }}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontSize: Math.min(20, Math.round(size / 6)),
+                    fontWeight: 700,
+                    color: 'rgba(255,255,255,0.9)'
+                  }}>
+                    {initials.charAt(0)}
+                  </div>
+                )}
+              </div>
 
-                    <TagInfo>
-                        <div className="name">
-                            {profile.name || `@${profile.username}`}
-                        </div>
-                        {profile.title && (
-                            <div className="role">
-                                {profile.title}
-                            </div>
-                        )}
-                    </TagInfo>
-                </PlanetTag>
-            </UserPlanet>
-        </Link>
-    );
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.95)' }}>
+                  {profile.name || `@${profile.username}`}
+                </div>
+                {profile.title && (
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>
+                    {profile.title}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </PlanetSurface>
+
+        <PlanetTag>
+          <MiniAvatar>
+            {profile.profileImage ? (
+              <Image
+                src={profile.profileImage}
+                alt={profile.name || profile.username}
+                fill
+                style={{ objectFit: 'cover' }}
+                loading="lazy"
+                sizes="20px"
+              />
+            ) : (
+              <div style={{
+                width: '100%',
+                height: '100%',
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: '10px',
+                fontWeight: 600,
+                color: 'rgba(255,255,255,0.7)'
+              }}>
+                {initials.charAt(0)}
+              </div>
+            )}
+          </MiniAvatar>
+
+          <TagInfo>
+            <div className="name">
+              {profile.name || `@${profile.username}`}
+            </div>
+            {profile.title && (
+              <div className="role">
+                {profile.title}
+              </div>
+            )}
+          </TagInfo>
+        </PlanetTag>
+      </UserPlanet>
+    </Link>
+  );
 });
 
 /* ---------------------------
    Main component
    --------------------------- */
 export default function CosmicExplorePage() {
-    const [portfolios, setPortfolios] = useState<Portfolio[] | null>(null);
-    const [query, setQuery] = useState("");
-    const [kindFilter, setKindFilter] = useState<string>("all");
-    const [isLoading, setIsLoading] = useState(true);
+  const [portfolios, setPortfolios] = useState<Portfolio[] | null>(null);
+  const [query, setQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<string>("all");
+  const [isLoading, setIsLoading] = useState(true);
 
-    const debouncedQuery = useDebounce(query, 350);
-    const isSearching = query !== debouncedQuery;
+  const debouncedQuery = useDebounce(query, 350);
+  const isSearching = query !== debouncedQuery;
 
-    // Load data
-    useEffect(() => {
-        const loadData = async () => {
-            setIsLoading(true);
-            await new Promise(resolve => setTimeout(resolve, 1200));
-            setPortfolios(Object.values(MOCK_PORTFOLIOS));
-            setIsLoading(false);
-        };
+  // Load data
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      setPortfolios(Object.values(MOCK_PORTFOLIOS));
+      setIsLoading(false);
+    };
 
-        loadData();
-    }, []);
+    loadData();
+  }, []);
 
-    const allPortfolios = useMemo(() => portfolios ?? [], [portfolios]);
+  const allPortfolios = useMemo(() => portfolios ?? [], [portfolios]);
 
-    const kinds = useMemo(() => {
-        const kindSet = new Set<string>();
-        allPortfolios.forEach(p => {
-            if (p.kind) kindSet.add(p.kind);
-        });
-        return ["all", ...Array.from(kindSet)];
-    }, [allPortfolios]);
+  const kinds = useMemo(() => {
+    const kindSet = new Set<string>();
+    allPortfolios.forEach(p => {
+      if (p.kind) kindSet.add(p.kind);
+    });
+    return ["all", ...Array.from(kindSet)];
+  }, [allPortfolios]);
 
-    const featuredProfiles = useMemo(() => {
-        const withImages = allPortfolios.filter(p => p.profileImage || p.coverImage);
-        if (withImages.length >= 4) {
-            return withImages
-                .sort((a, b) => (b.stats?.averageRating ?? 0) - (a.stats?.averageRating ?? 0))
-                .slice(0, 8);
-        }
-        return allPortfolios.slice(0, Math.min(8, allPortfolios.length));
-    }, [allPortfolios]);
-
-    const filteredProfiles = useMemo(() => {
-        const searchTerm = debouncedQuery.trim().toLowerCase();
-
-        return allPortfolios.filter(profile => {
-            if (kindFilter !== "all" && profile.kind !== kindFilter) {
-                return false;
-            }
-
-            if (!searchTerm) return true;
-
-            const searchableText = [
-                profile.username || "",
-                profile.name || "",
-                profile.title || "",
-                profile.tagline || "",
-                ...(profile.tags || []),
-                ...(profile.specializations || [])
-            ].join(" ").toLowerCase();
-
-            return searchableText.includes(searchTerm);
-        });
-    }, [allPortfolios, kindFilter, debouncedQuery]);
-
-    if (isLoading) {
-        return (
-            <CosmicPage>
-                <CosmicContainer>
-                    <CosmicHeader>
-                        <CosmicTitle>Cosmic Creators</CosmicTitle>
-                        <CosmicSubtitle>
-                            Loading universe...
-                        </CosmicSubtitle>
-                    </CosmicHeader>
-
-                    <CentralPlanetWrapper>
-                        <FeaturedOrb>
-                            <div style={{
-                                display: 'grid',
-                                placeItems: 'center',
-                                height: '100%',
-                                color: 'rgba(255,255,255,0.3)'
-                            }}>
-                               
-                            <LoadingDiv>Loading...</LoadingDiv>
-                            </div>
-                        </FeaturedOrb>
-                    </CentralPlanetWrapper>
-                </CosmicContainer>
-            </CosmicPage>
-        );
+  const featuredProfiles = useMemo(() => {
+    const withImages = allPortfolios.filter(p => p.profileImage || p.coverImage);
+    if (withImages.length >= 4) {
+      return withImages
+        .sort((a, b) => (b.stats?.averageRating ?? 0) - (a.stats?.averageRating ?? 0))
+        .slice(0, 8);
     }
+    return allPortfolios.slice(0, Math.min(8, allPortfolios.length));
+  }, [allPortfolios]);
 
+  const filteredProfiles = useMemo(() => {
+    const searchTerm = debouncedQuery.trim().toLowerCase();
+
+    return allPortfolios.filter(profile => {
+      if (kindFilter !== "all" && profile.kind !== kindFilter) {
+        return false;
+      }
+
+      if (!searchTerm) return true;
+
+      const searchableText = [
+        profile.username || "",
+        profile.name || "",
+        profile.title || "",
+        profile.tagline || "",
+        ...(profile.tags || []),
+        ...(profile.specializations || [])
+      ].join(" ").toLowerCase();
+
+      return searchableText.includes(searchTerm);
+    });
+  }, [allPortfolios, kindFilter, debouncedQuery]);
+
+  if (isLoading) {
     return (
-        <CosmicPage>
-            <CosmicContainer>
-                <CosmicHeader>
-                    <CosmicTitle>Cosmic Creators</CosmicTitle>
-                    <CosmicSubtitle>
-                        Explore the creative universe
-                    </CosmicSubtitle>
-                </CosmicHeader>
+      <CosmicPage>
+        <CosmicContainer>
+          <CosmicHeader>
+            <CosmicTitle>Cosmic Creators</CosmicTitle>
+            <CosmicSubtitle>
+              Loading universe...
+            </CosmicSubtitle>
+          </CosmicHeader>
 
-                <EnhancedSearch
-                    query={query}
-                    setQuery={setQuery}
-                    isSearching={isSearching}
-                />
+          <CentralPlanetWrapper>
+            <FeaturedOrb>
+              <div style={{
+                display: 'grid',
+                placeItems: 'center',
+                height: '100%',
+                color: 'rgba(255,255,255,0.3)'
+              }}>
 
-                <FilterConstellation role="group" aria-label="Filter by kind">
-                    {kinds.slice(0, 8).map(kind => (
-                        <FilterStar
-                            key={kind}
-                            $active={kindFilter === kind}
-                            onClick={() => setKindFilter(kind)}
-                            type="button"
-                            aria-pressed={kindFilter === kind}
-                        >
-                            {kind}
-                        </FilterStar>
-                    ))}
-                </FilterConstellation>
-
-                <StatsGalaxy>
-                    <strong>{filteredProfiles.length}</strong> creators found
-                </StatsGalaxy>
-
-                <FeaturedPlanet profiles={featuredProfiles} />
-
-                <OrbitSystem role="region" aria-label="Portfolio grid">
-                    {filteredProfiles.length === 0 ? (
-                        <EmptyVoid>
-                            <h3>Empty Space</h3>
-                            <p>No creators found. Try adjusting your search.</p>
-                        </EmptyVoid>
-                    ) : (
-                        filteredProfiles.map((profile, index) => (
-                            <OrbitingUser
-                                key={getItemKey(profile, index)}
-                                profile={profile}
-                                index={index}
-                            />
-                        ))
-                    )}
-                </OrbitSystem>
-            </CosmicContainer>
-        </CosmicPage>
+                <LoadingDiv>Loading...</LoadingDiv>
+              </div>
+            </FeaturedOrb>
+          </CentralPlanetWrapper>
+        </CosmicContainer>
+      </CosmicPage>
     );
+  }
+
+  return (
+    <CosmicPage>
+      <CosmicContainer>
+        <CosmicHeader>
+          <CosmicTitle>Cosmic Creators</CosmicTitle>
+          <CosmicSubtitle>
+            Explore the creative universe
+          </CosmicSubtitle>
+        </CosmicHeader>
+
+        <EnhancedSearch
+          query={query}
+          setQuery={setQuery}
+          isSearching={isSearching}
+        />
+
+        <FilterConstellation role="group" aria-label="Filter by kind">
+          {kinds.slice(0, 8).map(kind => (
+            <FilterStar
+              key={kind}
+              $active={kindFilter === kind}
+              onClick={() => setKindFilter(kind)}
+              type="button"
+              aria-pressed={kindFilter === kind}
+            >
+              {kind}
+            </FilterStar>
+          ))}
+        </FilterConstellation>
+
+        <StatsGalaxy>
+          <strong>{filteredProfiles.length}</strong> creators found
+        </StatsGalaxy>
+
+        <FeaturedPlanet profiles={featuredProfiles} />
+
+        <OrbitSystem role="region" aria-label="Portfolio grid">
+          {filteredProfiles.length === 0 ? (
+            <EmptyVoid>
+              <h3>Empty Space</h3>
+              <p>No creators found. Try adjusting your search.</p>
+            </EmptyVoid>
+          ) : (
+            filteredProfiles.map((profile, index) => (
+              <OrbitingUser
+                key={getItemKey(profile, index)}
+                profile={profile}
+                index={index}
+              />
+            ))
+          )}
+        </OrbitSystem>
+      </CosmicContainer>
+    </CosmicPage>
+  );
 }

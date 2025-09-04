@@ -66,47 +66,52 @@ export interface PlatformStats {
 
 export type ViewMode = 'assessments' | 'rankings' | 'analytics' | 'employer-tools';
 export type AssessmentCategory = 'professional' | 'psychological' | 'creativity';
-export type PsychCategory = 'personality' | 'clinical' | 'wellbeing';
 
 // ==============================================
 // DATA TRANSFORMATION FUNCTIONS
 // ==============================================
 
 // Transform professional assessments to add missing fields for dashboard
+export type PsychCategory = 'personality' | 'clinical' | 'wellbeing';
+
+const transformPsychologicalAssessments = (): Record<PsychCategory, Assessment[]> => {
+  return {
+    personality: PSYCHOLOGICAL_ASSESSMENTS.filter(a => a.category === 'Personality').map(a => ({
+      ...a,
+      icon: Brain,
+      color: '#8b5cf6',
+      duration: a.duration || '10-15 min',
+      route: `/dashboard/thrive/assessments/${a.id}`
+    })),
+    clinical: PSYCHOLOGICAL_ASSESSMENTS.filter(a => a.category === 'Clinical').map(a => ({
+      ...a,
+      icon: Brain,
+      color: '#8b5cf6',
+      duration: a.duration || '10-15 min',
+      route: `/dashboard/thrive/assessments/${a.id}`
+    })),
+    wellbeing: PSYCHOLOGICAL_ASSESSMENTS.filter(a => a.category === 'Wellbeing').map(a => ({
+      ...a,
+      icon: Brain,
+      color: '#8b5cf6',
+      duration: a.duration || '10-15 min',
+      route: `/dashboard/thrive/assessments/${a.id}`
+    }))
+  };
+};
+
 const transformProfessionalAssessments = (): Assessment[] => {
   return PROFESSIONAL_ASSESSMENTS.map((assessment, index) => ({
     ...assessment,
-    duration: 45 + (index * 5), // Mock duration
-    participants: 5000 + (index * 2000), // Mock participants
-    averageScore: 70 + (index * 3), // Mock average score
+    duration: 45 + index * 5,
+    participants: 5000 + index * 2000,
+    averageScore: 70 + index * 3,
     difficulty: ['intermediate', 'expert', 'intermediate', 'expert', 'beginner', 'expert'][index] as any,
     skillType: ['code', 'analytics', 'management', 'design', 'marketing', 'cloud'][index],
     route: `/dashboard/thrive/assessments/${assessment.id}`
   }));
 };
 
-// Transform psychological assessments for consistent interface
-const transformPsychologicalAssessments = () => {
-  const transformed: Record<PsychCategory, Assessment[]> = {
-    personality: [],
-    clinical: [],
-    wellbeing: []
-  };
-
-  Object.entries(PSYCHOLOGICAL_ASSESSMENTS).forEach(([category, assessments]) => {
-    if (category in transformed) {
-      transformed[category as PsychCategory] = assessments.map(assessment => ({
-        ...assessment,
-        icon: Brain,
-        color: '#8b5cf6',
-        duration: assessment.duration || '10-15 min',
-        route: `/dashboard/thrive/assessments/${assessment.id}`
-      }));
-    }
-  });
-
-  return transformed;
-};
 
 // Transform creativity assessments
 const transformCreativityAssessments = (): Assessment[] => {

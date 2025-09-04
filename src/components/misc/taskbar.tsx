@@ -47,6 +47,7 @@ const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
     { href: '/', label: 'Home' },
     { href: '/thrive', label: 'Thrive' },
     { href: '/simulations', label: 'The Matrix' },
+    { href: '/explore', label: "Explore"},
   ];
 
   if (isAuthenticated) links.push({ href: '/dashboard', label: 'Dashboard', requiresAuth: true });

@@ -291,7 +291,7 @@ const BrowseAllAssessments = ({ onViewAll }: { onViewAll: () => void }) => {
     },
     {
       name: 'Personality & Psychology',
-      count: PSYCHOLOGICAL_ASSESSMENTS.personality?.length || 0,
+      count: PSYCHOLOGICAL_ASSESSMENTS.length || 0,
       color: '#8b5cf6',
       icon: Brain,
       description: 'Personality traits, thinking styles, wellbeing'

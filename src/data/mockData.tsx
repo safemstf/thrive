@@ -1367,7 +1367,7 @@ export const MOCK_PORTFOLIOS: Record<string, Portfolio> = {
     id: '7',
     userId: '7',
     username: 'sandy_sings',
-    name: 'Sandra “Sandy” Lopez',
+    name: 'Sandra Lopez',
     title: 'Vocalist & Music Educator',
     tagline: 'Finding harmony in every note',
     bio: 'Professional vocalist with over a decade of performance experience across jazz, soul, and contemporary music. Passionate about teaching others to unlock their unique voice. Performed in international tours and currently leading vocal workshops that blend technique with self-expression.',
