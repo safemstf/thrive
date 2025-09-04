@@ -2,34 +2,21 @@
 // src/components/cs/simulationHub.styles.tsx
 import styled, { keyframes, css } from "styled-components";
 
-// Define animations locally to avoid import issues
+/* -------------------------
+   Animations
+   ------------------------- */
 const fadeInUp = keyframes`
-  0% {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
 `;
 
 const pulse = keyframes`
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+  0%,100% { opacity: 1; } 50% { opacity: 0.7; }
 `;
 
 const glow = keyframes`
-  0%, 100% {
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
-  }
+  0%,100% { box-shadow: 0 0 10px rgba(59,130,246,0.2); }
+  50% { box-shadow: 0 0 20px rgba(59,130,246,0.35); }
 `;
 
 const shimmer = keyframes`
@@ -37,348 +24,298 @@ const shimmer = keyframes`
   100% { background-position: 1000px 0; }
 `;
 
-// Main container - designed to work with Matrix Rain background
+/* -------------------------
+   Layout helpers
+   ------------------------- */
+
+/**
+ * SimulationContainer: root visual wrapper.
+ * - sets a predictable content width via SimulationInner
+ * - uses padding instead of odd width percentages so internal spacing behaves
+ */
 export const SimulationContainer = styled.div<{ $isDark?: boolean }>`
   width: 100%;
   min-height: 100vh;
-  background: ${({ $isDark = true }) => 
-    $isDark 
-      ? 'rgba(5, 10, 20, 0.85)' // Default to dark to match Matrix theme
-      : 'rgba(255, 255, 255, 0.95)'
-  };
-  backdrop-filter: blur(8px);
-  border-radius: 0;
+  background: ${({ $isDark = true }) =>
+    $isDark ? 'rgba(5,10,20,0.90)' : 'rgba(255,255,255,0.95)'};
+  color: ${({ $isDark = true }) => ($isDark ? '#e6eef8' : '#0f172a')};
   position: relative;
   z-index: 1;
-  animation: ${fadeInUp} 0.8s ease-out;
-  
-  /* Subtle border to define against Matrix background */
-  border: 1px solid ${({ $isDark = true }) => 
-    $isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(0, 0, 0, 0.1)'
-  };
+  animation: ${fadeInUp} 0.6s ease-out;
+  box-sizing: border-box;
+  padding: 2rem 1rem;
+  margin-top: 20px;
+
+  & * { box-sizing: border-box; }
 `;
 
-// Video section with enhanced visual depth
-export const VideoSection = styled.div`
-  width: 97%;
-  background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(10, 20, 40, 0.9));
-  position: relative;
-  aspect-ratio: 16 / 9;
-  max-height: 70vh;
+/**
+ * SimulationInner: center content and constrain width so spacing is predictable.
+ * Put most large sections inside this to avoid full-bleed math issues.
+ */
+export const SimulationInner = styled.div`
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1200px; /* main content width — adjust as needed */
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+`;
+
+/* -------------------------
+   Video / Canvas area
+   ------------------------- */
+
+/* VideoSection: full-width but constrained by SimulationInner
+   Uses aspect-ratio and max-height so it scales nicely. */
+export const VideoSection = styled.section`
+  width: 100%;
+  max-width: 100%;
+  background: linear-gradient(135deg, rgba(0,0,0,0.88), rgba(5,10,20,0.9));
+  border-radius: 12px;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  margin: 1rem;
-  overflow: hidden;
-  
-  /* Enhanced border with Matrix blue theme */
-  border: 2px solid rgba(59, 130, 246, 0.3);
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 20px rgba(59, 130, 246, 0.1);
+  border: 2px solid rgba(59,130,246,0.22);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.02);
+  padding: 0; /* keep canvas flush */
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  max-height: 65vh;
+
+  @media (max-width: 900px) {
+    aspect-ratio: 16 / 9;
+    max-height: 50vh;
+  }
+
+  @media (max-width: 480px) {
+    aspect-ratio: 4 / 3;
+    max-height: 40vh;
+  }
 `;
 
 export const CanvasContainer = styled.div`
   width: 100%;
   height: 100%;
   position: relative;
-  border-radius: 8px;
-  overflow: hidden;
 `;
 
 export const SimCanvas = styled.canvas`
   width: 100%;
   height: 100%;
+  display: block; /* avoids inline whitespace issues */
   cursor: crosshair;
-  transition: all 0.2s ease;
-  display: block; /* Prevent hydration issues with canvas */
-  
-  &:active {
-    cursor: grabbing;
-  }
-  
-  &:hover {
-    filter: brightness(1.05);
-  }
+  transition: filter 0.2s ease;
+  border-radius: 0;
 `;
 
-// Enhanced HUD with Matrix integration - removed complex pseudo-elements
+/* -------------------------
+   Heads-up / Controls
+   ------------------------- */
+
+/* HUD: simplified and pinned to top-left of the VideoSection, but responsive */
 export const HUD = styled.div<{ $isDark?: boolean }>`
   position: absolute;
   top: 1rem;
   left: 1rem;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
-  padding: 1.25rem;
-  border-radius: 12px;
-  border: 1px solid rgba(59, 130, 246, 0.4);
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.78);
+  backdrop-filter: blur(8px);
   color: #e2e8f0;
-  font-size: 0.875rem;
-  min-width: 200px;
-  z-index: 15;
-  
-  /* Simplified glow effect */
-  box-shadow: 0 0 10px rgba(59, 130, 246, 0.2);
-  
-  /* Matrix-style text shadow */
-  text-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+  border: 1px solid rgba(59,130,246,0.22);
+  font-size: 0.9rem;
+  z-index: 12;
+  min-width: 180px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.36);
+
+  @media (max-width: 640px) {
+    min-width: 140px;
+    top: 0.75rem;
+    left: 0.75rem;
+    font-size: 0.85rem;
+  }
 `;
 
-// Control selector with enhanced styling
+/* DiseaseSelector: pinned top-right, removed margin-top:100px bug */
 export const DiseaseSelector = styled.div`
   position: absolute;
-  margin-top: 100px;
   top: 1rem;
   right: 1rem;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
-  border-radius: 12px;
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  padding: 0.75rem;
-  z-index: 15;
   min-width: 160px;
-  
-  /* Subtle glow effect */
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+  z-index: 12;
+  padding: 0.5rem;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.78);
+  border: 1px solid rgba(59,130,246,0.22);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.32);
+
+  @media (max-width: 640px) {
+    top: 0.75rem;
+    right: 0.75rem;
+    min-width: 140px;
+  }
 `;
 
-// Enhanced playback controls - simplified for hydration safety
+/* PlaybackControls: centered at bottom, responsive spacing, safe-area aware */
 export const PlaybackControls = styled.div`
   position: absolute;
-  bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
+  bottom: calc(1.25rem + env(safe-area-inset-bottom));
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   align-items: center;
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(16px);
-  padding: 1rem 2rem;
-  border-radius: 50px;
-  border: 1px solid rgba(59, 130, 246, 0.5);
-  z-index: 15;
-  
-  /* Simplified visual effects */
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  
-  /* Hover effect */
-  transition: all 0.3s ease;
-  &:hover {
-    transform: translateX(-50%) translateY(-2px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  background: rgba(0,0,0,0.78);
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(59,130,246,0.26);
+  z-index: 12;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.42);
+  transition: transform 0.28s ease;
+
+  @media (max-width: 480px) {
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
   }
-  
+
   button {
     background: transparent;
     border: none;
-    color: #e2e8f0;
-    padding: 0.5rem;
+    color: #e6eef8;
+    padding: 0.4rem;
     border-radius: 8px;
-    transition: all 0.2s ease;
     cursor: pointer;
-    
-    &:hover {
-      background: rgba(59, 130, 246, 0.2);
-      color: #ffffff;
-      transform: scale(1.1);
-    }
+    transition: transform 0.12s ease, background 0.12s ease;
+
+    &:hover { transform: scale(1.07); background: rgba(59,130,246,0.12); }
+    &:active { transform: scale(0.98); }
   }
-  
+
   input[type="range"] {
     width: 120px;
     height: 4px;
-    background: rgba(59, 130, 246, 0.3);
-    border-radius: 2px;
-    outline: none;
+    background: rgba(59,130,246,0.18);
+    border-radius: 999px;
     -webkit-appearance: none;
-    
-    &::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
-      
-      &:hover {
-        transform: scale(1.3);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
-      }
-    }
   }
 `;
 
+/* Speed indicator pinned bottom-right (keeps spacing consistent) */
 export const SpeedIndicator = styled.div`
   position: absolute;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
-  padding: 0.75rem 1.25rem;
-  border-radius: 25px;
-  border: 1px solid rgba(59, 130, 246, 0.4);
+  right: 1rem;
+  bottom: calc(1.25rem + env(safe-area-inset-bottom));
+  z-index: 12;
+  padding: 0.5rem 0.75rem;
+  background: rgba(0,0,0,0.78);
+  border-radius: 18px;
+  border: 1px solid rgba(59,130,246,0.18);
   color: #3b82f6;
-  font-size: 0.875rem;
-  font-weight: 700;
   font-family: 'Courier New', monospace;
-  z-index: 15;
-  text-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.36);
 `;
 
-// Enhanced controls section with default props
-export const ControlsSection = styled.div<{ $isDark?: boolean }>`
-  padding: 2rem;
-  background: ${({ $isDark = true }) => 
-    $isDark 
-      ? 'rgba(10, 15, 30, 0.95)' 
-      : 'rgba(248, 250, 252, 0.95)'
-  };
-  backdrop-filter: blur(10px);
-  border-top: 1px solid ${({ $isDark = true }) => 
-    $isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(0, 0, 0, 0.1)'
-  };
-  margin: 1rem;
-  border-radius: 0 0 12px 12px;
-  
-  /* Simplified background pattern */
-  background-image: ${({ $isDark = true }) => 
-    $isDark 
-      ? 'radial-gradient(circle at 1px 1px, rgba(59, 130, 246, 0.05) 1px, transparent 0)'
-      : 'none'
-  };
-  background-size: 20px 20px;
+/* -------------------------
+   Controls / Panels
+   ------------------------- */
+
+/* ControlsSection: place below video area in the flow (not absolutely positioned)
+   Constrain to same content width for consistent left/right spacing. */
+export const ControlsSection = styled.section<{ $isDark?: boolean }>`
+  width: 100%;
+  max-width: 100%;
+  padding: 1rem;
+  border-radius: 8px;
+  background: ${({ $isDark = true }) => ($isDark ? 'rgba(8,12,20,0.6)' : 'rgba(255,255,255,0.9)')};
+  border: 1px solid ${({ $isDark = true }) => ($isDark ? 'rgba(59,130,246,0.06)' : 'rgba(0,0,0,0.06)')};
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.28);
+
+  @media (max-width: 700px) {
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
 `;
 
-// Tab components with Matrix theme
+/* Tab strip & content */
 export const TabContainer = styled.div`
   display: flex;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(59, 130, 246, 0.2);
-  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  align-items: center;
 `;
 
 export const Tab = styled.button<{ $active?: boolean }>`
-  padding: 0.875rem 1.75rem;
-  background: ${({ $active = false }) => 
-    $active 
-      ? 'rgba(59, 130, 246, 0.15)' 
-      : 'transparent'
-  };
-  border: 1px solid ${({ $active = false }) => 
-    $active 
-      ? 'rgba(59, 130, 246, 0.5)' 
-      : 'rgba(59, 130, 246, 0.2)'
-  };
+  padding: 0.5rem 1rem;
   border-radius: 8px;
-  color: ${({ $active = false }) => 
-    $active ? '#3b82f6' : '#94a3b8'
-  };
-  font-weight: 600;
+  border: 1px solid ${({ $active = false }) => ($active ? 'rgba(59,130,246,0.36)' : 'rgba(59,130,246,0.12)')};
+  background: ${({ $active = false }) => ($active ? 'rgba(59,130,246,0.08)' : 'transparent')};
+  color: ${({ $active = false }) => ($active ? '#3b82f6' : '#94a3b8')};
+  font-weight: 700;
   cursor: pointer;
-  position: relative;
-  transition: all 0.3s ease;
+  transition: transform 0.12s ease;
   font-family: 'Courier New', monospace;
-  
+
   &:hover {
-    background: rgba(59, 130, 246, 0.1);
+    transform: translateY(-2px);
     color: #3b82f6;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
   }
 `;
 
 export const TabContent = styled.div`
-  animation: ${fadeInUp} 0.4s ease-out;
+  width: 100%;
+  animation: ${fadeInUp} 0.32s ease-out;
 `;
 
-// Enhanced stat cards with default props
+/* -------------------------
+   Stat / Intervention UI
+   ------------------------- */
+
 export const StatCard = styled.div<{ $color?: string; $alert?: boolean }>`
-  --card-color: ${({ $color }) => $color || '#3b82f6'};
-  
-  padding: 1.25rem;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(8px);
-  border-radius: 12px;
-  border: 1px solid rgba(59, 130, 246, 0.4);
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  
+  --card-color: ${({ $color = '#3b82f6' }) => $color};
+  padding: 0.85rem;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.42);
+  border: 1px solid rgba(59,130,246,0.1);
+  color: #e6eef8;
+  min-width: 120px;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+
   ${({ $alert = false }) => $alert && css`animation: ${pulse} 2s infinite;`}
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-    border-color: rgba(59, 130, 246, 0.8);
-  }
-  
-  /* Simplified gradient overlay */
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--card-color);
-  }
-  
-  .label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    color: #94a3b8;
-    margin-bottom: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    font-family: 'Courier New', monospace;
-  }
-  
-  .value {
-    font-size: 2rem;
-    font-weight: 900;
-    font-family: 'Courier New', monospace;
-    color: var(--card-color);
-    text-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
-    line-height: 1;
-  }
-  
-  .change {
-    font-size: 0.8rem;
-    margin-top: 0.5rem;
-    color: #64748b;
-    font-family: 'Courier New', monospace;
-  }
+
+  .label { font-size: 0.72rem; color: #94a3b8; font-weight: 700; }
+  .value { font-size: 1.6rem; color: var(--card-color); font-weight: 800; }
 `;
 
-// Parameter controls with Matrix styling - simplified
+/* ParameterControl: added back (keeps the improved responsive layout) */
 export const ParameterControl = styled.div<{ $isDark?: boolean }>`
-  --accent: #3b82f6; /* blue-500 */
-  --accent-strong: #1d4ed8; /* blue-700 */
-  --track-dark: rgba(59,130,246,0.18);
-  --track-light: rgba(15,23,42,0.06);
-
-  /* adapt to theme */
+  --accent: #3b82f6;
+  --accent-strong: #1d4ed8;
   --bg: ${({ $isDark = true }) => ($isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)')};
-  --label: ${({ $isDark = true }) => ($isDark ? '#e6eef8' : '#0f172a')};       /* higher contrast label */
-  --muted: ${({ $isDark = true }) => ($isDark ? '#94a3b8' : '#475569')};       /* muted text */
-  --thumb-border: ${({ $isDark = true }) => ($isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)')};
+  --label: ${({ $isDark = true }) => ($isDark ? '#e6eef8' : '#0f172a')};
+  --muted: ${({ $isDark = true }) => ($isDark ? '#94a3b8' : '#475569')};
 
   display: block;
-  padding: 0.25rem 0;
-  margin-bottom: 1.5rem;
-  background: var(--bg);
+  padding: 0.5rem;
   border-radius: 8px;
+  background: var(--bg);
+  min-width: 160px;
 
   .header {
-    display: flex;
+    display:flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
   }
 
   .label {
@@ -386,7 +323,6 @@ export const ParameterControl = styled.div<{ $isDark?: boolean }>`
     font-weight: 700;
     color: var(--label);
     font-family: 'Courier New', monospace;
-    letter-spacing: 0.2px;
   }
 
   .value {
@@ -394,194 +330,106 @@ export const ParameterControl = styled.div<{ $isDark?: boolean }>`
     font-family: 'Courier New', monospace;
     font-weight: 800;
     font-size: 0.95rem;
-    text-shadow: 0 0 4px rgba(59, 130, 246, 0.25);
-    margin-left: 0.5rem;
   }
 
-  /* Range slider: larger thumb, accessible focus ring */
   input[type="range"] {
     width: 100%;
     height: 12px;
     -webkit-appearance: none;
-    background: ${({ $isDark = true }) => ($isDark ? 'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.02))' : 'transparent')};
+    background: transparent;
     outline: none;
     border-radius: 999px;
+    margin-top: 0.5rem;
   }
 
-  /* Track for webkit */
   input[type="range"]::-webkit-slider-runnable-track {
     height: 6px;
     border-radius: 999px;
-    background: ${({ $isDark = true }) => ($isDark ? 'var(--track-dark)' : 'var(--track-light)')};
+    background: rgba(59,130,246,0.12);
   }
 
-  /* Thumb for webkit */
   input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 20px;
-    height: 20px;
-    margin-top: -7px; /* centers the thumb on the track */
+    width: 18px;
+    height: 18px;
+    margin-top: -6px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-    border: 2px solid var(--thumb-border);
+    border: 2px solid rgba(255,255,255,0.08);
     box-shadow: 0 4px 14px rgba(13, 42, 148, 0.25);
     cursor: pointer;
     transition: transform 0.12s ease, box-shadow 0.12s ease;
   }
 
-  input[type="range"]::-webkit-slider-thumb:hover {
-    transform: scale(1.06);
-    box-shadow: 0 6px 20px rgba(13, 42, 148, 0.32);
-  }
-
-  /* Focus visible for keyboard users */
-  input[type="range"]:focus::-webkit-slider-thumb {
-    box-shadow: 0 0 0 6px rgba(59,130,246,0.14), 0 6px 20px rgba(13, 42, 148, 0.28);
-    transform: scale(1.06);
-  }
-
-  /* Firefox styles */
   input[type="range"]::-moz-range-track {
     height: 6px;
     border-radius: 999px;
-    background: ${({ $isDark = true }) => ($isDark ? 'var(--track-dark)' : 'var(--track-light)')};
+    background: rgba(59,130,246,0.12);
   }
+
   input[type="range"]::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-    border: 2px solid var(--thumb-border);
-    box-shadow: 0 4px 14px rgba(13, 42, 148, 0.25);
-    cursor: pointer;
-  }
-
-  /* Reduced-motion / prefers-contrast */
-  @media (prefers-reduced-motion: reduce) {
-    input[type="range"]::-webkit-slider-thumb,
-    input[type="range"]::-moz-range-thumb {
-      transition: none;
-    }
-  }
-
-  @media (prefers-contrast: more) {
-    --label: ${({ $isDark = true }) => ($isDark ? '#ffffff' : '#0b1220')};
-    --muted: ${({ $isDark = true }) => ($isDark ? '#cbd5e1' : '#334155')};
-    input[type="range"]::-webkit-slider-track,
-    input[type="range"]::-moz-range-track {
-      background: rgba(59,130,246,0.28);
-    }
-    input[type="range"]::-webkit-slider-thumb,
-    input[type="range"]::-moz-range-thumb {
-      box-shadow: 0 0 0 5px rgba(59,130,246,0.16);
-    }
+    border: 2px solid rgba(255,255,255,0.08);
   }
 `;
 
-
-// Intervention components with default props
+/* Intervention grid: use minmax bigger so items are roomy */
 export const InterventionGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.8rem;
+  width: 100%;
 `;
 
+/* InterventionCard: tuned padding / gap and consistent alignment */
 export const InterventionCard = styled.button<{ $active?: boolean; $color?: string }>`
-  --intervention-color: ${({ $color }) => $color || '#3b82f6'};
-  
-  padding: 1.5rem;
-  background: ${({ $active = false }) => 
-    $active 
-      ? 'rgba(59, 130, 246, 0.15)' 
-      : 'rgba(0, 0, 0, 0.3)'
-  };
-  backdrop-filter: blur(8px);
-  border: 2px solid ${({ $active = false }) => 
-    $active ? 'var(--intervention-color)' : 'rgba(59, 130, 246, 0.3)'};
-  border-radius: 16px;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  --intervention-color: ${({ $color = '#3b82f6' }) => $color};
+  padding: 1rem;
+  border-radius: 12px;
+  background: ${({ $active = false }) => ($active ? 'rgba(59,130,246,0.10)' : 'rgba(0,0,0,0.36)')};
+  border: 1px solid ${({ $active = false }) => ($active ? 'var(--intervention-color)' : 'rgba(59,130,246,0.12)')};
+  color: #e6eef8;
   display: flex;
   flex-direction: column;
+  gap: 0.4rem;
   align-items: center;
-  gap: 0.75rem;
-  color: #e2e8f0;
-  position: relative;
-  overflow: hidden;
-  
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  cursor: pointer;
+
   &:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: 
-      0 8px 25px rgba(0, 0, 0, 0.3),
-      0 0 20px rgba(59, 130, 246, 0.2);
-    border-color: #3b82f6;
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
   }
-  
-  &:active {
-    transform: translateY(-2px) scale(0.98);
-  }
-  
-  .icon {
-    color: var(--intervention-color);
-    filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.4));
-    z-index: 1;
-  }
-  
-  .name {
-    font-weight: 700;
-    font-size: 0.9rem;
-    font-family: 'Courier New', monospace;
-    z-index: 1;
-  }
-  
-  .efficacy {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    font-family: 'Courier New', monospace;
-    z-index: 1;
-  }
+
+  .icon { font-size: 1.35rem; color: var(--intervention-color); }
+  .name { font-weight: 800; font-size: 0.95rem; text-align: center; }
+  .efficacy { font-size: 0.75rem; color: #94a3b8; text-align: center; }
 `;
 
-// Additional utility components
+/* Misc utilities */
 export const MatrixOverlay = styled.div`
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    circle at center,
-    transparent 0%,
-    rgba(0, 0, 0, 0.1) 100%
-  );
-  pointer-events: none;
   z-index: 0;
+  pointer-events: none;
 `;
 
+/* Reusable glowing button */
 export const GlowButton = styled.button<{ $color?: string }>`
-  --glow-color: ${({ $color }) => $color || '#3b82f6'};
-  
-  background: linear-gradient(135deg, 
-    var(--glow-color), 
-    color-mix(in srgb, var(--glow-color) 80%, transparent)
-  );
+  --glow: ${({ $color = '#3b82f6' }) => $color};
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--glow), color-mix(in srgb, var(--glow) 80%, transparent));
   border: none;
   color: white;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: 'Courier New', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 
-      0 8px 25px rgba(59, 130, 246, 0.4),
-      0 0 20px rgba(59, 130, 246, 0.6);
-    filter: brightness(1.1);
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
+  font-weight: 700;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+
+  &:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
 `;
+
+/* End of file */

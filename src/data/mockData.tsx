@@ -3,188 +3,607 @@
 import { ArtworkCategory, ArtworkSize, ArtworkStatus, GalleryPiece, GalleryVisibility } from "@/types/gallery.types";
 import { ConceptProgress, Portfolio, PortfolioKind, PortfolioReview, PortfolioSettings, PortfolioStats } from "@/types/portfolio.types";
 import type { TopPerformer, AssessmentLeaderboard, RankingPlatformStats } from '@/types/thrive.types';
-import { Users, Zap, Brain, Target, Heart, Timer, Lightbulb, Palette, Puzzle, PenTool, TrendingUp, BookOpen } from "lucide-react";
+import { Users, Zap, Brain, Target, Heart, Timer, Lightbulb, Palette, Puzzle, PenTool, TrendingUp, BookOpen, Activity, AlertCircle, BatteryLow, Briefcase, CloudRain, Compass, Gauge, HeartHandshake, LineChart, LucideIcon, MessageSquare, Mountain, Shield, Star, Sun, Trophy } from "lucide-react";
 
 // ==============================================
 // THRIVE RANKING DATA (moved to top for better organization)
 // ==============================================
 
 // Assessment metadata
-export const PROFESSIONAL_ASSESSMENTS = [
+export interface BaseAssessment {
+  id: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  color: string;
+  items?: number;
+  duration: string;
+  questions?: number;
+  validated: boolean;
+  category: string;
+  subcategory?: string;
+  publisher?: string;
+  year?: number;
+}
+
+export interface ProfessionalAssessment extends BaseAssessment {
+  type: 'professional';
+  skillArea: string;
+  level: 'beginner' | 'intermediate' | 'advanced' | 'all';
+  certificationAvailable?: boolean;
+  status?: string;
+
+}
+
+export interface PsychologicalAssessment extends BaseAssessment {
+  type: 'psychological';
+  clinicalUse: boolean;
+  ageRange?: string;
+  normData?: string;
+  interpretationGuide?: boolean;
+  disclaimerRequired: boolean;
+  status?: string;
+
+}
+
+export interface CreativityAssessment extends BaseAssessment {
+  type: 'creativity';
+  domain: 'divergent' | 'convergent' | 'artistic' | 'practical' | 'mixed';
+  scoringMethod: string;
+  status?: string;
+
+}
+
+export type Assessment = ProfessionalAssessment | PsychologicalAssessment | CreativityAssessment;
+
+// ==============================================
+// PROFESSIONAL ASSESSMENTS
+// ==============================================
+
+export const PROFESSIONAL_ASSESSMENTS: ProfessionalAssessment[] = [
   {
     id: 'professional-communication',
-    title: 'Professional Communication Evaluation',
-    description: 'Assesses clarity, tone, and adaptability in workplace communication.',
-    icon: Users,
-    color: '#3b82f6',
+    type: 'professional',
+    title: 'Professional Communication Excellence',
+    description: 'Comprehensive evaluation of written, verbal, and non-verbal communication skills in workplace settings.',
+    icon: MessageSquare,
+    color: '#3b82f6', // blue
+    items: 45,
+    questions: 45,
+    duration: '20-25 min',
+    validated: true,
+    category: 'Communication',
+    skillArea: 'Soft Skills',
+    level: 'all',
+    status: 'coming_soon',
+    certificationAvailable: true
+
   },
   {
-    id: 'innovative-problem-solving',
-    title: 'Innovation & Creative Problem Solving',
-    description: 'Measures creative thinking, ideation, and innovative solution development.',
-    icon: Zap,
-    color: '#8b5cf6',
+    id: 'leadership-360',
+    type: 'professional',
+    title: 'Leadership 360° Assessment',
+    description: 'Multi-dimensional leadership evaluation covering strategic thinking, team building, and organizational influence.',
+    icon: Target,
+    color: '#8b5cf6', // purple
+    items: 60,
+    questions: 60,
+    duration: '25-30 min',
+    validated: true,
+    category: 'Leadership',
+    skillArea: 'Management',
+    level: 'intermediate',
+    status: 'coming_soon',
+
+    certificationAvailable: true
   },
   {
     id: 'technical-problem-solving',
-    title: 'Technical Problem-Solving Skills',
-    description: 'Evaluates analytical thinking, coding, and debugging capabilities.',
-    icon: Brain,
-    color: '#06b6d4',
+    type: 'professional',
+    title: 'Technical Problem-Solving Proficiency',
+    description: 'Evaluates analytical thinking, algorithmic reasoning, and systematic debugging capabilities.',
+    icon: LineChart,
+    color: '#06b6d4', // cyan
+    items: 40,
+    questions: 40,
+    duration: '30-35 min',
+    validated: true,
+    category: 'Technical',
+    status: 'coming_soon',
+
+    skillArea: 'Engineering',
+    level: 'intermediate'
   },
   {
-    id: 'leadership-assessment',
-    title: 'Leadership & Team Collaboration',
-    description: 'Analyzes decision-making, motivation, and conflict resolution skills.',
-    icon: Target,
-    color: '#f59e0b',
+    id: 'project-management',
+    type: 'professional',
+    title: 'Project Management Competency',
+    description: 'Assessment based on PMI standards covering initiation, planning, execution, monitoring, and closing.',
+    icon: Briefcase,
+    color: '#10b981', // emerald
+    items: 50,
+    questions: 50,
+    duration: '25-30 min',
+    validated: true,
+    category: 'Management',
+    skillArea: 'Operations',
+    status: 'coming_soon',
+
+    level: 'intermediate',
+    certificationAvailable: true,
+    publisher: 'PMI Standards'
   },
   {
-    id: 'emotional-intelligence',
-    title: 'Emotional Intelligence Assessment',
-    description: 'Assesses empathy, self-awareness, and interpersonal relationship skills.',
-    icon: Heart,
-    color: '#ec4899',
+    id: 'emotional-intelligence-work',
+    type: 'professional',
+    title: 'Workplace Emotional Intelligence',
+    description: 'Measures EQ competencies crucial for professional success: self-awareness, empathy, and social skills.',
+    icon: HeartHandshake,
+    color: '#ec4899', // pink
+    items: 35,
+    questions: 35,
+    duration: '15-20 min',
+    validated: true,
+    category: 'Interpersonal',
+    status: 'coming_soon',
+
+    skillArea: 'Soft Skills',
+    level: 'all'
   },
   {
-    id: 'time-management',
-    title: 'Time Management & Productivity',
-    description: 'Measures organization, prioritization, and execution efficiency.',
+    id: 'time-productivity',
+    type: 'professional',
+    title: 'Time Management & Productivity Index',
+    description: 'Analyzes work habits, prioritization strategies, and efficiency patterns for peak performance.',
     icon: Timer,
-    color: '#10b981',
+    color: '#f59e0b', // amber
+    items: 30,
+    questions: 30,
+    duration: '12-15 min',
+    validated: true,
+    category: 'Productivity',
+    status: 'coming_soon',
+
+    skillArea: 'Performance',
+    level: 'all'
   }
 ];
 
-// Psychological assessments metadata
-export const PSYCHOLOGICAL_ASSESSMENTS = {
-  personality: [
-    {
-      id: 'big-five-50',
-      title: 'Big Five Personality (50-item)',
-      description: 'Goldberg\'s Big Five Factor Markers - comprehensive personality assessment.',
-      items: 50,
-      duration: '10-15 min',
-      category: 'personality',
-      validated: true,
-    },
-    {
-      id: 'mini-ipip',
-      title: 'Mini-IPIP (20-item)',
-      description: 'Quick Big Five assessment - ideal for rapid screening.',
-      items: 20,
-      duration: '3-5 min',
-      category: 'personality',
-      validated: true,
-    },
-    {
-      id: 'hexaco-60',
-      title: 'HEXACO-60',
-      description: 'Six-factor personality model including Honesty-Humility.',
-      items: 60,
-      duration: '10-15 min',
-      category: 'personality',
-      validated: true,
-    },
-  ],
-  clinical: [
-    {
-      id: 'gad-7',
-      title: 'GAD-7 Anxiety Scale',
-      description: 'Generalized Anxiety Disorder screening tool.',
-      items: 7,
-      duration: '2-3 min',
-      category: 'anxiety',
-      validated: true,
-    },
-    {
-      id: 'phq-9',
-      title: 'PHQ-9 Depression Scale',
-      description: 'Patient Health Questionnaire for depression screening.',
-      items: 9,
-      duration: '3-5 min',
-      category: 'depression',
-      validated: true,
-    },
-  ],
-  wellbeing: [
-    {
-      id: 'via-character',
-      title: 'VIA Character Strengths',
-      description: 'Identify your top character strengths and virtues.',
-      items: 120,
-      duration: '15-20 min',
-      category: 'strengths',
-      validated: true,
-    },
-    {
-      id: 'perma',
-      title: 'PERMA Wellbeing Scale',
-      description: 'Measures five pillars of wellbeing and flourishing.',
-      items: 23,
-      duration: '5-7 min',
-      category: 'wellbeing',
-      validated: true,
-    },
-  ],
-};
+// ==============================================
+// PSYCHOLOGICAL ASSESSMENTS - Clinical & Personality
+// ==============================================
 
-// Creativity & Critical Thinking assessments
-export const CREATIVITY_ASSESSMENTS = [
+export const PSYCHOLOGICAL_ASSESSMENTS: PsychologicalAssessment[] = [
+  // Personality Assessments
   {
-    id: 'divergent-thinking',
-    title: 'Divergent Thinking Assessment',
-    description: 'Measures ability to generate creative ideas and see multiple solutions.',
-    icon: Lightbulb,
-    color: '#fbbf24',
-    items: 30,
+    id: 'big-five-neo',
+    type: 'psychological',
+    title: 'NEO Big Five Personality Inventory',
+    description: 'Gold standard assessment measuring Openness, Conscientiousness, Extraversion, Agreeableness, and Neuroticism.',
+    icon: Brain,
+    color: '#6366f1', // indigo
+    items: 60,
+    questions: 60,
     duration: '15-20 min',
+    validated: true,
+    category: 'Personality',
+    subcategory: 'Trait Theory',
+    clinicalUse: false,
+    ageRange: '16+',
+    normData: 'International norms available',
+    interpretationGuide: true,
+    disclaimerRequired: false,
+    status: 'coming_soon',
+
+    publisher: 'Costa & McCrae',
+    year: 1992
   },
   {
-    id: 'creative-personality',
-    title: 'Creative Personality Scale',
-    description: 'Assesses personality traits associated with creativity.',
-    icon: Palette,
-    color: '#f472b6',
+    id: 'hexaco-100',
+    type: 'psychological',
+    title: 'HEXACO-100 Personality Assessment',
+    description: 'Six-factor model adding Honesty-Humility to traditional Big Five dimensions for enhanced prediction.',
+    icon: Shield,
+    color: '#8b5cf6', // purple
+    items: 100,
+    questions: 100,
+    duration: '20-25 min',
+    validated: true,
+    category: 'Personality',
+    subcategory: 'Extended Trait Model',
+    clinicalUse: false,
+    ageRange: '16+',
+    interpretationGuide: true,
+    disclaimerRequired: false,
+    status: 'coming_soon'
+
+  },
+  {
+    id: 'mbti-style',
+    type: 'psychological',
+    title: 'Cognitive Function Type Indicator',
+    description: 'Jungian-based assessment identifying cognitive preferences and decision-making styles.',
+    icon: Compass,
+    color: '#0ea5e9', // sky
+    items: 70,
+    questions: 70,
+    duration: '20-25 min',
+    validated: true,
+    category: 'Personality',
+    subcategory: 'Type Theory',
+    clinicalUse: false,
+    ageRange: '18+',
+    interpretationGuide: true,
+    disclaimerRequired: false,
+    status: 'coming_soon'
+
+  },
+
+  // Clinical Screening Tools
+  {
+    id: 'gad-7',
+    type: 'psychological',
+    title: 'GAD-7 Anxiety Screening',
+    description: 'Validated screening tool for Generalized Anxiety Disorder severity in clinical and research settings.',
+    icon: Activity,
+    color: '#ef4444', // red
+    items: 7,
+    questions: 7,
+    duration: '2-3 min',
+    validated: true,
+    category: 'Clinical',
+    subcategory: 'Anxiety Disorders',
+    clinicalUse: true,
+    ageRange: '12+',
+    normData: 'Clinical cutoff scores',
+    interpretationGuide: true,
+    disclaimerRequired: true,
+    status: 'coming_soon',
+    publisher: 'Spitzer et al.',
+    year: 2006
+  },
+  {
+    id: 'phq-9',
+    type: 'psychological',
+    title: 'PHQ-9 Depression Scale',
+    description: 'Primary care screening tool for major depressive disorder based on DSM criteria.',
+    icon: CloudRain,
+    color: '#64748b', // slate
+    items: 9,
+    questions: 9,
+    duration: '3-5 min',
+    validated: true,
+    category: 'Clinical',
+    subcategory: 'Mood Disorders',
+    clinicalUse: true,
+    ageRange: '12+',
+    normData: 'Clinical severity ranges',
+    interpretationGuide: true,
+    disclaimerRequired: true,
+    status: 'coming_soon',
+    publisher: 'Kroenke et al.',
+    year: 2001
+  },
+  {
+    id: 'dass-42',
+    type: 'psychological',
+    title: 'DASS-42 (Depression, Anxiety, Stress Scales)',
+    description: 'Comprehensive tri-dimensional assessment of negative emotional states for research and clinical monitoring.',
+    icon: Gauge,
+    color: '#dc2626', // red-600
+    items: 42,
+    questions: 42,
+    duration: '10-15 min',
+    validated: true,
+    category: 'Clinical',
+    subcategory: 'Emotional Distress',
+    clinicalUse: true,
+    ageRange: '17+',
+    normData: 'Clinical and non-clinical norms',
+    interpretationGuide: true,
+    disclaimerRequired: true,
+    status: 'coming_soon',
+    publisher: 'Lovibond & Lovibond',
+    year: 1995
+  },
+  {
+    id: 'pcl-5',
+    type: 'psychological',
+    title: 'PCL-5 PTSD Checklist',
+    description: 'DSM-5 aligned screening for Post-Traumatic Stress Disorder symptoms and severity.',
+    icon: AlertCircle,
+    color: '#9333ea', // purple-600
+    items: 20,
+    questions: 20,
+    duration: '5-10 min',
+    validated: true,
+    category: 'Clinical',
+    subcategory: 'Trauma & Stress',
+    clinicalUse: true,
+    status: 'coming_soon',
+    ageRange: '18+',
+    interpretationGuide: true,
+    disclaimerRequired: true
+  },
+
+  // Wellbeing & Strengths
+  {
+    id: 'perma-profiler',
+    type: 'psychological',
+    title: 'PERMA Wellbeing Profiler',
+    description: 'Measures five pillars of flourishing: Positive emotions, Engagement, Relationships, Meaning, and Achievement.',
+    icon: Sun,
+    color: '#fbbf24', // amber-400
+    items: 23,
+    questions: 23,
+    duration: '5-7 min',
+    validated: true,
+    category: 'Wellbeing',
+    subcategory: 'Positive Psychology',
+    clinicalUse: false,
+    status: 'coming_soon',
+    ageRange: '16+',
+    interpretationGuide: true,
+    disclaimerRequired: false,
+    publisher: 'Seligman et al.'
+  },
+  {
+    id: 'via-character-strengths',
+    type: 'psychological',
+    title: 'VIA Character Strengths Survey',
+    description: 'Identifies top character strengths from 24 universally valued virtues for personal development.',
+    icon: Trophy,
+    color: '#10b981', // emerald
+    items: 120,
+    questions: 120,
+    duration: '15-20 min',
+    validated: true,
+    category: 'Wellbeing',
+    subcategory: 'Character Strengths',
+    clinicalUse: false,
+    status: 'coming_soon',
+    ageRange: '10+',
+    interpretationGuide: true,
+    disclaimerRequired: false,
+    publisher: 'VIA Institute'
+  },
+  {
+    id: 'resilience-scale',
+    type: 'psychological',
+    title: 'Connor-Davidson Resilience Scale',
+    description: 'Measures psychological resilience and ability to cope with adversity and bounce back from challenges.',
+    icon: Mountain,
+    color: '#0891b2', // cyan-600
+    items: 25,
+    questions: 25,
+    duration: '5-10 min',
+    validated: true,
+    category: 'Wellbeing',
+    subcategory: 'Resilience',
+    clinicalUse: false,
+    status: 'coming_soon',
+    ageRange: '18+',
+    interpretationGuide: true,
+    disclaimerRequired: false
+  },
+  {
+    id: 'burnout-assessment',
+    type: 'psychological',
+    title: 'Maslach Burnout Inventory',
+    description: 'Gold standard for measuring occupational burnout across emotional exhaustion, depersonalization, and achievement.',
+    icon: BatteryLow,
+    color: '#ea580c', // orange-600
+    items: 22,
+    questions: 22,
+    duration: '5-10 min',
+    validated: true,
+    category: 'Wellbeing',
+    subcategory: 'Occupational Health',
+    clinicalUse: true,
+    ageRange: '18+',
+    normData: 'Occupational norms',
+    interpretationGuide: true,
+    status: 'coming_soon',
+    disclaimerRequired: false,
+    publisher: 'Maslach & Jackson'
+  }
+];
+
+// ==============================================
+// CREATIVITY & COGNITIVE ASSESSMENTS
+// ==============================================
+
+export const CREATIVITY_ASSESSMENTS: CreativityAssessment[] = [
+  {
+    id: 'divergent-thinking-test',
+    type: 'creativity',
+    title: 'Torrance Test of Creative Thinking',
+    description: 'Classic assessment of divergent thinking measuring fluency, flexibility, originality, and elaboration.',
+    icon: Lightbulb,
+    color: '#fbbf24', // amber
     items: 30,
-    duration: '10 min',
+    questions: 30,
+    duration: '20-30 min',
+    validated: true,
+    category: 'Creativity',
+    domain: 'divergent',
+    status: 'coming_soon',
+
+    scoringMethod: 'Multi-dimensional scoring',
+    publisher: 'Torrance',
+    year: 1974
   },
   {
-    id: 'critical-thinking',
-    title: 'Watson-Glaser Critical Thinking',
-    description: 'Evaluates ability to analyze information and make logical decisions.',
+    id: 'creative-personality-scale',
+    type: 'creativity',
+    title: 'Creative Personality Scale (CPS)',
+    description: 'Assesses personality traits consistently associated with creative achievement and potential.',
+    icon: Palette,
+    color: '#f472b6', // pink-400
+    items: 30,
+    questions: 30,
+    duration: '10-15 min',
+    validated: true,
+    category: 'Creativity',
+    status: 'coming_soon',
+
+    domain: 'mixed',
+    scoringMethod: 'Trait aggregation'
+  },
+  {
+    id: 'remote-associates',
+    type: 'creativity',
+    title: 'Remote Associates Test (RAT)',
+    description: 'Measures convergent thinking and creative problem-solving through word association challenges.',
     icon: Puzzle,
-    color: '#818cf8',
+    color: '#818cf8', // violet-400
     items: 40,
-    duration: '20-30 min',
+    questions: 40,
+    duration: '15-20 min',
+    validated: true,
+    status: 'coming_soon',
+
+    category: 'Creativity',
+    domain: 'convergent',
+    scoringMethod: 'Accuracy-based',
+    publisher: 'Mednick'
   },
   {
     id: 'creative-problem-solving',
-    title: 'Creative Problem Solving Profile',
-    description: 'Identifies your creative problem-solving style and preferences.',
+    type: 'creativity',
+    title: 'Basadur Creative Problem Solving Profile',
+    description: 'Identifies preferred creative problem-solving style: Generator, Conceptualizer, Optimizer, or Implementer.',
     icon: PenTool,
-    color: '#34d399',
-    items: 35,
-    duration: '15 min',
+    color: '#34d399', // emerald-400
+    items: 36,
+    questions: 36,
+    duration: '15-20 min',
+    validated: true,
+    status: 'coming_soon',
+
+    category: 'Creativity',
+    domain: 'practical',
+    scoringMethod: 'Style profiling'
   },
   {
     id: 'systems-thinking',
+    type: 'creativity',
     title: 'Systems Thinking Scale',
-    description: 'Measures ability to understand complex relationships and patterns.',
+    description: 'Evaluates ability to understand complex relationships, feedback loops, and emergent patterns.',
     icon: TrendingUp,
-    color: '#60a5fa',
-    items: 25,
-    duration: '12 min',
+    color: '#60a5fa', // blue-400
+    items: 28,
+    status: 'coming_soon',
+
+    questions: 28,
+    duration: '12-15 min',
+    validated: true,
+    category: 'Cognition',
+    domain: 'mixed',
+    scoringMethod: 'Competency levels'
   },
   {
     id: 'cognitive-reflection',
-    title: 'Cognitive Reflection Test',
-    description: 'Quick assessment of analytical vs. intuitive thinking.',
+    type: 'creativity',
+    title: 'Extended Cognitive Reflection Test',
+    description: 'Measures tendency to override intuitive responses in favor of analytical thinking.',
     icon: BookOpen,
-    color: '#c084fc',
+    color: '#c084fc', // purple-400
     items: 10,
-    duration: '5 min',
+    questions: 10,
+    duration: '5-10 min',
+    validated: true,
+    category: 'Cognition',
+    status: 'coming_soon',
+
+    domain: 'convergent',
+    scoringMethod: 'Accuracy scoring',
+    publisher: 'Frederick'
   },
+  {
+    id: 'innovative-work-behavior',
+    type: 'creativity',
+    title: 'Innovative Work Behavior Scale',
+    description: 'Assesses innovation in workplace contexts: idea generation, promotion, and implementation.',
+    icon: Zap,
+    color: '#a855f7', // purple-500
+    items: 32,
+    questions: 32,
+    duration: '10-15 min',
+    validated: true,
+    status: 'coming_soon',
+
+    category: 'Innovation',
+    domain: 'practical',
+    scoringMethod: 'Behavioral frequency'
+  },
+  {
+    id: 'creative-self-efficacy',
+    type: 'creativity',
+    title: 'Creative Self-Efficacy Scale',
+    description: 'Measures confidence in one\'s ability to produce creative outcomes and overcome creative challenges.',
+    icon: Star,
+    color: '#eab308', // yellow-600
+    items: 21,
+    questions: 21,
+    duration: '5-10 min',
+    validated: true,
+    status: 'coming_soon',
+
+    category: 'Self-Perception',
+    domain: 'mixed',
+    scoringMethod: 'Likert scale aggregation'
+  }
 ];
+
+// ==============================================
+// HELPER FUNCTIONS
+// ==============================================
+
+export const getAssessmentById = (id: string): Assessment | undefined => {
+  const allAssessments: Assessment[] = [
+    ...PROFESSIONAL_ASSESSMENTS,
+    ...PSYCHOLOGICAL_ASSESSMENTS,
+    ...CREATIVITY_ASSESSMENTS
+  ];
+  return allAssessments.find(assessment => assessment.id === id);
+};
+
+export const getAssessmentsByCategory = (category: string): Assessment[] => {
+  const allAssessments: Assessment[] = [
+    ...PROFESSIONAL_ASSESSMENTS,
+    ...PSYCHOLOGICAL_ASSESSMENTS,
+    ...CREATIVITY_ASSESSMENTS
+  ];
+  return allAssessments.filter(assessment => assessment.category === category);
+};
+
+export const getClinicalAssessments = (): PsychologicalAssessment[] => {
+  return PSYCHOLOGICAL_ASSESSMENTS.filter(assessment => assessment.clinicalUse);
+};
+
+export const getValidatedAssessments = (): Assessment[] => {
+  const allAssessments: Assessment[] = [
+    ...PROFESSIONAL_ASSESSMENTS,
+    ...PSYCHOLOGICAL_ASSESSMENTS,
+    ...CREATIVITY_ASSESSMENTS
+  ];
+  return allAssessments.filter(assessment => assessment.validated);
+};
+
+// Assessment categories for filtering
+export const ASSESSMENT_CATEGORIES = {
+  professional: ['Communication', 'Leadership', 'Technical', 'Management', 'Interpersonal', 'Productivity'],
+  psychological: ['Personality', 'Clinical', 'Wellbeing'],
+  creativity: ['Creativity', 'Cognition', 'Innovation', 'Self-Perception']
+};
+
+// Important disclaimers for clinical assessments
+export const CLINICAL_DISCLAIMER = `
+These clinical screening tools are for educational and informational purposes only. 
+They are not diagnostic instruments and should not replace professional mental health evaluation. 
+If you're experiencing distress, please consult with a qualified healthcare provider.
+`;
 
 
 export const MOCK_TOP_PERFORMERS: TopPerformer[] = [
@@ -539,7 +958,7 @@ export const WEEKLY_TRENDING_PERFORMERS = [
     specialization: 'AI/Machine Learning'
   },
   {
-    id: '2', 
+    id: '2',
     name: 'Sarah Chen',
     username: 'sarah_codes',
     weeklyGain: 480,
@@ -548,7 +967,7 @@ export const WEEKLY_TRENDING_PERFORMERS = [
   },
   {
     id: '3',
-    name: 'Maria Santos', 
+    name: 'Maria Santos',
     username: 'maria_data',
     weeklyGain: 420,
     assessmentsThisWeek: 2,
@@ -634,7 +1053,7 @@ export const MOCK_PORTFOLIOS: Record<string, Portfolio> = {
   },
   'bob_codes': {
     id: '2',
-    userId: '2', 
+    userId: '2',
     username: 'bob_codes',
     name: 'Robert Chen',
     title: 'Senior Software Architect',
@@ -760,7 +1179,7 @@ export const MOCK_PORTFOLIOS: Record<string, Portfolio> = {
         notes: 'Excellent understanding of React hooks patterns'
       },
       {
-        conceptId: '2', 
+        conceptId: '2',
         status: 'in-progress',
         startedAt: '2024-03-01T09:00:00Z',
         score: 78,
@@ -945,59 +1364,59 @@ export const MOCK_PORTFOLIOS: Record<string, Portfolio> = {
     lastActiveAt: new Date('2024-03-09')
   },
   'sandy_sings': {
-  id: '7',
-  userId: '7',
-  username: 'sandy_sings',
-  name: 'Sandra “Sandy” Lopez',
-  title: 'Vocalist & Music Educator',
-  tagline: 'Finding harmony in every note',
-  bio: 'Professional vocalist with over a decade of performance experience across jazz, soul, and contemporary music. Passionate about teaching others to unlock their unique voice. Performed in international tours and currently leading vocal workshops that blend technique with self-expression.',
-  kind: 'creative',
-  profileImage: 'https://picsum.photos/900/900?random=7',
-  coverImage: 'https://picsum.photos/1400/700?random=7',
-  visibility: 'public',
-  status: 'active',
-  location: 'Los Angeles, CA',
-  yearsOfExperience: 11,
-  specializations: ['Vocal Performance', 'Songwriting', 'Music Education', 'Stage Presence'],
-  tags: ['Music', 'Vocalist', 'Performance', 'Creativity'],
-  socialLinks: {
-    website: 'https://sandy-sings.com',
-    instagram: 'https://instagram.com/sandy_sings',
-    youtube: 'https://youtube.com/sandy_sings',
-    spotify: 'https://spotify.com/artist/sandy_sings'
-  },
-  contactEmail: 'sandy@example.com',
-  showContactInfo: true,
-  settings: {
-    allowReviews: true,
-    allowComments: true,
-    requireReviewApproval: false,
-    allowAnonymousReviews: true,
-    showStats: true,
-    showPrices: false,
-    defaultGalleryView: 'masonry',
-    piecesPerPage: 16,
-    notifyOnReview: true,
-    notifyOnView: false,
-    weeklyAnalyticsEmail: true
-  },
-  stats: {
-    totalViews: 76000,
-    uniqueVisitors: 10100,
-    totalPieces: 35,
-    totalReviews: 92,
-    averageRating: 4.9,
-    responseRate: 97,
-    responseTime: 'within 3 hours',
-    viewsThisWeek: 2500,
-    viewsThisMonth: 9800,
-    shareCount: 640,
-    savedCount: 940
-  },
-  featuredPieces: ['13', '14'],
-  createdAt: new Date('2024-02-05'),
-  lastActiveAt: new Date('2024-03-10')
+    id: '7',
+    userId: '7',
+    username: 'sandy_sings',
+    name: 'Sandra “Sandy” Lopez',
+    title: 'Vocalist & Music Educator',
+    tagline: 'Finding harmony in every note',
+    bio: 'Professional vocalist with over a decade of performance experience across jazz, soul, and contemporary music. Passionate about teaching others to unlock their unique voice. Performed in international tours and currently leading vocal workshops that blend technique with self-expression.',
+    kind: 'creative',
+    profileImage: 'https://picsum.photos/900/900?random=7',
+    coverImage: 'https://picsum.photos/1400/700?random=7',
+    visibility: 'public',
+    status: 'active',
+    location: 'Los Angeles, CA',
+    yearsOfExperience: 11,
+    specializations: ['Vocal Performance', 'Songwriting', 'Music Education', 'Stage Presence'],
+    tags: ['Music', 'Vocalist', 'Performance', 'Creativity'],
+    socialLinks: {
+      website: 'https://sandy-sings.com',
+      instagram: 'https://instagram.com/sandy_sings',
+      youtube: 'https://youtube.com/sandy_sings',
+      spotify: 'https://spotify.com/artist/sandy_sings'
+    },
+    contactEmail: 'sandy@example.com',
+    showContactInfo: true,
+    settings: {
+      allowReviews: true,
+      allowComments: true,
+      requireReviewApproval: false,
+      allowAnonymousReviews: true,
+      showStats: true,
+      showPrices: false,
+      defaultGalleryView: 'masonry',
+      piecesPerPage: 16,
+      notifyOnReview: true,
+      notifyOnView: false,
+      weeklyAnalyticsEmail: true
+    },
+    stats: {
+      totalViews: 76000,
+      uniqueVisitors: 10100,
+      totalPieces: 35,
+      totalReviews: 92,
+      averageRating: 4.9,
+      responseRate: 97,
+      responseTime: 'within 3 hours',
+      viewsThisWeek: 2500,
+      viewsThisMonth: 9800,
+      shareCount: 640,
+      savedCount: 940
+    },
+    featuredPieces: ['13', '14'],
+    createdAt: new Date('2024-02-05'),
+    lastActiveAt: new Date('2024-03-10')
   },
   'kristin_knits': {
     id: '8',
@@ -1715,7 +2134,7 @@ export const MOCK_PORTFOLIOS: Record<string, Portfolio> = {
     createdAt: new Date('2024-02-01'),
     lastActiveAt: new Date('2024-03-13')
   },
-    'liam_maker': {
+  'liam_maker': {
     id: '26',
     userId: '26',
     username: 'liam_maker',
@@ -2421,7 +2840,7 @@ export const MOCK_REVIEWS: Record<string, PortfolioReview[]> = {
       createdAt: new Date('2024-03-01')
     },
     {
-      id: '2', 
+      id: '2',
       portfolioId: '1',
       portfolioUserId: '1',
       reviewerId: '102',
@@ -2440,7 +2859,7 @@ export const MOCK_REVIEWS: Record<string, PortfolioReview[]> = {
         respondedAt: new Date('2024-03-01')
       }
     }
-  ], 
+  ],
   'dana_writes': [
     {
       id: '3',
@@ -2717,7 +3136,7 @@ export const THRIVE_ASSESSMENTS: Record<string, any[]> = {
       timeSpent: 50
     }
   ],
-  
+
   'dana_writes': [
     {
       id: 'creative-writing',
@@ -2970,22 +3389,22 @@ export const createMockPortfolio = (kind: PortfolioKind = 'hybrid'): Portfolio =
   tagline: 'Building digital experiences that matter',
   bio: 'Passionate full-stack developer with a love for clean code and beautiful design. Currently exploring AI/ML applications and always learning something new.',
   kind,
-  
+
   // Images
   profileImage: 'https://picsum.photos/200/200?random=profile',
   coverImage: 'https://picsum.photos/800/300?random=cover',
-  
+
   // Visibility & Access
   visibility: 'public',
   status: 'active',
   customUrl: 'dev-portfolio',
-  
+
   // Professional Info
   location: 'Seattle, WA',
   yearsOfExperience: 5,
   specializations: ['React', 'Node.js', 'TypeScript', 'UI/UX Design', 'PostgreSQL'],
   tags: ['Frontend', 'Backend', 'Design', 'Full-Stack', 'React', 'Next.js'],
-  
+
   // Social & Contact
   socialLinks: {
     website: 'https://devportfolio.com',
@@ -2995,7 +3414,7 @@ export const createMockPortfolio = (kind: PortfolioKind = 'hybrid'): Portfolio =
   },
   contactEmail: 'dev@example.com',
   showContactInfo: true,
-  
+
   // Settings - Fix: Properly type as PortfolioSettings
   settings: {
     allowReviews: true,
@@ -3017,7 +3436,7 @@ export const createMockPortfolio = (kind: PortfolioKind = 'hybrid'): Portfolio =
     notifyOnConceptCompletion: true,
     weeklyProgressEmail: false
   } as PortfolioSettings,
-  
+
   // Stats - Fix: Properly type as PortfolioStats
   stats: {
     totalViews: 2847,
@@ -3040,7 +3459,7 @@ export const createMockPortfolio = (kind: PortfolioKind = 'hybrid'): Portfolio =
     streakDays: 12,
     certificationsEarned: 3
   } as PortfolioStats,
-  
+
   // Educational Content - Fix: Properly type as ConceptProgress[]
   conceptProgress: [
     {
@@ -3065,17 +3484,17 @@ export const createMockPortfolio = (kind: PortfolioKind = 'hybrid'): Portfolio =
       status: 'not-started'
     }
   ] as ConceptProgress[],
-  
+
   learningGoals: [
     'Master advanced TypeScript patterns',
     'Build scalable microservices architecture',
     'Complete AWS certification',
     'Contribute to open source projects'
   ],
-  
+
   currentBooks: ['typescript-handbook', 'system-design-primer'],
   completedBooks: ['react-patterns', 'clean-code', 'you-dont-know-js'],
-  
+
   // Metadata
   createdAt: new Date('2024-01-15T10:00:00Z'),
   updatedAt: new Date('2024-01-20T15:30:00Z'),
@@ -3095,50 +3514,50 @@ export const createMockGalleryPieces = (): GalleryPiece[] => [
     title: 'E-commerce Dashboard',
     artist: 'Dev User',
     description: 'Modern React dashboard with real-time analytics and intuitive UX design',
-    
+
     // Images
     thumbnailUrl: 'https://picsum.photos/400/300?random=1',
     imageUrl: 'https://picsum.photos/800/600?random=1',
-    
+
     // Metadata & Accessibility
     alt: 'E-commerce dashboard interface screenshot',
     medium: 'Digital',
     year: 2024,
     size: 'large' as ArtworkSize,
     displayOrder: 1,
-    
+
     // Dimensions
     dimensions: {
       width: 1920,
       height: 1080,
       unit: 'px'
     },
-    
+
     // Sales/Status
     forSale: false,
     status: 'published' as ArtworkStatus,
     price: 0,
     currency: 'USD',
-    
+
     // Visibility & Permissions
     visibility: 'public' as GalleryVisibility,
     ownerId: 'dev-user-123',
-    
+
     // Timestamps
     createdAt: new Date('2024-01-16T10:00:00Z'),
     updatedAt: new Date('2024-01-16T10:00:00Z'),
     publishedAt: new Date('2024-01-16T10:00:00Z'),
-    
+
     // Tags & Categories
     tags: ['React', 'TypeScript', 'Dashboard', 'Analytics'],
     category: 'Digital' as ArtworkCategory,
-    
+
     // Upload metadata
     uploadedBy: 'dev-user-123',
     originalFileName: 'ecommerce-dashboard.png',
     fileSize: 2.1,
     mimeType: 'image/png',
-    
+
     // Portfolio/Social Features
     portfolioId: 'portfolio-dev-123',
     views: 245,
@@ -3149,49 +3568,49 @@ export const createMockGalleryPieces = (): GalleryPiece[] => [
     title: 'Mobile Banking App',
     artist: 'Dev User',
     description: 'Clean and secure mobile banking interface with biometric authentication',
-    
+
     // Images
     thumbnailUrl: 'https://picsum.photos/400/300?random=2',
     imageUrl: 'https://picsum.photos/800/600?random=2',
-    
+
     // Metadata & Accessibility
     alt: 'Mobile banking app UI design mockup',
     medium: 'Digital',
     year: 2024,
     size: 'medium' as ArtworkSize,
     displayOrder: 2,
-    
+
     // Dimensions
     dimensions: {
       width: 375,
       height: 812,
       unit: 'px'
     },
-    
+
     // Sales/Status
     forSale: false,
     status: 'published' as ArtworkStatus,
     price: 0,
-    
+
     // Visibility & Permissions
     visibility: 'public' as GalleryVisibility,
     ownerId: 'dev-user-123',
-    
+
     // Timestamps
     createdAt: new Date('2024-01-18T14:00:00Z'),
     updatedAt: new Date('2024-01-18T14:00:00Z'),
     publishedAt: new Date('2024-01-18T14:00:00Z'),
-    
+
     // Tags & Categories
     tags: ['UI/UX', 'Mobile', 'Fintech', 'Design System'],
     category: 'Design' as ArtworkCategory,
-    
+
     // Upload metadata
     uploadedBy: 'dev-user-123',
     originalFileName: 'banking-app-ui.png',
     fileSize: 1.8,
     mimeType: 'image/png',
-    
+
     // Portfolio/Social Features
     portfolioId: 'portfolio-dev-123',
     views: 189,
@@ -3202,41 +3621,41 @@ export const createMockGalleryPieces = (): GalleryPiece[] => [
     title: 'Task Management API',
     artist: 'Dev User',
     description: 'RESTful API built with Node.js and PostgreSQL featuring real-time updates',
-    
+
     // Images (using placeholder for code project)
     thumbnailUrl: 'https://picsum.photos/400/300?random=3',
     imageUrl: 'https://picsum.photos/800/600?random=3',
-    
+
     // Metadata & Accessibility
     alt: 'Task Management API architecture diagram',
     medium: 'Code',
     year: 2024,
     size: 'medium' as ArtworkSize,
     displayOrder: 3,
-    
+
     // Sales/Status
     forSale: false,
     status: 'published' as ArtworkStatus,
-    
+
     // Visibility & Permissions
     visibility: 'public' as GalleryVisibility,
     ownerId: 'dev-user-123',
-    
+
     // Timestamps
     createdAt: new Date('2024-01-20T09:00:00Z'),
     updatedAt: new Date('2024-01-20T09:00:00Z'),
     publishedAt: new Date('2024-01-20T09:00:00Z'),
-    
+
     // Tags & Categories
     tags: ['Node.js', 'PostgreSQL', 'REST API', 'Real-time'],
     category: 'Digital' as ArtworkCategory,
-    
+
     // Upload metadata
     uploadedBy: 'dev-user-123',
     originalFileName: 'api-architecture.png',
     fileSize: 1.2,
     mimeType: 'image/png',
-    
+
     // Portfolio/Social Features
     portfolioId: 'portfolio-dev-123',
     views: 156,
@@ -3247,48 +3666,48 @@ export const createMockGalleryPieces = (): GalleryPiece[] => [
     title: 'Brand Identity Design',
     artist: 'Dev User',
     description: 'Complete brand identity package for a sustainable fashion startup',
-    
+
     // Images
     thumbnailUrl: 'https://picsum.photos/400/300?random=4',
     imageUrl: 'https://picsum.photos/800/600?random=4',
-    
+
     // Metadata & Accessibility
     alt: 'Brand identity design showcase with logo and color palette',
     medium: 'Digital',
     year: 2024,
     size: 'large' as ArtworkSize,
     displayOrder: 4,
-    
+
     // Dimensions
     dimensions: {
       width: 2000,
       height: 1500,
       unit: 'px'
     },
-    
+
     // Sales/Status
     forSale: false,
     status: 'published' as ArtworkStatus,
-    
+
     // Visibility & Permissions
     visibility: 'public' as GalleryVisibility,
     ownerId: 'dev-user-123',
-    
+
     // Timestamps
     createdAt: new Date('2024-01-19T11:00:00Z'),
     updatedAt: new Date('2024-01-19T11:00:00Z'),
     publishedAt: new Date('2024-01-19T11:00:00Z'),
-    
+
     // Tags & Categories
     tags: ['Branding', 'Logo Design', 'Identity', 'Sustainability'],
     category: 'Design' as ArtworkCategory,
-    
+
     // Upload metadata
     uploadedBy: 'dev-user-123',
     originalFileName: 'brand-identity.jpg',
     fileSize: 3.2,
     mimeType: 'image/jpeg',
-    
+
     // Portfolio/Social Features
     portfolioId: 'portfolio-dev-123',
     views: 312,
@@ -3299,48 +3718,48 @@ export const createMockGalleryPieces = (): GalleryPiece[] => [
     title: 'Learning Management System',
     artist: 'Dev User',
     description: 'Full-stack LMS with video streaming, progress tracking, and assessments',
-    
+
     // Images
     thumbnailUrl: 'https://picsum.photos/400/300?random=5',
     imageUrl: 'https://picsum.photos/800/600?random=5',
-    
+
     // Metadata & Accessibility
     alt: 'Learning Management System dashboard interface',
     medium: 'Digital',
     year: 2024,
     size: 'large' as ArtworkSize,
     displayOrder: 5,
-    
+
     // Dimensions
     dimensions: {
       width: 1440,
       height: 900,
       unit: 'px'
     },
-    
+
     // Sales/Status
     forSale: false,
     status: 'published' as ArtworkStatus,
-    
+
     // Visibility & Permissions
     visibility: 'public' as GalleryVisibility,
     ownerId: 'dev-user-123',
-    
+
     // Timestamps
     createdAt: new Date('2024-01-21T16:00:00Z'),
     updatedAt: new Date('2024-01-21T16:00:00Z'),
     publishedAt: new Date('2024-01-21T16:00:00Z'),
-    
+
     // Tags & Categories
     tags: ['React', 'Node.js', 'Education', 'Video Streaming'],
     category: 'Digital' as ArtworkCategory,
-    
+
     // Upload metadata
     uploadedBy: 'dev-user-123',
     originalFileName: 'lms-dashboard.png',
     fileSize: 2.8,
     mimeType: 'image/png',
-    
+
     // Portfolio/Social Features
     portfolioId: 'portfolio-dev-123',
     views: 198,
