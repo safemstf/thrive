@@ -298,6 +298,11 @@ export interface Portfolio extends BaseEntity {
     linkedin?: string;
     behance?: string;
     github?: string;
+    etsy?: string;
+    youtube?: string;
+    pinterest?: string;
+    spotify?: string;
+    soundcloud?: string;
   };
   contactEmail?: string;
   showContactInfo: boolean;

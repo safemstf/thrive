@@ -33,10 +33,6 @@ const LifeSimulation = dynamic(() => import('@/components/cs/life/life'), {
   loading: () => <SimulationLoader>Loading Game of Life...</SimulationLoader>
 });
 
-const AlgorithmVisualizer = dynamic(() => import('@/components/cs/algorithms/algorithms'), {
-  ssr: false,
-  loading: () => <SimulationLoader>Loading Algorithm Explorer...</SimulationLoader>
-});
 
 const AdvancedBacteremiaSimulator = dynamic(() => import('@/components/cs/bacteria/bacteria'), {
   ssr: false,
@@ -44,7 +40,7 @@ const AdvancedBacteremiaSimulator = dynamic(() => import('@/components/cs/bacter
 });
 
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'algorithms' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'parallel-model' | 'amdahl' | 'masters-visual' | 'wireless';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'parallel-model' | 'amdahl' | 'masters-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection';
 type TabType = 'simulations' | 'algorithms';
 
 interface SimulationItem {
@@ -603,16 +599,6 @@ const allItems: SimulationItem[] = [
   },
   // Algorithms
   {
-    key: 'algorithms',
-    label: 'Algorithm Explorer',
-    icon: <Bone size={24} />,
-    color: '#44efd5',
-    description: 'Interactive learning platform for core algorithms',
-    optimized: false,
-    featured: false,
-    category: 'algorithms'
-  },
-  {
     key: 'maze',
     label: 'Pathfinding Derby',
     icon: <Grid size={24} />,
@@ -651,6 +637,31 @@ const allItems: SimulationItem[] = [
     color: '#7c3aed',
     description: 'Recursion-tree visualizer for complexity analysis',
     optimized: true,
+    featured: false,
+    comingSoon: true,
+    category: 'algorithms'
+  },
+    
+    // todo:
+    // fourier transform based neural networks. simulation/algorithm module
+  {
+    key: 'FourierTransform-NeuralNetwork',
+    label: 'Fourier Transform Neural Network',
+    icon: <Wifi size={24} />,
+    color: '#d47406ff',
+    description: 'Exploring Fourier transform in neural networks',
+    optimized: false,
+    featured: false,
+    comingSoon: true,
+    category: 'algorithms'
+  },
+   {
+    key: 'FourierTransformNetworkErrorCorrection',
+    label: 'Wireless Networks Error Corretion',
+    icon: <Wifi size={24} />,
+    color: '#06d4a0ff',
+    description: 'Exploring wirless network error correction',
+    optimized: false,
     featured: false,
     comingSoon: true,
     category: 'algorithms'
@@ -727,15 +738,6 @@ export default function SimulationsPage() {
           />
         );
       
-      case 'algorithms':
-        return (
-          <AlgorithmVisualizer 
-            isRunning={isRunning} 
-            speed={speed}
-            isDark={false}
-          />
-        );
-
       case 'bacteria-phage':
         return (
           <AdvancedBacteremiaSimulator

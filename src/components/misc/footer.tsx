@@ -225,15 +225,6 @@ export function Footer({ className }: FooterProps) {
           <FooterLink href="/privacy">Privacy Policy</FooterLink>
           <FooterLink href="/terms">Terms of Service</FooterLink>
         </FooterSection>
-
-        <FooterSection>
-          <h3>Stay Connected</h3>
-          <FooterText>
-            Get the latest updates, tips, and community highlights delivered to your inbox.
-          </FooterText>
-          <FooterLink href="/newsletter">Join Newsletter</FooterLink>
-          <FooterLink href="/discord">Discord Community</FooterLink>
-        </FooterSection>
       </FooterContent>
 
       <FooterBottom>

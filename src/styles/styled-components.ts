@@ -206,13 +206,13 @@ export const Section = styled.section<{ $spacing?: 'sm' | 'md' | 'lg' | 'xl' }>`
   
   @media (max-width: 768px) {
     padding: ${({ $spacing = 'lg' }) => {
-      switch ($spacing) {
-        case 'sm': return 'var(--spacing-lg) 0';
-        case 'md': return 'var(--spacing-xl) 0';
-        case 'lg': return 'var(--spacing-2xl) 0';
-        case 'xl': return 'var(--spacing-3xl) 0';
-      }
-    }};
+    switch ($spacing) {
+      case 'sm': return 'var(--spacing-lg) 0';
+      case 'md': return 'var(--spacing-xl) 0';
+      case 'lg': return 'var(--spacing-2xl) 0';
+      case 'xl': return 'var(--spacing-3xl) 0';
+    }
+  }};
   }
 `;
 
@@ -226,9 +226,9 @@ export const Container = styled.div<{ $maxWidth?: string; $padding?: boolean }>`
   `}
 `;
 
-export const FlexRow = styled.div<{ 
-  $gap?: string; 
-  $align?: string; 
+export const FlexRow = styled.div<{
+  $gap?: string;
+  $align?: string;
   $justify?: string;
   $wrap?: boolean;
   $responsive?: boolean;
@@ -255,9 +255,9 @@ export const FlexColumn = styled.div<{ $gap?: string; $align?: string }>`
   gap: ${({ $gap = 'var(--spacing-md)' }) => $gap};
 `;
 
-export const Grid = styled.div<{ 
-  $columns?: number; 
-  $minWidth?: string; 
+export const Grid = styled.div<{
+  $columns?: number;
+  $minWidth?: string;
   $gap?: string;
   $responsive?: boolean;
 }>`
@@ -370,8 +370,8 @@ export const BodyText = styled.p<{ $size?: 'sm' | 'base' | 'lg' | 'xl' }>`
 // 6. COMPONENT EXPORTS (Enhanced with missing components)
 // ==============================================
 
-export const BaseButton = styled.button<{ 
-  $variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; 
+export const BaseButton = styled.button<{
+  $variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   $size?: 'sm' | 'md' | 'lg';
   $fullWidth?: boolean;
 }>`
@@ -485,16 +485,16 @@ export const BaseButton = styled.button<{
   }
 `;
 
-export const Card = styled.div<{ 
-  $hover?: boolean; 
+export const Card = styled.div<{
+  $hover?: boolean;
   $glass?: boolean;
   $padding?: 'sm' | 'md' | 'lg' | 'none';
 }>`
-  background: ${({ $glass }) => 
+  background: ${({ $glass }) =>
     $glass ? 'var(--glass-background)' : 'var(--color-background-secondary)'
   };
   border-radius: var(--radius-lg);
-  border: 1px solid ${({ $glass }) => 
+  border: 1px solid ${({ $glass }) =>
     $glass ? 'var(--glass-border)' : 'var(--color-border-light)'
   };
   box-shadow: var(--shadow-sm);
@@ -526,13 +526,13 @@ export const Card = styled.div<{
     
     @media (max-width: 768px) {
       padding: ${() => {
-        switch ($padding) {
-          case 'sm': return 'var(--spacing-sm)';
-          case 'md': return 'var(--spacing-md)';
-          case 'lg': return 'var(--spacing-lg)';
-          default: return 'var(--spacing-lg)';
-        }
-      }};
+      switch ($padding) {
+        case 'sm': return 'var(--spacing-sm)';
+        case 'md': return 'var(--spacing-md)';
+        case 'lg': return 'var(--spacing-lg)';
+        default: return 'var(--spacing-lg)';
+      }
+    }};
     }
   `}
 `;
@@ -548,12 +548,12 @@ export const CardContent = styled.div<{ $padding?: 'sm' | 'md' | 'lg' }>`
   
   @media (max-width: 768px) {
     padding: ${({ $padding = 'lg' }) => {
-      switch ($padding) {
-        case 'sm': return 'var(--spacing-sm)';
-        case 'md': return 'var(--spacing-md)';
-        case 'lg': return 'var(--spacing-lg)';
-      }
-    }};
+    switch ($padding) {
+      case 'sm': return 'var(--spacing-sm)';
+      case 'md': return 'var(--spacing-md)';
+      case 'lg': return 'var(--spacing-lg)';
+    }
+  }};
   }
 `;
 
@@ -616,8 +616,8 @@ export const EmptyState = styled.div<{ $minHeight?: string }>`
 `;
 
 // Enhanced Input component
-export const Input = styled.input<{ 
-  $size?: 'sm' | 'md' | 'lg'; 
+export const Input = styled.input<{
+  $size?: 'sm' | 'md' | 'lg';
   $error?: boolean;
   $hasIcon?: boolean;
 }>`
@@ -676,7 +676,7 @@ export const NavBar = styled.nav`
 `;
 
 // Login/Page Wrapper
-export const AuthPageWrapper = styled(PageContainer)<{ $variant?: 'login' | 'register' | 'default' }>`
+export const AuthPageWrapper = styled(PageContainer) <{ $variant?: 'login' | 'register' | 'default' }>`
   min-height: 100vh;
   display: flex;
   background: ${({ $variant }) => {
@@ -804,11 +804,11 @@ export const TabButton = styled.button<{ $active: boolean }>`
   flex: 1;
   padding: var(--spacing-md);
   border: none;
-  background: ${props => props.$active 
-    ? 'var(--color-background-secondary)' 
+  background: ${props => props.$active
+    ? 'var(--color-background-secondary)'
     : 'transparent'};
-  color: ${props => props.$active 
-    ? 'var(--color-text-primary)' 
+  color: ${props => props.$active
+    ? 'var(--color-text-primary)'
     : 'var(--color-text-secondary)'};
   border-radius: var(--radius-sm);
   font-family: var(--font-body);
@@ -818,9 +818,9 @@ export const TabButton = styled.button<{ $active: boolean }>`
   box-shadow: ${props => props.$active ? 'var(--shadow-sm)' : 'none'};
 
   &:hover {
-    background: ${props => props.$active 
-      ? 'var(--color-background-secondary)' 
-      : 'var(--color-background-tertiary)'};
+    background: ${props => props.$active
+    ? 'var(--color-background-secondary)'
+    : 'var(--color-background-tertiary)'};
   }
 `;
 
@@ -929,7 +929,7 @@ export const DevBadge = styled.span`
 `;
 
 // Assessment-specific components
-export const TimerCard = styled(Card)<{ $variant?: 'primary' | 'warning' | 'danger' }>`
+export const TimerCard = styled(Card) <{ $variant?: 'primary' | 'warning' | 'danger' }>`
   background: ${({ $variant = 'primary' }) => {
     switch ($variant) {
       case 'warning': return 'linear-gradient(135deg, #f59e0b, #d97706)';
@@ -943,7 +943,7 @@ export const TimerCard = styled(Card)<{ $variant?: 'primary' | 'warning' | 'dang
   box-shadow: var(--shadow-lg);
 `;
 
-export const QuestionButton = styled(BaseButton)<{ $status: 'unanswered' | 'answered' | 'current' }>`
+export const QuestionButton = styled(BaseButton) <{ $status: 'unanswered' | 'answered' | 'current' }>`
   aspect-ratio: 1;
   padding: 0;
   min-width: 40px;
@@ -979,17 +979,17 @@ export const WritingTaskContainer = styled(Card)`
   background: rgba(59, 130, 246, 0.02);
 `;
 
-export const DifficultyBadge = styled(Badge)<{ $difficulty?: 'beginner' | 'intermediate' | 'advanced' | 'expert' }>`
+export const DifficultyBadge = styled(Badge) <{ $difficulty?: 'beginner' | 'intermediate' | 'advanced' | 'expert' }>`
   ${({ $difficulty = 'intermediate' }) => {
     const colors = {
       beginner: '#10b981',
-      intermediate: '#3b82f6', 
+      intermediate: '#3b82f6',
       advanced: '#8b5cf6',
       expert: '#ef4444'
     };
     const color = colors[$difficulty];
     const rgb = color.slice(1).match(/.{2}/g)?.map(hex => parseInt(hex, 16)).join(', ') || '59, 130, 246';
-    
+
     return css`
       background: rgba(${rgb}, 0.1);
       color: ${color};
@@ -1034,7 +1034,7 @@ export const IconContainer = styled.div<{ $color?: string; $size?: 'sm' | 'md' |
     `;
   }}
   
-  background: ${({ $color = 'var(--color-primary-500)' }) => 
+  background: ${({ $color = 'var(--color-primary-500)' }) =>
     `linear-gradient(135deg, ${$color}, ${$color}dd)`};
   border-radius: var(--radius-md);
   display: flex;
@@ -1050,7 +1050,7 @@ export const IconContainer = styled.div<{ $color?: string; $size?: 'sm' | 'md' |
   }
 `;
 
-export const StatusBadge = styled(Badge)<{ $status: 'active' | 'inactive' | 'suspended' }>`
+export const StatusBadge = styled(Badge) <{ $status: 'active' | 'inactive' | 'suspended' }>`
   ${({ $status }) => {
     switch ($status) {
       case 'active':
@@ -1110,20 +1110,20 @@ export const responsive = {
 export const utils = {
   // Text utilities
   textGradient,
-  
+
   // Layout utilities
   responsiveContainer,
   glassEffect,
   focusRing,
-  
+
   // Animation utilities
   hoverLift,
-  
+
   // Responsive utilities
   breakpoints,
   responsive,
   media: responsive,
-  
+
   // CSS mixins
   mixins: {
     glassEffect,
@@ -1155,8 +1155,8 @@ export const ErrorContainer = styled.div`
 // ==============================================
 // TEXT AREA
 // ==============================================
-export const TextArea = styled.textarea<{ 
-  $size?: 'sm' | 'md' | 'lg'; 
+export const TextArea = styled.textarea<{
+  $size?: 'sm' | 'md' | 'lg';
   $error?: boolean;
 }>`
   font-family: var(--font-body);

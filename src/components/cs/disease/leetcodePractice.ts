@@ -11,6 +11,7 @@
  ******************************************************/
 
 import { Josefin_Slab } from "next/font/google";
+import { todo } from "node:test";
 import { MdMoney } from "react-icons/md";
 
 /**********************
@@ -1356,3 +1357,34 @@ return dp[totalTime];
 
 
 // Youtube Video: https://leetcode.com/problems/maximum-number-of-events-that-can-be-attended-ii/submissions/
+
+
+
+
+
+function sortAmazon(initialOrder: number[], result: number[]) {
+    let n = initialOrder;
+    if (n.length === 1) return initialOrder;
+    
+    let slow = 0;
+    let tmp = 0;
+
+    let r = result;
+
+    while (slow < n.length) {
+        if (slow === 0) {
+            tmp = n[slow];
+            slow++;
+        }
+        
+        if (slow > tmp) {
+            r.push(tmp)
+            tmp = slow;
+            slow++;
+        } else if (slow < tmp) {
+            r.push(slow);
+            slow++;
+        }
+    }
+    return r;
+}

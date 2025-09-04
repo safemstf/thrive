@@ -1,20 +1,19 @@
-// src/components/misc/header.tsx - Polished Header with Better UX
+// src/components/misc/header.tsx - Cleaned Header with Better UX
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import styled, { css, keyframes } from 'styled-components';
 import {
-  Menu, X, Search, Sun, Moon, User, Target, Settings, ArrowLeft,
-  GraduationCap, FolderOpen, Code, Brush, Circle, WifiOff, Wifi,
-  BarChart3, Award, BookOpen, ChevronLeft, ChevronRight
+  Menu, X, User, Settings, ArrowLeft,
+  Code, Brush, Circle, Wifi, WifiOff,
+  BookOpen, ChevronLeft, ChevronRight,
+  FileText, Mail
 } from 'lucide-react';
 import logoLight from '../../../public/assets/logo3.png';
-import logoDark from '../../../public/assets/logo3-dark.png';
 import { Taskbar } from './taskbar';
-import { FlexRow, FlexColumn, BaseButton, responsive } from '@/styles/styled-components';
 
 // ============================================
 // TYPES
@@ -72,7 +71,7 @@ interface HeaderProps {
 const fadeIn = keyframes`
   from { 
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(4px);
   }
   to { 
     opacity: 1;
@@ -85,132 +84,99 @@ const pulse = keyframes`
   50% { opacity: 1; }
 `;
 
-const slideIn = keyframes`
-  from { 
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  to { 
-    transform: translateX(0);
-    opacity: 1;
-  }
-`;
-
 // ============================================
 // HOOKS
 // ============================================
 
-function useMatrixSafe() {
-  return {
-    isMatrixOn: false,
-    toggleMatrix: () => { },
-    setMatrixOn: () => { },
-    isHydrated: true
-  };
-}
-
-function useDarkModeSafe() {
-  return {
-    isDarkMode: false,
-    isLoaded: true,
-    toggleDarkMode: () => { }
-  };
-}
-
 const useOptimizedScroll = () => {
-  const [scrollState, setScrollState] = useState({
-    isScrolled: false,
-    isVisible: true,
-    lastScrollY: 0
-  });
-
-  const lastYRef = useRef(0);
-  const tickingRef = useRef(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const ticking = useRef(false);
 
   useEffect(() => {
+    const updateScrollState = () => {
+      const scrollY = window.scrollY;
+      const scrollingDown = scrollY > lastScrollY.current;
+      
+      // Header becomes "scrolled" after 20px
+      setIsScrolled(scrollY > 20);
+      
+      // Always visible on desktop, hide on scroll down for mobile
+      if (window.innerWidth <= 768) {
+        if (scrollingDown && scrollY > 100) {
+          setIsVisible(false);
+        } else {
+          setIsVisible(true);
+        }
+      } else {
+        setIsVisible(true);
+      }
+      
+      lastScrollY.current = scrollY;
+      ticking.current = false;
+    };
+
     const handleScroll = () => {
-      if (!tickingRef.current) {
-        tickingRef.current = true;
-        requestAnimationFrame(() => {
-          const scrollY = window.scrollY;
-          const isScrolled = scrollY > 50;
-
-          // Simple visibility logic - always visible on desktop
-          setScrollState({
-            isScrolled,
-            isVisible: true,
-            lastScrollY: scrollY
-          });
-
-          tickingRef.current = false;
-        });
+      if (!ticking.current) {
+        window.requestAnimationFrame(updateScrollState);
+        ticking.current = true;
       }
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
+    handleScroll(); // Check initial state
 
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  return scrollState;
+  return { isScrolled, isVisible };
 };
 
 // ============================================
-// STYLED COMPONENTS - SIMPLIFIED AND PERFORMANT
+// STYLED COMPONENTS
 // ============================================
 
-const HeaderWrapper = styled.div<{ $withSidebar?: boolean }>`
+const HeaderWrapper = styled.div`
   position: relative;
-  ${props => props.$withSidebar && css`
-    display: flex;
-    flex-direction: column;
-  `}
 `;
 
-const HeaderContainer = styled.header<{ $scrolled: boolean; $matrixActive?: boolean }>`
+const HeaderContainer = styled.header<{ $scrolled: boolean; $visible: boolean }>`
   position: sticky;
   top: 0;
   z-index: 1001;
   
-  background: ${props => {
-    if (props.$matrixActive) {
-      return props.$scrolled
-        ? 'rgba(0, 15, 0, 0.95)'
-        : 'rgba(0, 20, 0, 0.85)';
-    }
-    return props.$scrolled
-      ? 'rgba(255, 255, 255, 0.95)'
-      : '#ffffff';
-  }};
+  transform: translateY(${props => props.$visible ? '0' : '-100%'});
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
-  backdrop-filter: ${props => props.$scrolled ? 'blur(20px)' : 'none'};
-  -webkit-backdrop-filter: ${props => props.$scrolled ? 'blur(20px)' : 'none'};
+  background: ${props => props.$scrolled
+    ? 'rgba(255, 255, 255, 0.95)'
+    : '#ffffff'
+  };
   
-  border-bottom: 1px solid ${props => {
-    if (props.$matrixActive) {
-      return 'rgba(34, 197, 94, 0.3)';
-    }
-    return props.$scrolled ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.08)';
-  }};
+  backdrop-filter: ${props => props.$scrolled ? 'blur(12px)' : 'none'};
+  -webkit-backdrop-filter: ${props => props.$scrolled ? 'blur(12px)' : 'none'};
   
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-bottom: 1px solid ${props => props.$scrolled 
+    ? 'rgba(0, 0, 0, 0.08)' 
+    : 'rgba(0, 0, 0, 0.05)'
+  };
+  
   box-shadow: ${props => props.$scrolled
     ? '0 4px 20px rgba(0, 0, 0, 0.08)'
-    : 'none'};
+    : 'none'
+  };
 `;
 
 const HeaderContent = styled.div<{ $scrolled: boolean }>`
   max-width: 1200px;
   margin: 0 auto;
-  padding: ${props => (props.$scrolled ? '0.75rem 1rem' : '1.25rem 1rem')};
+  padding: ${props => props.$scrolled ? '0.75rem 1rem' : '1.25rem 1rem'};
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1.25rem;
-  transition: padding 0.2s ease;
+  transition: padding 0.3s ease;
 
   @media (max-width: 768px) {
     padding: 1rem;
@@ -254,11 +220,10 @@ const BrandText = styled.div<{ $scrolled: boolean }>`
   }
 `;
 
-const BrandTitle = styled.span<{ $scrolled: boolean; $matrixActive?: boolean }>`
+const BrandTitle = styled.span<{ $scrolled: boolean }>`
   font-size: ${props => (props.$scrolled ? '1.25rem' : '1.6rem')};
-  font-family: system-ui, -apple-system, sans-serif;
   font-weight: 600;
-  color: ${props => props.$matrixActive ? '#22c55e' : '#1a1a1a'};
+  color: #1a1a1a;
   letter-spacing: 0.5px;
   transition: font-size 0.2s ease;
 
@@ -267,10 +232,9 @@ const BrandTitle = styled.span<{ $scrolled: boolean; $matrixActive?: boolean }>`
   }
 `;
 
-const BrandSubtitle = styled.p<{ $scrolled: boolean; $matrixActive?: boolean }>`
+const BrandSubtitle = styled.p<{ $scrolled: boolean }>`
   font-size: ${props => (props.$scrolled ? '0.8rem' : '0.9rem')};
-  color: ${props => props.$matrixActive ? 'rgba(34, 197, 94, 0.8)' : '#666666'};
-  font-family: system-ui, -apple-system, sans-serif;
+  color: #666666;
   margin: 0;
   transition: font-size 0.2s ease;
 `;
@@ -302,8 +266,8 @@ const SidebarToggle = styled.button<{ $active: boolean }>`
 
   &:hover {
     background: ${props => props.$active
-    ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
-    : 'rgba(0, 0, 0, 0.08)'};
+      ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
+      : 'rgba(0, 0, 0, 0.08)'};
     transform: scale(1.02);
   }
 
@@ -334,7 +298,7 @@ const MobileMenuButton = styled.button`
 `;
 
 // ============================================
-// SIDEBAR - CLEAN AND PERFORMANT
+// SIDEBAR
 // ============================================
 
 const SidebarOverlay = styled.div<{ $visible: boolean }>`
@@ -352,13 +316,13 @@ const SidebarOverlay = styled.div<{ $visible: boolean }>`
   }
 `;
 
-const SidebarContainer = styled.aside<{ $visible: boolean; $mobile?: boolean }>`
+const SidebarContainer = styled.aside<{ $visible: boolean }>`
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
   width: 280px;
-  z-index: 1002;
+  z-index: 1003;
   
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(24px);
@@ -366,17 +330,8 @@ const SidebarContainer = styled.aside<{ $visible: boolean; $mobile?: boolean }>`
   border-right: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.08);
   
-  /* Desktop: slide in/out cleanly */
-  @media (min-width: 1025px) {
-    transform: translateX(${props => props.$visible ? '0' : '-100%'});
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  /* Mobile: overlay pattern */
-  @media (max-width: 1024px) {
-    transform: translateX(${props => props.$visible ? '0' : '-100%'});
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
+  transform: translateX(${props => props.$visible ? '0' : '-100%'});
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
   overflow-y: auto;
   overflow-x: hidden;
@@ -405,11 +360,6 @@ const SidebarHeader = styled.div`
   padding: 1.5rem;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.03), rgba(139, 92, 246, 0.03));
-  
-  /* CRITICAL: First child offset to prevent header overlap */
-  &:first-child {
-    margin-top: 0px; /* Offset for header height */
-  }
 `;
 
 const SidebarSection = styled.div`
@@ -419,8 +369,6 @@ const SidebarSection = styled.div`
   &:last-child {
     border-bottom: none;
     margin-top: auto;
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.01));
-    border-radius: 12px 12px 0 0;
   }
 `;
 
@@ -432,6 +380,31 @@ const SectionTitle = styled.h3`
   letter-spacing: 0.5px;
   margin: 0 0 1rem 0;
   opacity: 0.8;
+`;
+
+const CloseButton = styled.button`
+  display: none;
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 0.5rem;
+  color: #666666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  @media (max-width: 1024px) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  &:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1a1a1a;
+  }
 `;
 
 const UserInfo = styled.div`
@@ -562,7 +535,6 @@ const PortfolioCard = styled.div<{ $color: string }>`
   border: 1px solid ${props => `${props.$color}15`};
   border-radius: 12px;
   padding: 1rem;
-  margin-bottom: 0.75rem;
 `;
 
 const PortfolioHeader = styled.div`
@@ -601,7 +573,7 @@ const NavList = styled.div`
   gap: 0.25rem;
 `;
 
-const NavItem = styled(Link) <{ $active?: boolean }>`
+const NavItem = styled(Link)<{ $active?: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -640,15 +612,12 @@ const ActionButton = styled.button`
   font-size: 0.85rem;
   font-weight: 500;
   margin-bottom: 0.5rem;
-  position: relative;
-  overflow: hidden;
   
   &:hover {
     background: rgba(0, 0, 0, 0.03);
     border-color: rgba(0, 0, 0, 0.15);
     color: #1a1a1a;
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   }
   
   &.logout {
@@ -659,32 +628,11 @@ const ActionButton = styled.button`
     &:hover {
       background: linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(239, 68, 68, 0.08));
       border-color: rgba(239, 68, 68, 0.25);
-      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
-    }
-    
-    &:before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-      transition: left 0.5s;
-    }
-    
-    &:hover:before {
-      left: 100%;
     }
   }
   
   svg {
     flex-shrink: 0;
-    transition: transform 0.2s ease;
-  }
-  
-  &:hover svg {
-    transform: scale(1.1);
   }
 `;
 
@@ -722,26 +670,33 @@ export function Header({
   withSidebar = false,
   sidebarConfig = {}
 }: HeaderProps) {
-  const { isScrolled } = useOptimizedScroll();
+  const { isScrolled, isVisible } = useOptimizedScroll();
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const pathname = usePathname();
+  const sidebarRef = useRef<HTMLElement>(null);
 
-  const { isDarkMode } = useDarkModeSafe();
-  const { isMatrixOn } = useMatrixSafe();
-
-  // Handle escape key and body scroll
+  // Handle escape key and body scroll lock
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSidebarVisible(false);
-        setIsMobileMenuOpen(false);
       }
     };
 
-    if (sidebarVisible || isMobileMenuOpen) {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Only for desktop sidebar
+      if (window.innerWidth > 1024 && 
+          sidebarRef.current && 
+          !sidebarRef.current.contains(event.target as Node)) {
+        setSidebarVisible(false);
+      }
+    };
+
+    if (sidebarVisible) {
       document.addEventListener('keydown', handleEscape);
+      document.addEventListener('mousedown', handleClickOutside);
+      
       // Only lock scroll on mobile
       if (window.innerWidth <= 1024) {
         document.body.style.overflow = 'hidden';
@@ -752,22 +707,24 @@ export function Header({
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('mousedown', handleClickOutside);
       document.body.style.overflow = '';
     };
-  }, [sidebarVisible, isMobileMenuOpen]);
+  }, [sidebarVisible]);
 
   const toggleSidebar = () => setSidebarVisible(prev => !prev);
   const closeSidebar = () => setSidebarVisible(false);
 
   return (
-    <HeaderWrapper $withSidebar={withSidebar}>
-      <HeaderContainer $scrolled={isScrolled} $matrixActive={isMatrixOn}>
+    <HeaderWrapper>
+      <HeaderContainer $scrolled={isScrolled} $visible={isVisible}>
         <HeaderContent $scrolled={isScrolled}>
+          {/* Logo Section */}
           <LogoSection href="/" aria-label="Go to homepage">
             <LogoImageContainer $scrolled={isScrolled}>
               <Image
-                src={isDarkMode ? logoDark : logoLight}
-                alt="Learn Morra Logo"
+                src={logoLight}
+                alt="Logo"
                 sizes="72px"
                 priority
                 style={{
@@ -781,17 +738,18 @@ export function Header({
               />
             </LogoImageContainer>
             <BrandText $scrolled={isScrolled}>
-              <BrandTitle $scrolled={isScrolled} $matrixActive={isMatrixOn}>
+              <BrandTitle $scrolled={isScrolled}>
                 {title}
               </BrandTitle>
               {subtitle && (
-                <BrandSubtitle $scrolled={isScrolled} $matrixActive={isMatrixOn}>
+                <BrandSubtitle $scrolled={isScrolled}>
                   {subtitle}
                 </BrandSubtitle>
               )}
             </BrandText>
           </LogoSection>
 
+          {/* Desktop Actions */}
           <DesktopNav>
             {withSidebar && (
               <SidebarToggle
@@ -805,6 +763,7 @@ export function Header({
             <Taskbar isScrolled={isScrolled} />
           </DesktopNav>
 
+          {/* Mobile Menu Button */}
           <MobileMenuButton
             onClick={toggleSidebar}
             aria-label="Open menu"
@@ -814,11 +773,14 @@ export function Header({
         </HeaderContent>
       </HeaderContainer>
 
-      {/* Sidebar with clean UX */}
+      {/* Sidebar */}
       {withSidebar && (
         <>
           <SidebarOverlay $visible={sidebarVisible} onClick={closeSidebar} />
-          <SidebarContainer $visible={sidebarVisible}>
+          <SidebarContainer ref={sidebarRef} $visible={sidebarVisible}>
+            <CloseButton onClick={closeSidebar}>
+              <X size={18} />
+            </CloseButton>
 
             {/* Header Section */}
             <SidebarHeader>
@@ -863,7 +825,7 @@ export function Header({
             )}
 
             {/* Portfolio Section */}
-            {sidebarConfig.portfolio && sidebarConfig.portfolioSections && sidebarConfig.portfolioSections.length > 0 && (
+            {sidebarConfig.portfolio && sidebarConfig.portfolioSections && (
               <SidebarSection>
                 <SectionTitle>Portfolio</SectionTitle>
                 <PortfolioCard $color={getPortfolioTypeColor(sidebarConfig.portfolio.kind)}>
@@ -921,7 +883,6 @@ export function Header({
                 </ActionButton>
               )}
             </SidebarSection>
-
           </SidebarContainer>
         </>
       )}
