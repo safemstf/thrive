@@ -1,18 +1,21 @@
-// src/app/talkohtaco/page.tsx
+// src\app\talkohtaco\page.tsx
+
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-import styled, { keyframes, css } from 'styled-components';
-import { Search, Sparkles, Zap, AlertCircle } from 'lucide-react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import styled, { keyframes } from 'styled-components';
+import { Search, Sparkles, Zap, AlertCircle, Bot, User, Send, X, Download, Cpu, Check, Loader, Globe, Heart } from 'lucide-react';
 import { JSX } from 'react';
+import OptimizedChat, { OptimizedModelManager, AGENT_PERSONALITIES } from '@/components/llm/webLLM';
 
 /* ==========================
-   MOCK AGENTS (categorized + statuses)
+   ENHANCED TYPES & INTERFACES
    ========================== */
+
 type AgentStatus = 'ready' | 'inDev';
 type AgentCategory = 'language' | 'coding' | 'creative';
 
-const agents: Array<{
+interface Agent {
     id: number;
     name: string;
     role: string;
@@ -20,35 +23,796 @@ const agents: Array<{
     status: AgentStatus;
     tags?: string[];
     short?: string;
-}> = [
-        { id: 1, name: 'Lexi', role: 'English Conversation', category: 'language', status: 'ready', tags: ['conversation', 'IELTS'], short: 'Friendly conversation practice' },
-        { id: 2, name: 'Kai', role: 'Spanish Pronunciation', category: 'language', status: 'ready', tags: ['pronunciation'], short: 'Phonetics & accent work' },
-        { id: 3, name: 'Sana', role: 'French Grammar', category: 'language', status: 'ready', tags: ['grammar'], short: 'Focused grammar drills' },
-        { id: 4, name: 'Ryo', role: 'Japanese Culture & Phrases', category: 'language', status: 'inDev', tags: ['phrases', 'culture'], short: 'Short cultural lessons + phrases' },
-        { id: 5, name: 'Elara', role: 'German Fluency', category: 'language', status: 'inDev', tags: ['fluency'], short: 'Conversation and fluency training' },
-        { id: 6, name: 'Mei', role: 'Mandarin Tone Practice', category: 'language', status: 'ready', tags: ['tones'], short: 'Tone drills and listening' },
+    systemPrompt: string;
+    nativeLanguage?: string;
+    specialties?: string[];
+    difficulty?: 'beginner' | 'intermediate' | 'advanced' | 'all';
+}
 
-        { id: 13, name: 'Jax', role: 'JavaScript Mentor', category: 'coding', status: 'ready', tags: ['JavaScript', 'ESNext'], short: 'Code explanations & exercises' },
-        { id: 14, name: 'Navi', role: 'React & Next.js Tutor', category: 'coding', status: 'inDev', tags: ['React', 'Next.js'], short: 'Project-based help (coming soon)' },
-        { id: 15, name: 'Pyra', role: 'Python Debugging Assistant', category: 'coding', status: 'inDev', tags: ['Python'], short: 'Debugging and idiomatic fixes' },
-
-        { id: 21, name: 'Aria', role: 'Perfect Pitch Training', category: 'creative', status: 'ready', tags: ['music', 'pitch'], short: 'Ear training and pitch identification' },
-        { id: 22, name: 'Lyra', role: 'Music Theory & Composition', category: 'creative', status: 'inDev', tags: ['music'], short: 'Theory lessons & composing tips' },
-        { id: 23, name: 'Pixel', role: 'Digital Art & Design', category: 'creative', status: 'ready', tags: ['design'], short: 'Critique & technique guidance' },
-    ];
+interface SearchFilters {
+    query: string;
+    category: 'all' | AgentCategory;
+    status: 'all' | AgentStatus;
+    language: 'all' | 'english' | 'spanish' | 'french' | 'chinese' | 'multilingual';
+    difficulty: 'all' | 'beginner' | 'intermediate' | 'advanced';
+}
 
 /* ==========================
-   ANIMATIONS & STYLES
+   ENHANCED AGENT DATA
+   ========================== */
+
+const OPTIMIZED_AGENTS: Agent[] = [
+    // Language Learning Agents
+    {
+        id: 1,
+        name: 'Lexi',
+        role: 'Arabic Teacher',
+        category: 'language',
+        status: 'ready',
+        tags: ['conversation', 'grammar', 'Arabic', 'pronunciation', 'writing'],
+        short: 'Friendly and supportive Arabic tutor for learners of all levels',
+        nativeLanguage: 'Arabic',
+        specialties: [
+            'conversational Arabic',
+            'grammar basics',
+            'pronunciation practice',
+            'reading & writing',
+            'daily expressions'
+        ],
+        difficulty: 'all',
+        systemPrompt: 'Enhanced system prompt handled by AGENT_PERSONALITIES'
+    },
+    {
+        id: 2,
+        name: 'Kai',
+        role: 'Spanish Teacher',
+        category: 'language',
+        status: 'ready',
+        tags: ['pronunciation', 'conversation', 'grammar', 'español', 'cultura'],
+        short: 'Patient Spanish teaching with cultural immersion',
+        nativeLanguage: 'Spanish',
+        specialties: ['pronunciation', 'conversational Spanish', 'grammar', 'cultural context'],
+        difficulty: 'all',
+        systemPrompt: 'Enhanced system prompt handled by AGENT_PERSONALITIES'
+    },
+    {
+        id: 3,
+        name: 'Sana',
+        role: 'French Teacher',
+        category: 'language',
+        status: 'ready',
+        tags: ['grammar', 'conversation', 'pronunciation', 'français', 'culture'],
+        short: 'Systematic French teaching with proper accent',
+        nativeLanguage: 'French',
+        specialties: ['French grammar', 'pronunciation', 'conversation', 'formal French'],
+        difficulty: 'all',
+        systemPrompt: 'Enhanced system prompt handled by AGENT_PERSONALITIES'
+    },
+    {
+        id: 6,
+        name: 'Mei',
+        role: 'Mandarin Teacher',
+        category: 'language',
+        status: 'ready',
+        tags: ['tones', 'pronunciation', 'characters', '中文', 'pinyin'],
+        short: 'Encouraging Mandarin with tone mastery focus',
+        nativeLanguage: 'Mandarin',
+        specialties: ['tone practice', 'character recognition', 'pronunciation', 'conversational Mandarin'],
+        difficulty: 'all',
+        systemPrompt: 'Enhanced system prompt handled by AGENT_PERSONALITIES'
+    },
+
+    // Coding Mentors
+    {
+        id: 13,
+        name: 'Jax',
+        role: 'JavaScript Mentor',
+        category: 'coding',
+        status: 'ready',
+        tags: ['JavaScript', 'ESNext', 'coding', 'web development', 'React'],
+        short: 'Enthusiastic code mentoring & practical exercises',
+        nativeLanguage: 'English',
+        specialties: ['modern JavaScript', 'ES6+', 'debugging', 'best practices'],
+        difficulty: 'intermediate',
+        systemPrompt: 'You are Jax, an enthusiastic JavaScript mentor. Focus on practical coding, modern ES6+ features, and building real projects.'
+    },
+
+    // Creative Arts
+    {
+        id: 21,
+        name: 'Aria',
+        role: 'Music Theory & Ear Training',
+        category: 'creative',
+        status: 'ready',
+        tags: ['music', 'pitch', 'theory', 'ear training', 'intervals'],
+        short: 'Musical ear training & perfect pitch development',
+        nativeLanguage: 'English',
+        specialties: ['perfect pitch', 'interval recognition', 'music theory', 'ear training'],
+        difficulty: 'all',
+        systemPrompt: 'You are Aria, a musical teacher specializing in ear training and music theory. Help develop perfect pitch and musical understanding.'
+    },
+    {
+        id: 23,
+        name: 'Pixel',
+        role: 'Digital Art & Design',
+        category: 'creative',
+        status: 'ready',
+        tags: ['design', 'art', 'creativity', 'digital art', 'composition'],
+        short: 'Creative design mentoring & artistic development',
+        nativeLanguage: 'English',
+        specialties: ['digital art', 'color theory', 'composition', 'design critique'],
+        difficulty: 'all',
+        systemPrompt: 'You are Pixel, a creative art mentor. Provide constructive feedback on artwork and teach design principles.'
+    },
+
+    // In Development Agents
+    {
+        id: 4,
+        name: 'Ryo',
+        role: 'Japanese Culture & Language',
+        category: 'language',
+        status: 'inDev',
+        tags: ['phrases', 'culture', 'conversation', '日本語'],
+        short: 'Cultural immersion + language fundamentals',
+        nativeLanguage: 'Japanese',
+        difficulty: 'beginner',
+        systemPrompt: ''
+    },
+    {
+        id: 5,
+        name: 'Elara',
+        role: 'German Teacher',
+        category: 'language',
+        status: 'inDev',
+        tags: ['fluency', 'grammar', 'conversation', 'Deutsch'],
+        short: 'Comprehensive German instruction',
+        nativeLanguage: 'German',
+        difficulty: 'all',
+        systemPrompt: ''
+    },
+    {
+        id: 14,
+        name: 'Navi',
+        role: 'React & Next.js Tutor',
+        category: 'coding',
+        status: 'inDev',
+        tags: ['React', 'Next.js', 'web development'],
+        short: 'Modern web development mentoring',
+        difficulty: 'intermediate',
+        systemPrompt: ''
+    },
+    {
+        id: 15,
+        name: 'Pyra',
+        role: 'Python Debugging Assistant',
+        category: 'coding',
+        status: 'inDev',
+        tags: ['Python', 'debugging', 'algorithms'],
+        short: 'Debugging and idiomatic Python',
+        difficulty: 'intermediate',
+        systemPrompt: ''
+    },
+    {
+        id: 22,
+        name: 'Lyra',
+        role: 'Music Theory & Composition',
+        category: 'creative',
+        status: 'inDev',
+        tags: ['music', 'composition', 'theory'],
+        short: 'Advanced theory & composing guidance',
+        difficulty: 'advanced',
+        systemPrompt: ''
+    },
+];
+
+/* ==========================
+   PERFORMANCE OPTIMIZED COMPONENTS
+   ========================== */
+
+// Memoized avatar component for better performance
+const MemoizedAvatar = React.memo(function AnimatedAvatar({
+    name,
+    id,
+    size = 84,
+    nativeLanguage
+}: {
+    name: string;
+    id: number;
+    size?: number;
+    nativeLanguage?: string;
+}) {
+    const seed = useMemo(() => {
+        let h = 2166136261 >>> 0;
+        const str = String(id) + ':' + name;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 16777619) >>> 0;
+        }
+        return h;
+    }, [id, name]);
+
+    const faceGradients = [
+        ['#ffd7b5', '#ffc29f'],
+        ['#ffe7d6', '#ffd1b3'],
+        ['#f8d7ff', '#f2b8ff'],
+        ['#dbeafe', '#bfdbfe'],
+        ['#dffcd6', '#baf5a6'],
+    ];
+
+    const hairColors = ['#1f2937', '#334155', '#6b21a8', '#0ea5a4', '#b45309', '#7c3aed'];
+
+    const grad = faceGradients[seed % faceGradients.length];
+    const hair = hairColors[(seed >> 8) % hairColors.length];
+    const eyeType = (seed >> 16) % 3;
+    const mouthType = (seed >> 20) % 3;
+    const tilt = ((seed % 11) - 5) * 0.7;
+
+    const initials = useMemo(() => {
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+        return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+    }, [name]);
+
+    return (
+        <AvatarWrapper $size={size} style={{ transform: `rotate(${tilt}deg)` }}>
+            <svg viewBox="0 0 120 120" width={size} height={size} role="img" aria-label={`${name} avatar`}>
+                <defs>
+                    <linearGradient id={`fg-${id}`} x1="0" x2="1" y1="0" y2="1">
+                        <stop offset="0%" stopColor={grad[0]} />
+                        <stop offset="100%" stopColor={grad[1]} />
+                    </linearGradient>
+                    <filter id={`soft-${id}`} x="-30%" y="-30%" width="160%" height="160%">
+                        <feDropShadow dx="0" dy="6" stdDeviation="12" floodColor="#000000" floodOpacity="0.08" />
+                    </filter>
+                </defs>
+
+                <g filter={`url(#soft-${id})`}>
+                    <circle cx="60" cy="54" r="36" fill={`url(#fg-${id})`} />
+                </g>
+
+                <g transform="translate(0, -6)">
+                    <path
+                        d="M26 40c6-18 28-24 48-18 8 2 14 8 18 16 2 6 2 12-2 16-8 8-42 18-64 2-4-3-5-12-0-16z"
+                        fill={hair}
+                        opacity="0.95"
+                    />
+                </g>
+
+                <g>
+                    <g transform="translate(36,52)">
+                        <ellipse cx="0" cy="0" rx="7" ry="5.5" fill="#fff" />
+                        {eyeType === 0 && <circle cx="0" cy="0" r="2.2" fill="#111827" />}
+                        {eyeType === 1 && (
+                            <>
+                                <circle cx="0" cy="0" r="3.6" fill="#0f172a" />
+                                <circle cx="-0.8" cy="-0.8" r="1.1" fill="#ffffff" opacity="0.9" />
+                            </>
+                        )}
+                        {eyeType === 2 && <ellipse cx="0" cy="0.3" rx="2.6" ry="3.2" fill="#0b1220" />}
+                        <BlinkingEyeLid x="-8" y="-6" width="16" height="12" rx="6" fill={`url(#fg-${id})`} />
+                    </g>
+
+                    <g transform="translate(84,52)">
+                        <ellipse cx="0" cy="0" rx="7" ry="5.5" fill="#fff" />
+                        {eyeType === 0 && <circle cx="0" cy="0" r="2.2" fill="#111827" />}
+                        {eyeType === 1 && (
+                            <>
+                                <circle cx="0" cy="0" r="3.6" fill="#0f172a" />
+                                <circle cx="-0.8" cy="-0.8" r="1.1" fill="#ffffff" opacity="0.9" />
+                            </>
+                        )}
+                        {eyeType === 2 && <ellipse cx="0" cy="0.3" rx="2.6" ry="3.2" fill="#0b1220" />}
+                        <BlinkingEyeLid x="-8" y="-6" width="16" height="12" rx="6" fill={`url(#fg-${id})`} />
+                    </g>
+                </g>
+
+                <g>
+                    <ellipse cx="44" cy="70" rx="6.5" ry="3.5" fill="#ffdede" opacity="0.6" />
+                    <ellipse cx="76" cy="70" rx="6.5" ry="3.5" fill="#ffdede" opacity="0.6" />
+                </g>
+
+                <g transform="translate(60,82)">
+                    {mouthType === 0 && (
+                        <path d="M-10 0 C -6 8, 6 8, 10 0" fill="transparent" stroke="#111827" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" transform="scale(1,0.9)" />
+                    )}
+                    {mouthType === 1 && (
+                        <path d="M-12 0 C -6 12, 6 12, 12 0 C 6 6, -6 6, -12 0" fill="#111827" opacity="0.07" />
+                    )}
+                    {mouthType === 2 && (
+                        <>
+                            <BreathingMouth cx="0" cy="0" rx="8" ry="4.6" fill="#111827" opacity="0.95" />
+                            <ellipse cx="0" cy="0.6" rx="4.2" ry="2.2" fill="#fff" opacity="0.08" />
+                        </>
+                    )}
+                </g>
+
+                <g transform="translate(60,106)">
+                    <rect x="-16" y="-10" width="32" height="20" rx="8" fill="rgba(255,255,255,0.6)" opacity="0.75" />
+                    <text x="0" y="4" fontSize="9" textAnchor="middle" fill="#0f172a" fontWeight={700}>{initials}</text>
+                </g>
+
+                {/* Language indicator */}
+                {nativeLanguage && nativeLanguage !== 'English' && (
+                    <g transform="translate(95, 25)">
+                        <circle cx="0" cy="0" r="8" fill="#3b82f6" opacity="0.9" />
+                        <Globe x="-5" y="-5" width="10" height="10" fill="white" />
+                    </g>
+                )}
+            </svg>
+        </AvatarWrapper>
+    );
+});
+
+/* ==========================
+   INTELLIGENT SEARCH & FILTERING
+   ========================== */
+
+class AgentSearchEngine {
+    static searchAgents(agents: Agent[], filters: SearchFilters): Agent[] {
+        return agents.filter(agent => {
+            // Category filter
+            if (filters.category !== 'all' && agent.category !== filters.category) return false;
+
+            // Status filter
+            if (filters.status !== 'all' && agent.status !== filters.status) return false;
+
+            // Language filter
+            if (filters.language !== 'all') {
+                const langMap = {
+                    english: ['English'],
+                    spanish: ['Spanish'],
+                    french: ['French'],
+                    chinese: ['Mandarin', 'Chinese'],
+                    multilingual: ['Spanish', 'French', 'Mandarin', 'Chinese']
+                };
+
+                const targetLangs = langMap[filters.language as keyof typeof langMap];
+                if (targetLangs && !targetLangs.includes(agent.nativeLanguage || 'English')) return false;
+            }
+
+            // Difficulty filter
+            if (filters.difficulty !== 'all' && agent.difficulty && agent.difficulty !== 'all' && agent.difficulty !== filters.difficulty) return false;
+
+            // Query filter
+            if (filters.query.trim()) {
+                const query = filters.query.toLowerCase();
+                const searchableText = [
+                    agent.name,
+                    agent.role,
+                    agent.short || '',
+                    ...(agent.tags || []),
+                    ...(agent.specialties || []),
+                    agent.nativeLanguage || ''
+                ].join(' ').toLowerCase();
+
+                return searchableText.includes(query);
+            }
+
+            return true;
+        });
+    }
+
+    static getSuggestions(query: string, agents: Agent[]): string[] {
+        if (!query.trim()) return [];
+
+        const suggestions = new Set<string>();
+        const queryLower = query.toLowerCase();
+
+        agents.forEach(agent => {
+            // Check names
+            if (agent.name.toLowerCase().includes(queryLower)) {
+                suggestions.add(agent.name);
+            }
+
+            // Check tags
+            agent.tags?.forEach(tag => {
+                if (tag.toLowerCase().includes(queryLower)) {
+                    suggestions.add(tag);
+                }
+            });
+
+            // Check specialties
+            agent.specialties?.forEach(specialty => {
+                if (specialty.toLowerCase().includes(queryLower)) {
+                    suggestions.add(specialty);
+                }
+            });
+        });
+
+        return Array.from(suggestions).slice(0, 5);
+    }
+}
+
+/* ==========================
+   MAIN OPTIMIZED COMPONENT
+   ========================== */
+
+export default function OptimizedTalkOhTacoPage(): JSX.Element {
+    const [filters, setFilters] = useState<SearchFilters>({
+        query: '',
+        category: 'all',
+        status: 'all',
+        language: 'all',
+        difficulty: 'all'
+    });
+
+    const [toast, setToast] = useState<string | null>(null);
+    const [activeAgent, setActiveAgent] = useState<Agent | null>(null);
+    const [modelStatus, setModelStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
+    const [loadingProgress, setLoadingProgress] = useState(0);
+    const [loadingText, setLoadingText] = useState('');
+    const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+
+    const modelManager = OptimizedModelManager.getInstance();
+
+    // Memoized filtered agents for performance
+    const filteredAgents = useMemo(() => {
+        return AgentSearchEngine.searchAgents(OPTIMIZED_AGENTS, filters);
+    }, [filters]);
+
+    // Memoized statistics
+    const agentStats = useMemo(() => {
+        const total = OPTIMIZED_AGENTS.length;
+        const ready = OPTIMIZED_AGENTS.filter(a => a.status === 'ready').length;
+        const languages = new Set(OPTIMIZED_AGENTS.map(a => a.nativeLanguage).filter(Boolean)).size;
+
+        return { total, ready, languages, inDev: total - ready };
+    }, []);
+
+    // Toast auto-dismiss
+    useEffect(() => {
+        if (!toast) return;
+        const timer = setTimeout(() => setToast(null), 4000);
+        return () => clearTimeout(timer);
+    }, [toast]);
+
+    // Check if model is already ready
+    useEffect(() => {
+        if (modelManager.isModelReady()) {
+            setModelStatus('ready');
+        }
+    }, []);
+
+    // Update search suggestions
+    useEffect(() => {
+        if (filters.query.length > 1) {
+            const suggestions = AgentSearchEngine.getSuggestions(filters.query, OPTIMIZED_AGENTS);
+            setSearchSuggestions(suggestions);
+        } else {
+            setSearchSuggestions([]);
+        }
+    }, [filters.query]);
+
+    const handleLoadModel = async () => {
+        if (modelStatus === 'loading' || modelStatus === 'ready') return;
+
+        setModelStatus('loading');
+        setLoadingProgress(0);
+        setLoadingText('Initializing AI models...');
+
+        try {
+            await modelManager.loadModel((progress, text) => {
+                setLoadingProgress(progress);
+                setLoadingText(text);
+            });
+
+            setModelStatus('ready');
+            setToast(`🎉 AI models loaded! All ${agentStats.ready} agents ready for multilingual conversation.`);
+        } catch (error) {
+            console.error('Failed to load model:', error);
+            setModelStatus('idle');
+            setToast('❌ Failed to load AI models. Please check your connection and try again.');
+        }
+    };
+
+    const handleStartAgent = useCallback((agent: Agent) => {
+        if (agent.status === 'inDev') {
+            setToast(`🔧 ${agent.name} is in development. Coming soon with ${agent.nativeLanguage || 'enhanced'} capabilities!`);
+            return;
+        }
+
+        if (modelStatus !== 'ready') {
+            setToast('⚡ Please load the AI models first using the button above.');
+            return;
+        }
+
+        setActiveAgent(agent);
+    }, [modelStatus]);
+
+    const updateFilter = useCallback((key: keyof SearchFilters, value: string) => {
+        setFilters(prev => ({ ...prev, [key]: value }));
+    }, []);
+
+    const getModelButtonText = () => {
+        if (modelStatus === 'ready') return `Chat with ${agentStats.ready} Agents`;
+        if (modelStatus === 'loading') return `Loading... ${loadingProgress}%`;
+        return `Load AI Models (${agentStats.ready} agents, ${agentStats.languages} languages)`;
+    };
+
+    return (
+        <PageWrapper>
+            {/* Global model loading indicator */}
+            <ModelStatusBar $isVisible={modelStatus === 'loading'}>
+                <SpinningIcon $spinning={true}>
+                    <Cpu size={20} />
+                </SpinningIcon>
+                <div>
+                    <div style={{ fontWeight: 600 }}>{loadingText}</div>
+                    <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>
+                        {loadingProgress}% complete • Preparing multilingual AI
+                    </div>
+                </div>
+            </ModelStatusBar>
+
+            <Hero>
+                <HeroTitle>TalkOh—Taco: Learn A New Language!</HeroTitle>
+                <HeroSubtitle>
+                    Learn languages with native-speaking AI tutors, master coding with expert mentors,
+                    and develop creative skills. Powered by local AI running entirely in your browser.
+                </HeroSubtitle>
+
+                {/* Model Status & Load Button */}
+                {modelStatus !== 'ready' ? (
+                    <LoadAIButton
+                        $status={modelStatus}
+                        onClick={handleLoadModel}
+                        disabled={modelStatus === 'loading'}
+                    >
+                        <SpinningIcon $spinning={modelStatus === 'loading'}>
+                            {modelStatus === 'idle' && <Download size={20} />}
+                            {modelStatus === 'loading' && <Loader size={20} />}
+                        </SpinningIcon>
+                        {getModelButtonText()}
+                    </LoadAIButton>
+                ) : (
+                    <ReadyBadge>
+                        <Check size={18} />
+                        <div>
+                            <div style={{ fontWeight: 700 }}>🎯 AI Ready for Instant Chat!</div>
+                            <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>
+                                {agentStats.ready} agents • {agentStats.languages} languages • Offline-capable
+                            </div>
+                        </div>
+                    </ReadyBadge>
+                )}
+
+                {/* Enhanced Search */}
+                <SearchSection>
+                    <SearchContainer>
+                        <SearchIcon><Search size={20} /></SearchIcon>
+                        <SearchInput
+                            value={filters.query}
+                            onChange={(e) => updateFilter('query', e.target.value)}
+                            placeholder="Search agents, languages, skills (e.g. 'Spanish conversation', 'JavaScript debugging', 'music theory')"
+                        />
+                        {searchSuggestions.length > 0 && (
+                            <SearchSuggestions>
+                                {searchSuggestions.map(suggestion => (
+                                    <SuggestionItem
+                                        key={suggestion}
+                                        onClick={() => updateFilter('query', suggestion)}
+                                    >
+                                        {suggestion}
+                                    </SuggestionItem>
+                                ))}
+                            </SearchSuggestions>
+                        )}
+                    </SearchContainer>
+
+                    {/* Enhanced Filters */}
+                    <FilterRow>
+                        <FilterGroup>
+                            <FilterLabel>Category:</FilterLabel>
+                            <FilterPills>
+                                {(['all', 'language', 'coding', 'creative'] as const).map(cat => (
+                                    <FilterPill
+                                        key={cat}
+                                        $active={filters.category === cat}
+                                        onClick={() => updateFilter('category', cat)}
+                                    >
+                                        {cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                                    </FilterPill>
+                                ))}
+                            </FilterPills>
+                        </FilterGroup>
+
+                        <FilterGroup>
+                            <FilterLabel>Language:</FilterLabel>
+                            <FilterPills>
+                                {(['all', 'english', 'spanish', 'french', 'chinese', 'multilingual'] as const).map(lang => (
+                                    <FilterPill
+                                        key={lang}
+                                        $active={filters.language === lang}
+                                        onClick={() => updateFilter('language', lang)}
+                                    >
+                                        {lang === 'all' ? 'All' : lang.charAt(0).toUpperCase() + lang.slice(1)}
+                                    </FilterPill>
+                                ))}
+                            </FilterPills>
+                        </FilterGroup>
+
+                        <FilterGroup>
+                            <FilterLabel>Status:</FilterLabel>
+                            <FilterPills>
+                                <FilterPill
+                                    $active={filters.status === 'all'}
+                                    onClick={() => updateFilter('status', 'all')}
+                                >
+                                    All
+                                </FilterPill>
+                                <FilterPill
+                                    $active={filters.status === 'ready'}
+                                    onClick={() => updateFilter('status', 'ready')}
+                                >
+                                    Available ({agentStats.ready})
+                                </FilterPill>
+                                <FilterPill
+                                    $active={filters.status === 'inDev'}
+                                    onClick={() => updateFilter('status', 'inDev')}
+                                >
+                                    In Development ({agentStats.inDev})
+                                </FilterPill>
+                            </FilterPills>
+                        </FilterGroup>
+                    </FilterRow>
+                </SearchSection>
+            </Hero>
+
+            {/* Agents Grid */}
+            <AgentsSection>
+                <SectionHeader>
+                    <h2>Available AI Trainers</h2>
+                    <p>Choose your specialized AI tutor for personalized learning</p>
+                </SectionHeader>
+
+                <AgentsGrid>
+                    {filteredAgents.length === 0 ? (
+                        <EmptyState>
+                            <AlertCircle size={48} style={{ color: '#6b7280', marginBottom: '1rem' }} />
+                            <h3>No agents match your filters</h3>
+                            <p>Try adjusting your search criteria or browse all available agents.</p>
+                            <ResetFiltersButton
+                                onClick={() => setFilters({
+                                    query: '',
+                                    category: 'all',
+                                    status: 'all',
+                                    language: 'all',
+                                    difficulty: 'all'
+                                })}
+                            >
+                                <Sparkles size={16} />
+                                Show All Agents
+                            </ResetFiltersButton>
+                        </EmptyState>
+                    ) : (
+                        filteredAgents.map((agent) => (
+                            <AgentCard
+                                key={agent.id}
+                                $status={agent.status}
+                                $disabled={agent.status === 'ready' && modelStatus !== 'ready'}
+                            >
+                                <MemoizedAvatar
+                                    name={agent.name}
+                                    id={agent.id}
+                                    size={84}
+                                    nativeLanguage={agent.nativeLanguage}
+                                />
+
+                                <AgentName>
+                                    {agent.name}
+                                    {agent.nativeLanguage && agent.nativeLanguage !== 'English' && (
+                                        <LanguageBadge>
+                                            <Globe size={12} />
+                                            {agent.nativeLanguage}
+                                        </LanguageBadge>
+                                    )}
+                                    {agent.status === 'inDev' && (
+                                        <DevBadge>
+                                            <AlertCircle size={12} />
+                                            In Development
+                                        </DevBadge>
+                                    )}
+                                </AgentName>
+
+                                <AgentRole>{agent.role}</AgentRole>
+
+                                {agent.short && (
+                                    <AgentDescription>{agent.short}</AgentDescription>
+                                )}
+
+                                {agent.specialties && (
+                                    <SpecialtiesList>
+                                        {agent.specialties.slice(0, 3).map(specialty => (
+                                            <SpecialtyTag key={specialty}>{specialty}</SpecialtyTag>
+                                        ))}
+                                        {agent.specialties.length > 3 && (
+                                            <SpecialtyTag>+{agent.specialties.length - 3} more</SpecialtyTag>
+                                        )}
+                                    </SpecialtiesList>
+                                )}
+
+                                {agent.tags && (
+                                    <TagsList>
+                                        {agent.tags.slice(0, 4).map(tag => (
+                                            <Tag key={tag}>{tag}</Tag>
+                                        ))}
+                                    </TagsList>
+                                )}
+
+                                <ActionRow>
+                                    <PrimaryButton
+                                        onClick={() => handleStartAgent(agent)}
+                                        $disabled={agent.status === 'inDev' || (agent.status === 'ready' && modelStatus !== 'ready')}
+                                    >
+                                        <Sparkles size={14} />
+                                        {agent.status === 'inDev'
+                                            ? 'Preview'
+                                            : modelStatus === 'ready'
+                                                ? 'Start Chat'
+                                                : 'Load AI First'
+                                        }
+                                    </PrimaryButton>
+
+                                    <SecondaryButton
+                                        onClick={() => {
+                                            if (agent.status === 'inDev') {
+                                                setToast(`💡 ${agent.name} preview: Will teach ${agent.nativeLanguage || 'skills'} with focus on ${agent.short?.toLowerCase()}`);
+                                            } else {
+                                                const personality = AGENT_PERSONALITIES.get(agent.name);
+                                                const tips = personality?.languageRules.useNativeInGreeting
+                                                    ? `💬 ${agent.name} will greet you in ${agent.nativeLanguage} and provide bilingual explanations!`
+                                                    : `💡 ${agent.name} specializes in ${agent.short?.toLowerCase()}. Voice responses play automatically!`;
+                                                setToast(tips);
+                                            }
+                                        }}
+                                    >
+                                        <Heart size={14} />
+                                        {agent.status === 'inDev' ? 'Preview' : 'Tips'}
+                                    </SecondaryButton>
+                                </ActionRow>
+                            </AgentCard>
+                        ))
+                    )}
+                </AgentsGrid>
+            </AgentsSection>
+
+            {/* Active Chat */}
+            {activeAgent && (
+                <OptimizedChat
+                    agent={activeAgent}
+                    onClose={() => setActiveAgent(null)}
+                />
+            )}
+
+            {/* Toast Notifications */}
+            {toast && (
+                <ToastContainer>
+                    <ToastMessage>
+                        {toast}
+                    </ToastMessage>
+                </ToastContainer>
+            )}
+        </PageWrapper>
+    );
+}
+
+/* ==========================
+   OPTIMIZED STYLED COMPONENTS
    ========================== */
 
 const fadeInUp = keyframes`
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 `;
 
 const float = keyframes`
-  0%,100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+`;
+
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 `;
 
 const blink = keyframes`
@@ -61,10 +825,6 @@ const breathe = keyframes`
   50% { transform: translateY(-1px) scale(1.02); }
 `;
 
-/* ==========================
-   LAYOUT STYLES (kept from previous)
-   ========================== */
-
 const PageWrapper = styled.div`
   width: 100%;
   min-height: 100vh;
@@ -73,37 +833,54 @@ const PageWrapper = styled.div`
   font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
 `;
 
-/* HERO */
+const ModelStatusBar = styled.div<{ $isVisible: boolean }>`
+  position: fixed;
+  top: 320px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #3b82f6, #7c3aed);
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);
+  z-index: 1000;
+  display: ${({ $isVisible }) => $isVisible ? 'flex' : 'none'};
+  align-items: center;
+  gap: 1rem;
+  font-weight: 600;
+  max-width: 90vw;
+  animation: ${fadeInUp} 0.3s ease;
+`;
+
 const Hero = styled.section`
-  padding: 5.5rem 1.25rem 3rem;
+  padding: 6rem 1.5rem 4rem;
   text-align: center;
+  background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(139,92,246,0.03) 100%);
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(59,130,246,0.04) 0%, rgba(139,92,246,0.03) 100%);
-  margin-bottom: 1.5rem;
 
   &::before {
     content: "";
     position: absolute;
-    width: 720px;
-    height: 720px;
+    width: 800px;
+    height: 800px;
     border-radius: 50%;
     right: -20%;
     top: -30%;
     background: radial-gradient(circle, rgba(59,130,246,0.06), transparent 55%);
-    filter: blur(24px);
+    filter: blur(32px);
     z-index: 0;
-    animation: ${float} 18s ease-in-out infinite;
+    animation: ${float} 20s ease-in-out infinite;
   }
 `;
 
 const HeroTitle = styled.h1`
   position: relative;
   z-index: 1;
-  font-size: clamp(2.25rem, 4.5vw, 3.25rem);
+  font-size: clamp(2.5rem, 5vw, 3.5rem);
   font-weight: 800;
-  line-height: 1.05;
-  margin: 0 0 0.75rem;
+  line-height: 1.1;
+  margin: 0 0 1rem;
   background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -113,558 +890,468 @@ const HeroSubtitle = styled.p`
   position: relative;
   z-index: 1;
   color: #475569;
-  max-width: 820px;
-  margin: 0 auto 1.75rem;
-  font-size: 1.03rem;
+  max-width: 900px;
+  margin: 0 auto 2rem;
+  font-size: 1.125rem;
+  line-height: 1.6;
 `;
 
-/* Controls */
-const Controls = styled.div`
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 1.25rem;
-  flex-wrap: wrap;
+const LoadAIButton = styled.button<{ $status: 'idle' | 'loading' | 'ready' }>`
   position: relative;
   z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 2.5rem;
+  border-radius: 16px;
+  font-weight: 700;
+  font-size: 1.125rem;
+  border: none;
+  cursor: ${({ $status }) => $status === 'loading' ? 'not-allowed' : 'pointer'};
+  transition: all 0.3s ease;
+  margin-bottom: 2rem;
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.2);
+
+  ${({ $status }) => {
+        switch ($status) {
+            case 'idle':
+                return `
+          background: linear-gradient(135deg, #3b82f6, #7c3aed);
+          color: white;
+          &:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(59, 130, 246, 0.3); }
+        `;
+            case 'loading':
+                return `
+          background: linear-gradient(135deg, #f59e0b, #d97706);
+          color: white;
+        `;
+        }
+    }}
 `;
 
-const SearchWrap = styled.div`
+const ReadyBadge = styled.div`
   position: relative;
-  width: min(720px, 84%);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 16px;
+  margin-bottom: 2rem;
+  box-shadow: 0 12px 32px rgba(16, 185, 129, 0.2);
+  animation: ${fadeInUp} 0.5s ease;
 `;
 
-const SearchInput = styled.input`
-  width: 100%;
-  padding: 0.95rem 3.2rem 0.95rem 3.1rem;
-  border-radius: 9999px;
-  border: 1px solid #e6eef8;
-  background: white;
-  font-size: 1rem;
-  box-shadow: 0 6px 18px rgba(15,23,42,0.04);
-  transition: box-shadow 160ms ease, transform 160ms ease;
+const SpinningIcon = styled.div<{ $spinning: boolean }>`
+  display: flex;
+  align-items: center;
+  animation: ${({ $spinning }) => $spinning ? spin : 'none'} 2s linear infinite;
+`;
 
-  &:focus {
-    box-shadow: 0 10px 30px rgba(59,130,246,0.12);
-    outline: none;
-    transform: translateY(-1px);
-    border-color: #cfe4ff;
-  }
+const SearchSection = styled.div`
+  position: relative;
+  z-index: 1;
+  max-width: 1000px;
+  margin: 0 auto;
+`;
+
+const SearchContainer = styled.div`
+  position: relative;
+  width: 100%;
+  margin-bottom: 1.5rem;
 `;
 
 const SearchIcon = styled.div`
   position: absolute;
-  left: 1.05rem;
+  left: 1.25rem;
   top: 50%;
   transform: translateY(-50%);
   color: #94a3b8;
+  z-index: 2;
 `;
 
-/* Filter pills */
-const Pills = styled.div`
-  display:flex;
-  gap: .5rem;
-  align-items:center;
-  justify-content:center;
-  flex-wrap:wrap;
+const SearchInput = styled.input`
+  width: 100%;
+  padding: 1.25rem 3.5rem 1.25rem 3.5rem;
+  border-radius: 16px;
+  border: 1px solid #e6eef8;
+  background: white;
+  font-size: 1.125rem;
+  box-shadow: 0 8px 24px rgba(15,23,42,0.06);
+  transition: all 0.3s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 12px 32px rgba(59,130,246,0.15);
+    transform: translateY(-1px);
+  }
 `;
 
-const Pill = styled.button<{ $active?: boolean }>`
+const SearchSuggestions = styled.div`
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e6eef8;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15,23,42,0.1);
+  z-index: 10;
+  margin-top: 0.5rem;
+  overflow: hidden;
+`;
+
+const SuggestionItem = styled.button`
+  width: 100%;
+  padding: 0.75rem 1.25rem;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #374151;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: #f3f4f6;
+  }
+`;
+
+const FilterRow = styled.div`
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+`;
+
+const FilterGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const FilterLabel = styled.span`
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+`;
+
+const FilterPills = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+`;
+
+const FilterPill = styled.button<{ $active?: boolean }>`
   background: ${({ $active }) => ($active ? 'linear-gradient(135deg,#3b82f6,#7c3aed)' : 'white')};
   color: ${({ $active }) => ($active ? 'white' : '#334155')};
   border: 1px solid ${({ $active }) => ($active ? 'transparent' : '#e6eef8')};
-  padding: 0.45rem 0.9rem;
-  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  border-radius: 24px;
   font-weight: 600;
+  font-size: 0.875rem;
   cursor: pointer;
-  box-shadow: ${({ $active }) => ($active ? '0 8px 22px rgba(59,130,246,0.12)' : 'none')};
-  transition: all 180ms ease;
-`;
-
-/* Agents grid */
-const AgentsSection = styled.section`
-  padding: 3rem 1.25rem 6rem;
-  background: #fff;
-`;
-
-const Grid = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-  display: grid;
-  gap: 1.25rem;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-`;
-
-/* Agent card */
-const Card = styled.article<{ $status: AgentStatus }>`
-  background: linear-gradient(180deg, #fbfdff 0%, #f5f7fb 100%);
-  border-radius: 16px;
-  padding: 1.5rem;
-  text-align: center;
-  box-shadow: 0 6px 18px rgba(8,15,30,0.04);
-  transition: transform .22s cubic-bezier(.22,.9,.35,1), box-shadow .22s;
-  border: 1px solid ${({ $status }) => ($status === 'inDev' ? 'rgba(245,158,11,0.08)' : 'transparent')};
-
+  transition: all 0.3s ease;
+  
   &:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 18px 36px rgba(17,24,39,0.08);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
   }
 `;
 
-const Name = styled.h3`
-  margin: 0;
-  font-size: 1.05rem;
+const AgentsSection = styled.section`
+  padding: 4rem 1.5rem 8rem;
+  background: white;
+`;
+
+const SectionHeader = styled.div`
+  text-align: center;
+  margin-bottom: 3rem;
+  
+  h2 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin: 0 0 0.5rem;
+    color: #0f172a;
+  }
+  
+  p {
+    font-size: 1.125rem;
+    color: #6b7280;
+    margin: 0;
+  }
+`;
+
+const AgentsGrid = styled.div`
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+`;
+
+const EmptyState = styled.div`
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #6b7280;
+  
+  h3 {
+    margin: 0 0 0.5rem;
+    color: #374151;
+  }
+  
+  p {
+    margin: 0 0 2rem;
+  }
+`;
+
+const ResetFiltersButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #3b82f6, #7c3aed);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+  }
+`;
+
+const AgentCard = styled.article<{ $status: AgentStatus; $disabled?: boolean }>`
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 20px;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(8,15,30,0.06);
+  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  border: 1px solid ${({ $status }) => ($status === 'inDev' ? 'rgba(245,158,11,0.1)' : 'transparent')};
+  opacity: ${({ $disabled }) => $disabled ? 0.7 : 1};
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: ${({ $status }) =>
+        $status === 'ready'
+            ? 'linear-gradient(90deg, #10b981, #3b82f6)'
+            : 'linear-gradient(90deg, #f59e0b, #d97706)'
+    };
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  &:hover {
+    transform: ${({ $disabled }) => $disabled ? 'none' : 'translateY(-12px)'};
+    box-shadow: ${({ $disabled }) => $disabled ? '0 8px 24px rgba(8,15,30,0.06)' : '0 24px 48px rgba(17,24,39,0.12)'};
+    
+    &::before {
+      opacity: 1;
+    }
+  }
+`;
+
+const AvatarWrapper = styled.div<{ $size: number }>`
+  width: ${({ $size }) => $size}px;
+  height: ${({ $size }) => $size}px;
+  margin: 0 auto 1.5rem;
+  position: relative;
+  transition: transform 0.3s ease;
+  
+  ${AgentCard}:hover & {
+    transform: scale(1.05);
+  }
+`;
+
+const BlinkingEyeLid = styled.rect`
+  transform-origin: center;
+  animation: ${blink} 5s infinite ease-in-out;
+`;
+
+const BreathingMouth = styled.ellipse`
+  transform-origin: center;
+  animation: ${breathe} 4s ease-in-out infinite;
+`;
+
+const AgentName = styled.h3`
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 `;
 
-const Role = styled.p`
-  margin: 0.35rem 0 1rem;
-  color: #475569;
+const LanguageBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: linear-gradient(90deg, #3b82f6, #7c3aed);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+`;
+
+const DevBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+`;
+
+const AgentRole = styled.p`
+  margin: 0 0 1rem;
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: 500;
+`;
+
+const AgentDescription = styled.p`
+  margin: 0 0 1.5rem;
+  color: #374151;
   font-size: 0.9rem;
+  line-height: 1.5;
 `;
 
-/* Tags & actions */
-const Tags = styled.div`
-  display:flex;
-  gap:0.4rem;
-  justify-content:center;
-  flex-wrap:wrap;
-  margin-bottom: 0.9rem;
+const SpecialtiesList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+`;
+
+const SpecialtyTag = styled.span`
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 0.25rem 0.75rem;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+`;
+
+const TagsList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
 `;
 
 const Tag = styled.span`
-  background: rgba(14, 165, 233, 0.08);
-  color: #0369a1;
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
   padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  font-weight:600;
-  font-size: 0.78rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
 `;
 
-/* Action area */
 const ActionRow = styled.div`
-  display:flex;
-  gap: .6rem;
-  justify-content:center;
-  align-items:center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
 `;
 
-const StartBtn = styled.button<{ $disabled?: boolean }>`
-  display:inline-flex;
-  align-items:center;
-  gap:0.5rem;
-  padding:0.6rem 1rem;
-  border-radius:999px;
-  font-weight:700;
-  color: ${({ $disabled }) => ($disabled ? '#0f172a88' : 'white')};
-  background: ${({ $disabled }) => ($disabled ? '#e6e9ee' : 'linear-gradient(135deg,#3b82f6,#7c3aed)')};
+const PrimaryButton = styled.button<{ $disabled?: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 700;
   border: none;
-  cursor: ${({ $disabled }) => ($disabled ? 'default' : 'pointer')};
-  box-shadow: ${({ $disabled }) => ($disabled ? 'none' : '0 8px 22px rgba(59,130,246,0.12)')};
-  transition: transform .12s ease, box-shadow .12s ease;
+  cursor: ${({ $disabled }) => ($disabled ? 'not-allowed' : 'pointer')};
+  transition: all 0.3s ease;
+  flex: 1;
 
-  &:active { transform: translateY(1px); }
+  ${({ $disabled }) => {
+        if ($disabled) {
+            return `
+        background: #e5e7eb;
+        color: #9ca3af;
+      `;
+        }
+        return `
+      background: linear-gradient(135deg, #3b82f6, #7c3aed);
+      color: white;
+      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2);
+      
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+      }
+    `;
+    }}
 `;
 
-/* Small Dev badge */
-const DevBadge = styled.span`
-  display:inline-flex;
-  gap:0.4rem;
-  align-items:center;
-  background: linear-gradient(90deg,#fff7ed,#fff1e6);
-  color: #92400e;
-  padding: 0.28rem 0.5rem;
-  border-radius: 999px;
-  font-weight:700;
-  font-size:0.78rem;
+const SecondaryButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-weight: 600;
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    transform: translateY(-1px);
+  }
 `;
 
-/* Toast */
-const ToastWrap = styled.div`
+const ToastContainer = styled.div`
   position: fixed;
+  bottom: 2rem;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 20px;
   z-index: 9999;
-  max-width: 92%;
+  max-width: 90vw;
 `;
 
-/* Session drawer (mock) */
-const SessionPanel = styled.div`
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  width: min(440px, 92%);
-  background: white;
+const ToastMessage = styled.div`
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: white;
+  padding: 1rem 1.5rem;
   border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 22px 48px rgba(2,6,23,0.18);
-  border: 1px solid rgba(2,6,23,0.04);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+  font-weight: 500;
+  animation: ${fadeInUp} 0.3s ease;
+  max-width: 500px;
+  text-align: center;
 `;
-
-/* ==========================
-   AnimatedAvatar component
-   ========================== */
-
-function stringToSeed(s: string) {
-    // simple deterministic hash -> number
-    let h = 2166136261 >>> 0;
-    for (let i = 0; i < s.length; i++) {
-        h ^= s.charCodeAt(i);
-        h = Math.imul(h, 16777619) >>> 0;
-    }
-    return h;
-}
-
-function seededPick(seed: number, items: string[]) {
-    // pseudo random pick from items
-    const i = seed % items.length;
-    return items[i];
-}
-
-const faceGradients = [
-    ['#ffd7b5', '#ffc29f'],
-    ['#ffe7d6', '#ffd1b3'],
-    ['#f8d7ff', '#f2b8ff'],
-    ['#dbeafe', '#bfdbfe'],
-    ['#dffcd6', '#baf5a6'],
-];
-
-const hairColors = ['#1f2937', '#334155', '#6b21a8', '#0ea5a4', '#b45309', '#7c3aed'];
-
-const EyeSVG = styled.g`
-  transform-origin: center;
-  @media (prefers-reduced-motion: reduce) {
-    animation: none !important;
-  }
-`;
-
-const AnimatedFaceWrapper = styled.div<{ $size?: number }>`
-  width: ${({ $size }) => ($size ?? 84)}px;
-  height: ${({ $size }) => ($size ?? 84)}px;
-  display: grid;
-  place-items: center;
-  margin: 0 auto 0.9rem;
-  position: relative;
-  will-change: transform;
-`;
-
-// CSS for reduced motion and some animation embedding via styled-components
-const EyeLid = styled.rect`
-  transform-origin: center;
-  animation: ${blink} 5s infinite ease-in-out;
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-    transform: none;
-  }
-`;
-
-const MouthEl = styled.ellipse`
-  transform-origin: center;
-  animation: ${breathe} 4s ease-in-out infinite;
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-`;
-
-function AnimatedAvatar({ name, id, size = 84 }: { name: string; id: number; size?: number }) {
-    const seed = useMemo(() => stringToSeed(String(id) + ':' + name), [id, name]);
-
-    // choices derived from seed
-    const grad = faceGradients[seed % faceGradients.length];
-    const hair = hairColors[(seed >> 8) % hairColors.length];
-    const eyeType = (seed >> 16) % 3; // 0 simple dot, 1 round iris, 2 anime/oval
-    const mouthType = (seed >> 20) % 3; // 0 small smile, 1 wide smile, 2 open
-
-    const initials = useMemo(() => {
-        const parts = name.trim().split(/\s+/);
-        if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-        return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
-    }, [name]);
-
-    // small offset to give a little tilt based on seed
-    const tilt = ((seed % 11) - 5) * 0.7;
-
-    return (
-        <AnimatedFaceWrapper $size={size} style={{ transform: `rotate(${tilt}deg)` }}>
-            <svg viewBox="0 0 120 120" width={size} height={size} role="img" aria-label={`${name} avatar`}>
-                <defs>
-                    <linearGradient id={`fg-${id}`} x1="0" x2="1" y1="0" y2="1">
-                        <stop offset="0%" stopColor={grad[0]} />
-                        <stop offset="100%" stopColor={grad[1]} />
-                    </linearGradient>
-
-                    <filter id={`soft-${id}`} x="-30%" y="-30%" width="160%" height="160%">
-                        <feDropShadow dx="0" dy="6" stdDeviation="12" floodColor="#000000" floodOpacity="0.08" />
-                    </filter>
-                </defs>
-
-                {/* face shadow (subtle) */}
-                <g filter={`url(#soft-${id})`}>
-                    <circle cx="60" cy="54" r="36" fill={`url(#fg-${id})`} />
-                </g>
-
-                {/* hair (simple shape) */}
-                <g transform="translate(0, -6)">
-                    {/* hair blob */}
-                    <path
-                        d="M26 40c6-18 28-24 48-18 8 2 14 8 18 16 2 6 2 12-2 16-8 8-42 18-64 2-4-3-5-12-0-16z"
-                        fill={hair}
-                        opacity="0.95"
-                    />
-                </g>
-
-                {/* eyes */}
-                <EyeSVG>
-                    {/* left eye group */}
-                    <g transform="translate(36,52)">
-                        {/* eye white */}
-                        <ellipse cx="0" cy="0" rx="7" ry="5.5" fill="#fff" />
-                        {/* iris / pupil variants */}
-                        {eyeType === 0 && <circle cx="0" cy="0" r="2.2" fill="#111827" />}
-                        {eyeType === 1 && (
-                            <>
-                                <circle cx="0" cy="0" r="3.6" fill="#0f172a" />
-                                <circle cx="-0.8" cy="-0.8" r="1.1" fill="#ffffff" opacity="0.9" />
-                            </>
-                        )}
-                        {eyeType === 2 && (
-                            <ellipse cx="0" cy="0.3" rx="2.6" ry="3.2" fill="#0b1220" />
-                        )}
-                        {/* blinking lid */}
-                        <EyeLid x="-8" y="-6" width="16" height="12" rx="6" fill={`url(#fg-${id})`} style={{ transformOrigin: 'center' }} />
-                    </g>
-
-                    {/* right eye group */}
-                    <g transform="translate(84,52)">
-                        <ellipse cx="0" cy="0" rx="7" ry="5.5" fill="#fff" />
-                        {eyeType === 0 && <circle cx="0" cy="0" r="2.2" fill="#111827" />}
-                        {eyeType === 1 && (
-                            <>
-                                <circle cx="0" cy="0" r="3.6" fill="#0f172a" />
-                                <circle cx="-0.8" cy="-0.8" r="1.1" fill="#ffffff" opacity="0.9" />
-                            </>
-                        )}
-                        {eyeType === 2 && <ellipse cx="0" cy="0.3" rx="2.6" ry="3.2" fill="#0b1220" />}
-                        <EyeLid x="-8" y="-6" width="16" height="12" rx="6" fill={`url(#fg-${id})`} style={{ transformOrigin: 'center' }} />
-                    </g>
-                </EyeSVG>
-
-                {/* blush */}
-                <g>
-                    <ellipse cx="44" cy="70" rx="6.5" ry="3.5" fill="#ffdede" opacity="0.6" />
-                    <ellipse cx="76" cy="70" rx="6.5" ry="3.5" fill="#ffdede" opacity="0.6" />
-                </g>
-
-                {/* mouth variations */}
-                <g transform="translate(60,82)">
-                    {mouthType === 0 && (
-                        <path d="M-10 0 C -6 8, 6 8, 10 0" fill="transparent" stroke="#111827" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" transform="scale(1,0.9)" />
-                    )}
-                    {mouthType === 1 && (
-                        <path d="M-12 0 C -6 12, 6 12, 12 0 C 6 6, -6 6, -12 0" fill="#111827" opacity="0.07" />
-                    )}
-                    {mouthType === 2 && (
-                        <>
-                            <MouthEl cx="0" cy="0" rx="8" ry="4.6" fill="#111827" opacity="0.95" />
-                            <ellipse cx="0" cy="0.6" rx="4.2" ry="2.2" fill="#fff" opacity="0.08" />
-                        </>
-                    )}
-                </g>
-
-                {/* tiny nameplate letter for recognizability (initials) */}
-                <g transform="translate(60,106)">
-                    <rect x="-16" y="-10" width="32" height="20" rx="8" fill="rgba(255,255,255,0.6)" opacity="0.75" />
-                    <text x="0" y="4" fontSize="9" textAnchor="middle" fill="#0f172a" fontWeight={700}>{initials}</text>
-                </g>
-            </svg>
-        </AnimatedFaceWrapper>
-    );
-}
-
-/* ==========================
-   MAIN PAGE COMPONENT
-   ========================== */
-
-export default function TalkOhTacoPage(): JSX.Element {
-    const [query, setQuery] = useState('');
-    const [category, setCategory] = useState<'all' | AgentCategory | 'all'>('all');
-    const [statusFilter, setStatusFilter] = useState<'all' | AgentStatus>('all');
-    const [toast, setToast] = useState<string | null>(null);
-    const [activeSession, setActiveSession] = useState<number | null>(null);
-
-    useEffect(() => {
-        if (!toast) return;
-        const t = setTimeout(() => setToast(null), 3600);
-        return () => clearTimeout(t);
-    }, [toast]);
-
-    const categories = useMemo(() => ['all', 'language', 'coding', 'creative'] as const, []);
-
-    const filtered = useMemo(() => {
-        return agents.filter(a => {
-            if (category !== 'all' && a.category !== category) return false;
-            if (statusFilter !== 'all' && a.status !== statusFilter) return false;
-            if (!query) return true;
-            const q = query.trim().toLowerCase();
-            return (
-                a.name.toLowerCase().includes(q) ||
-                a.role.toLowerCase().includes(q) ||
-                (a.tags || []).some(t => t.toLowerCase().includes(q))
-            );
-        });
-    }, [category, statusFilter, query]);
-
-    function handleStart(agentId: number, status: AgentStatus) {
-        if (status === 'inDev') {
-            setToast('This agent is in development — coming soon. We’ll notify you when it’s available.');
-            return;
-        }
-        setActiveSession(agentId);
-    }
-
-    function closeSession() {
-        setActiveSession(null);
-        setToast('Practice session ended (mock)');
-    }
-
-    return (
-        <PageWrapper>
-            <Hero>
-                <HeroTitle>TalkOhTaco — Practice with expert agents</HeroTitle>
-                <HeroSubtitle>Language tutors, coding mentors, and creative trainers — try mock sessions while the backend rests.</HeroSubtitle>
-
-                <Controls>
-                    <SearchWrap>
-                        <SearchIcon><Search size={18} /></SearchIcon>
-                        <SearchInput
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Search by agent name, skill, or tag (e.g. 'JavaScript', 'tones', 'composition')"
-                            aria-label="Search agents"
-                        />
-                    </SearchWrap>
-                </Controls>
-
-                <Controls style={{ marginTop: 12 }}>
-                    <Pills>
-                        {categories.map(c => (
-                            <Pill
-                                key={c}
-                                $active={category === c}
-                                onClick={() => setCategory(c)}
-                                aria-pressed={category === c}
-                                title={c === 'all' ? 'All categories' : `Show ${c}`}
-                            >
-                                {c === 'all' ? 'All' : c[0].toUpperCase() + c.slice(1)}
-                            </Pill>
-                        ))}
-                    </Pills>
-
-                    <div style={{ width: 12 }} />
-
-                    <Pills>
-                        <Pill $active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>All</Pill>
-                        <Pill $active={statusFilter === 'ready'} onClick={() => setStatusFilter('ready')}>Available</Pill>
-                        <Pill $active={statusFilter === 'inDev'} onClick={() => setStatusFilter('inDev')}>In development</Pill>
-                    </Pills>
-                </Controls>
-            </Hero>
-
-            <AgentsSection>
-                <Grid>
-                    {filtered.length === 0 ? (
-                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem', color: '#64748b' }}>
-                            No agents match your filters.
-                        </div>
-                    ) : (
-                        filtered.map((a, idx) => (
-                            <Card key={a.id} $status={a.status}>
-                                <AnimatedAvatar name={a.name} id={a.id} size={84} />
-
-                                <Name>
-                                    {a.name}{' '}
-                                    {a.status === 'inDev' && (
-                                        <DevBadge title="In development"><AlertCircle size={14} /> In dev</DevBadge>
-                                    )}
-                                </Name>
-
-                                <Role>{a.role}</Role>
-
-                                {a.short && <p style={{ marginTop: 0, marginBottom: 12, color: '#64748b' }}>{a.short}</p>}
-
-                                {a.tags && (
-                                    <Tags>
-                                        {a.tags.map(t => <Tag key={t}>{t}</Tag>)}
-                                    </Tags>
-                                )}
-
-                                <ActionRow>
-                                    <StartBtn
-                                        onClick={() => handleStart(a.id, a.status)}
-                                        $disabled={a.status === 'inDev'}
-                                        aria-disabled={a.status === 'inDev'}
-                                        title={a.status === 'inDev' ? 'This agent is in development' : `Start a session with ${a.name}`}
-                                    >
-                                        <Sparkles size={14} /> {a.status === 'inDev' ? 'Preview' : 'Start Practice Session'}
-                                    </StartBtn>
-
-                                    <StartBtn
-                                        onClick={() => {
-                                            if (a.status === 'inDev') {
-                                                setToast(`${a.name} is being prototyped — preview notes shown here.`);
-                                            } else {
-                                                setToast(`Opening quick-config for ${a.name} (mock).`);
-                                            }
-                                        }}
-                                        style={{ background: 'linear-gradient(135deg,#f8fafc,#eef2ff)', color: '#0f172a' }}
-                                    >
-                                        <Zap size={14} /> {a.status === 'inDev' ? 'Dev notes' : 'Quick config'}
-                                    </StartBtn>
-                                </ActionRow>
-                            </Card>
-                        ))
-                    )}
-                </Grid>
-            </AgentsSection>
-
-            {/* Mock session drawer */}
-            {activeSession && (
-                <SessionPanel role="dialog" aria-label="Mock practice session">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                        <div>
-                            <strong style={{ fontSize: 16 }}>{agents.find(a => a.id === activeSession)?.name} — practice session (mock)</strong>
-                            <div style={{ fontSize: 13, color: '#475569' }}>Client-side mock while the backend is offline.</div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 8 }}>
-                            <button onClick={() => { setToast('Mock “save transcript” (client-only)'); }} style={{ padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(2,6,23,0.06)', background: '#fff' }}>Save</button>
-                            <button onClick={closeSession} style={{ padding: '8px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#ef4444,#fb7185)', color: 'white', border: 'none' }}>End</button>
-                        </div>
-                    </div>
-
-                    <div style={{ marginTop: 12 }}>
-                        <label style={{ display: 'block', fontWeight: 700, marginBottom: 8 }}>Type to practice</label>
-                        <textarea placeholder="Type a practice prompt or role-play scenario..." style={{ width: '100%', minHeight: 110, padding: 12, borderRadius: 8, border: '1px solid #e6eef8' }} />
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-                            <button onClick={() => setToast('Mock audio feedback: +0.3 semitones (perfect pitch preview)')} style={{ background: 'linear-gradient(135deg,#3b82f6,#7c3aed)', color: '#fff', padding: '8px 12px', borderRadius: 10, border: 'none' }}>
-                                Give feedback (mock)
-                            </button>
-                        </div>
-                    </div>
-                </SessionPanel>
-            )}
-
-            {/* Toast */}
-            {toast && (
-                <ToastWrap>
-                    <div style={{ background: 'linear-gradient(90deg,#0f172a,#334155)', color: 'white', padding: '10px 14px', borderRadius: 10, boxShadow: '0 12px 30px rgba(2,6,23,0.2)' }}>
-                        {toast}
-                    </div>
-                </ToastWrap>
-            )}
-        </PageWrapper>
-    );
-}
