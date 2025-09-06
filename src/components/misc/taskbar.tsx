@@ -51,7 +51,7 @@ const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
   ];
 
   if (isAuthenticated) links.push({ href: '/dashboard', label: 'Dashboard', requiresAuth: true });
-  if (!isAuthenticated) links.push({ href: '/login', label: 'Login', hideWhenAuth: true });
+  // if (!isAuthenticated) links.push({ href: '/login', label: 'Login', hideWhenAuth: true });
 
   return links;
 };

@@ -1,534 +1,577 @@
-// src\components\llm\textToSpeech.tsx
-
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled, { css, keyframes } from 'styled-components';
-import { Play, Pause, Square, Volume2, VolumeX, Settings, Heart, Zap, AlertTriangle, Globe } from 'lucide-react';
+import { Play, Pause, Square, Volume2, VolumeX, Heart, Zap, AlertTriangle, Globe, SkipForward } from 'lucide-react';
 
 /* ==========================
-   ENHANCED TYPE SYSTEM
+   CORE TYPES
    ========================== */
 
-interface TTSOptions {
+interface TTSConfig {
     voice?: string;
-    rate?: number;
-    pitch?: number;
-    volume?: number;
-    lang?: string;
+    rate: number;
+    pitch: number;
+    volume: number;
+    lang: string;
     gender?: 'male' | 'female' | 'neutral';
-    emotion?: 'neutral' | 'happy' | 'excited' | 'calm' | 'serious' | 'encouraging' | 'welcoming';
-}
-
-interface ConversationTrack {
-    agentId: string;
-    language: string;
-    context: 'greeting' | 'teaching' | 'correction' | 'encouragement' | 'explanation';
-    emotionalState: TTSOptions['emotion'];
-    lastInteraction: Date;
 }
 
 interface SpeechSegment {
     text: string;
     language: string;
-    emotion: TTSOptions['emotion'];
+    emotion: EmotionType;
     priority: 'high' | 'normal' | 'low';
     pauseAfter: number;
-    rateModifier: number;
+    utterance?: SpeechSynthesisUtterance;
 }
 
+interface SpeechQueue {
+    segments: SpeechSegment[];
+    currentIndex: number;
+    totalDuration: number;
+    isReady: boolean;
+}
+
+type EmotionType = 'neutral' | 'happy' | 'excited' | 'calm' | 'serious' | 'encouraging' | 'welcoming';
+type ContextType = 'greeting' | 'teaching' | 'correction' | 'encouragement' | 'explanation';
+
 /* ==========================
-   ENHANCED AGENT PROFILES WITH TRACKS
+   CENTRALIZED VOICE NAMES DATABASE
    ========================== */
 
-class AgentProfile {
-    public readonly id: string;
-    public readonly name: string;
-    public readonly nativeLanguage: string;
-    public readonly voiceConfig: TTSOptions;
-    public readonly personality: string;
-    public readonly voicePreferences: string[];
-    public readonly greetingPatterns: string[];
-    public readonly speechPatterns: {
-        [key: string]: {
-            rate: number;
-            pitch: number;
-            pauseMultiplier: number;
-        };
+// Centralized database - this is the single source of truth for voice gender detection
+const VOICE_GENDER_DATABASE = {
+    female: [
+        // English
+        'susan', 'samantha', 'victoria', 'karen', 'allison', 'ava', 'siri', 'alexa', 'cortana',
+        // Arabic
+        'hoda', 'zeina', 'layla', 'salma', 'aya', 'reem', 'fatima', 'aisha',
+        // Spanish
+        'monica', 'paloma', 'esperanza', 'carmen', 'isabella', 'sofia', 'lucia', 'elena',
+        // French 
+        'amelie', 'audrey', 'marie', 'celine', 'brigitte', 'claire', 'sophie', 'camille',
+        // Chinese
+        'ting-ting', 'sin-ji', 'hui-chen', 'ya-ling', 'mei', 'li', 'xin',
+        // Italian
+        'giulia', 'anna', 'francesca', 'valentina', 'chiara', 'elena'
+    ],
+    male: [
+        // English
+        'alex', 'daniel', 'tom', 'david', 'michael', 'james', 'robert', 'john',
+        // Arabic
+        'maged', 'omar', 'hassan', 'ahmed', 'youssef', 'khalid', 'mohammed', 'ali',
+        // Spanish
+        'diego', 'carlos', 'jorge', 'miguel', 'antonio', 'pablo', 'fernando', 'rafael',
+        // French
+        'henri', 'vincent', 'pierre', 'bernard', 'philippe', 'guillaume', 'antoine',
+        // Chinese
+        'kangkang', 'liang', 'feng', 'jun', 'ming', 'wei', 'chen', 'wang',
+        // Italian
+        'marco', 'giuseppe', 'giovanni', 'francesco', 'alessandro', 'matteo'
+    ]
+};
+
+/* ==========================
+   LANGUAGE DETECTION
+   ========================== */
+
+class LanguageDetector {
+    private static readonly patterns = {
+        arabic: /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]|مرحبا|شكرا|أهلا|مع السلامة/,
+        spanish: /[ñáéíóúü]|hola|gracias|por favor|muy bien|qué|cómo|dónde|español|soy|está/i,
+        french: /[àâäéèêëïîôöùûüÿç]|bonjour|merci|s'il vous plaît|très bien|qu'est-ce|comment|français/i,
+        chinese: /[\u4e00-\u9fff]|你好|谢谢|请|很好|什么|怎么|中文/,
+        italian: /[àèéìíîòóù]|ciao|grazie|prego|molto bene|cosa|come|dove|italiano/i,
+        german: /[äöüß]|hallo|danke|bitte|sehr gut|was|wie|wo|deutsch/i,
+        portuguese: /[ãõáéíóúâêôç]|olá|obrigado|por favor|muito bem|português/i
     };
 
-    constructor(config: {
-        id: string;
-        name: string;
-        nativeLanguage: string;
-        voiceConfig: TTSOptions;
-        personality: string;
-        voicePreferences: string[];
-        greetingPatterns: string[];
-        speechPatterns: {
-            [key: string]: {
-                rate: number;
-                pitch: number;
-                pauseMultiplier: number;
-            };
-        };
-    }) {
-        this.id = config.id;
-        this.name = config.name;
-        this.nativeLanguage = config.nativeLanguage;
-        this.voiceConfig = config.voiceConfig;
-        this.personality = config.personality;
-        this.voicePreferences = config.voicePreferences;
-        this.greetingPatterns = config.greetingPatterns;
-        this.speechPatterns = config.speechPatterns;
-    }
+    static detect(text: string): string {
+        if (this.patterns.arabic.test(text)) return 'ar-SA';
 
-    getSpeechSettings(context: ConversationTrack['context'], emotion: TTSOptions['emotion']): TTSOptions {
-        const baseSettings = { ...this.voiceConfig };
-        const contextSettings = this.speechPatterns[context] || this.speechPatterns.default;
-
-        // Apply context-specific modifications
-        baseSettings.rate = (baseSettings.rate || 1) * contextSettings.rate;
-        baseSettings.pitch = (baseSettings.pitch || 1) * contextSettings.pitch;
-
-        // Apply emotional modifications
-        return EmotionalSpeechProcessor.applyEmotionalSettings(emotion, baseSettings);
-    }
-
-    getRandomGreeting(): string {
-        return this.greetingPatterns[Math.floor(Math.random() * this.greetingPatterns.length)];
-    }
-}
-
-/* ==========================
-   AGENT PROFILES REGISTRY
-   ========================== */
-
-const ENHANCED_AGENT_PROFILES = new Map<string, AgentProfile>([
-    ['Lexi', new AgentProfile({
-        id: 'Lexi',
-        name: 'Lexi',
-        nativeLanguage: 'ar-SA', // Arabic (Saudi) as native
-        voiceConfig: {
-            lang: 'ar-SA',
-            rate: 0.95,
-            pitch: 1.05,
-            gender: 'female',
-            emotion: 'encouraging'
-        },
-        personality: 'friendly and supportive Arabic tutor',
-        voicePreferences: ['female', 'woman', 'Hoda', 'Zeina'], // Arabic voices if available
-        greetingPatterns: [
-            "مرحبا! أنا Lexi، معلمتك للغة العربية. Let's start learning Arabic together!",
-            "أهلاً! Ready to practice Arabic today?",
-            "Hi! I'm excited to help you improve your Arabic skills."
-        ],
-        speechPatterns: {
-            greeting: { rate: 0.9, pitch: 1.15, pauseMultiplier: 1.3 },
-            teaching: { rate: 0.95, pitch: 1.05, pauseMultiplier: 1.1 },
-            correction: { rate: 0.85, pitch: 0.95, pauseMultiplier: 1.4 },
-            encouragement: { rate: 1.0, pitch: 1.2, pauseMultiplier: 0.8 },
-            explanation: { rate: 0.9, pitch: 1.0, pauseMultiplier: 1.2 },
-            default: { rate: 1.0, pitch: 1.0, pauseMultiplier: 1.0 }
-        }
-    })],
-
-    ['Kai', new AgentProfile({
-        id: 'Kai',
-        name: 'Kai',
-        nativeLanguage: 'es-ES',
-        voiceConfig: {
-            lang: 'es-ES',
-            rate: 0.85,
-            pitch: 0.9,
-            gender: 'male',
-            emotion: 'calm'
-        },
-        personality: 'patient Spanish pronunciation specialist',
-        voicePreferences: ['Diego', 'Carlos', 'Jorge', 'Antonio', 'male', 'man', 'español', 'masculino'],
-        greetingPatterns: [
-            "¡Hola! Soy Kai, tu profesor de español. Hello! I'm Kai, your Spanish teacher.",
-            "¡Buenos días! Ready to practice español?",
-            "¡Saludos! Let's work on your Spanish pronunciation."
-        ],
-        speechPatterns: {
-            greeting: { rate: 0.8, pitch: 0.95, pauseMultiplier: 1.4 },
-            teaching: { rate: 0.85, pitch: 0.9, pauseMultiplier: 1.2 },
-            correction: { rate: 0.75, pitch: 0.85, pauseMultiplier: 1.6 },
-            encouragement: { rate: 0.9, pitch: 1.0, pauseMultiplier: 1.0 },
-            explanation: { rate: 0.8, pitch: 0.9, pauseMultiplier: 1.3 },
-            default: { rate: 0.85, pitch: 0.9, pauseMultiplier: 1.0 }
-        }
-    })],
-
-    ['Sana', new AgentProfile({
-        id: 'Sana',
-        name: 'Sana',
-        nativeLanguage: 'fr-FR',
-        voiceConfig: {
-            lang: 'fr-FR',
-            rate: 0.88,
-            pitch: 1.05,
-            gender: 'female',
-            emotion: 'serious'
-        },
-        personality: 'systematic French grammar expert',
-        voicePreferences: ['Amelie', 'Audrey', 'Marie', 'French', 'female', 'femme', 'française'],
-        greetingPatterns: [
-            "Bonjour ! Je suis Sana, votre professeure de français. Hello! I'm Sana, your French teacher.",
-            "Salut! Ready to learn français today?",
-            "Bonjour mes étudiants! Let's practice French together."
-        ],
-        speechPatterns: {
-            greeting: { rate: 0.85, pitch: 1.1, pauseMultiplier: 1.4 },
-            teaching: { rate: 0.88, pitch: 1.05, pauseMultiplier: 1.2 },
-            correction: { rate: 0.8, pitch: 0.95, pauseMultiplier: 1.5 },
-            encouragement: { rate: 0.9, pitch: 1.15, pauseMultiplier: 1.0 },
-            explanation: { rate: 0.85, pitch: 1.0, pauseMultiplier: 1.3 },
-            default: { rate: 0.88, pitch: 1.05, pauseMultiplier: 1.0 }
-        }
-    })],
-
-    ['Mei', new AgentProfile({
-        id: 'Mei',
-        name: 'Mei',
-        nativeLanguage: 'zh-CN',
-        voiceConfig: {
-            lang: 'zh-CN',
-            rate: 0.75,
-            pitch: 1.15,
-            gender: 'female',
-            emotion: 'encouraging'
-        },
-        personality: 'patient Mandarin tone specialist',
-        voicePreferences: ['Ting-Ting', 'Li-Mu', 'Sin-Ji', 'Chinese', 'female', '中文', 'Kyoko', 'Yuna'],
-        greetingPatterns: [
-            "你好！我是美美，你的中文老师。Hello! I'm Mei, your Mandarin teacher.",
-            "你好! Ready to practice 中文?",
-            "欢迎！Let's work on your Mandarin tones today."
-        ],
-        speechPatterns: {
-            greeting: { rate: 0.7, pitch: 1.2, pauseMultiplier: 1.5 },
-            teaching: { rate: 0.75, pitch: 1.15, pauseMultiplier: 1.3 },
-            correction: { rate: 0.65, pitch: 1.1, pauseMultiplier: 1.8 },
-            encouragement: { rate: 0.8, pitch: 1.25, pauseMultiplier: 1.0 },
-            explanation: { rate: 0.7, pitch: 1.1, pauseMultiplier: 1.4 },
-            default: { rate: 0.75, pitch: 1.15, pauseMultiplier: 1.0 }
-        }
-    })]
-]);
-
-/* ==========================
-   CONVERSATION TRACKING SYSTEM
-   ========================== */
-
-class ConversationTracker {
-    private static instance: ConversationTracker;
-    private tracks = new Map<string, ConversationTrack>();
-
-    static getInstance(): ConversationTracker {
-        if (!ConversationTracker.instance) {
-            ConversationTracker.instance = new ConversationTracker();
-        }
-        return ConversationTracker.instance;
-    }
-
-    updateTrack(agentId: string, context: ConversationTrack['context'], emotion: TTSOptions['emotion']): void {
-        const profile = ENHANCED_AGENT_PROFILES.get(agentId);
-        if (!profile) return;
-
-        this.tracks.set(agentId, {
-            agentId,
-            language: profile.nativeLanguage,
-            context,
-            emotionalState: emotion,
-            lastInteraction: new Date()
-        });
-    }
-
-    getTrack(agentId: string): ConversationTrack | null {
-        return this.tracks.get(agentId) || null;
-    }
-
-    analyzeContext(text: string): ConversationTrack['context'] {
-        const lower = text.toLowerCase();
-
-        if (lower.match(/hello|hi|bonjour|hola|你好|salut/i)) return 'greeting';
-        if (lower.match(/correct|wrong|mistake|error|better/i)) return 'correction';
-        if (lower.match(/good|great|excellent|perfect|well done/i)) return 'encouragement';
-        if (lower.match(/how|why|what|explain|because|meaning/i)) return 'explanation';
-
-        return 'teaching';
-    }
-}
-
-/* ==========================
-   EMOTIONAL SPEECH PROCESSOR
-   ========================== */
-
-class EmotionalSpeechProcessor {
-    static analyzeTextEmotion(text: string, agentId?: string): TTSOptions['emotion'] {
-        const lower = text.toLowerCase();
-        const track = agentId ? ConversationTracker.getInstance().getTrack(agentId) : null;
-
-        // Greeting detection
-        if (lower.match(/hello|hi|bonjour|hola|你好|welcome|salut/i)) {
-            return 'welcoming';
-        }
-
-        // Excitement indicators
-        if (lower.match(/[!]{2,}|wow|amazing|fantastic|excellent|awesome|incredible/)) {
-            return 'excited';
-        }
-
-        // Encouragement indicators
-        if (lower.match(/good job|well done|perfect|nice|wonderful|keep going|try again/)) {
-            return 'encouraging';
-        }
-
-        // Happy indicators
-        if (lower.match(/:\)|😊|😄|smile|happy|glad|pleased/)) {
-            return 'happy';
-        }
-
-        // Serious/Important indicators
-        if (lower.match(/important|remember|careful|attention|focus|note that/)) {
-            return 'serious';
-        }
-
-        // Calm/Teaching indicators
-        if (lower.match(/let's|here's how|step by step|first|next|explanation/)) {
-            return 'calm';
-        }
-
-        // Use track context for default
-        return track?.emotionalState || 'neutral';
-    }
-
-    static applyEmotionalSettings(emotion: TTSOptions['emotion'], baseSettings: TTSOptions): TTSOptions {
-        const emotional = { ...baseSettings };
-
-        switch (emotion) {
-            case 'welcoming':
-                emotional.rate = (baseSettings.rate || 1) * 0.9;
-                emotional.pitch = (baseSettings.pitch || 1) * 1.1;
-                break;
-            case 'excited':
-                emotional.rate = (baseSettings.rate || 1) * 1.2;
-                emotional.pitch = (baseSettings.pitch || 1) * 1.15;
-                break;
-            case 'encouraging':
-                emotional.rate = (baseSettings.rate || 1) * 0.95;
-                emotional.pitch = (baseSettings.pitch || 1) * 1.08;
-                break;
-            case 'happy':
-                emotional.rate = (baseSettings.rate || 1) * 1.05;
-                emotional.pitch = (baseSettings.pitch || 1) * 1.1;
-                break;
-            case 'serious':
-                emotional.rate = (baseSettings.rate || 1) * 0.85;
-                emotional.pitch = (baseSettings.pitch || 1) * 0.92;
-                break;
-            case 'calm':
-                emotional.rate = (baseSettings.rate || 1) * 0.88;
-                emotional.pitch = baseSettings.pitch || 1;
-                break;
-            default: // neutral
-                break;
-        }
-
-        // Ensure reasonable bounds
-        emotional.rate = Math.max(0.5, Math.min(2.0, emotional.rate || 1));
-        emotional.pitch = Math.max(0.5, Math.min(2.0, emotional.pitch || 1));
-
-        return emotional;
-    }
-}
-
-/* ==========================
-   ADVANCED TEXT CHUNKING WITH LANGUAGE DETECTION
-   ========================== */
-
-class IntelligentTextProcessor {
-    private static languagePatterns = {
-        spanish: /\b(hola|gracias|por favor|muy bien|qué|cómo|dónde|cuándo|español|soy|es|son|está|están)\b/i,
-        french: /\b(bonjour|merci|s'il vous plaît|très bien|qu'est-ce que|comment|où|quand|français|je suis|il est|ils sont)\b/i,
-        chinese: /[\u4e00-\u9fff]|你好|谢谢|请|很好|什么|怎么|哪里|什么时候|中文|我是/,
-        english: /\b(hello|thank you|please|very good|what|how|where|when|english|i am|he is|they are)\b/i
-    };
-
-    static detectLanguage(text: string): string {
-        if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(text)) {
-                return 'ar-SA';
-            }
-            
-        for (const [lang, pattern] of Object.entries(this.languagePatterns)) {
+        for (const [lang, pattern] of Object.entries(this.patterns)) {
             if (pattern.test(text)) {
                 switch (lang) {
                     case 'spanish': return 'es-ES';
                     case 'french': return 'fr-FR';
                     case 'chinese': return 'zh-CN';
-                    default: return 'en-US';
+                    case 'italian': return 'it-IT';
+                    case 'german': return 'de-DE';
+                    case 'portuguese': return 'pt-BR';
                 }
             }
         }
         return 'en-US';
     }
+}
 
-    static splitIntoIntelligentSegments(text: string, agentId?: string): SpeechSegment[] {
+/* ==========================
+   PERFECTLY ALIGNED AGENT PROFILES
+   ========================== */
+
+export interface AgentProfile {
+    id: string;
+    name: string;
+    primaryLanguage: string;
+    baseConfig: TTSConfig;
+    voiceKeywords: string[];  // These MUST align with VOICE_GENDER_DATABASE
+    greetings: string[];
+    speedMultiplier: number;
+}
+
+const AGENT_PROFILES: Record<string, AgentProfile> = {
+    // ARABIC TEACHERS
+    Lexi: {
+        id: 'Lexi',
+        name: 'Lexi',
+        primaryLanguage: 'ar-SA',
+        baseConfig: {
+            lang: 'ar-SA',
+            rate: 1.0,
+            pitch: 1.05,
+            volume: 0.9,
+            gender: 'female'
+        },
+        // ALIGNED: Only female Arabic names from VOICE_GENDER_DATABASE.female
+        voiceKeywords: ['arabic', 'hoda', 'zeina', 'layla', 'salma', 'aya', 'reem', 'fatima', 'aisha', 'female', 'woman'],
+        greetings: [
+            "مرحباً! I'm Lexi, your Arabic teacher.",
+            "أهلاً وسهلاً! Ready to learn Arabic?",
+            "مرحبا! Let's explore Arabic together!"
+        ],
+        speedMultiplier: 0.95
+    },
+    Adam: {
+        id: 'Adam',
+        name: 'Adam',
+        primaryLanguage: 'ar-SA',
+        baseConfig: {
+            lang: 'ar-SA',
+            rate: 1.0,
+            pitch: 0.9,
+            volume: 0.9,
+            gender: 'male'
+        },
+        // ALIGNED: Only male Arabic names from VOICE_GENDER_DATABASE.male
+        voiceKeywords: ['arabic', 'maged', 'omar', 'hassan', 'ahmed', 'youssef', 'khalid', 'mohammed', 'ali', 'male', 'man'],
+        greetings: [
+            "مرحباً! أنا آدم، مدرس العربية. I'm Adam, your Arabic teacher.",
+            "أهلاً وسهلاً! Welcome to Arabic class!",
+            "السلام عليكم! Let's learn Arabic together."
+        ],
+        speedMultiplier: 0.95
+    },
+
+    // SPANISH TEACHERS
+    Kai: {
+        id: 'Kai',
+        name: 'Kai',
+        primaryLanguage: 'es-ES',
+        baseConfig: {
+            lang: 'es-ES',
+            rate: 1.0,
+            pitch: 0.95,
+            volume: 0.9,
+            gender: 'male'
+        },
+        // ALIGNED: Only male Spanish names from VOICE_GENDER_DATABASE.male
+        voiceKeywords: ['spanish', 'diego', 'carlos', 'jorge', 'miguel', 'antonio', 'pablo', 'fernando', 'rafael', 'male', 'español'],
+        greetings: [
+            "¡Hola! Soy Kai, tu profesor de español.",
+            "¡Buenos días! I'm your Spanish teacher.",
+            "¡Saludos! Let's practice español."
+        ],
+        speedMultiplier: 1.0
+    },
+    Lupita: {
+        id: 'Lupita',
+        name: 'Lupita',
+        primaryLanguage: 'es-ES',
+        baseConfig: {
+            lang: 'es-ES',
+            rate: 1.0,
+            pitch: 1.05,
+            volume: 0.9,
+            gender: 'female'
+        },
+        // ALIGNED: Only female Spanish names from VOICE_GENDER_DATABASE.female
+        voiceKeywords: ['spanish', 'monica', 'paloma', 'esperanza', 'carmen', 'isabella', 'sofia', 'lucia', 'elena', 'female', 'española'],
+        greetings: [
+            "¡Hola! Soy Lupita, tu profesora de español.",
+            "¡Buenos días! I'm your Spanish teacher.",
+            "¡Qué gusto conocerte! Let's learn español together."
+        ],
+        speedMultiplier: 1.0
+    },
+
+    // FRENCH TEACHERS
+    Sana: {
+        id: 'Sana',
+        name: 'Sana',
+        primaryLanguage: 'fr-FR',
+        baseConfig: {
+            lang: 'fr-FR',
+            rate: 1.0,
+            pitch: 1.0,
+            volume: 0.9,
+            gender: 'female'
+        },
+        // ALIGNED: Only female French names from VOICE_GENDER_DATABASE.female
+        voiceKeywords: ['french', 'amelie', 'audrey', 'marie', 'celine', 'brigitte', 'claire', 'sophie', 'camille', 'female', 'française'],
+        greetings: [
+            "Bonjour ! Je suis Sana, votre professeure de français.",
+            "Salut! I'm your French teacher.",
+            "Bonjour mes étudiants!"
+        ],
+        speedMultiplier: 1.0
+    },
+    Vinz: {
+        id: 'Vinz',
+        name: 'Vinz',
+        primaryLanguage: 'fr-FR',
+        baseConfig: {
+            lang: 'fr-FR',
+            rate: 1.0,
+            pitch: 0.9,
+            volume: 0.9,
+            gender: 'male'
+        },
+        // ALIGNED: Only male French names from VOICE_GENDER_DATABASE.male
+        voiceKeywords: ['french', 'henri', 'vincent', 'pierre', 'bernard', 'philippe', 'guillaume', 'antoine', 'male', 'français'],
+        greetings: [
+            "Bonjour ! Je suis Vinz, votre professeur de français.",
+            "Salut! I'm your French teacher.",
+            "Enchanté! Let's explore French together."
+        ],
+        speedMultiplier: 1.0
+    },
+
+    // CHINESE TEACHERS
+    Mei: {
+        id: 'Mei',
+        name: 'Mei',
+        primaryLanguage: 'zh-CN',
+        baseConfig: {
+            lang: 'zh-CN',
+            rate: 0.9,
+            pitch: 1.1,
+            volume: 0.9,
+            gender: 'female'
+        },
+        // ALIGNED: Only female Chinese names from VOICE_GENDER_DATABASE.female
+        voiceKeywords: ['chinese', 'mandarin', 'ting-ting', 'sin-ji', 'hui-chen', 'ya-ling', 'mei', 'li', 'xin', 'female', '中文'],
+        greetings: [
+            "你好！我是美美，你的中文老师。",
+            "你好! I'm Mei, your Mandarin teacher.",
+            "欢迎！Welcome to Chinese class."
+        ],
+        speedMultiplier: 1.0
+    },
+    Wei: {
+        id: 'Wei',
+        name: 'Wei',
+        primaryLanguage: 'zh-CN',
+        baseConfig: {
+            lang: 'zh-CN',
+            rate: 0.9,
+            pitch: 0.9,
+            volume: 0.9,
+            gender: 'male'
+        },
+        // ALIGNED: Only male Chinese names from VOICE_GENDER_DATABASE.male
+        voiceKeywords: ['chinese', 'mandarin', 'kangkang', 'liang', 'feng', 'jun', 'ming', 'wei', 'chen', 'wang', 'male', '中文'],
+        greetings: [
+            "你好！我是伟，你的中文老师。I'm Wei, your Mandarin teacher.",
+            "大家好! Hello everyone, let's learn Chinese!",
+            "欢迎来到中文课！Welcome to Chinese class!"
+        ],
+        speedMultiplier: 1.0
+    },
+
+    // ITALIAN TEACHERS
+    Giulia: {
+        id: 'Giulia',
+        name: 'Giulia',
+        primaryLanguage: 'it-IT',
+        baseConfig: {
+            lang: 'it-IT',
+            rate: 1.0,
+            pitch: 1.05,
+            volume: 0.9,
+            gender: 'female'
+        },
+        // ALIGNED: Only female Italian names from VOICE_GENDER_DATABASE.female
+        voiceKeywords: ['italian', 'giulia', 'anna', 'francesca', 'valentina', 'chiara', 'elena', 'female', 'italiana'],
+        greetings: [
+            "Ciao! Sono Giulia, la tua insegnante di italiano.",
+            "Buongiorno! I'm your Italian teacher.",
+            "Benvenuti! Welcome to Italian class!"
+        ],
+        speedMultiplier: 1.0
+    },
+    Marco: {
+        id: 'Marco',
+        name: 'Marco',
+        primaryLanguage: 'it-IT',
+        baseConfig: {
+            lang: 'it-IT',
+            rate: 1.0,
+            pitch: 0.9,
+            volume: 0.9,
+            gender: 'male'
+        },
+        // ALIGNED: Only male Italian names from VOICE_GENDER_DATABASE.male
+        voiceKeywords: ['italian', 'marco', 'giuseppe', 'giovanni', 'francesco', 'alessandro', 'matteo', 'male', 'italiano'],
+        greetings: [
+            "Ciao! Sono Marco, il vostro insegnante di italiano.",
+            "Buongiorno! I'm your Italian teacher.",
+            "Benvenuti alla classe di italiano!"
+        ],
+        speedMultiplier: 1.0
+    }
+};
+
+/* ==========================
+   EMOTION & CONTEXT PROCESSOR
+   ========================== */
+
+class EmotionProcessor {
+    static analyzeEmotion(text: string): EmotionType {
+        const lower = text.toLowerCase();
+
+        if (lower.match(/hello|hi|مرحبا|hola|bonjour|你好|ciao/)) return 'welcoming';
+        if (lower.match(/[!]{2,}|wow|amazing|fantastic|excellent/)) return 'excited';
+        if (lower.match(/good job|well done|perfect|wonderful/)) return 'encouraging';
+        if (lower.match(/:\)|😊|😄|happy|glad/)) return 'happy';
+        if (lower.match(/important|remember|careful|attention/)) return 'serious';
+        if (lower.match(/let's|here's how|step by step|explanation/)) return 'calm';
+
+        return 'neutral';
+    }
+
+    static analyzeContext(text: string): ContextType {
+        const lower = text.toLowerCase();
+
+        if (lower.match(/hello|hi|hey|مرحبا|hola|bonjour|你好/)) return 'greeting';
+        if (lower.match(/correct|wrong|mistake|error|better/)) return 'correction';
+        if (lower.match(/good|great|excellent|perfect|well done/)) return 'encouragement';
+        if (lower.match(/how|why|what|explain|because|meaning/)) return 'explanation';
+
+        return 'teaching';
+    }
+
+    static applyEmotionalModifiers(baseConfig: TTSConfig, emotion: EmotionType): TTSConfig {
+        const config = { ...baseConfig };
+
+        switch (emotion) {
+            case 'welcoming':
+                config.rate *= 0.95;
+                config.pitch *= 1.05;
+                break;
+            case 'excited':
+                config.rate *= 1.15;
+                config.pitch *= 1.1;
+                break;
+            case 'encouraging':
+                config.rate *= 1.0;
+                config.pitch *= 1.05;
+                break;
+            case 'happy':
+                config.rate *= 1.05;
+                config.pitch *= 1.08;
+                break;
+            case 'serious':
+                config.rate *= 0.9;
+                config.pitch *= 0.95;
+                break;
+            case 'calm':
+                config.rate *= 0.95;
+                config.pitch *= 1.0;
+                break;
+            default:
+                break;
+        }
+
+        config.rate = Math.max(0.5, Math.min(2.0, config.rate));
+        config.pitch = Math.max(0.5, Math.min(2.0, config.pitch));
+
+        return config;
+    }
+}
+
+/* ==========================
+   SPEECH QUEUE PROCESSOR
+   ========================== */
+
+class SpeechQueueProcessor {
+    static async createSpeechQueue(text: string, agentId?: string): Promise<SpeechQueue> {
+        if (!text?.trim()) {
+            return { segments: [], currentIndex: 0, totalDuration: 0, isReady: false };
+        }
+
+        const voiceManager = VoiceManager.getInstance();
+        await voiceManager.initialize();
+
+        const segments = this.splitIntoSegments(text, agentId);
+        const profile = agentId ? AGENT_PROFILES[agentId] : null;
+
+        // Select ONE voice for the entire agent response (voice consistency)
+        const agentVoice = agentId
+            ? voiceManager.findBestVoice(agentId, profile?.primaryLanguage)
+            : null;
+
+        console.log(`🎭 Voice consistency: Using ${agentVoice?.name || 'system default'} for all ${agentId || 'generic'} segments`);
+
+        // Pre-create all utterances using the SAME voice for consistency
+        for (const segment of segments) {
+            const baseConfig = profile?.baseConfig || {
+                lang: profile?.primaryLanguage || segment.language,
+                rate: 1.0,
+                pitch: 1.0,
+                volume: 0.8
+            };
+
+            const emotionalConfig = EmotionProcessor.applyEmotionalModifiers(baseConfig, segment.emotion);
+
+            if (profile?.speedMultiplier) {
+                emotionalConfig.rate *= profile.speedMultiplier;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(segment.text);
+            utterance.rate = emotionalConfig.rate;
+            utterance.pitch = emotionalConfig.pitch;
+            utterance.volume = emotionalConfig.volume;
+
+            // Use consistent language and voice for agent identity
+            if (agentId && profile) {
+                // Agent responses: Use agent's primary language and voice consistently
+                utterance.lang = profile.primaryLanguage;
+                if (agentVoice) {
+                    utterance.voice = agentVoice;
+                }
+                console.log(`🗣️  Agent segment: "${segment.text.slice(0, 30)}..." using ${agentVoice?.name || 'default'} (${profile.primaryLanguage})`);
+            } else {
+                // Non-agent responses: Use detected language
+                utterance.lang = segment.language;
+                const segmentVoice = voiceManager.findBestVoice('default', segment.language);
+                if (segmentVoice) {
+                    utterance.voice = segmentVoice;
+                }
+                console.log(`💬 User segment: "${segment.text.slice(0, 30)}..." using ${segmentVoice?.name || 'default'} (${segment.language})`);
+            }
+
+            segment.utterance = utterance;
+        }
+
+        const totalDuration = segments.reduce((total, segment) => {
+            const estimatedDuration = (segment.text.length / 12) * 1000;
+            return total + estimatedDuration + segment.pauseAfter;
+        }, 0);
+
+        console.log(`✅ Speech queue ready: ${segments.length} segments, ~${Math.round(totalDuration / 1000)}s, voice-consistent: ${!!agentId}`);
+
+        return {
+            segments,
+            currentIndex: 0,
+            totalDuration,
+            isReady: true
+        };
+    }
+
+    private static splitIntoSegments(text: string, agentId?: string): SpeechSegment[] {
         if (!text?.trim()) return [];
 
-        // Protect abbreviations
-        const abbreviations = /\b(?:Dr|Mr|Mrs|Ms|Prof|Sr|Jr|vs|etc|Inc|Corp|Ltd|Co|St|Ave|Blvd|Rd|Mt|Ft|No|Vol|Ch|pp|Fig|Ref|e\.g|i\.e|a\.m|p\.m|U\.S|U\.K|Ph\.D|B\.A|M\.A)\./gi;
-        const placeholders = new Map<string, string>();
-        let placeholderCount = 0;
-
-        const protectedText = text.replace(abbreviations, (match) => {
-            const placeholder = `__ABBREV_${placeholderCount++}__`;
-            placeholders.set(placeholder, match);
-            return placeholder;
-        });
-
-        // Enhanced sentence splitting with language awareness
-        const sentences = protectedText
-            .split(/(?<=[.!?])\s+|(?<=[。！？])\s*/)
-            .map(sentence => {
-                // Restore abbreviations
-                let restored = sentence;
-                placeholders.forEach((original, placeholder) => {
-                    restored = restored.replace(placeholder, original);
-                });
-                return restored.trim();
-            })
-            .filter(Boolean);
-
+        const sentences = this.smartSentenceSplit(text);
         const segments: SpeechSegment[] = [];
-        const tracker = ConversationTracker.getInstance();
 
         for (const sentence of sentences) {
-            const detectedLang = this.detectLanguage(sentence);
-            const emotion = EmotionalSpeechProcessor.analyzeTextEmotion(sentence, agentId);
-            const context = tracker.analyzeContext(sentence);
+            if (!sentence.trim()) continue;
 
-            // Update conversation track
-            if (agentId) {
-                tracker.updateTrack(agentId, context, emotion);
-            }
+            const language = LanguageDetector.detect(sentence);
+            const emotion = EmotionProcessor.analyzeEmotion(sentence);
+            const context = EmotionProcessor.analyzeContext(sentence);
 
-            // Determine priority based on content
-            let priority: SpeechSegment['priority'] = 'normal';
-            if (context === 'greeting' || emotion === 'welcoming') priority = 'high';
-            if (context === 'correction' || emotion === 'serious') priority = 'high';
-
-            // Calculate optimal rate modifier
-            const wordCount = sentence.split(/\s+/).length;
-            const avgWordLength = sentence.length / wordCount;
-            let rateModifier = 1.0;
-
-            if (avgWordLength > 6) rateModifier *= 0.92; // Slower for complex words
-            if (detectedLang !== 'en-US') rateModifier *= 0.88; // Slower for non-English
-            if (priority === 'high') rateModifier *= 0.9; // Slower for important content
-
-            // Split very long sentences
-            if (sentence.length > 200) {
-                const subChunks = sentence.split(/(?<=[,;:])\s+/).filter(Boolean);
-                for (const subChunk of subChunks) {
-                    segments.push({
-                        text: subChunk,
-                        language: detectedLang,
-                        emotion,
-                        priority,
-                        pauseAfter: this.calculatePauseDuration(subChunk, emotion, context),
-                        rateModifier
-                    });
-                }
-            } else {
-                segments.push({
-                    text: sentence,
-                    language: detectedLang,
-                    emotion,
-                    priority,
-                    pauseAfter: this.calculatePauseDuration(sentence, emotion, context),
-                    rateModifier
-                });
-            }
+            segments.push({
+                text: sentence.trim(),
+                language,
+                emotion,
+                priority: context === 'greeting' || context === 'correction' ? 'high' : 'normal',
+                pauseAfter: this.calculatePause(sentence, emotion, context)
+            });
         }
 
         return segments;
     }
 
-    static calculatePauseDuration(text: string, emotion: TTSOptions['emotion'], context: ConversationTrack['context']): number {
-        let delay = 250; // Base delay
+    private static smartSentenceSplit(text: string): string[] {
+        const protectedText = text
+            .replace(/\b(?:Dr|Mr|Mrs|Ms|Prof|Sr|Jr|vs|etc|Inc|Corp|Ltd|Co|St|Ave|Blvd|No|Vol|Ch|pp|Fig|Ref|e\.g|i\.e|a\.m|p\.m|U\.S|U\.K|Ph\.D|B\.A|M\.A)\./gi, match =>
+                match.replace('.', '__DOT__')
+            );
 
-        // Punctuation-based adjustments
-        if (text.endsWith('.') || text.endsWith('。')) delay += 400;
-        else if (text.endsWith('?') || text.endsWith('!') || text.endsWith('？') || text.endsWith('！')) delay += 350;
-        else if (text.endsWith(',') || text.endsWith(';') || text.endsWith('，') || text.endsWith('；')) delay += 150;
+        const sentences = protectedText
+            .split(/(?<=[.!?。！？])\s+/)
+            .map(sentence => sentence.replace(/__DOT__/g, '.').trim())
+            .filter(Boolean);
 
-        // Context-based adjustments
+        return sentences;
+    }
+
+    private static calculatePause(text: string, emotion: EmotionType, context: ContextType): number {
+        let pause = 300;
+
+        if (text.endsWith('.') || text.endsWith('。')) pause += 200;
+        else if (text.endsWith('?') || text.endsWith('!')) pause += 150;
+        else if (text.endsWith(',') || text.endsWith(';')) pause += 80;
+
         switch (context) {
-            case 'greeting':
-                delay *= 1.4; // Longer pauses after greetings
-                break;
-            case 'correction':
-                delay *= 1.5; // Give time to process corrections
-                break;
-            case 'explanation':
-                delay *= 1.2; // Allow processing time
-                break;
-            case 'encouragement':
-                delay *= 0.9; // Keep energy up
-                break;
+            case 'greeting': pause *= 1.1; break;
+            case 'correction': pause *= 1.2; break;
+            case 'explanation': pause *= 1.0; break;
+            case 'encouragement': pause *= 0.9; break;
         }
 
-        // Emotional adjustments
         switch (emotion) {
-            case 'welcoming':
-                delay *= 1.3; // Warm, unhurried
-                break;
-            case 'excited':
-                delay *= 0.7; // Quick pacing
-                break;
-            case 'serious':
-                delay *= 1.4; // Deliberate pacing
-                break;
-            case 'calm':
-                delay *= 1.1; // Relaxed pacing
-                break;
+            case 'excited': pause *= 0.8; break;
+            case 'serious': pause *= 1.1; break;
+            case 'welcoming': pause *= 1.0; break;
+            default: break;
         }
 
-        return Math.max(100, Math.min(2000, delay));
+        return Math.max(150, Math.min(1000, pause));
     }
 }
 
 /* ==========================
-   OPTIMIZED VOICE MANAGER
+   PERFECTLY ALIGNED VOICE MANAGER
    ========================== */
 
-class OptimizedVoiceManager {
-    private static instance: OptimizedVoiceManager;
+class VoiceManager {
+    private static instance: VoiceManager;
     private voices: SpeechSynthesisVoice[] = [];
     private voiceCache = new Map<string, SpeechSynthesisVoice>();
-    private genderCache = new Map<string, 'male' | 'female' | 'neutral'>();
-    private initialized = false;
+    private ready = false;
+    private initPromise: Promise<void> | null = null;
 
-    static getInstance(): OptimizedVoiceManager {
-        if (!OptimizedVoiceManager.instance) {
-            OptimizedVoiceManager.instance = new OptimizedVoiceManager();
+    static getInstance(): VoiceManager {
+        if (!VoiceManager.instance) {
+            VoiceManager.instance = new VoiceManager();
         }
-        return OptimizedVoiceManager.instance;
+        return VoiceManager.instance;
     }
 
     async initialize(): Promise<void> {
-        if (this.initialized) return;
+        if (this.ready) return;
+        if (this.initPromise) return this.initPromise;
 
-        return new Promise((resolve) => {
+        this.initPromise = new Promise((resolve) => {
             const loadVoices = () => {
                 this.voices = speechSynthesis.getVoices();
                 if (this.voices.length > 0) {
-                    this.initialized = true;
-                    this.precomputeGenders();
-                    console.log(`Optimized TTS: Loaded ${this.voices.length} voices`);
+                    this.ready = true;
+                    console.log(`🎙️  TTS: Loaded ${this.voices.length} voices`);
+                    this.logAvailableVoices();
                     resolve();
                 } else {
                     setTimeout(loadVoices, 100);
@@ -538,38 +581,152 @@ class OptimizedVoiceManager {
             speechSynthesis.addEventListener('voiceschanged', loadVoices);
             loadVoices();
         });
+
+        return this.initPromise;
     }
 
-    private precomputeGenders(): void {
-        for (const voice of this.voices) {
-            this.genderCache.set(voice.name, this.detectVoiceGender(voice.name));
-        }
+    private logAvailableVoices(): void {
+        const voicesByLang = this.voices.reduce((acc, voice) => {
+            const lang = voice.lang.split('-')[0];
+            if (!acc[lang]) acc[lang] = [];
+            acc[lang].push(voice.name);
+            return acc;
+        }, {} as Record<string, string[]>);
+
+        console.log('🗣️  Available voices by language:', voicesByLang);
     }
 
-    findOptimalVoice(agentId: string): SpeechSynthesisVoice | null {
-        if (!this.initialized) return null;
-
-        // Check cache first
-        const cached = this.voiceCache.get(agentId);
+    findBestVoice(agentId: string, targetLang?: string): SpeechSynthesisVoice | null {
+        const cacheKey = `${agentId}-${targetLang || 'default'}`;
+        const cached = this.voiceCache.get(cacheKey);
         if (cached && this.voices.includes(cached)) return cached;
 
-        const profile = ENHANCED_AGENT_PROFILES.get(agentId);
-        if (!profile) return this.voices[0] || null;
+        const profile = AGENT_PROFILES[agentId];
+        if (!profile) {
+            return this.findBestLanguageVoice(targetLang || 'en-US');
+        }
 
-        // Gender-first filtering
-        const genderFiltered = this.voices.filter(voice => {
-            const gender = this.genderCache.get(voice.name);
-            return gender === profile.voiceConfig.gender;
-        });
+        // If profile specifies an exact system voice name, honor it
+        // (useful when you know a particular voice is correct)
+        // Add `forcedVoice` to your AGENT_PROFILES entries to use this.
+        // Example: forcedVoice: 'Microsoft Hoda - Arabic (Egypt)'
+        // This is optional and won't break existing profiles.
+        const forcedName = (profile as any).forcedVoice as string | undefined;
+        if (forcedName) {
+            const forced = this.voices.find(v => v.name === forcedName);
+            if (forced) {
+                console.log(`🔒 Forced voice for ${agentId}: ${forced.name}`);
+                this.voiceCache.set(cacheKey, forced);
+                return forced;
+            } else {
+                console.warn(`⚠️ Forced voice "${forcedName}" for ${agentId} not found on this system.`);
+            }
+        }
 
-        const candidateVoices = genderFiltered.length > 0 ? genderFiltered : this.voices;
+        const searchLang = profile.primaryLanguage;
+        const langCode = searchLang.split('-')[0];
+        const targetGender = profile.baseConfig.gender;
 
-        // Score and select best voice
+        console.log(`🎭 Finding ${targetGender} voice for ${agentId} (${searchLang})`);
+
+        // Primary candidates: voices that match the desired language code
+        let candidates = this.voices.filter(voice =>
+            voice.lang && voice.lang.toLowerCase().includes(langCode.toLowerCase())
+        );
+
+        // Special handling for limited language availability (Arabic/Chinese)
+        if (candidates.length === 0 && (langCode === 'ar' || langCode === 'zh')) {
+            candidates = this.voices.filter(voice =>
+                (voice.lang && voice.lang.toLowerCase().includes(langCode)) ||
+                voice.name.toLowerCase().includes(langCode === 'ar' ? 'arab' : 'chin') ||
+                profile.voiceKeywords.some(keyword =>
+                    voice.name.toLowerCase().includes(keyword.toLowerCase())
+                )
+            );
+            console.log(`🔍 ${langCode.toUpperCase()} voice search: Found ${candidates.length} candidates`);
+        }
+
+        // If still none, try fallback to voices that include the profile's primary language exactly
+        if (candidates.length === 0) {
+            candidates = this.voices.filter(voice =>
+                voice.lang && voice.lang.toLowerCase() === searchLang.toLowerCase()
+            );
+        }
+
+        // If still none, broaden to voices that start with the lang code
+        if (candidates.length === 0) {
+            candidates = this.voices.filter(voice =>
+                voice.lang && voice.lang.toLowerCase().startsWith(langCode.toLowerCase())
+            );
+        }
+
+        // Final fallback cascades
+        if (candidates.length === 0) {
+            candidates = this.voices.filter(voice =>
+                voice.lang && voice.lang.toLowerCase().includes('en')
+            );
+        }
+        if (candidates.length === 0) {
+            candidates = this.voices;
+        }
+
+        // --- NEW: Filter by gender preference first --- //
+        const genderMatched = candidates.filter(v => this.detectGender(v.name) === targetGender);
+        const neutralMatched = candidates.filter(v => this.detectGender(v.name) === 'neutral');
+
+        let prioritizedCandidates: SpeechSynthesisVoice[] = [];
+        if (genderMatched.length > 0) {
+            prioritizedCandidates = genderMatched;
+            console.log(`✅ Found ${genderMatched.length} ${targetGender} voice(s) for ${agentId}, restricting selection to those.`);
+        } else if (neutralMatched.length > 0) {
+            prioritizedCandidates = neutralMatched;
+            console.log(`⚠️ No explicit ${targetGender} voices; using ${neutralMatched.length} neutral voice(s) as fallback for ${agentId}.`);
+        } else {
+            // as last resort, use original candidates (may include opposite gender)
+            prioritizedCandidates = candidates;
+            console.log(`⚠️ No ${targetGender} or neutral voices found; allowing all candidates for ${agentId}.`);
+        }
+
+        // Scoring inside the prioritized pool (so keywords can't overcome gender)
         let bestVoice: SpeechSynthesisVoice | null = null;
-        let bestScore = -1;
+        let bestScore = -Infinity;
 
-        for (const voice of candidateVoices) {
-            const score = this.scoreVoiceMatch(voice, profile);
+        for (const voice of prioritizedCandidates) {
+            let score = 0;
+
+            // language match (still high priority)
+            if (voice.lang && voice.lang.toLowerCase() === searchLang.toLowerCase()) score += 150;
+            else if (voice.lang && voice.lang.toLowerCase().startsWith(langCode.toLowerCase())) score += 100;
+
+            const voiceName = voice.name.toLowerCase();
+
+            // Keyword matching (good but lower weight now that gender is enforced)
+            for (const keyword of profile.voiceKeywords) {
+                if (voiceName.includes(keyword.toLowerCase())) {
+                    score += 50;
+                    // only log first found keyword match to reduce noise
+                    console.log(`✨ Keyword match: ${voice.name} contains "${keyword}" for ${agentId}`);
+                    break;
+                }
+            }
+
+            // Gender scoring (stronger impact but we already filtered by gender above)
+            const detectedGender = this.detectGender(voice.name);
+            if (targetGender && detectedGender === targetGender) {
+                score += 100;
+            } else if (detectedGender === 'neutral') {
+                score += 20;
+            } else if (targetGender && detectedGender !== targetGender) {
+                score -= 100;
+            }
+
+            // Quality indicators
+            if (voice.localService) score += 20;
+            if (voiceName.includes('enhanced') || voiceName.includes('premium') || voiceName.includes('neural')) score += 15;
+
+            // small tie-breaker: prefer voices with longer names (heuristic — tends to pick vendor-labeled voices)
+            score += Math.min(5, voiceName.length / 20);
+
             if (score > bestScore) {
                 bestScore = score;
                 bestVoice = voice;
@@ -577,67 +734,46 @@ class OptimizedVoiceManager {
         }
 
         if (bestVoice) {
-            this.voiceCache.set(agentId, bestVoice);
-            console.log(`Selected voice for ${agentId}: ${bestVoice.name} (${this.genderCache.get(bestVoice.name)})`);
+            this.voiceCache.set(cacheKey, bestVoice);
+            const gender = this.detectGender(bestVoice.name);
+            console.log(`🎯 Selected voice for ${agentId}: ${bestVoice.name} (${gender}, score: ${bestScore}, lang: ${bestVoice.lang})`);
+        } else {
+            console.warn(`❌ No suitable voice found for ${agentId} (${searchLang}, ${targetGender})`);
         }
 
         return bestVoice;
     }
 
-    private scoreVoiceMatch(voice: SpeechSynthesisVoice, profile: AgentProfile): number {
-        let score = 0;
-
-        // Language matching
-        if (voice.lang === profile.voiceConfig.lang) score += 80;
-        else if (voice.lang.startsWith(profile.voiceConfig.lang?.split('-')[0] || '')) score += 60;
-
-        // Gender matching (cached)
-        const detectedGender = this.genderCache.get(voice.name) || 'neutral';
-        if (profile.voiceConfig.gender !== 'neutral' && detectedGender === profile.voiceConfig.gender) {
-            score += 70;
-        } else if (profile.voiceConfig.gender !== 'neutral' && detectedGender !== 'neutral' && detectedGender !== profile.voiceConfig.gender) {
-            score -= 50;
-        }
-
-        // Name preferences
-        const lowerName = voice.name.toLowerCase();
-        for (const preference of profile.voicePreferences) {
-            if (lowerName.includes(preference.toLowerCase())) {
-                score += 40;
-                break;
-            }
-        }
-
-        // Quality indicators
-        if (voice.localService) score += 15;
-        if (lowerName.includes('premium') || lowerName.includes('enhanced')) score += 10;
-
-        return score;
-    }
-
-    private detectVoiceGender(voiceName: string): 'male' | 'female' | 'neutral' {
+    // ALIGNED: Gender detection using the centralized database
+    private detectGender(voiceName: string): 'male' | 'female' | 'neutral' {
         const lower = voiceName.toLowerCase();
 
-        // Explicit indicators
-        if (lower.includes('female') || lower.includes('woman') || lower.includes('femme')) return 'female';
-        if (lower.includes('male') || lower.includes('man') || lower.includes('homme')) return 'male';
+        // Explicit gender indicators
+        if (lower.includes('female') || lower.includes('woman') || lower.includes('lady')) return 'female';
+        if (lower.includes('male') || lower.includes('man') || lower.includes('guy')) return 'male';
 
-        // Extended name lists
-        const femaleNames = ['susan', 'samantha', 'victoria', 'karen', 'moira', 'allison', 'ava', 'emma', 'amelie', 'audrey', 'marie', 'ting-ting', 'sin-ji', 'siri', 'kyoko', 'yuna', 'veena', 'serena'];
-        const maleNames = ['alex', 'daniel', 'tom', 'fred', 'diego', 'carlos', 'jorge', 'li-mu', 'antonio', 'bruno', 'dmitri'];
-
-        if (femaleNames.some(name => lower.includes(name))) return 'female';
-        if (maleNames.some(name => lower.includes(name))) return 'male';
+        // ALIGNED: Use the centralized database for perfect alignment
+        if (VOICE_GENDER_DATABASE.female.some(name => lower.includes(name))) return 'female';
+        if (VOICE_GENDER_DATABASE.male.some(name => lower.includes(name))) return 'male';
 
         return 'neutral';
     }
+
+    private findBestLanguageVoice(targetLang: string): SpeechSynthesisVoice | null {
+        const langCode = targetLang.split('-')[0];
+        const candidates = this.voices.filter(voice =>
+            voice.lang.toLowerCase().includes(langCode.toLowerCase())
+        );
+        return candidates[0] || this.voices[0] || null;
+    }
 }
 
+
 /* ==========================
-   ENHANCED TTS COMPONENT
+   MAIN TTS COMPONENT
    ========================== */
 
-interface EnhancedTTSProps {
+interface TTSProps {
     text: string;
     agentId?: string;
     autoPlay?: boolean;
@@ -647,7 +783,7 @@ interface EnhancedTTSProps {
     onProgress?: (segment: SpeechSegment, index: number, total: number) => void;
 }
 
-const OptimizedTextToSpeech: React.FC<EnhancedTTSProps> = ({
+const OptimizedTextToSpeech: React.FC<TTSProps> = ({
     text,
     agentId,
     autoPlay = false,
@@ -656,25 +792,54 @@ const OptimizedTextToSpeech: React.FC<EnhancedTTSProps> = ({
     onError,
     onProgress
 }) => {
-    const [isSupported, setIsSupported] = useState(false);
+    const [isSupported] = useState(() => typeof window !== 'undefined' && 'speechSynthesis' in window);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [currentSegment, setCurrentSegment] = useState<SpeechSegment | null>(null);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
+    const [speechQueue, setSpeechQueue] = useState<SpeechQueue | null>(null);
 
-    const voiceManager = OptimizedVoiceManager.getInstance();
     const abortControllerRef = useRef<AbortController | null>(null);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Pre-process speech when text changes
     useEffect(() => {
-        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-            setIsSupported(true);
-            voiceManager.initialize();
+        if (!text?.trim() || !isSupported) {
+            setSpeechQueue(null);
+            return;
         }
-    }, []);
+
+        let mounted = true;
+        setIsLoading(true);
+
+        const processSpeech = async () => {
+            try {
+                const queue = await SpeechQueueProcessor.createSpeechQueue(text, agentId);
+                if (mounted) {
+                    setSpeechQueue(queue);
+                    setIsLoading(false);
+                    console.log(`Pre-processed ${queue.segments.length} speech segments`);
+                }
+            } catch (error) {
+                console.error('Failed to pre-process speech:', error);
+                if (mounted) {
+                    setIsLoading(false);
+                    onError?.('Failed to prepare speech');
+                }
+            }
+        };
+
+        processSpeech();
+
+        return () => {
+            mounted = false;
+        };
+    }, [text, agentId, isSupported, onError]);
 
     const speak = useCallback(async () => {
-        if (!isSupported || !text?.trim()) {
-            onError?.('Speech synthesis not supported or no text provided');
+        if (!isSupported || !speechQueue?.isReady || speechQueue.segments.length === 0) {
+            onError?.('Speech not ready or no content available');
             return;
         }
 
@@ -683,95 +848,71 @@ const OptimizedTextToSpeech: React.FC<EnhancedTTSProps> = ({
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+        }
 
         abortControllerRef.current = new AbortController();
         const { signal } = abortControllerRef.current;
 
-        // Process text into intelligent segments
-        const segments = IntelligentTextProcessor.splitIntoIntelligentSegments(text, agentId);
-        if (segments.length === 0) {
-            onError?.('No speakable content found');
-            return;
-        }
-
         setIsSpeaking(true);
         setIsPaused(false);
+        setProgress({ current: 0, total: speechQueue.segments.length });
         onStart?.();
 
         try {
-            const selectedVoice = agentId ? voiceManager.findOptimalVoice(agentId) : null;
-            const profile = agentId ? ENHANCED_AGENT_PROFILES.get(agentId) : null;
-
-            for (let i = 0; i < segments.length && !signal.aborted; i++) {
-                const segment = segments[i];
+            for (let i = 0; i < speechQueue.segments.length && !signal.aborted; i++) {
+                const segment = speechQueue.segments[i];
                 setCurrentSegment(segment);
-                setProgress({ current: i + 1, total: segments.length });
-                onProgress?.(segment, i + 1, segments.length);
+                setProgress({ current: i + 1, total: speechQueue.segments.length });
+                onProgress?.(segment, i + 1, speechQueue.segments.length);
 
-                // Get context-aware speech settings
-                const track = agentId ? ConversationTracker.getInstance().getTrack(agentId) : null;
-                const speechSettings = profile?.getSpeechSettings(track?.context || 'teaching', segment.emotion) || {
-                    rate: 1.0,
-                    pitch: 1.0,
-                    volume: 0.8,
-                    lang: segment.language
-                };
-
-                // Create optimized utterance
-                const utterance = new SpeechSynthesisUtterance(segment.text);
-                utterance.rate = (speechSettings.rate || 1) * segment.rateModifier;
-                utterance.pitch = speechSettings.pitch || 1;
-                utterance.volume = speechSettings.volume || 0.8;
-                utterance.lang = segment.language;
-
-                if (selectedVoice) {
-                    utterance.voice = selectedVoice;
+                if (!segment.utterance) {
+                    console.warn('Segment missing pre-created utterance, skipping');
+                    continue;
                 }
 
-                // Speak segment
+                // Play the pre-created utterance
                 await new Promise<void>((resolve) => {
                     if (signal.aborted) {
                         resolve();
                         return;
                     }
 
-                    let hasEnded = false;
+                    let resolved = false;
                     const cleanup = () => {
-                        hasEnded = true;
-                        signal.removeEventListener('abort', handleAbort);
-                    };
-
-                    const handleAbort = () => {
-                        if (!hasEnded) {
-                            cleanup();
+                        if (!resolved) {
+                            resolved = true;
+                            signal.removeEventListener('abort', handleAbort);
                             resolve();
                         }
                     };
 
-                    utterance.onend = () => {
-                        if (!hasEnded) {
-                            cleanup();
-                            resolve();
-                        }
-                    };
+                    const handleAbort = cleanup;
 
-                    utterance.onerror = (event) => {
-                        if (!hasEnded) {
-                            cleanup();
-                            console.warn('TTS error:', event.error);
-                            resolve();
-                        }
+                    segment.utterance!.onend = cleanup;
+                    segment.utterance!.onerror = (event) => {
+                        console.warn('TTS error:', event.error);
+                        cleanup();
                     };
 
                     signal.addEventListener('abort', handleAbort);
-                    speechSynthesis.speak(utterance);
+                    speechSynthesis.speak(segment.utterance!);
                 });
 
-                if (signal.aborted) break;
+                // Pause between segments
+                if (i < speechQueue.segments.length - 1 && !signal.aborted) {
+                    await new Promise<void>((resolve) => {
+                        timeoutRef.current = setTimeout(() => {
+                            timeoutRef.current = null;
+                            resolve();
+                        }, segment.pauseAfter);
 
-                // Intelligent pause
-                if (i < segments.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, segment.pauseAfter));
+                        if (signal.aborted) {
+                            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                            resolve();
+                        }
+                    });
                 }
             }
         } catch (error) {
@@ -787,7 +928,7 @@ const OptimizedTextToSpeech: React.FC<EnhancedTTSProps> = ({
                 onEnd?.();
             }
         }
-    }, [text, agentId, isSupported, onStart, onEnd, onError, onProgress]);
+    }, [speechQueue, isSupported, onStart, onEnd, onError, onProgress]);
 
     const pause = useCallback(() => {
         if (speechSynthesis.speaking && !speechSynthesis.paused) {
@@ -808,6 +949,10 @@ const OptimizedTextToSpeech: React.FC<EnhancedTTSProps> = ({
         if (abortControllerRef.current) {
             abortControllerRef.current.abort();
         }
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
         setIsSpeaking(false);
         setIsPaused(false);
         setCurrentSegment(null);
@@ -815,61 +960,91 @@ const OptimizedTextToSpeech: React.FC<EnhancedTTSProps> = ({
     }, []);
 
     useEffect(() => {
-        if (autoPlay && text && isSupported && !isSpeaking) {
-            const timer = setTimeout(speak, 300);
+        if (autoPlay && speechQueue?.isReady && !isSpeaking && !isLoading) {
+            const timer = setTimeout(speak, 200);
             return () => clearTimeout(timer);
         }
-    }, [autoPlay, text, isSupported, isSpeaking, speak]);
+    }, [autoPlay, speechQueue?.isReady, isSpeaking, isLoading, speak]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            speechSynthesis.cancel();
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
+        };
+    }, []);
 
     if (!isSupported) {
         return (
-            <TTSContainer>
-                <VolumeX size={16} />
+            <TTSContainer role="region" aria-label="Text-to-speech not supported">
+                <VolumeX size={16} aria-hidden="true" />
                 <StatusText>Speech not supported</StatusText>
             </TTSContainer>
         );
     }
 
-    const getEmotionIcon = (emotion: TTSOptions['emotion']) => {
+    const getEmotionIcon = (emotion: EmotionType) => {
         switch (emotion) {
-            case 'excited': return <Zap size={12} />;
-            case 'happy': return <Heart size={12} />;
-            case 'serious': return <AlertTriangle size={12} />;
-            case 'welcoming': return <Globe size={12} />;
+            case 'excited': return <Zap size={12} aria-hidden="true" />;
+            case 'happy': return <Heart size={12} aria-hidden="true" />;
+            case 'serious': return <AlertTriangle size={12} aria-hidden="true" />;
+            case 'welcoming': return <Globe size={12} aria-hidden="true" />;
             default: return null;
         }
     };
 
+    const isReady = speechQueue?.isReady && !isLoading;
+
     return (
-        <TTSContainer>
+        <TTSContainer role="region" aria-label="Text-to-speech controls">
             <ControlButton
                 onClick={isSpeaking ? (isPaused ? resume : pause) : speak}
                 $isActive={isSpeaking}
-                disabled={!text}
+                disabled={!isReady}
                 title={isSpeaking ? (isPaused ? 'Resume' : 'Pause') : 'Play'}
+                aria-label={isSpeaking ? (isPaused ? 'Resume speech' : 'Pause speech') : 'Play speech'}
             >
                 {isSpeaking && !isPaused ? <Pause size={14} /> : <Play size={14} />}
             </ControlButton>
 
             {isSpeaking && (
-                <ControlButton onClick={stop} $variant="secondary" title="Stop">
+                <ControlButton
+                    onClick={stop}
+                    $variant="secondary"
+                    title="Stop"
+                    aria-label="Stop speech"
+                >
                     <Square size={14} />
                 </ControlButton>
             )}
 
             {currentSegment && (
-                <EmotionIndicator $emotion={currentSegment.emotion}>
+                <EmotionIndicator
+                    $emotion={currentSegment.emotion}
+                    aria-label={`Speaking in ${currentSegment.language} with ${currentSegment.emotion} emotion`}
+                >
                     {getEmotionIcon(currentSegment.emotion)}
-                    <span style={{ fontSize: '10px', textTransform: 'uppercase' }}>
-                        {currentSegment.language.split('-')[0]} - {currentSegment.emotion}
+                    <span>
+                        {currentSegment.language.split('-')[0].toUpperCase()} - {currentSegment.emotion}
                     </span>
                 </EmotionIndicator>
             )}
 
-            <StatusText>
-                {isSpeaking
-                    ? (isPaused ? 'Paused' : `${progress.current}/${progress.total}`)
-                    : agentId ? `${agentId} ready` : 'Ready'
+            <StatusText role="status">
+                {isLoading
+                    ? 'Preparing...'
+                    : isSpeaking
+                        ? (isPaused ? 'Paused' : `${progress.current}/${progress.total}`)
+                        : agentId
+                            ? `${agentId} ready`
+                            : isReady
+                                ? 'Ready'
+                                : 'Loading...'
                 }
             </StatusText>
         </TTSContainer>
@@ -877,7 +1052,7 @@ const OptimizedTextToSpeech: React.FC<EnhancedTTSProps> = ({
 };
 
 /* ==========================
-   STYLED COMPONENTS (Optimized)
+   STYLED COMPONENTS
    ========================== */
 
 const pulse = keyframes`
@@ -894,7 +1069,6 @@ const TTSContainer = styled.div`
   border-radius: 8px;
   border: 1px solid rgba(59, 130, 246, 0.1);
   font-size: 0.875rem;
-  position: relative;
 `;
 
 const ControlButton = styled.button<{ $isActive?: boolean; $variant?: 'primary' | 'secondary' }>`
@@ -909,18 +1083,18 @@ const ControlButton = styled.button<{ $isActive?: boolean; $variant?: 'primary' 
   transition: all 0.2s ease;
 
   background: ${({ $isActive, $variant }) => {
-    if ($isActive) return 'linear-gradient(135deg, #3b82f6, #7c3aed)';
-    if ($variant === 'secondary') return 'rgba(107, 114, 128, 0.1)';
-    return 'rgba(59, 130, 246, 0.1)';
-  }};
+        if ($isActive) return 'linear-gradient(135deg, #3b82f6, #7c3aed)';
+        if ($variant === 'secondary') return 'rgba(107, 114, 128, 0.1)';
+        return 'rgba(59, 130, 246, 0.1)';
+    }};
 
   color: ${({ $isActive, $variant }) => {
-    if ($isActive) return 'white';
-    if ($variant === 'secondary') return '#6b7280';
-    return '#3b82f6';
-  }};
+        if ($isActive) return 'white';
+        if ($variant === 'secondary') return '#6b7280';
+        return '#3b82f6';
+    }};
 
-  &:hover {
+  &:hover:not(:disabled) {
     transform: translateY(-1px);
   }
 
@@ -930,40 +1104,47 @@ const ControlButton = styled.button<{ $isActive?: boolean; $variant?: 'primary' 
     transform: none;
   }
 
+  &:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+
   ${({ $isActive }) =>
-    $isActive &&
-    css`
+        $isActive &&
+        css`
       animation: ${pulse} 2s ease-in-out infinite;
     `}
 `;
 
-const EmotionIndicator = styled.div<{ $emotion: TTSOptions['emotion'] }>`
+const EmotionIndicator = styled.div<{ $emotion: EmotionType }>`
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.75rem;
+  font-size: 0.65rem;
   font-weight: 600;
   color: ${({ $emotion }) => {
-        switch ($emotion) {
-            case 'excited': return '#f59e0b';
-            case 'happy': return '#10b981';
-            case 'serious': return '#ef4444';
-            case 'encouraging': return '#8b5cf6';
-            case 'welcoming': return '#06b6d4';
-            case 'calm': return '#14b8a6';
-            default: return '#6b7280';
-        }
+        const colors = {
+            excited: '#f59e0b',
+            happy: '#10b981',
+            serious: '#ef4444',
+            encouraging: '#8b5cf6',
+            welcoming: '#06b6d4',
+            calm: '#14b8a6',
+            neutral: '#6b7280'
+        };
+        return colors[$emotion];
     }};
   background: ${({ $emotion }) => {
-        switch ($emotion) {
-            case 'excited': return 'rgba(245, 158, 11, 0.1)';
-            case 'happy': return 'rgba(16, 185, 129, 0.1)';
-            case 'serious': return 'rgba(239, 68, 68, 0.1)';
-            case 'encouraging': return 'rgba(139, 92, 246, 0.1)';
-            case 'welcoming': return 'rgba(6, 182, 212, 0.1)';
-            case 'calm': return 'rgba(20, 184, 166, 0.1)';
-            default: return 'rgba(107, 114, 128, 0.1)';
-        }
+        const backgrounds = {
+            excited: 'rgba(245, 158, 11, 0.1)',
+            happy: 'rgba(16, 185, 129, 0.1)',
+            serious: 'rgba(239, 68, 68, 0.1)',
+            encouraging: 'rgba(139, 92, 246, 0.1)',
+            welcoming: 'rgba(6, 182, 212, 0.1)',
+            calm: 'rgba(20, 184, 166, 0.1)',
+            neutral: 'rgba(107, 114, 128, 0.1)'
+        };
+        return backgrounds[$emotion];
     }};
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
@@ -974,12 +1155,8 @@ const StatusText = styled.span`
   font-size: 0.75rem;
   color: #6b7280;
   margin-left: 0.5rem;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-weight: 500;
 `;
 
 export default OptimizedTextToSpeech;
-export { ENHANCED_AGENT_PROFILES, ConversationTracker, IntelligentTextProcessor, OptimizedVoiceManager };
+export { AGENT_PROFILES, VoiceManager, LanguageDetector, EmotionProcessor };

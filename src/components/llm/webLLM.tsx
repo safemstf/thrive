@@ -1,15 +1,14 @@
-// src\components\llm\webLLM.tsx
-
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { Send, Bot, User, Download, Cpu, AlertCircle, Check, X, Globe, Sparkles } from 'lucide-react';
+import { Send, Bot, User, Download, Cpu, AlertCircle, Check, X, Globe, Volume2, VolumeX, SkipForward } from 'lucide-react';
 import * as webllm from '@mlc-ai/web-llm';
-import OptimizedTextToSpeech, { ENHANCED_AGENT_PROFILES, ConversationTracker } from './textToSpeech';
+import OptimizedTextToSpeech, { AGENT_PROFILES, LanguageDetector, EmotionProcessor, AgentProfile } from './textToSpeech';
+import { pulse } from '@/styles/styled-components';
 
 /* ==========================
-   ENHANCED TYPES
+   CORE TYPES
    ========================== */
 
 interface Message {
@@ -19,277 +18,183 @@ interface Message {
     timestamp: Date;
     language?: string;
     context?: 'greeting' | 'teaching' | 'correction' | 'encouragement' | 'explanation';
+    audioPlayed?: boolean;
 }
 
-interface AgentPersonality {
-    id: string;
-    name: string;
+
+export interface AgentPersonality extends AgentProfile {
     role: string;
-    nativeLanguage: string;
     teachingStyle: string;
-    responseTemplates: {
-        greeting: string[];
-        teaching: string[];
-        correction: string[];
-        encouragement: string[];
-        explanation: string[];
-    };
-    languageRules: {
-        useNativeInGreeting: boolean;
-        bilingualResponses: boolean;
-        translationHelp: boolean;
-        pronunciationFocus: boolean;
-    };
+    bilingualResponses: boolean;
+
+    // overrides / convenience
+    nativeLanguage: string;   // alias of primaryLanguage, for chat context
+    greeting: string;         // single greeting string instead of string[]
 }
 
-// Properly typed message for WebLLM API
 interface WebLLMMessage {
     role: 'system' | 'user' | 'assistant';
     content: string;
 }
 
 /* ==========================
-   ENHANCED AGENT PERSONALITIES
+   STREAMLINED AGENT PERSONALITIES
    ========================== */
 
-const AGENT_PERSONALITIES = new Map<string, AgentPersonality>([
-    ['Lexi', {
-        id: 'Lexi',
-        name: 'Lexi',
-        role: 'Arabic Teacher',
-        nativeLanguage: 'Arabic',
-        teachingStyle: 'friendly and encouraging, explaining Arabic concepts in simple English with examples',
-        responseTemplates: {
-            greeting: [
-                "مرحباً! I'm Lexi, your Arabic teacher. Let's start with some basics!",
-                "أهلاً! Ready to improve your Arabic today?",
-                "Hi! I’ll guide you step by step in learning Arabic."
-            ],
-            teaching: [
-                "In Arabic, this is said as...",
-                "Here's how you write and pronounce it in Arabic...",
-                "This is a common phrase in Arabic..."
-            ],
-            correction: [
-                "Almost there! Try saying it like this in Arabic...",
-                "Good effort! The correct Arabic way to say that is...",
-                "Let me help you refine your pronunciation..."
-            ],
-            encouragement: [
-                "ممتاز! (Excellent!)",
-                "أحسنت! (Well done!)",
-                "Great progress, keep going!"
-            ],
-            explanation: [
-                "Arabic has a root-based system. Let me show you...",
-                "Think of Arabic verbs this way...",
-                "Here’s an easy trick to remember this rule..."
-            ]
-        },
-        languageRules: {
-            useNativeInGreeting: true,      // Start with Arabic greetings
-            bilingualResponses: true,       // Mix Arabic + English for clarity
-            translationHelp: true,          // Provide English equivalents
-            pronunciationFocus: true        // Pay attention to Arabic sounds
-        }
-    }],
+const CHAT_AGENT_PERSONALITIES = new Map<string, AgentPersonality>([
+  ['Lexi', {
+    ...AGENT_PROFILES.Lexi,
+    role: 'Arabic Teacher',
+    nativeLanguage: 'Arabic',
+    teachingStyle: 'friendly and encouraging, explaining Arabic concepts in simple English with examples',
+    greeting: "مرحباً! I'm Lexi, your Arabic teacher. Let's explore the beautiful Arabic language together!",
+    bilingualResponses: true
+  }],
+  ['Adam', {
+    ...AGENT_PROFILES.Adam,
+    role: 'Arabic Teacher',
+    nativeLanguage: 'Arabic',
+    teachingStyle: 'calm and methodical, breaking down Arabic grammar step by step with cultural insights',
+    greeting: "مرحباً! أنا آدم، مدرس العربية. I'm Adam, your Arabic teacher. Let's discover Arabic together!",
+    bilingualResponses: true
+  }],
 
-    ['Kai', {
-        id: 'Kai',
-        name: 'Kai',
-        role: 'Spanish Teacher',
-        nativeLanguage: 'Spanish',
-        teachingStyle: 'patient and methodical with emphasis on pronunciation',
-        responseTemplates: {
-            greeting: [
-                "¡Hola! Soy Kai, tu profesor de español. Hello! I'm Kai, your Spanish teacher. ¡Vamos a practicar español juntos!",
-                "¡Buenos días! Ready to practice español today? Let's start with some básico conversation.",
-                "¡Saludos! I'm here to help you with your Spanish pronunciation and conversation. ¡Empecemos!"
-            ],
-            teaching: [
-                "En español, we say... In Spanish, we say...",
-                "Listen carefully to the pronunciation: [Spanish phrase] - this means [English translation]",
-                "This is an important rule in español..."
-            ],
-            correction: [
-                "¡Muy bien! Good effort! Let me help: instead of saying that, try: [Spanish correction]",
-                "¡Casi! Almost! The correct pronunciation is: [Spanish] - remember to roll your R",
-                "Good attempt! In español, we say it like this: [Spanish phrase]"
-            ],
-            encouragement: [
-                "¡Excelente! Excellent!",
-                "¡Muy bien! You're improving!",
-                "¡Perfecto! Keep practicing like that!"
-            ],
-            explanation: [
-                "Let me explain this Spanish grammar rule...",
-                "In español, this works differently than English...",
-                "Here's why we pronounce it this way in Spanish..."
-            ]
-        },
-        languageRules: {
-            useNativeInGreeting: true,
-            bilingualResponses: true,
-            translationHelp: true,
-            pronunciationFocus: true
-        }
-    }],
+  // SPANISH TEACHERS
+  ['Kai', {
+    ...AGENT_PROFILES.Kai,
+    role: 'Spanish Teacher',
+    nativeLanguage: 'Spanish',
+    teachingStyle: 'patient and methodical with emphasis on pronunciation',
+    greeting: "¡Hola! Soy Kai, tu profesor de español. I'm excited to help you master Spanish!",
+    bilingualResponses: true
+  }],
+  ['Lupita', {
+    ...AGENT_PROFILES.Lupita,
+    role: 'Spanish Teacher',
+    nativeLanguage: 'Spanish',
+    teachingStyle: 'warm and expressive, focusing on conversational Spanish with cultural context',
+    greeting: "¡Hola! Soy Lupita, tu profesora de español. ¡Qué gusto conocerte! Let's learn Spanish together!",
+    bilingualResponses: true
+  }],
 
-    ['Sana', {
-        id: 'Sana',
-        name: 'Sana',
-        role: 'French Teacher',
-        nativeLanguage: 'French',
-        teachingStyle: 'systematic and precise with focus on proper grammar',
-        responseTemplates: {
-            greeting: [
-                "Bonjour ! Je suis Sana, votre professeure de français. Hello! I'm Sana, your French teacher. Commençons notre leçon !",
-                "Salut ! Ready to learn français today? Let's practice proper French pronunciation and grammar.",
-                "Bonjour mes étudiants ! I'll help you master the beautiful French language. Allons-y !"
-            ],
-            teaching: [
-                "En français, nous disons... In French, we say...",
-                "Note the pronunciation: [French phrase] - this means [English translation]",
-                "This is a fundamental rule in français..."
-            ],
-            correction: [
-                "Très bien ! Good try! The correct French is: [French correction] - note the liaison",
-                "Presque ! Almost! In français, we say: [French phrase] - mind the accent",
-                "Good effort! The proper French pronunciation is: [French phrase]"
-            ],
-            encouragement: [
-                "Parfait ! Perfect!",
-                "Très bien ! You're progressing well!",
-                "Excellent ! Continue like this!"
-            ],
-            explanation: [
-                "Let me explain this French grammar concept...",
-                "En français, this structure works like this...",
-                "Here's why French pronunciation follows this pattern..."
-            ]
-        },
-        languageRules: {
-            useNativeInGreeting: true,
-            bilingualResponses: true,
-            translationHelp: true,
-            pronunciationFocus: true
-        }
-    }],
+  // FRENCH TEACHERS
+  ['Sana', {
+    ...AGENT_PROFILES.Sana,
+    role: 'French Teacher',
+    nativeLanguage: 'French',
+    teachingStyle: 'systematic and precise with focus on proper grammar',
+    greeting: "Bonjour ! Je suis Sana, votre professeure de français. Let's begin your French journey!",
+    bilingualResponses: true
+  }],
+  ['Vinz', {
+    ...AGENT_PROFILES.Vinz,
+    role: 'French Teacher',
+    nativeLanguage: 'French',
+    teachingStyle: 'casual and conversational, emphasizing practical French for real situations',
+    greeting: "Bonjour ! Je suis Vinz, votre professeur de français. Enchanté! Let's explore French together.",
+    bilingualResponses: true
+  }],
 
-    ['Mei', {
-        id: 'Mei',
-        name: 'Mei',
-        role: 'Mandarin Teacher',
-        nativeLanguage: 'Mandarin',
-        teachingStyle: 'encouraging and patient with emphasis on tones',
-        responseTemplates: {
-            greeting: [
-                "你好！我是美美，你的中文老师。Hello! I'm Mei, your Mandarin teacher. 我们一起学中文吧！",
-                "你好! Ready to practice 中文? Let's work on those important tones together!",
-                "欢迎！Welcome! I'll help you master Mandarin pronunciation and tones. 开始吧！"
-            ],
-            teaching: [
-                "在中文里，我们说... In Mandarin, we say...",
-                "Listen to the tones: [Chinese with pinyin] - this means [English translation]",
-                "This tone pattern is important in 中文..."
-            ],
-            correction: [
-                "很好！Good try! The correct tone is: [Chinese with tone marks] - remember the rising tone",
-                "差不多！Close! In 中文, we say: [Chinese phrase] - focus on the third tone",
-                "Good attempt! The proper Mandarin is: [Chinese with pinyin]"
-            ],
-            encouragement: [
-                "太好了！Excellent!",
-                "很好！You're improving!",
-                "完美！Perfect tones!"
-            ],
-            explanation: [
-                "Let me explain this Mandarin tone rule...",
-                "在中文里，tones work like this...",
-                "Here's why this tone combination changes..."
-            ]
-        },
-        languageRules: {
-            useNativeInGreeting: true,
-            bilingualResponses: true,
-            translationHelp: true,
-            pronunciationFocus: true
-        }
-    }]
+  // CHINESE TEACHERS
+  ['Mei', {
+    ...AGENT_PROFILES.Mei,
+    role: 'Mandarin Teacher',
+    nativeLanguage: 'Mandarin',
+    teachingStyle: 'encouraging and patient with emphasis on tones',
+    greeting: "你好！我是美美，你的中文老师。I'm Mei, excited to teach you Mandarin!",
+    bilingualResponses: true
+  }],
+  ['Wei', {
+    ...AGENT_PROFILES.Wei,
+    role: 'Mandarin Teacher',
+    nativeLanguage: 'Mandarin',
+    teachingStyle: 'structured and thorough, focusing on character writing and pronunciation',
+    greeting: "你好！我是伟，你的中文老师。I'm Wei, your Mandarin teacher. Let's master Chinese!",
+    bilingualResponses: true
+  }],
+
+  // ITALIAN TEACHERS
+  ['Giulia', {
+    ...AGENT_PROFILES.Giulia,
+    role: 'Italian Teacher',
+    nativeLanguage: 'Italian',
+    teachingStyle: 'passionate and animated, bringing Italian culture alive through language',
+    greeting: "Ciao! Sono Giulia, la tua insegnante di italiano. Benvenuti! Welcome to beautiful Italian!",
+    bilingualResponses: true
+  }],
+  ['Marco', {
+    ...AGENT_PROFILES.Marco,
+    role: 'Italian Teacher',
+    nativeLanguage: 'Italian',
+    teachingStyle: 'practical and clear, focusing on useful Italian for travel and conversation',
+    greeting: "Ciao! Sono Marco, il vostro insegnante di italiano. Andiamo! Let's learn Italian together!",
+    bilingualResponses: true
+  }]
 ]);
 
 /* ==========================
-   ADVANCED PROMPT ENGINEERING
+   ENHANCED PROMPT ENGINE
    ========================== */
 
-class MultilingualPromptEngine {
-    static generateEnhancedSystemPrompt(agentId: string): string {
-        const personality = AGENT_PERSONALITIES.get(agentId);
+class PromptEngine {
+    static generateSystemPrompt(agentId: string): string {
+        const personality = CHAT_AGENT_PERSONALITIES.get(agentId);
         if (!personality) return '';
 
-        const basePrompt = `You are ${personality.name}, a ${personality.role.toLowerCase()}.
+        return `You are ${personality.name}, a native ${personality.nativeLanguage} speaker and professional ${personality.role}.
 
-CRITICAL LANGUAGE REQUIREMENTS:
-${personality.languageRules.useNativeInGreeting ?
-                `- ALWAYS start your first response with ${personality.nativeLanguage} greeting, then English
-- Use ${personality.nativeLanguage} phrases naturally throughout responses
-- Provide bilingual explanations: [${personality.nativeLanguage} phrase] - [English translation]` :
-                `- Respond primarily in English with helpful explanations
-- Use target language examples when teaching`}
-
-PERSONALITY & STYLE:
-- Teaching style: ${personality.teachingStyle}
+TEACHING APPROACH:
 - Be ${personality.teachingStyle}
-- ${personality.languageRules.pronunciationFocus ? 'Focus heavily on pronunciation and provide phonetic guidance' : ''}
-- ${personality.languageRules.translationHelp ? 'Always provide translations between languages' : ''}
+- Mix ${personality.nativeLanguage} naturally with English explanations
+- Always provide translations in brackets: [${personality.nativeLanguage}] = [English]
+- Focus on practical, everyday usage and pronunciation
+- Keep responses concise but informative (2-3 sentences typically)
+- Use encouragement when students make attempts
+- Correct mistakes gently with clear explanations
 
-RESPONSE STRUCTURE:
-1. ${personality.languageRules.useNativeInGreeting ? `Start with ${personality.nativeLanguage} greeting/phrase` : 'Start with warm English greeting'}
-2. Provide teaching content
-3. ${personality.languageRules.bilingualResponses ? 'Include both languages naturally' : 'Focus on English explanations'}
-4. End with encouragement
+RESPONSE STYLE:
+- Start with a ${personality.nativeLanguage} greeting/phrase when appropriate
+- Explain grammar, pronunciation, and cultural context clearly
+- Give practical examples the student can use immediately
+- Be warm, encouraging, and patient
+- End with a question or suggestion to keep the conversation flowing
 
-EXAMPLE RESPONSES:
-${personality.responseTemplates.greeting[0]}
+IMPORTANT: Always include some ${personality.nativeLanguage} in your responses to help with pronunciation practice.
 
-Remember: Be authentic to your ${personality.nativeLanguage} background while teaching effectively.`;
-
-        return basePrompt;
+Remember: You're teaching beginners, so keep explanations simple and engaging.`;
     }
 
-    static formatUserMessage(content: string, context: Message['context']): string {
-        const contextMarkers = {
-            greeting: '[FIRST_INTERACTION]',
-            teaching: '[LEARNING_REQUEST]',
-            correction: '[NEEDS_CORRECTION]',
-            encouragement: '[SEEKING_ENCOURAGEMENT]',
-            explanation: '[NEEDS_EXPLANATION]'
-        };
+    static detectContext(message: string): Message['context'] {
+        const lower = message.toLowerCase();
 
-        const marker = context ? contextMarkers[context] : '[GENERAL_INTERACTION]';
-        return `${marker} ${content}`;
+        if (lower.match(/hello|hi|hey|greet|start|مرحبا|hola|bonjour|你好/)) return 'greeting';
+        if (lower.match(/how do|what is|translate|mean|explain|why|grammar/)) return 'explanation';
+        if (lower.match(/correct|wrong|mistake|check|pronunciation|better/)) return 'correction';
+        if (lower.match(/difficult|hard|struggle|help|confused|don't understand/)) return 'encouragement';
+
+        return 'teaching';
     }
 
-    static analyzeResponseNeeds(userMessage: string): {
-        context: Message['context'];
-        needsTranslation: boolean;
-        needsPronunciation: boolean;
-        language: string;
-    } {
-        const lower = userMessage.toLowerCase();
+    static generateContextualPrompt(message: string, context: Message['context'], agentId: string): string {
+        const personality = CHAT_AGENT_PERSONALITIES.get(agentId);
+        if (!personality) return message;
 
-        let context: Message['context'] = 'teaching';
-        if (lower.match(/hello|hi|hey|first time|nice to meet/)) context = 'greeting';
-        if (lower.match(/how do you say|translate|what does.*mean/)) context = 'explanation';
-        if (lower.match(/is this correct|did i say.*right|check my/)) context = 'correction';
-        if (lower.match(/struggling|difficult|hard|confused/)) context = 'encouragement';
+        switch (context) {
+            case 'greeting':
+                return `${message}\n\n[Context: This is a greeting. Respond warmly with a ${personality.nativeLanguage} greeting and introduce what you can help with today.]`;
 
-        return {
-            context,
-            needsTranslation: lower.includes('translate') || lower.includes('mean'),
-            needsPronunciation: lower.includes('pronounce') || lower.includes('sound'),
-            language: 'auto-detect'
-        };
+            case 'correction':
+                return `${message}\n\n[Context: The student needs correction or feedback. Be gentle but clear, provide the correct form in ${personality.nativeLanguage}, and explain why.]`;
+
+            case 'encouragement':
+                return `${message}\n\n[Context: The student is struggling. Be extra encouraging, break down the concept into simpler parts, and provide easier examples in ${personality.nativeLanguage}.]`;
+
+            case 'explanation':
+                return `${message}\n\n[Context: The student wants to learn something new. Explain clearly with ${personality.nativeLanguage} examples and practical usage.]`;
+
+            default:
+                return message;
+        }
     }
 }
 
@@ -297,41 +202,50 @@ Remember: Be authentic to your ${personality.nativeLanguage} background while te
    OPTIMIZED MODEL MANAGER
    ========================== */
 
-class OptimizedModelManager {
-    private static instance: OptimizedModelManager;
+class ModelManager {
+    private static instance: ModelManager;
     private engine: webllm.MLCEngineInterface | null = null;
     private isLoading = false;
     private isReady = false;
-    private loadingCallbacks = new Set<(progress: number, text: string) => void>();
-    private readyCallbacks = new Set<() => void>();
     private conversationHistory = new Map<string, Message[]>();
+    private loadPromise: Promise<webllm.MLCEngineInterface> | null = null;
 
-    static getInstance(): OptimizedModelManager {
-        if (!OptimizedModelManager.instance) {
-            OptimizedModelManager.instance = new OptimizedModelManager();
+    static getInstance(): ModelManager {
+        if (!ModelManager.instance) {
+            ModelManager.instance = new ModelManager();
         }
-        return OptimizedModelManager.instance;
+        return ModelManager.instance;
     }
 
     async loadModel(progressCallback?: (progress: number, text: string) => void): Promise<webllm.MLCEngineInterface> {
-        if (this.engine && this.isReady) return this.engine;
-
-        if (this.isLoading) {
-            return new Promise((resolve) => {
-                if (progressCallback) this.loadingCallbacks.add(progressCallback);
-                this.readyCallbacks.add(() => resolve(this.engine!));
-            });
+        // Return existing engine if ready
+        if (this.engine && this.isReady) {
+            return this.engine;
         }
 
-        this.isLoading = true;
-        if (progressCallback) this.loadingCallbacks.add(progressCallback);
+        // Return existing load promise if loading
+        if (this.loadPromise) {
+            return this.loadPromise;
+        }
 
+        // Start new load
+        this.isLoading = true;
+        this.loadPromise = this.performLoad(progressCallback);
+
+        try {
+            const result = await this.loadPromise;
+            return result;
+        } finally {
+            this.loadPromise = null;
+        }
+    }
+
+    private async performLoad(progressCallback?: (progress: number, text: string) => void): Promise<webllm.MLCEngineInterface> {
         try {
             const engineConfig: webllm.MLCEngineConfig = {
                 initProgressCallback: (progress) => {
-                    const progressPercent = Math.round(progress.progress * 100);
-                    const text = progress.text || 'Loading...';
-                    this.loadingCallbacks.forEach(cb => cb(progressPercent, text));
+                    const percent = Math.round(progress.progress * 100);
+                    progressCallback?.(percent, progress.text || 'Loading model...');
                 }
             };
 
@@ -340,110 +254,131 @@ class OptimizedModelManager {
 
             this.isReady = true;
             this.isLoading = false;
-            this.loadingCallbacks.clear();
-            this.readyCallbacks.forEach(cb => cb());
-            this.readyCallbacks.clear();
-
+            console.log('WebLLM model loaded successfully');
             return this.engine;
         } catch (error) {
             this.isLoading = false;
-            this.loadingCallbacks.clear();
-            this.readyCallbacks.clear();
+            this.isReady = false;
+            console.error('Failed to load WebLLM model:', error);
             throw error;
         }
     }
 
-    async generateResponse(agentId: string, userMessage: string, conversationId: string): Promise<string> {
+    async generateResponse(
+        agentId: string,
+        userMessage: string,
+        conversationId: string,
+        maxRetries: number = 2
+    ): Promise<string> {
         if (!this.engine || !this.isReady) {
             throw new Error('Model not ready');
         }
 
-        // Analyze user message for context
-        const analysis = MultilingualPromptEngine.analyzeResponseNeeds(userMessage);
+        const history = this.conversationHistory.get(conversationId) || [];
+        const context = PromptEngine.detectContext(userMessage);
+        const contextualMessage = PromptEngine.generateContextualPrompt(userMessage, context, agentId);
+        const systemPrompt = PromptEngine.generateSystemPrompt(agentId);
 
-        // Update conversation tracking
-        const tracker = ConversationTracker.getInstance();
-        const context: NonNullable<Message['context']> = analysis.context ?? 'teaching';
-        tracker.updateTrack(agentId, context, 'calm');
+        let lastError: Error | null = null;
 
-        // Get conversation history
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                // Build message history with better context
+                const messages: WebLLMMessage[] = [
+                    { role: 'system', content: systemPrompt },
+                    // Include recent conversation history for context
+                    ...history.slice(-6).map(msg => ({
+                        role: msg.role as 'user' | 'assistant',
+                        content: msg.content
+                    })),
+                    { role: 'user', content: contextualMessage }
+                ];
+
+                const completion = await this.engine.chat.completions.create({
+                    messages,
+                    temperature: 0.75, // Slightly higher for more creative language teaching
+                    max_tokens: 300, // Increased for better explanations
+                    top_p: 0.9,
+                    frequency_penalty: 0.1, // Reduce repetition
+                    presence_penalty: 0.1
+                });
+
+                const response = completion.choices[0]?.message?.content;
+
+                if (!response || response.trim().length === 0) {
+                    throw new Error('Empty response from model');
+                }
+
+                // Save to history
+                this.updateHistory(conversationId, userMessage, response, context);
+
+                return response.trim();
+
+            } catch (error) {
+                lastError = error as Error;
+                console.warn(`Generation attempt ${attempt + 1} failed:`, error);
+
+                // Wait before retry
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+                }
+            }
+        }
+
+        throw lastError || new Error('Failed to generate response after all retries');
+    }
+
+    private updateHistory(conversationId: string, userMsg: string, assistantMsg: string, context: Message['context']) {
         const history = this.conversationHistory.get(conversationId) || [];
 
-        // Format user message with context
-        const formattedUserMessage = MultilingualPromptEngine.formatUserMessage(userMessage, analysis.context);
-
-        // Generate enhanced system prompt
-        const systemPrompt = MultilingualPromptEngine.generateEnhancedSystemPrompt(agentId);
-
-        try {
-            // Prepare properly typed messages for WebLLM API
-            const messages: WebLLMMessage[] = [
-                { role: 'system', content: systemPrompt },
-                ...history.slice(-6).map((msg): WebLLMMessage => ({
-                    role: msg.role as 'user' | 'assistant', // Explicit cast to ensure proper typing
-                    content: msg.content
-                })),
-                { role: 'user', content: formattedUserMessage }
-            ];
-
-            const completion = await this.engine.chat.completions.create({
-                messages,
-                temperature: 0.8,
-                max_tokens: 1200,
-                top_p: 0.9
-            });
-
-            const response = completion.choices[0].message.content || 'I apologize, but I could not generate a response.';
-
-            // Store conversation
-            const userMsg: Message = {
-                id: Date.now().toString(),
+        const newMessages: Message[] = [
+            {
+                id: `${Date.now()}-user`,
                 role: 'user',
-                content: userMessage,
+                content: userMsg,
                 timestamp: new Date(),
-                context: analysis.context
-            };
-
-            const assistantMsg: Message = {
-                id: (Date.now() + 1).toString(),
+                context,
+                language: LanguageDetector.detect(userMsg)
+            },
+            {
+                id: `${Date.now()}-assistant`,
                 role: 'assistant',
-                content: response,
+                content: assistantMsg,
                 timestamp: new Date(),
-                context: analysis.context
-            };
+                context,
+                language: LanguageDetector.detect(assistantMsg),
+                audioPlayed: false
+            }
+        ];
 
-            const updatedHistory = [...history, userMsg, assistantMsg];
-            this.conversationHistory.set(conversationId, updatedHistory.slice(-20));
+        // Keep last 12 messages for better context retention
+        const updated = [...history, ...newMessages].slice(-12);
+        this.conversationHistory.set(conversationId, updated);
+    }
 
-            return response;
-        } catch (error) {
-            console.error('Generation error:', error);
-            throw new Error('Failed to generate response');
-        }
+    clearConversation(conversationId: string) {
+        this.conversationHistory.delete(conversationId);
+        console.log(`Cleared conversation: ${conversationId}`);
     }
 
     getConversationHistory(conversationId: string): Message[] {
         return this.conversationHistory.get(conversationId) || [];
     }
 
-    clearConversation(conversationId: string): void {
-        this.conversationHistory.delete(conversationId);
-    }
-
     isModelReady(): boolean {
         return this.isReady;
     }
 
-    isModelLoading(): boolean {
-        return this.isLoading;
+    getLoadingStatus(): { isLoading: boolean; isReady: boolean } {
+        return { isLoading: this.isLoading, isReady: this.isReady };
     }
 }
 
 /* ==========================
-   ENHANCED CHAT COMPONENT
+   MAIN CHAT COMPONENT
    ========================== */
 
-interface OptimizedChatProps {
+interface ChatProps {
     agent: {
         id: number;
         name: string;
@@ -455,188 +390,403 @@ interface OptimizedChatProps {
     onClose: () => void;
 }
 
-const OptimizedChat: React.FC<OptimizedChatProps> = ({ agent, onClose }) => {
+const OptimizedChat: React.FC<ChatProps> = ({ agent, onClose }) => {
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [loadingProgress, setLoadingProgress] = useState(0);
     const [loadingText, setLoadingText] = useState('Initializing...');
+    const [audioEnabled, setAudioEnabled] = useState(true);
+    const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
+    const [isAudioPlaying, setIsAudioPlaying] = useState(false);
 
-    const modelManager = OptimizedModelManager.getInstance();
-    const conversationId = `${agent.name}-${Date.now()}`;
+    const modelManager = useMemo(() => ModelManager.getInstance(), []);
+    const conversationId = useMemo(() => `${agent.name}-${Date.now()}`, [agent.name]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const chatAreaRef = useRef<HTMLDivElement>(null);
 
-    // Scroll to bottom when messages change
+    // Auto-scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const initializeAgent = async () => {
-        try {
-            setStatus('loading');
-            setLoadingProgress(0);
-            setLoadingText(`Preparing ${agent.name}...`);
-
-            await modelManager.loadModel((progress, text) => {
-                setLoadingProgress(progress);
-                setLoadingText(text);
-            });
-
-            setStatus('ready');
-
-            // Generate personalized welcome message
-            const personality = AGENT_PERSONALITIES.get(agent.name);
-            const welcomeContent = personality?.responseTemplates.greeting[0] ||
-                `Hello! I'm ${agent.name}, your ${agent.role.toLowerCase()}. Let's start learning together!`;
-
-            const welcomeMessage: Message = {
-                id: Date.now().toString(),
-                role: 'assistant',
-                content: welcomeContent,
-                timestamp: new Date(),
-                context: 'greeting'
-            };
-
-            setMessages([welcomeMessage]);
-
-        } catch (err) {
-            console.error('Failed to initialize agent:', err);
-            setStatus('error');
-        }
-    };
-
+    // Initialize agent
     useEffect(() => {
-        initializeAgent();
-    }, [agent]);
+        let mounted = true;
 
-    const sendMessage = async () => {
-        if (!inputText.trim() || isGenerating || status !== 'ready') return;
+        const init = async () => {
+            try {
+                setStatus('loading');
+                setLoadingText('Loading language model...');
+
+                await modelManager.loadModel((progress, text) => {
+                    if (mounted) {
+                        setLoadingProgress(progress);
+                        setLoadingText(text);
+                    }
+                });
+
+                if (mounted) {
+                    setStatus('ready');
+                    setLoadingText('Ready!');
+
+                    // Add welcome message
+                    const personality = CHAT_AGENT_PERSONALITIES.get(agent.name);
+                    if (personality) {
+                        const welcomeMessage: Message = {
+                            id: 'welcome',
+                            role: 'assistant',
+                            content: personality.greeting,
+                            timestamp: new Date(),
+                            context: 'greeting',
+                            language: LanguageDetector.detect(personality.greeting),
+                            audioPlayed: false
+                        };
+
+                        setMessages([welcomeMessage]);
+
+                        // Auto-play welcome message if audio enabled
+                        if (audioEnabled) {
+                            setTimeout(() => setCurrentPlayingId('welcome'), 500);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Initialization failed:', err);
+                if (mounted) {
+                    setStatus('error');
+                    setLoadingText('Failed to load model');
+                }
+            }
+        };
+
+        init();
+
+        return () => {
+            mounted = false;
+        };
+    }, [agent.name, modelManager, audioEnabled]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Escape to close
+            if (e.key === 'Escape') {
+                onClose();
+            }
+
+            // Space to toggle audio when not typing
+            if (e.key === ' ' && document.activeElement !== inputRef.current && !isGenerating) {
+                e.preventDefault();
+                setAudioEnabled(!audioEnabled);
+            }
+
+            // S to skip current audio
+            if (e.key === 's' && (e.ctrlKey || e.metaKey) && isAudioPlaying) {
+                e.preventDefault();
+                setCurrentPlayingId(null);
+                setIsAudioPlaying(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose, audioEnabled, isGenerating, isAudioPlaying]);
+
+    // Focus management for accessibility
+    useEffect(() => {
+        if (status === 'ready') {
+            inputRef.current?.focus();
+        }
+    }, [status]);
+
+    // Handle message sending
+    const sendMessage = useCallback(async () => {
+        const trimmedInput = inputText.trim();
+        if (!trimmedInput || isGenerating || status !== 'ready') return;
 
         const userMessage: Message = {
-            id: Date.now().toString(),
+            id: `user-${Date.now()}`,
             role: 'user',
-            content: inputText.trim(),
-            timestamp: new Date()
+            content: trimmedInput,
+            timestamp: new Date(),
+            language: LanguageDetector.detect(trimmedInput),
+            context: PromptEngine.detectContext(trimmedInput)
         };
 
         setMessages(prev => [...prev, userMessage]);
         setInputText('');
         setIsGenerating(true);
 
+        // Announce to screen readers
+        const announcement = `Sending message: ${trimmedInput}`;
+        announceToScreenReader(announcement);
+
+        // Focus input after a short delay
+        setTimeout(() => inputRef.current?.focus(), 100);
+
         try {
             const response = await modelManager.generateResponse(
                 agent.name,
-                userMessage.content,
+                trimmedInput,
                 conversationId
             );
 
             const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
+                id: `assistant-${Date.now()}`,
                 role: 'assistant',
                 content: response,
-                timestamp: new Date()
+                timestamp: new Date(),
+                language: LanguageDetector.detect(response),
+                context: PromptEngine.detectContext(trimmedInput),
+                audioPlayed: false
             };
 
             setMessages(prev => [...prev, assistantMessage]);
+
+            // Announce response to screen readers
+            announceToScreenReader(`${agent.name} responded`);
+
+            // Auto-play audio for new message if enabled
+            if (audioEnabled) {
+                setCurrentPlayingId(assistantMessage.id);
+            }
+
         } catch (err) {
-            console.error('Error generating response:', err);
+            console.error('Generation failed:', err);
+
+            // Generate contextual error message
+            const personality = CHAT_AGENT_PERSONALITIES.get(agent.name);
+            const errorContent = personality
+                ? `${personality.name === 'Lexi' ? 'آسف! ' :
+                    personality.name === 'Kai' ? '¡Lo siento! ' :
+                        personality.name === 'Sana' ? 'Désolé! ' :
+                            personality.name === 'Mei' ? '对不起! ' : ''}I apologize, but I encountered an error. Please try again.`
+                : 'I apologize, but I encountered an error. Please try again.';
+
             const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
+                id: `error-${Date.now()}`,
                 role: 'assistant',
-                content: 'Lo siento, I encountered an error. Please try again. Désolé pour ce problème technique.',
-                timestamp: new Date()
+                content: errorContent,
+                timestamp: new Date(),
+                language: 'en-US',
+                audioPlayed: false
             };
+
             setMessages(prev => [...prev, errorMessage]);
+            announceToScreenReader('An error occurred. Please try again.');
         } finally {
             setIsGenerating(false);
         }
-    };
+    }, [inputText, isGenerating, status, agent.name, conversationId, modelManager, audioEnabled]);
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
+    // Handle keyboard shortcuts
+    const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
         }
-    };
+    }, [sendMessage]);
+
+    // Handle input changes with better UX
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setInputText(e.target.value);
+
+        // Auto-resize textarea
+        const textarea = e.target;
+        textarea.style.height = 'auto';
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+    }, []);
+
+    // Handle audio start/stop
+    const handleAudioStart = useCallback(() => {
+        setIsAudioPlaying(true);
+        announceToScreenReader('Audio playback started');
+    }, []);
+
+    const handleAudioComplete = useCallback((messageId: string) => {
+        setMessages(prev => prev.map(msg =>
+            msg.id === messageId ? { ...msg, audioPlayed: true } : msg
+        ));
+        setCurrentPlayingId(null);
+        setIsAudioPlaying(false);
+        announceToScreenReader('Audio playback completed');
+    }, []);
+
+    // Skip current audio
+    const skipAudio = useCallback(() => {
+        setCurrentPlayingId(null);
+        setIsAudioPlaying(false);
+        announceToScreenReader('Audio playback skipped');
+    }, []);
+
+    // Clear conversation
+    const clearConversation = useCallback(() => {
+        modelManager.clearConversation(conversationId);
+        setMessages([]);
+        setCurrentPlayingId(null);
+
+        // Re-add welcome message
+        const personality = CHAT_AGENT_PERSONALITIES.get(agent.name);
+        if (personality) {
+            const welcomeMessage: Message = {
+                id: `welcome-${Date.now()}`,
+                role: 'assistant',
+                content: personality.greeting,
+                timestamp: new Date(),
+                context: 'greeting',
+                language: LanguageDetector.detect(personality.greeting),
+                audioPlayed: false
+            };
+            setMessages([welcomeMessage]);
+        }
+
+        announceToScreenReader('Conversation cleared');
+        inputRef.current?.focus();
+    }, [modelManager, conversationId, agent.name]);
+
+    // Utility function to announce to screen readers
+    const announceToScreenReader = useCallback((message: string) => {
+        const announcement = document.createElement('div');
+        announcement.setAttribute('aria-live', 'polite');
+        announcement.setAttribute('aria-atomic', 'true');
+        announcement.style.position = 'absolute';
+        announcement.style.left = '-10000px';
+        announcement.style.width = '1px';
+        announcement.style.height = '1px';
+        announcement.style.overflow = 'hidden';
+        announcement.textContent = message;
+
+        document.body.appendChild(announcement);
+        setTimeout(() => document.body.removeChild(announcement), 1000);
+    }, []);
 
     return (
-        <ChatOverlay onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <ChatOverlay
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="chat-title"
+        >
             <ChatContainer>
                 <ChatHeader>
                     <HeaderInfo>
-                        <Bot size={24} />
+                        <Bot size={24} aria-hidden="true" />
                         <div>
-                            <h3 style={{ margin: 0, fontSize: '1.125rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <AgentName id="chat-title">
                                 {agent.name}
-                                {AGENT_PERSONALITIES.get(agent.name)?.languageRules.useNativeInGreeting && (
-                                    <Globe size={16} style={{ opacity: 0.8 }} />
-                                )}
-                            </h3>
-                            <p style={{ margin: 0, fontSize: '0.875rem', opacity: 0.9 }}>
-                                {agent.role} • {AGENT_PERSONALITIES.get(agent.name)?.nativeLanguage || 'English'} Teacher
-                            </p>
+                                <Globe size={16} aria-hidden="true" />
+                            </AgentName>
+                            <AgentRole>
+                                {agent.role} • {CHAT_AGENT_PERSONALITIES.get(agent.name)?.nativeLanguage}
+                            </AgentRole>
                         </div>
                     </HeaderInfo>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <StatusBadge $status={status}>
-                            {status === 'loading' && <Download size={16} />}
-                            {status === 'ready' && <Check size={16} />}
-                            {status === 'error' && <AlertCircle size={16} />}
-                            {status === 'loading' && 'Loading'}
-                            {status === 'ready' && 'Ready'}
-                            {status === 'error' && 'Error'}
+                    <HeaderControls>
+                        <AudioToggle
+                            onClick={() => setAudioEnabled(!audioEnabled)}
+                            $enabled={audioEnabled}
+                            title={audioEnabled ? 'Disable audio (Space)' : 'Enable audio (Space)'}
+                            aria-label={audioEnabled ? 'Disable audio' : 'Enable audio'}
+                        >
+                            {audioEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                        </AudioToggle>
+
+                        {isAudioPlaying && (
+                            <SkipButton
+                                onClick={skipAudio}
+                                title="Skip audio (Ctrl+S)"
+                                aria-label="Skip audio"
+                            >
+                                <SkipForward size={18} />
+                            </SkipButton>
+                        )}
+
+                        <StatusBadge
+                            $status={status}
+                            role="status"
+                            aria-label={`Model status: ${status}`}
+                        >
+                            {status === 'loading' && <Download size={16} aria-hidden="true" />}
+                            {status === 'ready' && <Check size={16} aria-hidden="true" />}
+                            {status === 'error' && <AlertCircle size={16} aria-hidden="true" />}
+                            {status}
                         </StatusBadge>
 
-                        <CloseButton onClick={onClose}>
+                        <CloseButton
+                            onClick={onClose}
+                            aria-label="Close chat (Escape)"
+                            title="Close chat (Escape)"
+                        >
                             <X size={20} />
                         </CloseButton>
-                    </div>
+                    </HeaderControls>
                 </ChatHeader>
 
                 {status === 'loading' && (
-                    <LoadingContainer>
-                        <Cpu size={48} style={{ color: '#3b82f6', marginBottom: '1rem' }} />
-                        <h3 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>
-                            Loading {agent.name}
-                        </h3>
-                        <p style={{ color: '#6b7280', margin: '0.5rem 0', fontSize: '0.875rem' }}>
-                            {loadingText}
-                        </p>
-                        <ProgressBar>
+                    <LoadingContainer role="status" aria-live="polite">
+                        <Cpu size={48} aria-hidden="true" />
+                        <LoadingTitle>Loading {agent.name}</LoadingTitle>
+                        <LoadingText aria-live="polite">{loadingText}</LoadingText>
+                        <ProgressBar role="progressbar" aria-valuenow={loadingProgress} aria-valuemin={0} aria-valuemax={100}>
                             <ProgressFill $progress={loadingProgress} />
                         </ProgressBar>
-                        <p style={{ color: '#6b7280', fontSize: '0.75rem' }}>
-                            {loadingProgress}% complete
-                        </p>
+                        <LoadingPercent aria-live="polite">{loadingProgress}% complete</LoadingPercent>
                     </LoadingContainer>
                 )}
 
                 {status === 'ready' && (
                     <>
-                        <MessagesArea>
-                            {messages.map((message) => (
-                                <MessageBubble key={message.id} $isUser={message.role === 'user'}>
+                        <MessagesArea
+                            ref={chatAreaRef}
+                            role="log"
+                            aria-live="polite"
+                            aria-label="Conversation history"
+                        >
+                            {messages.map((message, index) => (
+                                <MessageBubble
+                                    key={message.id}
+                                    $isUser={message.role === 'user'}
+                                    role="article"
+                                    aria-label={`${message.role === 'user' ? 'Your message' : `${agent.name}'s response`}`}
+                                >
                                     {message.role === 'assistant' && (
-                                        <Avatar $isUser={false}>
+                                        <Avatar $isUser={false} aria-hidden="true">
                                             <Bot size={16} />
                                         </Avatar>
                                     )}
                                     <MessageContent $isUser={message.role === 'user'}>
-                                        {message.content}
-                                        {message.role === 'assistant' && (
-                                            <div style={{ position: 'absolute', top: '-8px', right: '-8px' }}>
+                                        <MessageText>
+                                            {message.content}
+                                        </MessageText>
+                                        {message.role === 'assistant' && audioEnabled && (
+                                            <AudioButton>
                                                 <OptimizedTextToSpeech
                                                     text={message.content}
                                                     agentId={agent.name}
-                                                    autoPlay={true}
+                                                    autoPlay={currentPlayingId === message.id && !message.audioPlayed}
+                                                    onStart={handleAudioStart}
+                                                    onEnd={() => handleAudioComplete(message.id)}
                                                 />
-                                            </div>
+                                            </AudioButton>
                                         )}
+                                        {message.language && message.language !== 'en-US' && (
+                                            <LanguageTag
+                                                $language={message.language}
+                                                aria-label={`Language: ${message.language}`}
+                                            >
+                                                {message.language.split('-')[0].toUpperCase()}
+                                            </LanguageTag>
+                                        )}
+                                        <MessageTime aria-label={`Sent at ${message.timestamp.toLocaleTimeString()}`}>
+                                            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </MessageTime>
                                     </MessageContent>
                                     {message.role === 'user' && (
-                                        <Avatar $isUser={true}>
+                                        <Avatar $isUser={true} aria-hidden="true">
                                             <User size={16} />
                                         </Avatar>
                                     )}
@@ -644,10 +794,10 @@ const OptimizedChat: React.FC<OptimizedChatProps> = ({ agent, onClose }) => {
                             ))}
 
                             {isGenerating && (
-                                <TypingIndicator>
-                                    <Bot size={16} />
+                                <TypingIndicator role="status" aria-live="polite">
+                                    <Bot size={16} aria-hidden="true" />
                                     <span>{agent.name} is thinking</span>
-                                    <TypingDots>
+                                    <TypingDots aria-hidden="true">
                                         <span />
                                         <span />
                                         <span />
@@ -661,16 +811,24 @@ const OptimizedChat: React.FC<OptimizedChatProps> = ({ agent, onClose }) => {
                         <InputArea>
                             <InputContainer>
                                 <TextInput
+                                    ref={inputRef}
                                     value={inputText}
-                                    onChange={(e) => setInputText(e.target.value)}
+                                    onChange={handleInputChange}
                                     onKeyPress={handleKeyPress}
-                                    placeholder={`Chat with ${agent.name}... (Press Enter to send)`}
+                                    placeholder={`Ask ${agent.name} anything... (Press Enter to send)`}
                                     disabled={isGenerating}
+                                    rows={1}
+                                    aria-label="Type your message"
+                                    aria-describedby="input-help"
                                 />
+                                <HiddenText id="input-help">
+                                    Press Enter to send, Shift+Enter for new line, Escape to close, Space to toggle audio
+                                </HiddenText>
                                 <SendButton
                                     onClick={sendMessage}
-                                    $disabled={!inputText.trim() || isGenerating}
                                     disabled={!inputText.trim() || isGenerating}
+                                    $disabled={!inputText.trim() || isGenerating}
+                                    aria-label="Send message"
                                 >
                                     <Send size={18} />
                                 </SendButton>
@@ -680,14 +838,13 @@ const OptimizedChat: React.FC<OptimizedChatProps> = ({ agent, onClose }) => {
                 )}
 
                 {status === 'error' && (
-                    <LoadingContainer>
+                    <LoadingContainer role="alert">
                         <AlertCircle size={48} style={{ color: '#ef4444', marginBottom: '1rem' }} />
-                        <h3 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>
-                            Failed to load {agent.name}
-                        </h3>
-                        <p style={{ color: '#6b7280', margin: '0.5rem 0', fontSize: '0.875rem' }}>
-                            Please try again
-                        </p>
+                        <LoadingTitle>Failed to load {agent.name}</LoadingTitle>
+                        <LoadingText>Please refresh and try again</LoadingText>
+                        <RetryButton onClick={() => window.location.reload()}>
+                            Retry
+                        </RetryButton>
                     </LoadingContainer>
                 )}
             </ChatContainer>
@@ -696,7 +853,7 @@ const OptimizedChat: React.FC<OptimizedChatProps> = ({ agent, onClose }) => {
 };
 
 /* ==========================
-   OPTIMIZED STYLED COMPONENTS
+   STYLED COMPONENTS
    ========================== */
 
 const fadeInUp = keyframes`
@@ -735,6 +892,12 @@ const ChatContainer = styled.div`
   flex-direction: column;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
   overflow: hidden;
+  
+  @media (max-width: 768px) {
+    height: 95vh;
+    max-height: none;
+    border-radius: 8px;
+  }
 `;
 
 const ChatHeader = styled.div`
@@ -744,12 +907,86 @@ const ChatHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
 `;
 
 const HeaderInfo = styled.div`
   display: flex;
   align-items: center;
   gap: 1rem;
+`;
+
+const AgentName = styled.h1`
+  margin: 0;
+  font-size: 1.125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  svg { opacity: 0.8; }
+`;
+
+const AgentRole = styled.p`
+  margin: 0;
+  font-size: 0.875rem;
+  opacity: 0.9;
+`;
+
+const HeaderControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  
+  @media (max-width: 768px) {
+    gap: 0.5rem;
+  }
+`;
+
+const AudioToggle = styled.button<{ $enabled: boolean }>`
+  background: ${({ $enabled }) => $enabled ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)'};
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  border-radius: 8px;
+  padding: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  
+  &:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
+  }
+`;
+
+const SkipButton = styled.button`
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  border-radius: 8px;
+  padding: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+  
+  &:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
+  }
 `;
 
 const StatusBadge = styled.div<{ $status: 'loading' | 'ready' | 'error' }>`
@@ -760,6 +997,7 @@ const StatusBadge = styled.div<{ $status: 'loading' | 'ready' | 'error' }>`
   border-radius: 20px;
   font-size: 0.875rem;
   font-weight: 600;
+  text-transform: capitalize;
   background: ${({ $status }) => {
         switch ($status) {
             case 'loading': return 'rgba(245, 158, 11, 0.2)';
@@ -791,6 +1029,11 @@ const CloseButton = styled.button`
   &:hover {
     background: rgba(255, 255, 255, 0.3);
   }
+  
+  &:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
+  }
 `;
 
 const LoadingContainer = styled.div`
@@ -801,6 +1044,25 @@ const LoadingContainer = styled.div`
   justify-content: center;
   padding: 2rem;
   text-align: center;
+  
+  svg { color: #3b82f6; margin-bottom: 1rem; }
+`;
+
+const LoadingTitle = styled.h2`
+  margin: 0 0 0.5rem 0;
+  color: #374151;
+`;
+
+const LoadingText = styled.p`
+  color: #6b7280;
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+`;
+
+const LoadingPercent = styled.p`
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
 `;
 
 const ProgressBar = styled.div`
@@ -821,6 +1083,28 @@ const ProgressFill = styled.div<{ $progress: number }>`
   width: ${({ $progress }) => $progress}%;
 `;
 
+const RetryButton = styled.button`
+  background: linear-gradient(135deg, #3b82f6, #7c3aed);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 1rem;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+  
+  &:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+`;
+
 const MessagesArea = styled.div`
   flex: 1;
   overflow-y: auto;
@@ -828,6 +1112,7 @@ const MessagesArea = styled.div`
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  scroll-behavior: smooth;
 `;
 
 const MessageBubble = styled.div<{ $isUser: boolean }>`
@@ -837,6 +1122,10 @@ const MessageBubble = styled.div<{ $isUser: boolean }>`
   animation: ${fadeInUp} 0.3s ease;
   align-self: ${({ $isUser }) => $isUser ? 'flex-end' : 'flex-start'};
   max-width: 80%;
+  
+  @media (max-width: 768px) {
+    max-width: 90%;
+  }
 `;
 
 const Avatar = styled.div<{ $isUser: boolean }>`
@@ -867,6 +1156,35 @@ const MessageContent = styled.div<{ $isUser: boolean }>`
   `}
 `;
 
+const MessageText = styled.div`
+  margin-bottom: 0.5rem;
+`;
+
+const MessageTime = styled.div`
+  font-size: 0.6rem;
+  opacity: 0.7;
+  margin-top: 0.25rem;
+`;
+
+const AudioButton = styled.div`
+  position: absolute;
+  top: -8px;
+  right: -8px;
+`;
+
+const LanguageTag = styled.div<{ $language: string }>`
+  position: absolute;
+  bottom: -8px;
+  left: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+`;
+
 const InputArea = styled.div`
   padding: 1rem;
   border-top: 1px solid #e5e7eb;
@@ -877,6 +1195,7 @@ const InputContainer = styled.div`
   display: flex;
   gap: 0.75rem;
   align-items: flex-end;
+  position: relative;
 `;
 
 const TextInput = styled.textarea`
@@ -890,6 +1209,7 @@ const TextInput = styled.textarea`
   resize: none;
   outline: none;
   font-family: inherit;
+  overflow-y: auto;
   
   &:focus {
     border-color: #3b82f6;
@@ -899,6 +1219,54 @@ const TextInput = styled.textarea`
   &::placeholder {
     color: #9ca3af;
   }
+`;
+
+const VoiceInputButton = styled.button<{ $isListening: boolean }>`
+  background: ${({ $isListening }) => $isListening ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(255, 255, 255, 0.15)'};
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  border-radius: 8px;
+  padding: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  position: relative;
+  font-size: 1rem;
+  
+  &:hover {
+    background: ${({ $isListening }) => $isListening ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : 'rgba(255, 255, 255, 0.25)'};
+  }
+  
+  &:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const ListeningIndicator = styled.div`
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+  animation: ${pulse} 1s ease-in-out infinite;
+`;
+
+const HiddenText = styled.div`
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
 `;
 
 const SendButton = styled.button<{ $disabled: boolean }>`
@@ -913,6 +1281,7 @@ const SendButton = styled.button<{ $disabled: boolean }>`
   justify-content: center;
   cursor: ${({ $disabled }) => $disabled ? 'not-allowed' : 'pointer'};
   transition: all 0.2s ease;
+  flex-shrink: 0;
   
   &:hover:not(:disabled) {
     transform: translateY(-1px);
@@ -921,6 +1290,11 @@ const SendButton = styled.button<{ $disabled: boolean }>`
   
   &:active:not(:disabled) {
     transform: translateY(0);
+  }
+  
+  &:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
   }
 `;
 
@@ -952,4 +1326,4 @@ const TypingDots = styled.div`
 `;
 
 export default OptimizedChat;
-export { OptimizedModelManager, MultilingualPromptEngine, AGENT_PERSONALITIES };
+export { ModelManager, PromptEngine, CHAT_AGENT_PERSONALITIES };
