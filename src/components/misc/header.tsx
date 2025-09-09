@@ -1,11 +1,10 @@
-// src/components/misc/header.tsx - Cleaned Header with Better UX
+// src/components/misc/header.tsx - HODA REMOVED
 'use client';
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import styled, { css, keyframes } from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import {
   Menu, X, User, Settings, ArrowLeft,
   Code, Brush, Circle, Wifi, WifiOff,
@@ -18,7 +17,6 @@ import { Taskbar } from './taskbar';
 // ============================================
 // TYPES
 // ============================================
-
 interface QuickAction {
   id: string;
   title: string;
@@ -67,7 +65,6 @@ interface HeaderProps {
 // ============================================
 // ANIMATIONS
 // ============================================
-
 const fadeIn = keyframes`
   from { 
     opacity: 0;
@@ -84,10 +81,20 @@ const pulse = keyframes`
   50% { opacity: 1; }
 `;
 
+const slideInFromBottom = keyframes`
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
 // ============================================
 // HOOKS
 // ============================================
-
 const useOptimizedScroll = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
@@ -136,7 +143,6 @@ const useOptimizedScroll = () => {
 // ============================================
 // STYLED COMPONENTS
 // ============================================
-
 const HeaderWrapper = styled.div`
   position: relative;
 `;
@@ -184,6 +190,14 @@ const HeaderContent = styled.div<{ $scrolled: boolean }>`
   }
 `;
 
+const LeftSection = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex: 1;
+  min-width: 0;
+`;
+
 const LogoSection = styled(Link)`
   display: flex;
   align-items: center;
@@ -191,6 +205,7 @@ const LogoSection = styled(Link)`
   text-decoration: none;
   color: inherit;
   transition: transform 0.2s ease;
+  flex-shrink: 0;
 
   &:hover { 
     transform: translateY(-1px);
@@ -298,9 +313,8 @@ const MobileMenuButton = styled.button`
 `;
 
 // ============================================
-// SIDEBAR
+// SIDEBAR COMPONENTS
 // ============================================
-
 const SidebarOverlay = styled.div<{ $visible: boolean }>`
   position: fixed;
   inset: 0;
@@ -414,7 +428,7 @@ const UserInfo = styled.div`
   margin-bottom: 1rem;
 `;
 
-const Avatar = styled.div`
+const UserAvatar = styled.div`
   width: 48px;
   height: 48px;
   background: linear-gradient(135deg, #3b82f6, #8b5cf6);
@@ -639,7 +653,6 @@ const ActionButton = styled.button`
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
-
 const getPortfolioTypeColor = (type?: string): string => {
   const types: Record<string, string> = {
     creative: '#8b5cf6',
@@ -663,7 +676,6 @@ const getPortfolioTypeLabel = (type?: string): string => {
 // ============================================
 // MAIN COMPONENT
 // ============================================
-
 export function Header({
   title,
   subtitle,
@@ -719,35 +731,37 @@ export function Header({
     <HeaderWrapper>
       <HeaderContainer $scrolled={isScrolled} $visible={isVisible}>
         <HeaderContent $scrolled={isScrolled}>
-          {/* Logo Section */}
-          <LogoSection href="/" aria-label="Go to homepage">
-            <LogoImageContainer $scrolled={isScrolled}>
-              <Image
-                src={logoLight}
-                alt="Logo"
-                sizes="72px"
-                priority
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  opacity: imageLoaded ? 1 : 0,
-                  transition: 'opacity 0.2s ease'
-                }}
-                onLoad={() => setImageLoaded(true)}
-              />
-            </LogoImageContainer>
-            <BrandText $scrolled={isScrolled}>
-              <BrandTitle $scrolled={isScrolled}>
-                {title}
-              </BrandTitle>
-              {subtitle && (
-                <BrandSubtitle $scrolled={isScrolled}>
-                  {subtitle}
-                </BrandSubtitle>
-              )}
-            </BrandText>
-          </LogoSection>
+          {/* Left Section with Logo */}
+          <LeftSection>
+            <LogoSection href="/" aria-label="Go to homepage">
+              <LogoImageContainer $scrolled={isScrolled}>
+                <Image
+                  src={logoLight}
+                  alt="Logo"
+                  sizes="72px"
+                  priority
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    opacity: imageLoaded ? 1 : 0,
+                    transition: 'opacity 0.2s ease'
+                  }}
+                  onLoad={() => setImageLoaded(true)}
+                />
+              </LogoImageContainer>
+              <BrandText $scrolled={isScrolled}>
+                <BrandTitle $scrolled={isScrolled}>
+                  {title}
+                </BrandTitle>
+                {subtitle && (
+                  <BrandSubtitle $scrolled={isScrolled}>
+                    {subtitle}
+                  </BrandSubtitle>
+                )}
+              </BrandText>
+            </LogoSection>
+          </LeftSection>
 
           {/* Desktop Actions */}
           <DesktopNav>
@@ -787,9 +801,9 @@ export function Header({
               {sidebarConfig.user && (
                 <>
                   <UserInfo>
-                    <Avatar>
+                    <UserAvatar>
                       <User size={20} />
-                    </Avatar>
+                    </UserAvatar>
                     <UserDetails>
                       <UserName>{sidebarConfig.user.name}</UserName>
                       <UserEmail>{sidebarConfig.user.email}</UserEmail>

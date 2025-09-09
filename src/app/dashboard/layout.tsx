@@ -411,8 +411,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <DashboardContainer>
           {/* Enhanced Header with smooth sidebar */}
           <Header
-            title="Learn Morra"
-            subtitle="Professional Development Dashboard"
+            title="LearnMorra"
+            subtitle="Brag Responsibly"
             withSidebar={true}
             sidebarConfig={sidebarConfig}
           />

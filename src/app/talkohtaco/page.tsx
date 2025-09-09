@@ -566,18 +566,18 @@ export default function DualAvatarLanguagePage() {
             {/* Active Chat */}
             {selectedTeacher && selectedLanguage && (
                 <OptimizedChat
-                agent={{
-                    id: selectedTeacher.id,
-                    name: selectedTeacher.name,
-                    role: `${selectedLanguage} Teacher`,
-                    category: 'language',
-                    status: 'ready',
-                    systemPrompt: CHAT_AGENT_PERSONALITIES.get(selectedTeacher.name)?.greeting ?? 'Hello!'
-                }}
-                onClose={() => {
-                    setSelectedTeacher(null);
-                    setSelectedLanguage(null);
-                }}
+                    agent={{
+                        id: selectedTeacher.id,
+                        name: selectedTeacher.name,
+                        role: `${selectedLanguage} Teacher`,
+                        category: 'language',
+                        status: 'ready',
+                        systemPrompt: CHAT_AGENT_PERSONALITIES.get(selectedTeacher.name)?.greeting ?? 'Hello!'
+                    }}
+                    onClose={() => {
+                        setSelectedTeacher(null);
+                        setSelectedLanguage(null);
+                    }}
                 />
             )}
 

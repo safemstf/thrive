@@ -1,4 +1,4 @@
-// app/layout.tsx - Simplified Layout (No Dark Mode)
+// app/layout.tsx - Layout with HODA Integration
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import ogImage from '../../public/assets/logo3.jpeg';
@@ -11,6 +11,9 @@ import { Providers } from '@/providers/providers';
 import { AuthProvider } from '@/providers/authProvider';
 import { ConditionalLayout } from '@/components/layout/conditionalLayout';
 import { GlobalStyles } from '@/styles/theme';
+
+// Import HODA wrapper component
+import { HodaWrapper } from '@/components/llm/hoda.wrapper';
 
 // Font setup
 const geistSans = Geist({
@@ -159,6 +162,38 @@ export default function RootLayout({
                 opacity: 1;
                 transition: opacity 0.15s ease;
               }
+
+              /* HODA Integration Styles */
+              .hoda-overlay {
+                pointer-events: none;
+                z-index: 9999;
+              }
+
+              .hoda-overlay > * {
+                pointer-events: auto;
+              }
+
+              /* Ensure HODA doesn't interfere with main content */
+              #main-content {
+                position: relative;
+                z-index: 1;
+              }
+
+              /* Accessibility improvements for HODA */
+              @media (prefers-reduced-motion: reduce) {
+                .hoda-overlay * {
+                  animation-duration: 0.01ms !important;
+                  animation-iteration-count: 1 !important;
+                  transition-duration: 0.01ms !important;
+                }
+              }
+
+              /* Mobile responsiveness for HODA */
+              @media (max-width: 768px) {
+                .hoda-overlay {
+                  /* Adjust positioning for mobile if needed */
+                }
+              }
             `,
           }}
         />
@@ -177,6 +212,9 @@ export default function RootLayout({
                   <ConditionalLayout>
                     <main id="main-content">{children}</main>
                   </ConditionalLayout>
+                  
+                  {/* HODA Voice Assistant - Floating position, globally available */}
+                  <HodaWrapper className="hoda-overlay" />
                 </ApiConnectionManager>
               </AuthProvider>
             </ApiProvider>

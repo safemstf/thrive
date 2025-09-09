@@ -1,381 +1,32 @@
+// src/components/llm/webLLM.tsx
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { Send, Bot, User, Download, Cpu, AlertCircle, Check, X, Globe, Volume2, VolumeX, SkipForward } from 'lucide-react';
-import * as webllm from '@mlc-ai/web-llm';
-import OptimizedTextToSpeech, { AGENT_PROFILES, LanguageDetector, EmotionProcessor, AgentProfile } from './textToSpeech';
+import OptimizedTextToSpeech, { LanguageDetector } from './textToSpeech';
 import { pulse } from '@/styles/styled-components';
 
-/* ==========================
-   CORE TYPES
-   ========================== */
+// CLEAN IMPORTS FROM CHAT.TSX
+import {
+    ModelManager,
+    PromptEngine,
+    CHAT_AGENT_PERSONALITIES,
+    type Message,
+    type AgentPersonality
+} from './chat';
 
-interface Message {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: Date;
-    language?: string;
-    context?: 'greeting' | 'teaching' | 'correction' | 'encouragement' | 'explanation';
-    audioPlayed?: boolean;
-}
-
-
-export interface AgentPersonality extends AgentProfile {
-    role: string;
-    teachingStyle: string;
-    bilingualResponses: boolean;
-
-    // overrides / convenience
-    nativeLanguage: string;   // alias of primaryLanguage, for chat context
-    greeting: string;         // single greeting string instead of string[]
-}
-
-interface WebLLMMessage {
-    role: 'system' | 'user' | 'assistant';
-    content: string;
-}
+// RE-EXPORT FOR CLEAN PIPELINE
+export {
+    ModelManager,
+    PromptEngine,
+    CHAT_AGENT_PERSONALITIES,
+    type Message,
+    type AgentPersonality
+};
 
 /* ==========================
-   STREAMLINED AGENT PERSONALITIES
-   ========================== */
-
-const CHAT_AGENT_PERSONALITIES = new Map<string, AgentPersonality>([
-  ['Lexi', {
-    ...AGENT_PROFILES.Lexi,
-    role: 'Arabic Teacher',
-    nativeLanguage: 'Arabic',
-    teachingStyle: 'friendly and encouraging, explaining Arabic concepts in simple English with examples',
-    greeting: "مرحباً! I'm Lexi, your Arabic teacher. Let's explore the beautiful Arabic language together!",
-    bilingualResponses: true
-  }],
-  ['Adam', {
-    ...AGENT_PROFILES.Adam,
-    role: 'Arabic Teacher',
-    nativeLanguage: 'Arabic',
-    teachingStyle: 'calm and methodical, breaking down Arabic grammar step by step with cultural insights',
-    greeting: "مرحباً! أنا آدم، مدرس العربية. I'm Adam, your Arabic teacher. Let's discover Arabic together!",
-    bilingualResponses: true
-  }],
-
-  // SPANISH TEACHERS
-  ['Kai', {
-    ...AGENT_PROFILES.Kai,
-    role: 'Spanish Teacher',
-    nativeLanguage: 'Spanish',
-    teachingStyle: 'patient and methodical with emphasis on pronunciation',
-    greeting: "¡Hola! Soy Kai, tu profesor de español. I'm excited to help you master Spanish!",
-    bilingualResponses: true
-  }],
-  ['Lupita', {
-    ...AGENT_PROFILES.Lupita,
-    role: 'Spanish Teacher',
-    nativeLanguage: 'Spanish',
-    teachingStyle: 'warm and expressive, focusing on conversational Spanish with cultural context',
-    greeting: "¡Hola! Soy Lupita, tu profesora de español. ¡Qué gusto conocerte! Let's learn Spanish together!",
-    bilingualResponses: true
-  }],
-
-  // FRENCH TEACHERS
-  ['Sana', {
-    ...AGENT_PROFILES.Sana,
-    role: 'French Teacher',
-    nativeLanguage: 'French',
-    teachingStyle: 'systematic and precise with focus on proper grammar',
-    greeting: "Bonjour ! Je suis Sana, votre professeure de français. Let's begin your French journey!",
-    bilingualResponses: true
-  }],
-  ['Vinz', {
-    ...AGENT_PROFILES.Vinz,
-    role: 'French Teacher',
-    nativeLanguage: 'French',
-    teachingStyle: 'casual and conversational, emphasizing practical French for real situations',
-    greeting: "Bonjour ! Je suis Vinz, votre professeur de français. Enchanté! Let's explore French together.",
-    bilingualResponses: true
-  }],
-
-  // CHINESE TEACHERS
-  ['Mei', {
-    ...AGENT_PROFILES.Mei,
-    role: 'Mandarin Teacher',
-    nativeLanguage: 'Mandarin',
-    teachingStyle: 'encouraging and patient with emphasis on tones',
-    greeting: "你好！我是美美，你的中文老师。I'm Mei, excited to teach you Mandarin!",
-    bilingualResponses: true
-  }],
-  ['Wei', {
-    ...AGENT_PROFILES.Wei,
-    role: 'Mandarin Teacher',
-    nativeLanguage: 'Mandarin',
-    teachingStyle: 'structured and thorough, focusing on character writing and pronunciation',
-    greeting: "你好！我是伟，你的中文老师。I'm Wei, your Mandarin teacher. Let's master Chinese!",
-    bilingualResponses: true
-  }],
-
-  // ITALIAN TEACHERS
-  ['Giulia', {
-    ...AGENT_PROFILES.Giulia,
-    role: 'Italian Teacher',
-    nativeLanguage: 'Italian',
-    teachingStyle: 'passionate and animated, bringing Italian culture alive through language',
-    greeting: "Ciao! Sono Giulia, la tua insegnante di italiano. Benvenuti! Welcome to beautiful Italian!",
-    bilingualResponses: true
-  }],
-  ['Marco', {
-    ...AGENT_PROFILES.Marco,
-    role: 'Italian Teacher',
-    nativeLanguage: 'Italian',
-    teachingStyle: 'practical and clear, focusing on useful Italian for travel and conversation',
-    greeting: "Ciao! Sono Marco, il vostro insegnante di italiano. Andiamo! Let's learn Italian together!",
-    bilingualResponses: true
-  }]
-]);
-
-/* ==========================
-   ENHANCED PROMPT ENGINE
-   ========================== */
-
-class PromptEngine {
-    static generateSystemPrompt(agentId: string): string {
-        const personality = CHAT_AGENT_PERSONALITIES.get(agentId);
-        if (!personality) return '';
-
-        return `You are ${personality.name}, a native ${personality.nativeLanguage} speaker and professional ${personality.role}.
-
-TEACHING APPROACH:
-- Be ${personality.teachingStyle}
-- Mix ${personality.nativeLanguage} naturally with English explanations
-- Always provide translations in brackets: [${personality.nativeLanguage}] = [English]
-- Focus on practical, everyday usage and pronunciation
-- Keep responses concise but informative (2-3 sentences typically)
-- Use encouragement when students make attempts
-- Correct mistakes gently with clear explanations
-
-RESPONSE STYLE:
-- Start with a ${personality.nativeLanguage} greeting/phrase when appropriate
-- Explain grammar, pronunciation, and cultural context clearly
-- Give practical examples the student can use immediately
-- Be warm, encouraging, and patient
-- End with a question or suggestion to keep the conversation flowing
-
-IMPORTANT: Always include some ${personality.nativeLanguage} in your responses to help with pronunciation practice.
-
-Remember: You're teaching beginners, so keep explanations simple and engaging.`;
-    }
-
-    static detectContext(message: string): Message['context'] {
-        const lower = message.toLowerCase();
-
-        if (lower.match(/hello|hi|hey|greet|start|مرحبا|hola|bonjour|你好/)) return 'greeting';
-        if (lower.match(/how do|what is|translate|mean|explain|why|grammar/)) return 'explanation';
-        if (lower.match(/correct|wrong|mistake|check|pronunciation|better/)) return 'correction';
-        if (lower.match(/difficult|hard|struggle|help|confused|don't understand/)) return 'encouragement';
-
-        return 'teaching';
-    }
-
-    static generateContextualPrompt(message: string, context: Message['context'], agentId: string): string {
-        const personality = CHAT_AGENT_PERSONALITIES.get(agentId);
-        if (!personality) return message;
-
-        switch (context) {
-            case 'greeting':
-                return `${message}\n\n[Context: This is a greeting. Respond warmly with a ${personality.nativeLanguage} greeting and introduce what you can help with today.]`;
-
-            case 'correction':
-                return `${message}\n\n[Context: The student needs correction or feedback. Be gentle but clear, provide the correct form in ${personality.nativeLanguage}, and explain why.]`;
-
-            case 'encouragement':
-                return `${message}\n\n[Context: The student is struggling. Be extra encouraging, break down the concept into simpler parts, and provide easier examples in ${personality.nativeLanguage}.]`;
-
-            case 'explanation':
-                return `${message}\n\n[Context: The student wants to learn something new. Explain clearly with ${personality.nativeLanguage} examples and practical usage.]`;
-
-            default:
-                return message;
-        }
-    }
-}
-
-/* ==========================
-   OPTIMIZED MODEL MANAGER
-   ========================== */
-
-class ModelManager {
-    private static instance: ModelManager;
-    private engine: webllm.MLCEngineInterface | null = null;
-    private isLoading = false;
-    private isReady = false;
-    private conversationHistory = new Map<string, Message[]>();
-    private loadPromise: Promise<webllm.MLCEngineInterface> | null = null;
-
-    static getInstance(): ModelManager {
-        if (!ModelManager.instance) {
-            ModelManager.instance = new ModelManager();
-        }
-        return ModelManager.instance;
-    }
-
-    async loadModel(progressCallback?: (progress: number, text: string) => void): Promise<webllm.MLCEngineInterface> {
-        // Return existing engine if ready
-        if (this.engine && this.isReady) {
-            return this.engine;
-        }
-
-        // Return existing load promise if loading
-        if (this.loadPromise) {
-            return this.loadPromise;
-        }
-
-        // Start new load
-        this.isLoading = true;
-        this.loadPromise = this.performLoad(progressCallback);
-
-        try {
-            const result = await this.loadPromise;
-            return result;
-        } finally {
-            this.loadPromise = null;
-        }
-    }
-
-    private async performLoad(progressCallback?: (progress: number, text: string) => void): Promise<webllm.MLCEngineInterface> {
-        try {
-            const engineConfig: webllm.MLCEngineConfig = {
-                initProgressCallback: (progress) => {
-                    const percent = Math.round(progress.progress * 100);
-                    progressCallback?.(percent, progress.text || 'Loading model...');
-                }
-            };
-
-            this.engine = new webllm.MLCEngine(engineConfig);
-            await this.engine.reload('Llama-3.2-1B-Instruct-q4f32_1-MLC');
-
-            this.isReady = true;
-            this.isLoading = false;
-            console.log('WebLLM model loaded successfully');
-            return this.engine;
-        } catch (error) {
-            this.isLoading = false;
-            this.isReady = false;
-            console.error('Failed to load WebLLM model:', error);
-            throw error;
-        }
-    }
-
-    async generateResponse(
-        agentId: string,
-        userMessage: string,
-        conversationId: string,
-        maxRetries: number = 2
-    ): Promise<string> {
-        if (!this.engine || !this.isReady) {
-            throw new Error('Model not ready');
-        }
-
-        const history = this.conversationHistory.get(conversationId) || [];
-        const context = PromptEngine.detectContext(userMessage);
-        const contextualMessage = PromptEngine.generateContextualPrompt(userMessage, context, agentId);
-        const systemPrompt = PromptEngine.generateSystemPrompt(agentId);
-
-        let lastError: Error | null = null;
-
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-                // Build message history with better context
-                const messages: WebLLMMessage[] = [
-                    { role: 'system', content: systemPrompt },
-                    // Include recent conversation history for context
-                    ...history.slice(-6).map(msg => ({
-                        role: msg.role as 'user' | 'assistant',
-                        content: msg.content
-                    })),
-                    { role: 'user', content: contextualMessage }
-                ];
-
-                const completion = await this.engine.chat.completions.create({
-                    messages,
-                    temperature: 0.75, // Slightly higher for more creative language teaching
-                    max_tokens: 300, // Increased for better explanations
-                    top_p: 0.9,
-                    frequency_penalty: 0.1, // Reduce repetition
-                    presence_penalty: 0.1
-                });
-
-                const response = completion.choices[0]?.message?.content;
-
-                if (!response || response.trim().length === 0) {
-                    throw new Error('Empty response from model');
-                }
-
-                // Save to history
-                this.updateHistory(conversationId, userMessage, response, context);
-
-                return response.trim();
-
-            } catch (error) {
-                lastError = error as Error;
-                console.warn(`Generation attempt ${attempt + 1} failed:`, error);
-
-                // Wait before retry
-                if (attempt < maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-                }
-            }
-        }
-
-        throw lastError || new Error('Failed to generate response after all retries');
-    }
-
-    private updateHistory(conversationId: string, userMsg: string, assistantMsg: string, context: Message['context']) {
-        const history = this.conversationHistory.get(conversationId) || [];
-
-        const newMessages: Message[] = [
-            {
-                id: `${Date.now()}-user`,
-                role: 'user',
-                content: userMsg,
-                timestamp: new Date(),
-                context,
-                language: LanguageDetector.detect(userMsg)
-            },
-            {
-                id: `${Date.now()}-assistant`,
-                role: 'assistant',
-                content: assistantMsg,
-                timestamp: new Date(),
-                context,
-                language: LanguageDetector.detect(assistantMsg),
-                audioPlayed: false
-            }
-        ];
-
-        // Keep last 12 messages for better context retention
-        const updated = [...history, ...newMessages].slice(-12);
-        this.conversationHistory.set(conversationId, updated);
-    }
-
-    clearConversation(conversationId: string) {
-        this.conversationHistory.delete(conversationId);
-        console.log(`Cleared conversation: ${conversationId}`);
-    }
-
-    getConversationHistory(conversationId: string): Message[] {
-        return this.conversationHistory.get(conversationId) || [];
-    }
-
-    isModelReady(): boolean {
-        return this.isReady;
-    }
-
-    getLoadingStatus(): { isLoading: boolean; isReady: boolean } {
-        return { isLoading: this.isLoading, isReady: this.isReady };
-    }
-}
-
-/* ==========================
-   MAIN CHAT COMPONENT
+   CHAT COMPONENT TYPES
    ========================== */
 
 interface ChatProps {
@@ -389,6 +40,10 @@ interface ChatProps {
     };
     onClose: () => void;
 }
+
+/* ==========================
+   MAIN CHAT COMPONENT
+   ========================== */
 
 const OptimizedChat: React.FC<ChatProps> = ({ agent, onClose }) => {
     const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -619,7 +274,7 @@ const OptimizedChat: React.FC<ChatProps> = ({ agent, onClose }) => {
     const skipAudio = useCallback(() => {
         setCurrentPlayingId(null);
         setIsAudioPlaying(false);
-        announceToScreenReader('Audio playback skipped');
+        announceToScreenReader('Audio playbook skipped');
     }, []);
 
     // Clear conversation
@@ -1221,46 +876,6 @@ const TextInput = styled.textarea`
   }
 `;
 
-const VoiceInputButton = styled.button<{ $isListening: boolean }>`
-  background: ${({ $isListening }) => $isListening ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(255, 255, 255, 0.15)'};
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  border-radius: 8px;
-  padding: 0.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  position: relative;
-  font-size: 1rem;
-  
-  &:hover {
-    background: ${({ $isListening }) => $isListening ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : 'rgba(255, 255, 255, 0.25)'};
-  }
-  
-  &:focus {
-    outline: 2px solid rgba(255, 255, 255, 0.5);
-    outline-offset: 2px;
-  }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const ListeningIndicator = styled.div`
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 8px;
-  height: 8px;
-  background: #ef4444;
-  border-radius: 50%;
-  animation: ${pulse} 1s ease-in-out infinite;
-`;
-
 const HiddenText = styled.div`
   position: absolute;
   left: -10000px;
@@ -1326,4 +941,3 @@ const TypingDots = styled.div`
 `;
 
 export default OptimizedChat;
-export { ModelManager, PromptEngine, CHAT_AGENT_PERSONALITIES };
