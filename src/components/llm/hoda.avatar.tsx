@@ -1,4 +1,3 @@
-// src/components/llm/hoda.avatar
 'use client';
 
 import React from 'react';
@@ -15,7 +14,6 @@ import {
 type AssistantStatus = 'idle' | 'loading' | 'listening' | 'processing' | 'speaking' | 'error';
 type DanceMove = 'bounce' | 'pulse' | 'shimmer' | 'glow' | 'wave' | 'moonwalk' | 'griddy' | 'naynay' | 'none';
 
-/* NOTE: removed `export` here to avoid duplicate-export conflict; exported at bottom instead */
 interface AvatarProps {
   size?: number;
   status?: AssistantStatus;
@@ -318,35 +316,38 @@ const Avatar: React.FC<AvatarProps> = ({
   const [prevStatus, setPrevStatus] = React.useState<AssistantStatus>(status);
   const [showTooltip, setShowTooltip] = React.useState(false);
 
-  // Initialize with system preference if available
-  const [prefersReducedMotion, setPrefersReducedMotion] = React.useState<boolean>(() => {
-    if (typeof window === 'undefined') return reduceMotion;
-    try {
-      return !!window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch {
-      return reduceMotion;
-    }
-  });
+  // HYDRATION-SAFE: start in a conservative "reduced motion" state on the server
+  // so SSR output is deterministic. We'll probe the real preference on mount.
+  const [isMounted, setIsMounted] = React.useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = React.useState<boolean>(() => true);
 
-  /* ---------------------------
-     Listen for changes to prefers-reduced-motion safely
-     - we cast to `any` only when calling legacy .addListener/.removeListener
-     - `mq` typed as MediaQueryList | null, so TS knows it's not `never`
-     --------------------------- */
   React.useEffect(() => {
+    setIsMounted(true);
+
+    // If parent explicitly forced reduceMotion, respect it and skip probing.
+    if (reduceMotion) {
+      setPrefersReducedMotion(true);
+      return;
+    }
+
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
 
     const mq: MediaQueryList = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // Set actual initial on mount
+    try {
+      setPrefersReducedMotion(!!mq.matches);
+    } catch {
+      setPrefersReducedMotion(false);
+    }
 
     const handler = (e: MediaQueryListEvent) => {
       setPrefersReducedMotion(!!e.matches);
     };
 
-    // Modern (addEventListener) first, then legacy fallback
     if (typeof mq.addEventListener === 'function') {
       mq.addEventListener('change', handler);
     } else if (typeof (mq as any).addListener === 'function') {
-      // legacy TS DOM types sometimes don't include addListener — cast to any to call it
       (mq as any).addListener(handler as any);
     }
 
@@ -357,7 +358,7 @@ const Avatar: React.FC<AvatarProps> = ({
         (mq as any).removeListener(handler as any);
       }
     };
-  }, []);
+  }, [reduceMotion]);
 
   // Announce status changes via in-component live region
   const [liveMessage, setLiveMessage] = React.useState('');
@@ -400,10 +401,10 @@ const Avatar: React.FC<AvatarProps> = ({
       aria-describedby={`${uniqueId}-desc`}
       tabIndex={onClick ? 0 : -1}
     >
+      {/* Visually-hidden description. Only append the client-only "Animations reduced." text after mount */}
       <div id={`${uniqueId}-desc`} style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, overflow: 'hidden' }}>
-        {`HODA angel assistant avatar. Current status: ${status}. ${onClick ? 'Press Enter or Space to interact.' : ''} ${
-          prefersReducedMotion ? 'Animations reduced.' : ''
-        }`}
+        {`HODA angel assistant avatar. Current status: ${status}. ${onClick ? 'Press Enter or Space to interact.' : ''}`}
+        {isMounted && prefersReducedMotion ? ' Animations reduced.' : ''}
       </div>
 
       <div aria-live="polite" aria-atomic="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, overflow: 'hidden' }}>
@@ -420,7 +421,9 @@ const Avatar: React.FC<AvatarProps> = ({
         <defs>
           <linearGradient id={`${uniqueId}-colorCycle`}>
             <stop offset="0%" stopColor="#fbbf24">
-              {!prefersReducedMotion && <animate attributeName="stop-color" values="#fbbf24;#f43f5e;#8b5cf6;#3b82f6;#10b981;#f59e0b;#fbbf24" dur="8s" repeatCount="indefinite" />}
+              {isMounted && !prefersReducedMotion && (
+                <animate attributeName="stop-color" values="#fbbf24;#f43f5e;#8b5cf6;#3b82f6;#10b981;#f59e0b;#fbbf24" dur="8s" repeatCount="indefinite" />
+              )}
             </stop>
           </linearGradient>
 
@@ -542,7 +545,7 @@ const Avatar: React.FC<AvatarProps> = ({
           </text>
         </g>
 
-        {!prefersReducedMotion && <animateTransform attributeName="transform" type="translate" values="0,0;0,-1;0,0;0,1;0,0" dur="6s" repeatCount="indefinite" />}
+        {isMounted && !prefersReducedMotion && <animateTransform attributeName="transform" type="translate" values="0,0;0,-1;0,0;0,1;0,0" dur="6s" repeatCount="indefinite" />}
       </AvatarSVG>
 
       {showStatusIndicator && status !== 'idle' && (
@@ -574,7 +577,7 @@ const Avatar: React.FC<AvatarProps> = ({
             </svg>
           )}
 
-          {!prefersReducedMotion && status === 'listening' && <StatusRipple $status={status} $reduceMotion={prefersReducedMotion || reduceMotion} />}
+          {isMounted && !prefersReducedMotion && status === 'listening' && <StatusRipple $status={status} $reduceMotion={prefersReducedMotion || reduceMotion} />}
         </StatusIndicatorContainer>
       )}
 
