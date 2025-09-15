@@ -1,4 +1,4 @@
-// src/components/llm/hoda.wrapper.tsx - Clean Professional Wrapper
+// src/components/llm/hoda.wrapper.tsx - Clean Professional Wrapper with Hide
 'use client';
 
 import { Suspense, lazy, useState, useEffect } from 'react';
@@ -26,6 +26,7 @@ interface HodaWrapperProps {
   initialMode?: 'avatar' | 'full' | 'hidden';
   professionalMode?: boolean;
   reduceMotion?: boolean;
+  showHideOption?: boolean; // New prop to control if hide option is available
 }
 
 type ViewMode = 'avatar' | 'full' | 'hidden';
@@ -33,14 +34,18 @@ type ViewMode = 'avatar' | 'full' | 'hidden';
 export function HodaWrapper({
   className,
   initialMode = 'avatar',
-  professionalMode = true, // Default to professional
-  reduceMotion
+  professionalMode = true,
+  reduceMotion,
+  showHideOption = true // Default to showing hide option
 }: HodaWrapperProps) {
   const [hodaStatus, setHodaStatus] = useState<AssistantStatus>('idle');
   const [viewMode, setViewMode] = useState<ViewMode>(initialMode);
   const [isMinimized, setIsMinimized] = useState(false);
-  // Handle hydration properly
   const [isClient, setIsClient] = useState(false);
+
+  // Track clicks for double-click to hide functionality
+  const [clickCount, setClickCount] = useState(0);
+  const [clickTimer, setClickTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Handle hydration
   useEffect(() => {
@@ -55,7 +60,7 @@ export function HodaWrapper({
     return false;
   });
 
-  // Listen for system motion preference changes
+  // Listen for system motion preference changes and custom events
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -67,24 +72,73 @@ export function HodaWrapper({
         setIsMinimized(false);
       };
 
+      // Listen for hide HODA events (can be triggered globally)
+      const handleHideHoda = () => {
+        setViewMode('hidden');
+        setIsMinimized(false);
+      };
+
+      // Listen for show HODA events (can be triggered globally)
+      const handleShowHoda = () => {
+        setViewMode('avatar');
+        setIsMinimized(false);
+      };
+
       mediaQuery.addListener(handleChange);
       window.addEventListener('hoda-close-panel', handleClosePanel);
-      
+      window.addEventListener('hoda-hide', handleHideHoda);
+      window.addEventListener('hoda-show', handleShowHoda);
+
       return () => {
         mediaQuery.removeListener(handleChange);
         window.removeEventListener('hoda-close-panel', handleClosePanel);
+        window.removeEventListener('hoda-hide', handleHideHoda);
+        window.removeEventListener('hoda-show', handleShowHoda);
+        // Clean up click timer on unmount
+        if (clickTimer) {
+          clearTimeout(clickTimer);
+        }
       };
     }
-  }, []);
+  }, [clickTimer]);
 
   const shouldReduceMotion = reduceMotion || systemReduceMotion;
 
+  // Handle clicks for double-click to hide functionality
   const handleAvatarClick = () => {
-    if (viewMode === 'avatar') {
-      setViewMode('full');
-    } else if (viewMode === 'full') {
-      setIsMinimized(!isMinimized);
+    if (!showHideOption) {
+      // Normal behavior when hide option is disabled
+      if (viewMode === 'avatar') {
+        setViewMode('full');
+      } else if (viewMode === 'full') {
+        setIsMinimized(!isMinimized);
+      }
+      return;
     }
+
+    // Handle double-click to hide when hide option is enabled
+    setClickCount(prev => prev + 1);
+
+    if (clickTimer) {
+      clearTimeout(clickTimer);
+    }
+
+    const timer = setTimeout(() => {
+      if (clickCount === 1) {
+        // Single click - normal behavior
+        if (viewMode === 'avatar') {
+          setViewMode('full');
+        } else if (viewMode === 'full') {
+          setIsMinimized(!isMinimized);
+        }
+      } else if (clickCount === 2) {
+        // Double click - hide HODA
+        setViewMode('hidden');
+      }
+      setClickCount(0);
+    }, 300);
+
+    setClickTimer(timer);
   };
 
   const handleClose = () => {
@@ -92,11 +146,19 @@ export function HodaWrapper({
     setIsMinimized(false);
   };
 
+  const handleHide = () => {
+    setViewMode('hidden');
+    setIsMinimized(false);
+  };
+
   const handleStatusChange = (status: AssistantStatus) => {
     setHodaStatus(status);
   };
 
-  if (viewMode === 'hidden') return null;
+  // Completely hidden - return null
+  if (viewMode === 'hidden') {
+    return null;
+  }
 
   // Render minimal server-side version before hydration
   if (!isClient) {
@@ -131,13 +193,20 @@ export function HodaWrapper({
             onClick={handleAvatarClick}
             professionalMode={professionalMode}
             reduceMotion={shouldReduceMotion}
-            ariaLabel="HODA voice assistant - Click to open full interface"
+            ariaLabel={
+              showHideOption
+                ? "HODA voice assistant - Click to interact, double-click to hide"
+                : "HODA voice assistant - Click to interact"
+            }
             className="hoda-fixed-avatar"
           />
 
-          {/* Status tooltip - only shows on hover, no automatic bubbles */}
+          {/* Status tooltip - shows interaction hints */}
           <StatusTooltip>
-            {viewMode === 'avatar' ? 'Click to interact with HODA' : 'Click to minimize HODA'}
+            {viewMode === 'avatar'
+              ? (showHideOption ? 'Click to interact • Double-click to hide' : 'Click to interact with HODA')
+              : 'Click to minimize HODA'
+            }
           </StatusTooltip>
         </AvatarContainer>
       )}
@@ -146,7 +215,6 @@ export function HodaWrapper({
         <FullContainer $isMinimized={isMinimized} $reduceMotion={shouldReduceMotion}>
           <HeaderBar>
             <HeaderTitle>
-              {/* Remove the small avatar from header since we're keeping the main one */}
               HODA Assistant
             </HeaderTitle>
             <HeaderControls>
@@ -157,6 +225,19 @@ export function HodaWrapper({
               >
                 {isMinimized ? '▲' : '▼'}
               </ControlButton>
+
+              {/* Show hide button if option is enabled */}
+              {showHideOption && (
+                <ControlButton
+                  onClick={handleHide}
+                  aria-label="Hide HODA completely"
+                  title="Hide HODA"
+                  style={{ fontSize: '14px' }}
+                >
+                  👁️
+                </ControlButton>
+              )}
+
               <ControlButton
                 onClick={handleClose}
                 aria-label="Close HODA interface and return to avatar mode"
@@ -184,5 +265,18 @@ export function HodaWrapper({
     </WrapperContainer>
   );
 }
+
+// Helper functions to show/hide HODA from anywhere in the app
+export const hideHoda = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('hoda-hide'));
+  }
+};
+
+export const showHoda = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('hoda-show'));
+  }
+};
 
 export default HodaWrapper;
