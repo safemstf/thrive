@@ -4,13 +4,14 @@
 import React, { useState, useCallback } from 'react';
 import dynamic from "next/dynamic";
 import styled, { keyframes, css } from 'styled-components';
-import { 
+import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Bone, Zap, Users, Trophy, Shield, Crown, Cpu, Eye, Star, RotateCw, Microscope,
   Droplet, Wifi, BookOpen, Sliders, Monitor, Beaker, Loader
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
+import PermutationSimulation from '@/components/cs/algorithms/algorithms';
 
 // Dynamically import ALL simulations with loading states
 const TSPAlgorithmRace = dynamic(() => import("@/components/cs/ants/ants"), {
@@ -33,14 +34,18 @@ const LifeSimulation = dynamic(() => import('@/components/cs/life/life'), {
   loading: () => <SimulationLoader>Loading Game of Life...</SimulationLoader>
 });
 
-
 const AdvancedBacteremiaSimulator = dynamic(() => import('@/components/cs/bacteria/bacteria'), {
   ssr: false,
   loading: () => <SimulationLoader>Loading Bacteria & Phages...</SimulationLoader>
 });
 
+const NetworkProtocolSimulation = dynamic(() => import('@/components/cs/networkProtocol/np'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading OFDM Simulation...</SimulationLoader>
+});
+
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'parallel-model' | 'amdahl' | 'masters-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'parallel-model' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection';
 type TabType = 'simulations' | 'algorithms';
 
 interface SimulationItem {
@@ -239,8 +244,8 @@ const ItemCard = styled.div<{ $active?: boolean; $featured?: boolean; $comingSoo
 
   &:hover {
     transform: ${({ $comingSoon }) => $comingSoon ? 'none' : 'translateY(-4px)'};
-    box-shadow: ${({ $comingSoon }) => 
-      $comingSoon ? '0 4px 20px rgba(0, 0, 0, 0.05)' : '0 12px 40px rgba(0, 0, 0, 0.1)'};
+    box-shadow: ${({ $comingSoon }) =>
+    $comingSoon ? '0 4px 20px rgba(0, 0, 0, 0.05)' : '0 12px 40px rgba(0, 0, 0, 0.1)'};
     border-color: ${({ $comingSoon }) => $comingSoon ? 'rgba(148, 163, 184, 0.2)' : '#3b82f6'};
   }
 `;
@@ -358,13 +363,13 @@ const ControlButton = styled.button<{ $variant?: string }>`
   gap: 0.5rem;
   padding: 0.875rem 1.5rem;
   border-radius: 8px;
-  border: 1px solid ${({ $variant }) => 
+  border: 1px solid ${({ $variant }) =>
     $variant === 'danger' ? '#f87171' : '#3b82f6'
   };
-  background: ${({ $variant }) => 
+  background: ${({ $variant }) =>
     $variant === 'danger' ? '#fef2f2' : '#eff6ff'
   };
-  color: ${({ $variant }) => 
+  color: ${({ $variant }) =>
     $variant === 'danger' ? '#dc2626' : '#2563eb'
   };
   font-family: 'Inter', system-ui, sans-serif;
@@ -374,13 +379,13 @@ const ControlButton = styled.button<{ $variant?: string }>`
   transition: all 0.2s ease;
 
   &:hover {
-    background: ${({ $variant }) => 
-      $variant === 'danger' ? '#fee2e2' : '#dbeafe'
-    };
+    background: ${({ $variant }) =>
+    $variant === 'danger' ? '#fee2e2' : '#dbeafe'
+  };
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px ${({ $variant }) => 
-      $variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)'
-    };
+    box-shadow: 0 4px 12px ${({ $variant }) =>
+    $variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)'
+  };
   }
 `;
 
@@ -453,8 +458,9 @@ const SimulationContent = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 16px;
   background: #fafbfc;
+  padding: 2rem;
 `;
 
 const PlaceholderContent = styled.div`
@@ -627,23 +633,23 @@ const allItems: SimulationItem[] = [
     description: 'Interactive performance scaling law visualizer',
     optimized: true,
     featured: false,
-    comingSoon: false,
+    comingSoon: true,
     category: 'algorithms'
   },
   {
-    key: 'masters-visual',
-    label: "Master's Theorem Lab",
+    key: 'permutations-visual',
+    label: "Permutations",
     icon: <BookOpen size={24} />,
     color: '#7c3aed',
     description: 'Recursion-tree visualizer for complexity analysis',
     optimized: true,
     featured: false,
-    comingSoon: true,
+    comingSoon: false,
     category: 'algorithms'
   },
-    
-    // todo:
-    // fourier transform based neural networks. simulation/algorithm module
+
+  // todo:
+  // fourier transform based neural networks. simulation/algorithm module
   {
     key: 'FourierTransform-NeuralNetwork',
     label: 'Fourier Transform Neural Network',
@@ -655,7 +661,7 @@ const allItems: SimulationItem[] = [
     comingSoon: true,
     category: 'algorithms'
   },
-   {
+  {
     key: 'FourierTransformNetworkErrorCorrection',
     label: 'Wireless Networks Error Corretion',
     icon: <Wifi size={24} />,
@@ -672,9 +678,9 @@ const allItems: SimulationItem[] = [
     icon: <Wifi size={24} />,
     color: '#06b6d4',
     description: 'Wireless propagation, routing protocols and packet analysis',
-    optimized: false,
-    featured: false,
-    comingSoon: true,
+    optimized: true,
+    featured: true,
+    comingSoon: false,
     category: 'algorithms'
   }
 ];
@@ -711,33 +717,33 @@ export default function SimulationsPage() {
     switch (activeSimulation) {
       case 'ants':
         return (
-          <TSPAlgorithmRace 
-            isRunning={isRunning} 
-            speed={speed} 
+          <TSPAlgorithmRace
+            isRunning={isRunning}
+            speed={speed}
           />
         );
-      
+
       case 'maze':
         return <MazeSolverDemo />;
-      
+
       case 'disease':
         return (
-          <DiseaseSimulation 
-            isRunning={isRunning} 
-            speed={speed} 
+          <DiseaseSimulation
+            isRunning={isRunning}
+            speed={speed}
             isDark={false} // Light mode
           />
         );
-      
+
       case 'life':
         return (
-          <LifeSimulation 
+          <LifeSimulation
             isDark={false}
             isRunning={isRunning}
             speed={speed}
           />
         );
-      
+
       case 'bacteria-phage':
         return (
           <AdvancedBacteremiaSimulator
@@ -753,14 +759,30 @@ export default function SimulationsPage() {
             isRunning={isRunning}
             speed={speed}
             isDark={false}
-          />  
+          />
         );
-      
+      case 'wireless':
+        return (
+          <NetworkProtocolSimulation
+            isRunning={isRunning}
+            speed={speed}
+            isDark={false}
+          />
+        );
+
+      case 'permutations-visual':
+        return (
+          <PermutationSimulation
+            isRunning={isRunning}
+            speed={speed}
+            isDark={false}
+          />
+        );
       default:
         return (
           <PlaceholderContent>
-            <div style={{ 
-              fontSize: '48px', 
+            <div style={{
+              fontSize: '48px',
               marginBottom: '1rem',
               color: activeItem?.color || '#3b82f6'
             }}>
@@ -782,12 +804,12 @@ export default function SimulationsPage() {
     <PageContainer>
       {/* Subtle Matrix Background */}
       <MatrixBackground>
-        <MatrixRain 
+        <MatrixRain
           fontSize={32}
           layers={3}
         />
       </MatrixBackground>
-      
+
       <ContentWrapper>
         <PageHeader>
           <PageTitle>Computational Simulations</PageTitle>
@@ -798,14 +820,14 @@ export default function SimulationsPage() {
 
         <TabContainer>
           <TabWrapper>
-            <TabButton 
+            <TabButton
               $active={activeTab === 'simulations'}
               onClick={() => setActiveTab('simulations')}
             >
               <Microscope size={18} />
               Simulations
             </TabButton>
-            <TabButton 
+            <TabButton
               $active={activeTab === 'algorithms'}
               onClick={() => setActiveTab('algorithms')}
             >
@@ -838,9 +860,9 @@ export default function SimulationsPage() {
                   <Badge $variant="coming-soon">Coming Soon</Badge>
                 )}
               </BadgeContainer>
-              
+
               <ItemHeader>
-                <ItemIcon 
+                <ItemIcon
                   $color={item.color}
                   $comingSoon={item.comingSoon}
                 >
@@ -859,16 +881,16 @@ export default function SimulationsPage() {
 
         {activeItem && !activeItem.comingSoon && (
           <ControlsContainer>
-            <ControlButton 
-              onClick={() => setIsRunning(!isRunning)} 
+            <ControlButton
+              onClick={() => setIsRunning(!isRunning)}
               $variant={isRunning ? 'danger' : 'primary'}
             >
-              {isRunning ? <Pause size={18} /> : <Play size={18} />} 
+              {isRunning ? <Pause size={18} /> : <Play size={18} />}
               {isRunning ? 'Pause' : 'Run'}
             </ControlButton>
 
             <ControlButton onClick={handleReset}>
-              <RotateCcw size={18} /> 
+              <RotateCcw size={18} />
               Reset
             </ControlButton>
 
@@ -885,11 +907,11 @@ export default function SimulationsPage() {
               <div className="value">{speed.toFixed(1)}x</div>
             </SpeedControl>
 
-            <ControlButton 
+            <ControlButton
               onClick={() => setSoundEnabled(!soundEnabled)}
               $variant={soundEnabled ? 'primary' : 'secondary'}
             >
-              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />} 
+              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
               Audio
             </ControlButton>
           </ControlsContainer>
@@ -913,7 +935,7 @@ export default function SimulationsPage() {
                   </div>
                 )}
               </StatusBar>
-              
+
               <SimulationContent>
                 {renderSimulation()}
               </SimulationContent>

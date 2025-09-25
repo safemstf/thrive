@@ -302,8 +302,8 @@ export const ParameterControl = styled.div<{ $isDark?: boolean }>`
   --accent: #3b82f6;
   --accent-strong: #1d4ed8;
   --bg: ${({ $isDark = true }) => ($isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)')};
-  --label: ${({ $isDark = true }) => ($isDark ? '#e6eef8' : '#0f172a')};
-  --muted: ${({ $isDark = true }) => ($isDark ? '#94a3b8' : '#475569')};
+  --label: ${({ $isDark = false }) => ($isDark ? '#e6eef8' : '#0f172a')};
+  --muted: ${({ $isDark = false }) => ($isDark ? '#94a3b8' : '#475569')};
 
   display: block;
   padding: 0.5rem;
