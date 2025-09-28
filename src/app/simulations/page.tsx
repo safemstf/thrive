@@ -44,6 +44,11 @@ const NetworkProtocolSimulation = dynamic(() => import('@/components/cs/networkP
   loading: () => <SimulationLoader>Loading OFDM Simulation...</SimulationLoader>
 });
 
+const NBodySandbox = dynamic(() => import("@/components/cs/nb/nb"), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading N-Body Sandbox...</SimulationLoader>
+});
+
 // Types
 type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'parallel-model' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection';
 type TabType = 'simulations' | 'algorithms';
@@ -583,13 +588,13 @@ const allItems: SimulationItem[] = [
   },
   {
     key: 'nbody',
-    label: 'N-Body Sandbox',
+    label: 'Space & Stars',
     icon: <Star size={24} />,
     color: '#f97316',
     description: 'Star & gravity sandbox with advanced physics integration',
     optimized: true,
     featured: true,
-    comingSoon: true,
+    comingSoon: false, 
     category: 'simulations'
   },
   {
@@ -778,6 +783,16 @@ export default function SimulationsPage() {
             isDark={false}
           />
         );
+
+      case 'nbody':
+        return (
+          <NBodySandbox
+            isRunning={isRunning}
+            speed={speed}
+            isDark={false}
+          />
+        );
+
       default:
         return (
           <PlaceholderContent>
