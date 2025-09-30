@@ -4,8 +4,8 @@
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
-  Play, Pause, RotateCcw, Settings, Target, Zap, Star, Users, Activity, 
-  Clock, Cpu, Eye, Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle, 
+  Play, Pause, RotateCcw, Settings, Target, Zap, Star, Users, Activity,
+  Clock, Cpu, Eye, Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle,
   Grid, Maximize2, Menu, X
 } from 'lucide-react';
 
@@ -61,7 +61,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
   speed: externalSpeed = 1,
   isDark = true
 }) => {
-  
+
   // ===== REFS =====
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
@@ -98,8 +98,8 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
   const simulation = useNBodySimulation({
     config: physicsConfig,
     initialScenario: PREDEFINED_SCENARIOS[uiState.selectedScenario || 'solar-system'],
-    onBodyUpdate: useCallback((updates: PhysicsUpdate[]) => {}, []),
-    onPerformanceUpdate: useCallback((metrics: PerformanceMetrics) => {}, [])
+    onBodyUpdate: useCallback((updates: PhysicsUpdate[]) => { }, []),
+    onPerformanceUpdate: useCallback((metrics: PerformanceMetrics) => { }, [])
   });
 
   const rendering = useNBodyRendering({
@@ -108,7 +108,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     selectedBodies: simulation.getSelectedBodies(),
     visualConfig,
     cameraConfig,
-    onCameraUpdate: useCallback((position: Vector3Data, target: Vector3Data) => {}, []),
+    onCameraUpdate: useCallback((position: Vector3Data, target: Vector3Data) => { }, []),
     onBodyClick: useCallback((bodyId: string, event: MouseEvent) => {
       simulation.selectBody(bodyId, event.ctrlKey);
       setUIState(prev => ({ ...prev, selectedBodyId: bodyId }));
@@ -551,17 +551,17 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
             <div className="value">{simulation.simulationState.totalSteps.toLocaleString()}</div>
           </MetricCard>
 
-          {typeof simulation.simulationState.energyDrift === 'number' && 
-           isFinite(simulation.simulationState.energyDrift) && 
-           simulation.simulationState.energyDrift > 0.01 && (
-            <MetricCard $variant="danger">
-              <div className="label">
-                <AlertTriangle className="icon" />
-                <span>Energy Drift</span>
-              </div>
-              <div className="value">{(simulation.simulationState.energyDrift * 100).toFixed(2)}%</div>
-            </MetricCard>
-          )}
+          {typeof simulation.simulationState.energyDrift === 'number' &&
+            isFinite(simulation.simulationState.energyDrift) &&
+            simulation.simulationState.energyDrift > 0.01 && (
+              <MetricCard $variant="danger">
+                <div className="label">
+                  <AlertTriangle className="icon" />
+                  <span>Energy Drift</span>
+                </div>
+                <div className="value">{(simulation.simulationState.energyDrift * 100).toFixed(2)}%</div>
+              </MetricCard>
+            )}
         </PanelContent>
       )}
     </FloatingPanel>
@@ -654,7 +654,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
   const renderMobileStatusBar = () => {
     const timeInDays = simulation.simulationState.currentTime / 86400;
     const timeInYears = timeInDays / 365.25;
-    
+
     return (
       <MobileStatusBar>
         <div className="status-item">
@@ -663,18 +663,18 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
             {simulation.simulationState.isRunning ? 'Running' : 'Paused'}
           </span>
         </div>
-        
+
         <div className="divider" />
-        
+
         <div className="status-item">
           <Clock className="icon" size={14} />
           <span className="value">
             {timeInYears >= 1 ? `${timeInYears.toFixed(1)}y` : `${timeInDays.toFixed(0)}d`}
           </span>
         </div>
-        
+
         <div className="divider" />
-        
+
         <div className="status-item">
           <Zap className="icon" size={14} />
           <span className="value">{simulation.simulationState.speed.toFixed(1)}×</span>
@@ -685,17 +685,17 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
 
   const renderMobileMenu = () => (
     <>
-      <MobileMenuButton 
+      <MobileMenuButton
         $isOpen={uiState.mobileMenuOpen}
         onClick={toggleMobileMenu}
       >
         {uiState.mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
       </MobileMenuButton>
 
-      <MobileDrawerOverlay 
-        $isOpen={uiState.mobileMenuOpen} 
+      <MobileDrawerOverlay
+        $isOpen={uiState.mobileMenuOpen}
       />
-      
+
       <MobileDrawer $isOpen={uiState.mobileMenuOpen}>
         <MobileDrawerHeader>
           <div className="header-content">
@@ -715,7 +715,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
             </div>
             <div className="section-content">
               <MobileQuickActions>
-                <MobileQuickAction 
+                <MobileQuickAction
                   onClick={handlePlayPause}
                   $active={simulation.simulationState.isRunning}
                   $variant="primary"
@@ -738,7 +738,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
                   <div className="label">Fullscreen</div>
                 </MobileQuickAction>
 
-                <MobileQuickAction 
+                <MobileQuickAction
                   onClick={toggleCameraFollow}
                   $active={!!uiState.cameraFollowTarget}
                 >
@@ -905,6 +905,74 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
       </MobileDrawer>
     </>
   );
+// ========================================
+  // MOBILE VIEW BUTTON
+  // ========================================
+
+  const renderViewSimButton = () => (
+    <div style={{
+      display: 'none',
+      '@media (max-width: 768px)': {
+        display: 'flex'
+      }
+    } as React.CSSProperties}>
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .mobile-view-button {
+              display: flex !important;
+              width: 100%;
+              align-items: center;
+              justify-content: center;
+              gap: 0.75rem;
+              padding: 1.25rem;
+              background: linear-gradient(135deg, #6366f1, #8b5cf6);
+              color: white;
+              border: none;
+              border-radius: 1rem;
+              font-size: 1.125rem;
+              font-weight: 600;
+              cursor: pointer;
+              margin-bottom: 1.5rem;
+              box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+            }
+            .mobile-view-button:active {
+              transform: scale(0.98);
+            }
+            .canvas-container-desktop-only {
+              display: none !important;
+            }
+            .desktop-panels {
+              display: block !important;
+            }
+          }
+          @media (min-width: 769px) {
+            .mobile-view-button {
+              display: none !important;
+            }
+            .canvas-container-desktop-only {
+              display: block !important;
+            }
+            .mobile-only {
+              display: none !important;
+            }
+          }
+        `}
+      </style>
+      <button 
+        className="mobile-view-button"
+        onClick={() => {
+          handleFullscreenToggle();
+          if (!simulation.simulationState.isRunning) {
+            simulation.start();
+          }
+        }}
+      >
+        <Maximize2 size={24} />
+        View Simulation
+      </button>
+    </div>
+  );
 
   // ========================================
   // MAIN RENDER
@@ -914,17 +982,28 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     <>
       <NBodyGlobalStyles />
       <SimulationContainer className="n-body-simulation">
-        <CanvasContainer ref={canvasContainerRef} />
+        {/* Mobile View Button */}
+        {renderViewSimButton()}
+
+        {/* Canvas - Desktop always visible, Mobile hidden until fullscreen */}
+        <CanvasContainer 
+          ref={canvasContainerRef}
+          className="canvas-container-desktop-only"
+        />
 
         {/* Desktop UI - Floating Panels */}
-        {renderScenarioPanel()}
-        {renderControlsPanel()}
-        {renderMetricsPanel()}
-        {renderStatusPanel()}
+        <div className="desktop-panels">
+          {renderScenarioPanel()}
+          {renderControlsPanel()}
+          {renderMetricsPanel()}
+          {renderStatusPanel()}
+        </div>
 
-        {/* Mobile UI - Status Bar + Drawer Menu */}
-        {renderMobileStatusBar()}
-        {renderMobileMenu()}
+        {/* Mobile UI - Status Bar + Drawer Menu (always available for configuration) */}
+        <div className="mobile-only">
+          {!uiState.isFullscreen && renderMobileStatusBar()}
+          {!uiState.isFullscreen && renderMobileMenu()}
+        </div>
 
         {/* Loading Overlay */}
         {uiState.isLoading && (
