@@ -1,6 +1,23 @@
 // src/components/cs/nb/nb.config.ts
 // ===== CORE TYPES =====
 
+/**
+ * NOTE: This file was updated to import canonical numeric constants from
+ * `nb.planetConstants.ts` and to generate the Solar System `bodies` array
+ * programmatically. All exported names and shapes from the original file
+ * are preserved so downstream modules are not disrupted.
+ */
+
+// import plain numeric constants (data-only, no circular types)
+import {
+  PLANETARY_CONSTANTS,
+  MOON_CONSTANTS,
+  DEFAULT_BODY_COLORS,
+  PLANET_KEYS
+} from './nb.planetConstants';
+
+// ===== CORE TYPES =====
+
 export interface Vector3Data {
     x: number;
     y: number;
@@ -212,7 +229,6 @@ export type BodyScale = {
   trailFadeType?: 'linear' | 'exponential' | 'inverse' | 'none';
 };
 
-// (Paste the BODY_SCALE you already accepted earlier)
 export const BODY_SCALE: Record<string, BodyScale> = {
   star: { min: 5, max: 15, multiplier: 2e-7, lodDistances: [0,500,1000,2000], glowScale: 3, enableTrails: false, trailLength: 0 },
   planet: { min: 1, max: 5, multiplier: 5e-6, lodDistances: [0,300,800,1500], enableTrails: true, trailLength: 300 },
@@ -222,6 +238,100 @@ export const BODY_SCALE: Record<string, BodyScale> = {
   artificial: { min: 0.05, max: 0.2, multiplier: 1e-3, lodDistances: [0,50,200,600], enableTrails: false, trailLength: 50 },
   particle: { min: 0.01, max: 0.1, multiplier: 1e-3, lodDistances: [0,30,100,400], enableTrails: false, trailLength: 0 }
 };
+
+// -------------------------------
+// planet -> CelestialBodyDefinition factories (keep in nb.config.ts so types stay authoritative)
+// -------------------------------
+
+function capitalizeId(id: string) {
+  return id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+function makePlanet(id: keyof typeof PLANETARY_CONSTANTS, overrides: Partial<CelestialBodyDefinition> = {}): CelestialBodyDefinition {
+  const p = PLANETARY_CONSTANTS[id];
+  const color = (DEFAULT_BODY_COLORS as Record<string,string>)[id] ?? '#888';
+
+  return {
+    id,
+    name: capitalizeId(id),
+    type: 'planet',
+    position: { x: p.semiMajorAxis ?? 0, y: 0, z: 0 }, // place on +x axis
+    velocity: { x: 0, y: p.orbitalVelocity ?? 0, z: 0 },
+    mass: p.mass,
+    radius: p.radius,
+    color,
+    albedo: p.albedo ?? 0.3,
+    temperature: p.temperature,
+    parentId: 'sun',
+    childIds: p.moons ? [...p.moons] : [],
+    isFixed: false,
+    useAnalyticalOrbit: true,
+    rotationPeriod: p.rotationPeriod,
+    obliquity: p.obliquity,
+    orbitalElements: overrides.orbitalElements ?? undefined,
+    ...overrides
+  } as CelestialBodyDefinition;
+}
+
+function makeMoon(id: string, parentId: keyof typeof PLANETARY_CONSTANTS, overrides: Partial<CelestialBodyDefinition> = {}): CelestialBodyDefinition {
+  const m = MOON_CONSTANTS[id];
+  const parent = PLANETARY_CONSTANTS[parentId];
+  const parentSemi = parent?.semiMajorAxis ?? 0;
+  const semiFromParent = m?.semiMajorAxisFromParent ?? 0;
+  const worldX = parentSemi + semiFromParent;
+  const parentOrbitalV = parent?.orbitalVelocity ?? 0;
+  const moonOrbV = m?.orbitalVelocity ?? 0;
+
+  return {
+    id,
+    name: capitalizeId(id),
+    type: 'moon',
+    position: { x: worldX, y: 0, z: 0 },
+    velocity: { x: 0, y: parentOrbitalV + moonOrbV, z: 0 },
+    mass: m?.mass ?? 1e16,
+    radius: m?.radius ?? 1e3,
+    color: DEFAULT_BODY_COLORS['moon'] ?? '#C0C0C0',
+    albedo: m?.albedo ?? 0.1,
+    parentId,
+    childIds: [],
+    isFixed: false,
+    useAnalyticalOrbit: true,
+    rotationPeriod: m?.rotationPeriod,
+    ...overrides
+  } as CelestialBodyDefinition;
+}
+
+// Build solar system array: sun + planets + moons (keeps ordering consistent with previous file)
+const planetOrder = PLANET_KEYS; // handled in planetConstants
+const sunBody: CelestialBodyDefinition = {
+  id: 'sun',
+  name: 'Sun',
+  type: 'star',
+  position: { x: 0, y: 0, z: 0 },
+  velocity: { x: 0, y: 0, z: 0 },
+  mass: PLANETARY_CONSTANTS.sun.mass,
+  radius: PLANETARY_CONSTANTS.sun.radius,
+  color: DEFAULT_BODY_COLORS.sun,
+  emissive: DEFAULT_BODY_COLORS.sun,
+  albedo: 1.0,
+  temperature: PLANETARY_CONSTANTS.sun.temperature,
+  parentId: undefined,
+  childIds: planetOrder as string[],
+  isFixed: true,
+  useAnalyticalOrbit: false,
+  realWorldObject: 'Sun'
+};
+
+const planetBodies = planetOrder.map(k => makePlanet(k));
+const moonBodies: CelestialBodyDefinition[] = [];
+for (const pKey of planetOrder) {
+  const moons = PLANETARY_CONSTANTS[pKey].moons ?? [];
+  for (const mKey of moons) {
+    moonBodies.push(makeMoon(mKey, pKey));
+  }
+}
+
+const solarBodies: CelestialBodyDefinition[] = [sunBody, ...planetBodies, ...moonBodies];
 
 // ===== SCENARIO DEFINITIONS =====
 
@@ -342,14 +452,14 @@ export const DEFAULT_VISUAL: VisualConfig = {
     trailFadeType: 'exponential',
     trailOpacity: 0.7,
     trailWidth: 2,
-       showVelocityVectors: false,
+    showVelocityVectors: false,
     showAccelerationVectors: false,
     showGravitationalField: false,
     showPotentialWells: false,
     showCenterOfMass: false,
     showHillSpheres: false,
     showRocheLobes: false,
-    
+
     // NEW: Spacetime defaults
     showSpacetimeGrid: false,
     spacetimeGridOpacity: 0.15,
@@ -358,7 +468,7 @@ export const DEFAULT_VISUAL: VisualConfig = {
     spacetimeGridDivisions: 60,
     spacetimeWarpStrength: 0.05,
     showGravitationalWaves: true,
-    
+
     enableBloom: true,
     enableGravitationalLensing: false,
     enableDopplerShift: false,
@@ -418,227 +528,14 @@ export const DEFAULT_PERFORMANCE: PerformanceConfig = {
 
 // ===== PREDEFINED SCENARIOS =====
 
-// Solar System
+// Solar System - bodies built from planet constants (keeps exports identical)
 export const SOLAR_SYSTEM_SCENARIO: Scenario = {
     id: 'solar-system',
     name: 'Our Solar System',
     description: 'Explore the planets and their motions around the Sun',
     category: 'solar-system',
     difficulty: 'beginner',
-    bodies: [
-        {
-            id: 'sun',
-            name: 'Sun',
-            type: 'star',
-            position: { x: 0, y: 0, z: 0 },
-            velocity: { x: 0, y: 0, z: 0 },
-            mass: 1.989e30,
-            radius: 6.96e8,
-            color: '#FDB813',
-            emissive: '#FDB813',
-            albedo: 1.0,
-            temperature: 5778,
-            parentId: undefined,
-            childIds: ['mercury', 'venus', 'earth', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'],
-            isFixed: true,
-            useAnalyticalOrbit: false,
-            realWorldObject: 'Sun'
-        },
-        {
-            id: 'earth',
-            name: 'Earth',
-            type: 'planet',
-            position: { x: 1.496e11, y: 0, z: 0 }, // 1 AU
-            velocity: { x: 0, y: 29780, z: 0 }, // ~30 km/s orbital velocity
-            mass: 5.972e24,
-            radius: 6.371e6,
-            color: '#6B93D6',
-            albedo: 0.306,
-            temperature: 288,
-            parentId: 'sun',
-            childIds: ['moon'],
-            isFixed: false,
-            useAnalyticalOrbit: true,
-            orbitalElements: {
-                semiMajorAxis: 1.496e11,
-                eccentricity: 0.0167,
-                inclination: 0.0001, // ~23.4 degrees to ecliptic
-                longitudeOfAscendingNode: 0,
-                argumentOfPeriapsis: 1.796,
-                meanAnomalyAtEpoch: 6.23,
-                epochTime: 0
-            },
-            rotationPeriod: 86164, // sidereal day
-            obliquity: 0.408, // 23.44 degrees
-            atmosphere: {
-                pressure: 101325,
-                composition: { N2: 78.08, O2: 20.95, Ar: 0.93, CO2: 0.04 }
-            },
-            realWorldObject: 'Earth'
-        },
-        {
-            id: 'moon',
-            name: 'Moon',
-            type: 'moon',
-            position: { x: 1.496e11 + 3.844e8, y: 0, z: 0 },
-            velocity: { x: 0, y: 29780 + 1022, z: 0 },
-            mass: 7.342e22,
-            radius: 1.737e6,
-            color: '#C0C0C0',
-            albedo: 0.136,
-            parentId: 'earth',
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: true,
-            realWorldObject: 'Moon'
-        },
-        // Add these bodies to the SOLAR_SYSTEM_SCENARIO bodies array after the Moon:
-
-        {
-            id: 'mercury',
-            name: 'Mercury',
-            type: 'planet',
-            position: { x: 5.79e10, y: 0, z: 0 }, // 0.387 AU
-            velocity: { x: 0, y: 47870, z: 0 }, // ~48 km/s
-            mass: 3.301e23,
-            radius: 2.439e6,
-            color: '#8C7853',
-            albedo: 0.119,
-            temperature: 440,
-            parentId: 'sun',
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: false,
-            realWorldObject: 'Mercury'
-        },
-        {
-            id: 'venus',
-            name: 'Venus',
-            type: 'planet',
-            position: { x: 1.082e11, y: 0, z: 0 }, // 0.723 AU
-            velocity: { x: 0, y: 35020, z: 0 }, // ~35 km/s
-            mass: 4.867e24,
-            radius: 6.051e6,
-            color: '#FFC649',
-            albedo: 0.689,
-            temperature: 735,
-            parentId: 'sun',
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: false,
-            atmosphere: {
-                pressure: 9200000,
-                composition: { CO2: 96.5, N2: 3.5 }
-            },
-            realWorldObject: 'Venus'
-        },
-        {
-            id: 'mars',
-            name: 'Mars',
-            type: 'planet',
-            position: { x: 2.279e11, y: 0, z: 0 }, // 1.524 AU
-            velocity: { x: 0, y: 24070, z: 0 }, // ~24 km/s
-            mass: 6.4171e23,
-            radius: 3.389e6,
-            color: '#CD5C5C',
-            albedo: 0.250,
-            temperature: 210,
-            parentId: 'sun',
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: false,
-            atmosphere: {
-                pressure: 610,
-                composition: { CO2: 95.3, N2: 2.7, Ar: 1.6 }
-            },
-            realWorldObject: 'Mars'
-        },
-        {
-            id: 'jupiter',
-            name: 'Jupiter',
-            type: 'planet',
-            position: { x: 7.785e11, y: 0, z: 0 }, // 5.203 AU
-            velocity: { x: 0, y: 13070, z: 0 }, // ~13 km/s
-            mass: 1.898e27,
-            radius: 6.9911e7,
-            color: '#DAA520',
-            albedo: 0.343,
-            temperature: 165,
-            parentId: 'sun',
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: false,
-            atmosphere: {
-                pressure: 100000,
-                composition: { H2: 89.8, He: 10.2 }
-            },
-            realWorldObject: 'Jupiter'
-        },
-        {
-            id: 'saturn',
-            name: 'Saturn',
-            type: 'planet',
-            position: { x: 1.427e12, y: 0, z: 0 }, // 9.537 AU
-            velocity: { x: 0, y: 9690, z: 0 }, // ~9.7 km/s
-            mass: 5.683e26,
-            radius: 5.8232e7,
-            color: '#F4E99B',
-            albedo: 0.342,
-            temperature: 134,
-            parentId: 'sun',
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: false,
-            atmosphere: {
-                pressure: 100000,
-                composition: { H2: 96.3, He: 3.25 }
-            },
-            realWorldObject: 'Saturn'
-        },
-        {
-            id: 'uranus',
-            name: 'Uranus',
-            type: 'planet',
-            position: { x: 2.871e12, y: 0, z: 0 }, // 19.19 AU
-            velocity: { x: 0, y: 6810, z: 0 }, // ~6.8 km/s
-            mass: 8.681e25,
-            radius: 2.5362e7,
-            color: '#4FD0E0',
-            albedo: 0.300,
-            temperature: 76,
-            parentId: 'sun',
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: false,
-            atmosphere: {
-                pressure: 100000,
-                composition: { H2: 82.5, He: 15.2, CH4: 2.3 }
-            },
-            realWorldObject: 'Uranus'
-        },
-        {
-            id: 'neptune',
-            name: 'Neptune',
-            type: 'planet',
-            position: { x: 4.498e12, y: 0, z: 0 }, // 30.07 AU
-            velocity: { x: 0, y: 5430, z: 0 }, // ~5.4 km/s
-            mass: 1.024e26,
-            radius: 2.4622e7,
-            color: '#4169E1',
-            albedo: 0.290,
-            temperature: 72,
-            parentId: 'sun',
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: false,
-            atmosphere: {
-                pressure: 100000,
-                composition: { H2: 80.0, He: 19.0, CH4: 1.0 }
-            },
-            realWorldObject: 'Neptune'
-        }
-        // Additional planets would be added here...
-    ],
+    bodies: solarBodies,
     initialCamera: {
         ...DEFAULT_CAMERA,
         position: { x: 0, y: 5e10, z: 5e10 }, // Above and away from solar system
@@ -763,7 +660,8 @@ export const SANDBOX_SCENARIO: Scenario = {
     basedOnRealSystem: false,
     accuracy: 'educational'
 };
-// --- Example Galaxy Explorer scenario matching your Scenario interface ---
+
+// Galaxy Explorer scenario
 export const GALAXY_EXPLORER_SCENARIO: Scenario = {
   id: 'galaxy-explorer',
   name: 'Galaxy Explorer',
@@ -817,13 +715,11 @@ export const GALAXY_EXPLORER_SCENARIO: Scenario = {
   accuracy: 'entertainment'
 };
 
-
 export const PREDEFINED_SCENARIOS: Record<string, Scenario> = {
     'solar-system': SOLAR_SYSTEM_SCENARIO,
     'binary-star': BINARY_STAR_SCENARIO,
     'sandbox': SANDBOX_SCENARIO,
     'galaxy-explorer': GALAXY_EXPLORER_SCENARIO
-
 };
 
 // ===== UTILITY CONSTANTS =====

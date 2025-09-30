@@ -226,6 +226,27 @@ html.matrix-active * {
   .btn-theme-secondary:hover {
     background-color: var(--color-interactive-hover);
   }
+
+  /* ==============================================
+   MOBILE TASKBAR ACCESSIBILITY FIX
+   Add these lines to the END of your existing globals.css
+   ============================================== */
+
+/* Only affects mobile when sidebar is open */
+@media (max-width: 1024px) {
+  /* Ensure taskbar stays on top when sidebar opens */
+  body.sidebar-open [data-taskbar],
+  body.sidebar-open .taskbar {
+    z-index: 5000 !important;
+    position: fixed !important;
+    pointer-events: auto !important;
+  }
+
+  /* Make sidebar overlay stop before taskbar */
+  body.sidebar-open .sidebar-overlay {
+    bottom: 60px !important; /* Adjust if your taskbar height is different */
+  }
+}
   
   /* Card components */
   .card-theme {

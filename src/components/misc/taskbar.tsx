@@ -1,11 +1,12 @@
-// src/components/Taskbar.tsx - HODA REMOVED
+// src/components/Taskbar.tsx - Mobile-Safe with Proper Accessibility
 'use client';
 import React from 'react';
 import Link from 'next/link';
 import {
   LogOut, User, Settings, LayoutDashboard,
   X, ArrowLeft, ChevronLeft, ChevronRight,
-  Circle, Wifi, WifiOff
+  Circle, Wifi, WifiOff,
+  Menu
 } from 'lucide-react';
 
 // Import logic (HODA management removed)
@@ -27,8 +28,18 @@ import {
   UserInfo, UserAvatar, UserDetails, SidebarUserName, SidebarUserEmail,
   StatusBadge, QuickActionsGrid, QuickActionCard, PortfolioCard,
   PortfolioHeader, PortfolioIndicator, PortfolioTitle, PortfolioSubtitle,
-  NavList, NavItem, ActionButton
+  NavList, NavItem, ActionButton,
+  RightNavItem,
+  RightSidebarContainer,
+  RightSidebarHeader,
+  RightSidebarNav,
+  RightSidebarOverlay,
+  RightSidebarTitle
 } from '@/components/misc/taskbar.styles';
+
+
+import { Menu as MobileMenuIcon } from 'lucide-react';
+
 
 /* ---------- Taskbar component ---------- */
 export function Taskbar(props: TaskbarProps) {
@@ -67,63 +78,173 @@ export function Taskbar(props: TaskbarProps) {
   /* ----------------- Mobile UI ----------------- */
   if (isMobile) {
     return (
-      <MobileNavContainer>
-        {navLinks.map(link => {
-          if (link.requiresAuth && !isAuthenticated) return null;
-          if (link.requiresAdmin && !isAuthenticated) return null;
-          if (link.hideWhenAuth && isAuthenticated) return null;
-
-          return (
-            <MobileNavButton
-              key={link.href}
-              href={link.href}
-              $active={pathname === link.href || (link.href === '/dashboard' && pathname.startsWith('/dashboard'))}
-              onClick={() => handleNavLinkClick(link.href)}
-            >
-              {link.label}
-            </MobileNavButton>
-          );
-        })}
-
-        {isAuthenticated && (
-          <MobileNavButton
-            href="/dashboard"
-            $active={pathname.startsWith('/dashboard')}
-            onClick={() => handleNavLinkClick('/dashboard')}
+      <>
+        {/* Fixed Bottom Taskbar */}
+        <MobileNavContainer
+          data-taskbar
+          role="navigation"
+          aria-label="Main navigation"
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 5000,
+            pointerEvents: 'auto',
+            touchAction: 'auto',
+            isolation: 'isolate',
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'space-around',
+            alignItems: 'center',
+            padding: '0.75rem 1rem',
+            background: 'var(--color-background-secondary)',
+            borderTop: '1px solid var(--color-border-light)',
+            gap: '0.5rem'
+          }}
+        >
+          {/* Menu Button */}
+          <MobileMenuIcon
+            onClick={toggleSidebar}
+            aria-label="Open navigation menu"
           >
-            Dashboard
-          </MobileNavButton>
-        )}
+            <Menu size={20} />
+          </MobileMenuIcon>
 
-        {isAuthenticated && user && (
-          <MobileUserSection>
-            <MobileUserInfo>
-              <MobileUserAvatar>
-                <User size={20} color="var(--color-text-secondary)" />
-              </MobileUserAvatar>
-              <div>
-                <div style={{ fontWeight: 400, color: 'var(--color-text-primary)' }}>
-                  {user.name}
-                </div>
-                <div style={{ fontSize: '0.8rem', marginTop: '2px' }}>
-                  {user.email}
-                </div>
-              </div>
-            </MobileUserInfo>
-            <MobileLogoutButton onClick={handleLogout}>
-              <LogOut size={16} />
-              Sign Out
-            </MobileLogoutButton>
-          </MobileUserSection>
-        )}
-      </MobileNavContainer>
+          {/* Quick Links */}
+          <NavButton
+            href="/"
+            $active={pathname === '/'}
+            onClick={() => handleNavLinkClick('/')}
+            style={{ flex: 1, textAlign: 'center', padding: '0.6rem' }}
+          >
+            Home
+          </NavButton>
+
+          {isAuthenticated && (
+            <NavButton
+              href="/dashboard"
+              $active={pathname.startsWith('/dashboard')}
+              onClick={() => handleNavLinkClick('/dashboard')}
+              style={{ flex: 1, textAlign: 'center', padding: '0.6rem' }}
+            >
+              Dashboard
+            </NavButton>
+          )}
+        </MobileNavContainer>
+
+        {/* RIGHT SIDEBAR - Navigation Panel */}
+        <>
+          <RightSidebarOverlay
+            $visible={sidebarVisible}
+            onClick={closeSidebar}
+            className="right-sidebar-overlay"
+          />
+          <RightSidebarContainer
+            $visible={sidebarVisible}
+            role="navigation"
+            aria-label="Main navigation menu"
+            className="right-sidebar-container"
+          >
+            <CloseButton
+              onClick={closeSidebar}
+              aria-label="Close navigation menu"
+              style={{ display: 'flex' }}
+            >
+              <X size={18} />
+            </CloseButton>
+
+            <RightSidebarHeader>
+              <RightSidebarTitle>Navigation</RightSidebarTitle>
+            </RightSidebarHeader>
+
+            <RightSidebarNav>
+              {navLinks.map(link => {
+                if (link.requiresAuth && !isAuthenticated) return null;
+                if (link.requiresAdmin && !isAuthenticated) return null;
+                if (link.hideWhenAuth && isAuthenticated) return null;
+
+                return (
+                  <RightNavItem
+                    key={link.href}
+                    href={link.href}
+                    $active={pathname === link.href}
+                    onClick={() => {
+                      handleNavLinkClick(link.href);
+                      closeSidebar();
+                    }}
+                  >
+                    {link.label}
+                  </RightNavItem>
+                );
+              })}
+
+              {isAuthenticated && user && (
+                <>
+                  <div style={{
+                    borderTop: '1px solid rgba(0,0,0,0.08)',
+                    margin: '1rem 0',
+                    paddingTop: '1rem'
+                  }}>
+                    <div style={{
+                      padding: '0 1.25rem 0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      color: '#666',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Account
+                    </div>
+                    <RightNavItem
+                      href="/dashboard"
+                      $active={pathname.startsWith('/dashboard')}
+                      onClick={() => {
+                        handleNavLinkClick('/dashboard');
+                        closeSidebar();
+                      }}
+                    >
+                      <User size={20} />
+                      Dashboard
+                    </RightNavItem>
+                    <RightNavItem
+                      href="/dashboard/profile"
+                      $active={pathname === '/dashboard/profile'}
+                      onClick={() => {
+                        handleNavLinkClick('/dashboard/profile');
+                        closeSidebar();
+                      }}
+                    >
+                      <Settings size={20} />
+                      Profile
+                    </RightNavItem>
+                    <ActionButton
+                      onClick={handleLogout}
+                      style={{ margin: '0.5rem 0' }}
+                    >
+                      <LogOut size={16} />
+                      Sign Out
+                    </ActionButton>
+                  </div>
+                </>
+              )}
+            </RightSidebarNav>
+          </RightSidebarContainer>
+        </>
+      </>
     );
   }
 
   /* ----------------- Desktop UI ----------------- */
   return (
     <>
-      <NavContainer className="taskbar" $isScrolled={isScrolled}>
+      <NavContainer
+        className="taskbar"
+        data-taskbar
+        role="navigation"
+        aria-label="Main navigation"
+        $isScrolled={isScrolled}
+      >
         {/* Sidebar Toggle */}
         {withSidebar && (
           <SidebarToggle
@@ -131,6 +252,7 @@ export function Taskbar(props: TaskbarProps) {
             $isScrolled={isScrolled}
             onClick={toggleSidebar}
             aria-label="Toggle sidebar"
+            aria-expanded={sidebarVisible}
           >
             {sidebarVisible ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
           </SidebarToggle>
@@ -161,34 +283,57 @@ export function Taskbar(props: TaskbarProps) {
             <UserButton
               $isScrolled={isScrolled}
               onClick={() => setDropdownOpen(!dropdownOpen)}
+              aria-expanded={dropdownOpen}
+              aria-haspopup="true"
             >
               <User size={16} />
               {getFirstName(user.name || user.username || 'User')}
             </UserButton>
 
-            <DropdownMenu $open={dropdownOpen} $isScrolled={isScrolled}>
+            <DropdownMenu
+              $open={dropdownOpen}
+              $isScrolled={isScrolled}
+              role="menu"
+              aria-label="User menu"
+            >
               <DropdownHeader>
                 <UserName>{user.name || user.username}</UserName>
                 <UserRole>{user.role || 'user'}</UserRole>
                 {user.email && <UserEmail>{user.email}</UserEmail>}
               </DropdownHeader>
 
-              <DropdownLink href="/dashboard" onClick={() => setDropdownOpen(false)}>
+              <DropdownLink
+                href="/dashboard"
+                onClick={() => setDropdownOpen(false)}
+                role="menuitem"
+              >
                 <LayoutDashboard size={16} />
                 Dashboard
               </DropdownLink>
 
-              <DropdownLink href="/dashboard/profile" onClick={() => setDropdownOpen(false)}>
+              <DropdownLink
+                href="/dashboard/profile"
+                onClick={() => setDropdownOpen(false)}
+                role="menuitem"
+              >
                 <User size={16} />
                 Profile
               </DropdownLink>
 
-              <DropdownLink href="/dashboard/settings" onClick={() => setDropdownOpen(false)}>
+              <DropdownLink
+                href="/dashboard/settings"
+                onClick={() => setDropdownOpen(false)}
+                role="menuitem"
+              >
                 <Settings size={16} />
                 Settings
               </DropdownLink>
 
-              <DropdownItem className="logout" onClick={handleLogout}>
+              <DropdownItem
+                className="logout"
+                onClick={handleLogout}
+                role="menuitem"
+              >
                 <LogOut size={16} />
                 Sign Out
               </DropdownItem>
@@ -200,9 +345,23 @@ export function Taskbar(props: TaskbarProps) {
       {/* Sidebar */}
       {withSidebar && (
         <>
-          <SidebarOverlay $visible={sidebarVisible} onClick={closeSidebar} />
-          <SidebarContainer ref={sidebarRef} $visible={sidebarVisible}>
-            <CloseButton onClick={closeSidebar}>
+          <SidebarOverlay
+            $visible={sidebarVisible}
+            onClick={closeSidebar}
+            aria-hidden={!sidebarVisible}
+            className="sidebar-overlay"
+          />
+          <SidebarContainer
+            ref={sidebarRef}
+            $visible={sidebarVisible}
+            role="complementary"
+            aria-label="Sidebar navigation"
+            className="sidebar-container"
+          >
+            <CloseButton
+              onClick={closeSidebar}
+              aria-label="Close sidebar"
+            >
               <X size={18} />
             </CloseButton>
 
@@ -211,7 +370,7 @@ export function Taskbar(props: TaskbarProps) {
               {sidebarConfig.user && (
                 <>
                   <UserInfo>
-                    <UserAvatar>
+                    <UserAvatar aria-hidden="true">
                       <User size={20} />
                     </UserAvatar>
                     <UserDetails>
@@ -221,7 +380,11 @@ export function Taskbar(props: TaskbarProps) {
                   </UserInfo>
 
                   {sidebarConfig.dataStatus && (
-                    <StatusBadge $type={sidebarConfig.dataStatus.type}>
+                    <StatusBadge
+                      $type={sidebarConfig.dataStatus.type}
+                      role="status"
+                      aria-label={`Connection status: ${sidebarConfig.dataStatus.label}`}
+                    >
                       {sidebarConfig.dataStatus.type === 'live' ? <Wifi size={8} /> : <WifiOff size={8} />}
                       {sidebarConfig.dataStatus.label}
                     </StatusBadge>
@@ -236,9 +399,14 @@ export function Taskbar(props: TaskbarProps) {
                 <SectionTitle>Quick Actions</SectionTitle>
                 <QuickActionsGrid>
                   {sidebarConfig.quickActions.map((action) => (
-                    <Link key={action.id} href={action.href} style={{ textDecoration: 'none' }}>
-                      <QuickActionCard $color={action.color} onClick={closeSidebar}>
-                        <div className="action-icon">{action.icon}</div>
+                    <Link
+                      key={action.id}
+                      href={action.href}
+                      style={{ textDecoration: 'none' }}
+                      onClick={closeSidebar}
+                    >
+                      <QuickActionCard $color={action.color}>
+                        <div className="action-icon" aria-hidden="true">{action.icon}</div>
                         <h4 className="action-title">{action.title}</h4>
                         <p className="action-desc">{action.description}</p>
                       </QuickActionCard>
@@ -254,7 +422,10 @@ export function Taskbar(props: TaskbarProps) {
                 <SectionTitle>Portfolio</SectionTitle>
                 <PortfolioCard $color={getPortfolioTypeColor(sidebarConfig.portfolio.kind)}>
                   <PortfolioHeader>
-                    <PortfolioIndicator $color={getPortfolioTypeColor(sidebarConfig.portfolio.kind)}>
+                    <PortfolioIndicator
+                      $color={getPortfolioTypeColor(sidebarConfig.portfolio.kind)}
+                      aria-hidden="true"
+                    >
                       <Circle size={6} fill="currentColor" />
                     </PortfolioIndicator>
                     <div>
@@ -265,15 +436,16 @@ export function Taskbar(props: TaskbarProps) {
                     </div>
                   </PortfolioHeader>
 
-                  <NavList>
+                  <NavList role="navigation" aria-label="Portfolio sections">
                     {sidebarConfig.portfolioSections.map((section) => (
                       <NavItem
                         key={section.id}
                         href={section.href}
                         $active={pathname === section.href}
                         onClick={closeSidebar}
+                        aria-current={pathname === section.href ? 'page' : undefined}
                       >
-                        {section.icon}
+                        <span aria-hidden="true">{section.icon}</span>
                         {section.title}
                       </NavItem>
                     ))}
@@ -285,11 +457,14 @@ export function Taskbar(props: TaskbarProps) {
             {/* Footer Actions */}
             <SidebarSection>
               {sidebarConfig.onSettingsClick && (
-                <ActionButton onClick={() => {
-                  sidebarConfig.onSettingsClick?.();
-                  closeSidebar();
-                }}>
-                  <Settings size={16} />
+                <ActionButton
+                  onClick={() => {
+                    sidebarConfig.onSettingsClick?.();
+                    closeSidebar();
+                  }}
+                  aria-label="Open settings"
+                >
+                  <Settings size={16} aria-hidden="true" />
                   Settings
                 </ActionButton>
               )}
@@ -301,8 +476,9 @@ export function Taskbar(props: TaskbarProps) {
                     sidebarConfig.onLogout?.();
                     closeSidebar();
                   }}
+                  aria-label="Sign out"
                 >
-                  <ArrowLeft size={16} />
+                  <ArrowLeft size={16} aria-hidden="true" />
                   Sign Out
                 </ActionButton>
               )}

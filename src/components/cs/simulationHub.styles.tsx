@@ -30,28 +30,36 @@ const shimmer = keyframes`
 
 /**
  * SimulationContainer: root visual wrapper.
- * - sets a predictable content width via SimulationInner
- * - uses padding instead of odd width percentages so internal spacing behaves
+ * Added optional $fullscreen prop so React can switch true fullscreen mode easily.
  */
-export const SimulationContainer = styled.div<{ $isDark?: boolean }>`
+export const SimulationContainer = styled.div<{
+  $isDark?: boolean;
+  $fullscreen?: boolean;
+}>`
   width: 100%;
   min-height: 100vh;
   background: ${({ $isDark = true }) =>
     $isDark ? 'rgba(5,10,20,0.90)' : 'rgba(255,255,255,0.95)'};
   color: ${({ $isDark = true }) => ($isDark ? '#e6eef8' : '#0f172a')};
-  position: relative;
-  z-index: 1;
+  position: ${({ $fullscreen }) => ($fullscreen ? 'fixed' : 'relative')};
+  inset: ${({ $fullscreen }) => ($fullscreen ? '0' : 'auto')};
+  z-index: ${({ $fullscreen }) => ($fullscreen ? 99999 : 1)};
   animation: ${fadeInUp} 0.6s ease-out;
   box-sizing: border-box;
-  padding: 2rem 1rem;
+  padding: ${({ $fullscreen }) => ($fullscreen ? 'calc(1rem + env(safe-area-inset-top)) 0.75rem calc(1.25rem + env(safe-area-inset-bottom)) 0.75rem' : '2rem 1rem')};
   margin-top: 20px;
 
   & * { box-sizing: border-box; }
+
+  /* Slightly tighter padding on small screens unless in fullscreen (then safe-area used) */
+  @media (max-width: 640px) {
+    padding: ${({ $fullscreen }) => ($fullscreen ? 'calc(0.75rem + env(safe-area-inset-top)) 0.5rem calc(0.9rem + env(safe-area-inset-bottom)) 0.5rem' : '1rem 0.75rem')};
+    margin-top: 12px;
+  }
 `;
 
 /**
  * SimulationInner: center content and constrain width so spacing is predictable.
- * Put most large sections inside this to avoid full-bleed math issues.
  */
 export const SimulationInner = styled.div`
   margin: 0 auto;
@@ -67,8 +75,9 @@ export const SimulationInner = styled.div`
    ------------------------- */
 
 /* VideoSection: full-width but constrained by SimulationInner
-   Uses aspect-ratio and max-height so it scales nicely. */
-export const VideoSection = styled.section`
+   Allows for mobile-fullscreen mode (class .mobile-fullscreen) where aspect-ratio gives way to height-based layout
+*/
+export const VideoSection = styled.section<{ $mobileFullscreen?: boolean }>`
   width: 100%;
   max-width: 100%;
   background: linear-gradient(135deg, rgba(0,0,0,0.88), rgba(5,10,20,0.9));
@@ -84,14 +93,33 @@ export const VideoSection = styled.section`
   aspect-ratio: 16 / 9;
   max-height: 65vh;
 
+  /* When presenting a compact mobile fullscreen mode (toggled via prop or class),
+     relax the aspect-ratio and make height relative to viewport so we maximize space. */
+  ${({ $mobileFullscreen }) => $mobileFullscreen && css`
+    aspect-ratio: auto;
+    max-height: none;
+    height: calc(100vh - 120px); /* default reserve for header / controls — adjust in JS if needed */
+  `}
+
   @media (max-width: 900px) {
     aspect-ratio: 16 / 9;
     max-height: 50vh;
   }
 
-  @media (max-width: 480px) {
+  @media (max-width: 640px) {
+    /* On small phones prefer 4:3 to get a taller canvas, unless mobile fullscreen requested */
     aspect-ratio: 4 / 3;
     max-height: 40vh;
+    ${({ $mobileFullscreen }) => $mobileFullscreen && css`
+      height: calc(100vh - 84px); /* leave space for top/bottom bars */
+    `}
+  }
+
+  /* Landscape phones: expand height aggressively */
+  @media (orientation: landscape) and (max-width: 900px) {
+    aspect-ratio: auto;
+    height: calc(100vh - 48px);
+    max-height: none;
   }
 `;
 
@@ -108,16 +136,21 @@ export const SimCanvas = styled.canvas`
   cursor: crosshair;
   transition: filter 0.2s ease;
   border-radius: 0;
+
+  /* ensure touch/pointer interactions behave predictably on mobile */
+  touch-action: none; /* we handle gestures in JS (pan/zoom) */
+  -webkit-tap-highlight-color: transparent;
 `;
 
 /* -------------------------
    Heads-up / Controls
    ------------------------- */
 
-/* HUD: simplified and pinned to top-left of the VideoSection, but responsive */
+/* HUD: pinned to top-left of the VideoSection, responsive and safe-area aware.
+   On very small screens the HUD can be collapsed by toggling the `hud-collapsed` class. */
 export const HUD = styled.div<{ $isDark?: boolean }>`
   position: absolute;
-  top: 1rem;
+  top: calc(1rem + env(safe-area-inset-top));
   left: 1rem;
   padding: 0.75rem 1rem;
   border-radius: 10px;
@@ -129,19 +162,30 @@ export const HUD = styled.div<{ $isDark?: boolean }>`
   z-index: 12;
   min-width: 180px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.36);
+  transition: transform 0.18s ease, opacity 0.18s ease;
 
   @media (max-width: 640px) {
     min-width: 140px;
-    top: 0.75rem;
+    top: calc(0.6rem + env(safe-area-inset-top));
     left: 0.75rem;
     font-size: 0.85rem;
   }
+
+  /* collapsed compact HUD for tiny mobile screens or if user toggles it */
+  &.hud-collapsed {
+    transform-origin: left top;
+    transform: scale(0.86) translateY(-6px);
+    opacity: 0.96;
+    pointer-events: auto;
+    min-width: 100px;
+    padding: 0.5rem 0.6rem;
+  }
 `;
 
-/* DiseaseSelector: pinned top-right, removed margin-top:100px bug */
+/* DiseaseSelector: pinned top-right */
 export const DiseaseSelector = styled.div`
   position: absolute;
-  top: 1rem;
+  top: calc(1rem + env(safe-area-inset-top));
   right: 1rem;
   min-width: 160px;
   z-index: 12;
@@ -153,13 +197,14 @@ export const DiseaseSelector = styled.div`
   box-shadow: 0 6px 20px rgba(0,0,0,0.32);
 
   @media (max-width: 640px) {
-    top: 0.75rem;
+    top: calc(0.6rem + env(safe-area-inset-top));
     right: 0.75rem;
     min-width: 140px;
   }
 `;
 
-/* PlaybackControls: centered at bottom, responsive spacing, safe-area aware */
+/* PlaybackControls: centered at bottom, responsive spacing, safe-area aware
+   Buttons get larger min-size on touch devices */
 export const PlaybackControls = styled.div`
   position: absolute;
   left: 50%;
@@ -186,10 +231,17 @@ export const PlaybackControls = styled.div`
     background: transparent;
     border: none;
     color: #e6eef8;
-    padding: 0.4rem;
-    border-radius: 8px;
+    padding: 0.5rem;
+    border-radius: 10px;
     cursor: pointer;
     transition: transform 0.12s ease, background 0.12s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    /* touch target improvements */
+    min-width: 44px;
+    min-height: 44px;
 
     &:hover { transform: scale(1.07); background: rgba(59,130,246,0.12); }
     &:active { transform: scale(0.98); }
@@ -201,6 +253,15 @@ export const PlaybackControls = styled.div`
     background: rgba(59,130,246,0.18);
     border-radius: 999px;
     -webkit-appearance: none;
+    outline: none;
+  }
+
+  /* compact controls state for tiny screens */
+  &.controls-collapsed {
+    padding: 0.35rem 0.5rem;
+
+    button { min-width: 38px; min-height: 38px; padding: 0.35rem; }
+    input[type="range"] { width: 84px; }
   }
 `;
 
@@ -219,14 +280,19 @@ export const SpeedIndicator = styled.div`
   font-weight: 700;
   font-size: 0.9rem;
   box-shadow: 0 10px 30px rgba(0,0,0,0.36);
+
+  @media (max-width: 480px) {
+    right: 0.75rem;
+    bottom: calc(0.9rem + env(safe-area-inset-bottom));
+    font-size: 0.82rem;
+    padding: 0.4rem 0.6rem;
+  }
 `;
 
 /* -------------------------
    Controls / Panels
    ------------------------- */
 
-/* ControlsSection: place below video area in the flow (not absolutely positioned)
-   Constrain to same content width for consistent left/right spacing. */
 export const ControlsSection = styled.section<{ $isDark?: boolean }>`
   width: 100%;
   max-width: 100%;
@@ -244,6 +310,21 @@ export const ControlsSection = styled.section<{ $isDark?: boolean }>`
     flex-direction: column;
     gap: 0.75rem;
     padding: 0.75rem;
+  }
+
+  /* optionally pinned bottom for mobile if you toggle this state in the React view */
+  &.pinned-bottom-mobile {
+    @media (max-width: 700px) {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: calc(0.5rem + env(safe-area-inset-bottom));
+      margin: 0 auto;
+      width: calc(100% - 1.5rem);
+      z-index: 30;
+      border-radius: 12px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+    }
   }
 `;
 
@@ -297,7 +378,6 @@ export const StatCard = styled.div<{ $color?: string; $alert?: boolean }>`
   .value { font-size: 1.6rem; color: var(--card-color); font-weight: 800; }
 `;
 
-/* ParameterControl: added back (keeps the improved responsive layout) */
 export const ParameterControl = styled.div<{ $isDark?: boolean }>`
   --accent: #3b82f6;
   --accent-strong: #1d4ed8;
@@ -376,7 +456,6 @@ export const ParameterControl = styled.div<{ $isDark?: boolean }>`
   }
 `;
 
-/* Intervention grid: use minmax bigger so items are roomy */
 export const InterventionGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -384,7 +463,6 @@ export const InterventionGrid = styled.div`
   width: 100%;
 `;
 
-/* InterventionCard: tuned padding / gap and consistent alignment */
 export const InterventionCard = styled.button<{ $active?: boolean; $color?: string }>`
   --intervention-color: ${({ $color = '#3b82f6' }) => $color};
   padding: 1rem;

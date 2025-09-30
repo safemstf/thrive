@@ -6,53 +6,34 @@ import { useState, useEffect, useRef } from 'react';
 import { Header } from '@/components/misc/header';
 import { Footer } from '@/components/misc/footer';
 import { MatrixProvider, useMatrix } from '@/hooks/useMatrix';
+import { Code, Brush, BookOpen, FileText, Mail } from 'lucide-react';
 
 interface ConditionalLayoutProps {
   children: React.ReactNode;
 }
 
-/**
- * LayoutInner runs inside MatrixProvider so it can call useMatrix()
- * to toggle matrix state automatically based on the current pathname.
- *
- * Important: Be careful not to always overwrite user toggles when pathname changes.
- * The logic below auto-enables when entering /simulations, and only auto-disables
- * if that enable was performed by this effect (i.e. it was "auto-enabled").
- */
 function LayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // read matrix state + setter from the provider
   const { isMatrixOn, setMatrixOn } = useMatrix();
-
-  // track whether the last change was performed automatically by this component
-  // so we don't disable something the user intentionally enabled/disabled.
   const autoToggledRef = useRef(false);
 
-  // compute route flags
   const isDashboard = pathname?.startsWith('/dashboard') ?? false;
   const isAdmin = pathname?.startsWith('/admin') ?? false;
   const isApiTest = pathname?.startsWith('/dashboard/api-test') ?? false;
   const isMatrixRoute = pathname?.startsWith('/simulations') ?? false;
 
-  // update fullscreen status based on pathname
   useEffect(() => {
     setIsFullscreen(Boolean(isDashboard || isAdmin || isApiTest));
   }, [isDashboard, isAdmin, isApiTest]);
 
-  // safe auto-toggle behavior:
-  // - when entering /simulations: enable matrix and mark autoToggledRef = true
-  // - when leaving /simulations: disable matrix ONLY if autoToggledRef === true
-  // This prevents clobbering user toggles.
   useEffect(() => {
     try {
       if (isMatrixRoute) {
-        // entering matrix route => auto-enable
         setMatrixOn(true);
         autoToggledRef.current = true;
       } else {
-        // leaving matrix route => only auto-disable if we auto-enabled earlier
         if (autoToggledRef.current) {
           setMatrixOn(false);
           autoToggledRef.current = false;
@@ -64,42 +45,115 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
     }
   }, [isMatrixRoute, setMatrixOn]);
 
-  // If the user manually toggles while on the matrix route, clear the auto flag.
-  // Example: we auto-enabled when entering /simulations, user clicks the taskbar to turn it off —
-  // we should respect that and not auto-enable/disable on the next navigation unless re-entering the route.
   useEffect(() => {
     if (isMatrixRoute && !isMatrixOn && autoToggledRef.current) {
-      // user turned it off manually
       autoToggledRef.current = false;
     }
-    // If user manually turned it on while not auto-enabled, we should also clear auto flag
-    // so leaving the route doesn't forcibly turn it off unexpectedly.
     if (!isMatrixRoute && isMatrixOn && !autoToggledRef.current) {
-      // user manually enabled matrix on a non-simulations route; keep their preference
-      // (we don't flip anything here, but record that it was user-controlled)
       autoToggledRef.current = false;
     }
   }, [isMatrixOn, isMatrixRoute]);
 
   return (
     <div className="flex flex-col min-h-screen relative">
+      {/* Header with full sidebar config */}
+      {!isFullscreen && (
+        <Header 
+          title="LearnMorra" 
+          subtitle="Brag Responsibly"
+          withSidebar={true}
+          sidebarConfig={{
+            user: {
+              name: "Guest User",
+              email: "guest@learnmorra.com",
+              role: "visitor"
+            },
+            dataStatus: {
+              type: 'dev',
+              label: 'Development'
+            },
+            quickActions: [
+              {
+                id: 'code',
+                title: 'Code',
+                description: 'View projects',
+                icon: <Code size={20} />,
+                color: '#3b82f6',
+                href: '/projects'
+              },
+              {
+                id: 'design',
+                title: 'Design',
+                description: 'Creative work',
+                icon: <Brush size={20} />,
+                color: '#8b5cf6',
+                href: '/design'
+              },
+              {
+                id: 'blog',
+                title: 'Blog',
+                description: 'Read articles',
+                icon: <BookOpen size={20} />,
+                color: '#10b981',
+                href: '/blog'
+              },
+              {
+                id: 'contact',
+                title: 'Contact',
+                description: 'Get in touch',
+                icon: <Mail size={20} />,
+                color: '#f59e0b',
+                href: '/contact'
+              }
+            ],
+            portfolio: {
+              kind: 'hybrid',
+              title: 'Portfolio'
+            },
+            portfolioSections: [
+              {
+                id: 'home',
+                title: 'Home',
+                href: '/',
+                icon: <BookOpen size={16} />,
+                types: []
+              },
+              {
+                id: 'thrive',
+                title: 'Thrive',
+                href: '/thrive',
+                icon: <Brush size={16} />,
+                types: []
+              },
+              {
+                id: 'simulations',
+                title: 'The Matrix',
+                href: '/simulations',
+                icon: <Code size={16} />,
+                types: []
+              },
+              {
+                id: 'taco',
+                title: 'Talk Oh—Taco',
+                href: '/talkohtaco',
+                icon: <Mail size={16} />,
+                types: []
+              }
+            ]
+          }}
+        />
+      )}
 
-      {/* Header - hidden on fullscreen-ish routes */}
-      {!isFullscreen && <Header title="LearnMorra" subtitle="Brag Responsibly" />}
-
-      {/* Main */}
-      <main id="main-content" className="flex-grow relative z-10">
+      <div className="flex-grow relative">
         {children}
-      </main>
+      </div>
 
-      {/* Footer */}
       {!isFullscreen && <Footer />}
     </div>
   );
 }
 
 export function ConditionalLayout({ children }: ConditionalLayoutProps) {
-  // Wrap the app in the provider so any component (Header/Footer/Taskbar) can read the matrix state
   return (
     <MatrixProvider>
       <LayoutInner>{children}</LayoutInner>

@@ -1,4 +1,4 @@
-// src/components/misc/header.tsx - HODA REMOVED
+// src/components/misc/header.tsx - Full file (100vh sidebars + dashboard/account items in right sidebar)
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
@@ -105,11 +105,9 @@ const useOptimizedScroll = () => {
     const updateScrollState = () => {
       const scrollY = window.scrollY;
       const scrollingDown = scrollY > lastScrollY.current;
-      
-      // Header becomes "scrolled" after 20px
+
       setIsScrolled(scrollY > 20);
-      
-      // Always visible on desktop, hide on scroll down for mobile
+
       if (window.innerWidth <= 768) {
         if (scrollingDown && scrollY > 100) {
           setIsVisible(false);
@@ -119,7 +117,7 @@ const useOptimizedScroll = () => {
       } else {
         setIsVisible(true);
       }
-      
+
       lastScrollY.current = scrollY;
       ticking.current = false;
     };
@@ -132,7 +130,7 @@ const useOptimizedScroll = () => {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // Check initial state
+    handleScroll();
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -163,8 +161,8 @@ const HeaderContainer = styled.header<{ $scrolled: boolean; $visible: boolean }>
   backdrop-filter: ${props => props.$scrolled ? 'blur(12px)' : 'none'};
   -webkit-backdrop-filter: ${props => props.$scrolled ? 'blur(12px)' : 'none'};
   
-  border-bottom: 1px solid ${props => props.$scrolled 
-    ? 'rgba(0, 0, 0, 0.08)' 
+  border-bottom: 1px solid ${props => props.$scrolled
+    ? 'rgba(0, 0, 0, 0.08)'
     : 'rgba(0, 0, 0, 0.05)'
   };
   
@@ -291,6 +289,98 @@ const SidebarToggle = styled.button<{ $active: boolean }>`
   }
 `;
 
+// RIGHT sidebar + overlay (mobile nav)
+const RightSidebarOverlay = styled.div<{ $visible: boolean }>`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 4999;
+  opacity: ${props => props.$visible ? 1 : 0};
+  pointer-events: ${props => props.$visible ? 'auto' : 'none'};
+  transition: opacity 0.2s ease;
+  backdrop-filter: blur(4px);
+`;
+
+const RightSidebarContainer = styled.aside<{ $visible: boolean }>`
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh; /* full height */
+  width: 280px;
+  z-index: 5001;
+  
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+  
+  transform: translateX(${props => props.$visible ? '0' : '100%'});
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+  }
+`;
+
+/* Nav inside right sidebar */
+const NavSidebarHeader = styled.div`
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.03), rgba(139, 92, 246, 0.03));
+`;
+
+const NavSidebarTitle = styled.h2`
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+`;
+
+const NavSidebarContent = styled.nav`
+  padding: 1rem;
+`;
+
+const NavLinkItem = styled(Link)<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  text-decoration: none;
+  color: ${props => props.$active ? '#1a1a1a' : '#666666'};
+  font-size: 1rem;
+  font-weight: ${props => props.$active ? '600' : '400'};
+  transition: all 0.2s ease;
+  background: ${props => props.$active ? 'rgba(59, 130, 246, 0.08)' : 'transparent'};
+  border: 1px solid ${props => props.$active ? 'rgba(59, 130, 246, 0.2)' : 'transparent'};
+  margin-bottom: 0.5rem;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.06);
+    color: #1a1a1a;
+    border-color: rgba(59, 130, 246, 0.15);
+    transform: translateX(-4px);
+  }
+  
+  svg {
+    flex-shrink: 0;
+  }
+`;
+
 const MobileMenuButton = styled.button`
   display: none;
   background: rgba(0, 0, 0, 0.05);
@@ -312,9 +402,7 @@ const MobileMenuButton = styled.button`
   }
 `;
 
-// ============================================
-// SIDEBAR COMPONENTS
-// ============================================
+/* LEFT sidebar (desktop) */
 const SidebarOverlay = styled.div<{ $visible: boolean }>`
   position: fixed;
   inset: 0;
@@ -326,7 +414,7 @@ const SidebarOverlay = styled.div<{ $visible: boolean }>`
   backdrop-filter: blur(4px);
 
   @media (min-width: 1025px) {
-    display: none;
+    display: block;
   }
 `;
 
@@ -334,7 +422,7 @@ const SidebarContainer = styled.aside<{ $visible: boolean }>`
   position: fixed;
   top: 0;
   left: 0;
-  bottom: 0;
+  height: 100vh; /* full height */
   width: 280px;
   z-index: 1003;
   
@@ -351,7 +439,6 @@ const SidebarContainer = styled.aside<{ $visible: boolean }>`
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   
-  /* Custom scrollbar */
   &::-webkit-scrollbar {
     width: 4px;
   }
@@ -683,55 +770,78 @@ export function Header({
   sidebarConfig = {}
 }: HeaderProps) {
   const { isScrolled, isVisible } = useOptimizedScroll();
-  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);   // desktop/dashboard sidebar (left)
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(false); // mobile menu (right)
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const pathname = usePathname();
-  const sidebarRef = useRef<HTMLElement>(null);
 
-  // Handle escape key and body scroll lock
+  const leftSidebarRef = useRef<HTMLElement | null>(null);
+  const rightSidebarRef = useRef<HTMLElement | null>(null);
+
+  // Handle escape key and body scroll lock for either sidebar
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setSidebarVisible(false);
+        setLeftSidebarOpen(false);
+        setRightSidebarOpen(false);
       }
     };
 
     const handleClickOutside = (event: MouseEvent) => {
-      // Only for desktop sidebar
-      if (window.innerWidth > 1024 && 
-          sidebarRef.current && 
-          !sidebarRef.current.contains(event.target as Node)) {
-        setSidebarVisible(false);
+      // close left sidebar if click outside AND on large screens (desktop behavior)
+      if (leftSidebarOpen &&
+          window.innerWidth > 1024 &&
+          leftSidebarRef.current &&
+          !leftSidebarRef.current.contains(event.target as Node)) {
+        setLeftSidebarOpen(false);
+      }
+
+      // close right sidebar if click outside and it's open
+      if (rightSidebarOpen &&
+          rightSidebarRef.current &&
+          !rightSidebarRef.current.contains(event.target as Node)) {
+        setRightSidebarOpen(false);
       }
     };
 
-    if (sidebarVisible) {
+    if (leftSidebarOpen || rightSidebarOpen) {
       document.addEventListener('keydown', handleEscape);
       document.addEventListener('mousedown', handleClickOutside);
-      
-      // Only lock scroll on mobile
-      if (window.innerWidth <= 1024) {
-        document.body.style.overflow = 'hidden';
-      }
+      document.body.classList.add('sidebar-open');
     } else {
-      document.body.style.overflow = '';
+      document.body.classList.remove('sidebar-open');
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.removeEventListener('mousedown', handleClickOutside);
-      document.body.style.overflow = '';
+      document.body.classList.remove('sidebar-open');
     };
-  }, [sidebarVisible]);
+  }, [leftSidebarOpen, rightSidebarOpen]);
 
-  const toggleSidebar = () => setSidebarVisible(prev => !prev);
-  const closeSidebar = () => setSidebarVisible(false);
+  // Detect mobile for taskbar
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const toggleLeftSidebar = () => setLeftSidebarOpen(prev => !prev);
+  const closeLeftSidebar = () => setLeftSidebarOpen(false);
+
+  const toggleRightSidebar = () => setRightSidebarOpen(prev => !prev);
+  const closeRightSidebar = () => setRightSidebarOpen(false);
 
   return (
     <HeaderWrapper>
       <HeaderContainer $scrolled={isScrolled} $visible={isVisible}>
         <HeaderContent $scrolled={isScrolled}>
-          {/* Left Section with Logo */}
           <LeftSection>
             <LogoSection href="/" aria-label="Go to homepage">
               <LogoImageContainer $scrolled={isScrolled}>
@@ -763,23 +873,21 @@ export function Header({
             </LogoSection>
           </LeftSection>
 
-          {/* Desktop Actions */}
           <DesktopNav>
             {withSidebar && (
               <SidebarToggle
-                $active={sidebarVisible}
-                onClick={toggleSidebar}
+                $active={leftSidebarOpen}
+                onClick={toggleLeftSidebar}
                 aria-label="Toggle sidebar"
               >
-                {sidebarVisible ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                {leftSidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
               </SidebarToggle>
             )}
-            <Taskbar isScrolled={isScrolled} />
+            <Taskbar isScrolled={isScrolled} isMobile={isMobile} />
           </DesktopNav>
 
-          {/* Mobile Menu Button */}
           <MobileMenuButton
-            onClick={toggleSidebar}
+            onClick={toggleRightSidebar}
             aria-label="Open menu"
           >
             <Menu size={20} />
@@ -787,16 +895,19 @@ export function Header({
         </HeaderContent>
       </HeaderContainer>
 
-      {/* Sidebar */}
       {withSidebar && (
         <>
-          <SidebarOverlay $visible={sidebarVisible} onClick={closeSidebar} />
-          <SidebarContainer ref={sidebarRef} $visible={sidebarVisible}>
-            <CloseButton onClick={closeSidebar}>
+          {/* LEFT (desktop) sidebar + overlay */}
+          <SidebarOverlay
+            className="sidebar-overlay"
+            $visible={leftSidebarOpen}
+            onClick={closeLeftSidebar}
+          />
+          <SidebarContainer ref={leftSidebarRef} $visible={leftSidebarOpen} aria-hidden={!leftSidebarOpen} role="complementary" aria-label="Sidebar">
+            <CloseButton onClick={closeLeftSidebar} aria-label="Close sidebar">
               <X size={18} />
             </CloseButton>
 
-            {/* Header Section */}
             <SidebarHeader>
               {sidebarConfig.user && (
                 <>
@@ -820,15 +931,14 @@ export function Header({
               )}
             </SidebarHeader>
 
-            {/* Quick Actions */}
             {sidebarConfig.quickActions && sidebarConfig.quickActions.length > 0 && (
               <SidebarSection>
                 <SectionTitle>Quick Actions</SectionTitle>
                 <QuickActionsGrid>
                   {sidebarConfig.quickActions.map((action) => (
                     <Link key={action.id} href={action.href} style={{ textDecoration: 'none' }}>
-                      <QuickActionCard $color={action.color} onClick={closeSidebar}>
-                        <div className="action-icon">{action.icon}</div>
+                      <QuickActionCard $color={action.color} onClick={closeLeftSidebar}>
+                        <div className="action-icon" aria-hidden>{action.icon}</div>
                         <h4 className="action-title">{action.title}</h4>
                         <p className="action-desc">{action.description}</p>
                       </QuickActionCard>
@@ -838,7 +948,6 @@ export function Header({
               </SidebarSection>
             )}
 
-            {/* Portfolio Section */}
             {sidebarConfig.portfolio && sidebarConfig.portfolioSections && (
               <SidebarSection>
                 <SectionTitle>Portfolio</SectionTitle>
@@ -861,7 +970,7 @@ export function Header({
                         key={section.id}
                         href={section.href}
                         $active={pathname === section.href}
-                        onClick={closeSidebar}
+                        onClick={closeLeftSidebar}
                       >
                         {section.icon}
                         {section.title}
@@ -872,12 +981,11 @@ export function Header({
               </SidebarSection>
             )}
 
-            {/* Footer Actions */}
             <SidebarSection>
               {sidebarConfig.onSettingsClick && (
                 <ActionButton onClick={() => {
                   sidebarConfig.onSettingsClick?.();
-                  closeSidebar();
+                  closeLeftSidebar();
                 }}>
                   <Settings size={16} />
                   Settings
@@ -889,7 +997,7 @@ export function Header({
                   className="logout"
                   onClick={() => {
                     sidebarConfig.onLogout?.();
-                    closeSidebar();
+                    closeLeftSidebar();
                   }}
                 >
                   <ArrowLeft size={16} />
@@ -898,6 +1006,121 @@ export function Header({
               )}
             </SidebarSection>
           </SidebarContainer>
+
+          {/* RIGHT (mobile) sidebar + overlay */}
+          <RightSidebarOverlay
+            className="right-sidebar-overlay"
+            $visible={rightSidebarOpen}
+            onClick={closeRightSidebar}
+          />
+          <RightSidebarContainer ref={rightSidebarRef} $visible={rightSidebarOpen} aria-hidden={!rightSidebarOpen} role="navigation" aria-label="Mobile navigation">
+            <CloseButton onClick={closeRightSidebar} style={{ display: 'flex' }} aria-label="Close menu">
+              <X size={18} />
+            </CloseButton>
+
+            <NavSidebarHeader>
+              <NavSidebarTitle>Navigation</NavSidebarTitle>
+            </NavSidebarHeader>
+
+            <NavSidebarContent>
+              <NavLinkItem
+                href="/"
+                $active={pathname === '/'}
+                onClick={closeRightSidebar}
+              >
+                <BookOpen size={20} />
+                Home
+              </NavLinkItem>
+
+              <NavLinkItem
+                href="/thrive"
+                $active={pathname === '/thrive'}
+                onClick={closeRightSidebar}
+              >
+                <Brush size={20} />
+                Thrive
+              </NavLinkItem>
+
+              <NavLinkItem
+                href="/simulations"
+                $active={pathname === '/simulations'}
+                onClick={closeRightSidebar}
+              >
+                <Code size={20} />
+                The Matrix
+              </NavLinkItem>
+
+              <NavLinkItem
+                href="/talkohtaco"
+                $active={pathname === '/talkohtaco'}
+                onClick={closeRightSidebar}
+              >
+                <Mail size={20} />
+                Talk Oh—Taco
+              </NavLinkItem>
+
+              {/* Dashboard + account items only when user exists */}
+              {sidebarConfig.user ? (
+                <>
+                  <hr style={{ margin: '0.75rem 0', border: 'none', borderTop: '1px solid rgba(0,0,0,0.06)' }} />
+                  <NavLinkItem
+                    href="/dashboard"
+                    $active={pathname.startsWith('/dashboard')}
+                    onClick={closeRightSidebar}
+                  >
+                    <FileText size={20} />
+                    Dashboard
+                  </NavLinkItem>
+
+                  <NavLinkItem
+                    href="/dashboard/profile"
+                    $active={pathname === '/dashboard/profile'}
+                    onClick={closeRightSidebar}
+                  >
+                    <Settings size={20} />
+                    Profile
+                  </NavLinkItem>
+
+                  <div style={{ padding: '0 1.25rem', marginTop: '0.75rem' }}>
+                    <ActionButton
+                      onClick={() => {
+                        sidebarConfig.onSettingsClick?.();
+                        closeRightSidebar();
+                      }}
+                      aria-label="Open settings"
+                    >
+                      <Settings size={16} aria-hidden />
+                      Settings
+                    </ActionButton>
+
+                    {sidebarConfig.onLogout && (
+                      <ActionButton
+                        className="logout"
+                        onClick={() => {
+                          sidebarConfig.onLogout?.();
+                          closeRightSidebar();
+                        }}
+                        aria-label="Sign out"
+                      >
+                        <ArrowLeft size={16} aria-hidden />
+                        Sign Out
+                      </ActionButton>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* If no user, show a sign-in or dashboard link that may route to auth */
+                <NavLinkItem
+                  href="/signin"
+                  $active={pathname === '/signin'}
+                  onClick={closeRightSidebar}
+                >
+                  <User size={20} />
+                  Sign in
+                </NavLinkItem>
+              )}
+            </NavSidebarContent>
+          </RightSidebarContainer>
         </>
       )}
     </HeaderWrapper>

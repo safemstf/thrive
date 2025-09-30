@@ -181,20 +181,20 @@ export function useTaskbarLogic({
             document.addEventListener('keydown', handleEscape);
             document.addEventListener('mousedown', handleClickOutside);
 
-            if (window.innerWidth <= 1024) {
-                document.body.style.overflow = 'hidden';
-            }
+            // ADD THE CLASS - this is what was missing!
+            document.body.classList.add('sidebar-open');
         } else {
-            document.body.style.overflow = '';
+            // REMOVE THE CLASS
+            document.body.classList.remove('sidebar-open');
         }
 
         return () => {
             document.removeEventListener('keydown', handleEscape);
             document.removeEventListener('mousedown', handleClickOutside);
-            document.body.style.overflow = '';
+            // Clean up on unmount
+            document.body.classList.remove('sidebar-open');
         };
     }, [sidebarVisible]);
-
     // Event handlers
     const handleLogout = useCallback(async () => {
         try {

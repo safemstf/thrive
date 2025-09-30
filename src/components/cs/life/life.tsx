@@ -1,22 +1,19 @@
 'use client'
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { 
-  Play, Pause, RotateCcw, Palette, ZoomIn, ZoomOut, Grid3X3, 
+import {
+  Play, Pause, RotateCcw, Palette, ZoomIn, ZoomOut, Grid3X3,
   BarChart3
 } from "lucide-react";
 
 import styled from "styled-components";
 
-// Import shared styled components (kept intact)
 import {
   SimulationContainer,
   VideoSection,
-  CanvasContainer,
+  CanvasContainer as SharedCanvasContainer,
   SimCanvas,
   HUD,
   ControlsSection,
-  TabContainer,
-  Tab,
   TabContent,
   ParameterControl,
   InterventionGrid,
@@ -31,6 +28,17 @@ const PageWrapper = styled.div`
   max-width: 1400px;
   margin: 0 auto;
   padding: 0.5rem;
+`;
+
+/* Use a responsive grid so right column collapses on small screens */
+const GridLayout = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 1.25rem;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 /* VideoInner wraps the canvas and the control bar (stacked vertically). */
@@ -87,7 +95,6 @@ const LocalControlsBar = styled.div`
   }
 `;
 
-/* SpeedBadge placed next to the controls */
 const SpeedBadge = styled.div`
   margin-left: auto;
   padding: 0.5rem 0.9rem;
@@ -99,7 +106,6 @@ const SpeedBadge = styled.div`
   border: 1px solid rgba(59,130,246,0.14);
 `;
 
-/* Local tab bar placed underneath the video (horizontal, centered) */
 const LocalTabBar = styled.div`
   display: flex;
   gap: 0.5rem;
@@ -130,7 +136,6 @@ const LocalTabBar = styled.div`
   }
 `;
 
-/* Header helpers */
 const Header = styled.div`
   text-align: center;
   margin-bottom: 1.25rem;
@@ -149,7 +154,6 @@ const Subtitle = styled.p`
   margin: 0;
 `;
 
-/* Small stat list inside HUD */
 const StatList = styled.div`
   font-size: 0.875rem;
   display: flex;
@@ -162,9 +166,16 @@ const StatRow = styled.div`
   font-family: monospace;
 `;
 
-// --------------------------
-// Constants / Types
-// --------------------------
+/* Slight wrapper to observe size of the video area */
+const CanvasWrapper = styled(SharedCanvasContainer)`
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+`;
+
+/* --------------------------
+   Constants / Types
+   -------------------------- */
 const INITIAL_CANVAS_W = 800;
 const INITIAL_CANVAS_H = 600;
 const INITIAL_CELL_SIZE = 6;
@@ -177,7 +188,6 @@ type Pattern = { name: string; matrix: number[][]; category: string; description
 interface Props { isDark?: boolean; isRunning?: boolean; speed?: number; }
 interface RuleSet { birth: number[]; survive: number[]; }
 
-// reuse your existing lookup and patterns (kept as-is here)
 const RULES_LOOKUP: Record<Variant, RuleSet> = {
   conway: { birth: [3], survive: [2, 3] },
   highlife: { birth: [3, 6], survive: [2, 3] },
@@ -207,15 +217,21 @@ export default function LifeSimulation({
   speed: externalSpeed = 1
 }: Props) {
   // refs
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const gridRef = useRef<Uint8Array | null>(null);
   const colorDataRef = useRef<Uint32Array | null>(null);
   const animationRef = useRef<number>(0);
   const lastUpdateRef = useRef<number>(0);
 
+  const prevColsRef = useRef<number>(0);
+  const prevRowsRef = useRef<number>(0);
+
+  // container ref for measuring available layout space
+  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+
   // state
-  const [canvasSize] = useState({ w: INITIAL_CANVAS_W, h: INITIAL_CANVAS_H });
+  const [layoutSize, setLayoutSize] = useState({ w: INITIAL_CANVAS_W, h: INITIAL_CANVAS_H }); // CSS pixels
   const [cellSize, setCellSize] = useState(INITIAL_CELL_SIZE);
   const [generation, setGeneration] = useState(0);
   const [population, setPopulation] = useState(0);
@@ -229,74 +245,186 @@ export default function LifeSimulation({
   // active tab for right panel
   const [activeTab, setActiveTab] = useState<"settings" | "patterns">("settings");
 
-  // derived
-  const COLS = Math.floor(canvasSize.w / cellSize);
-  const ROWS = Math.floor(canvasSize.h / cellSize);
+  // derived (recomputed each render from layoutSize and cellSize)
+  const COLS = Math.max(1, Math.floor(layoutSize.w / cellSize));
+  const ROWS = Math.max(1, Math.floor(layoutSize.h / cellSize));
   const GRID_SIZE = ROWS * COLS;
 
   // sync external props
   useEffect(() => setIsPlaying(externalIsRunning), [externalIsRunning]);
   useEffect(() => setSimSpeed(externalSpeed), [externalSpeed]);
 
-  // initialize grid + population
+  /* -------------------------
+     Resize handling
+     - Observe the canvas container and adapt layoutWidth/layoutHeight.
+     - Then update <canvas> attributes and scale context to devicePixelRatio.
+     - Resize grid with copying of overlapping cells (keeps content on resize).
+  ------------------------- */
+  useEffect(() => {
+    if (!canvasContainerRef.current) return;
+    const el = canvasContainerRef.current;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const cr = entry.contentRect;
+        const w = Math.max(64, Math.floor(cr.width)); // avoid zero
+        const h = Math.max(64, Math.floor(cr.height));
+        setLayoutSize({ w, h });
+      }
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // apply layoutSize -> canvas DOM attributes and context transform for DPR
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    // set css size
+    canvas.style.width = `${layoutSize.w}px`;
+    canvas.style.height = `${layoutSize.h}px`;
+    // set internal pixel resolution
+    canvas.width = Math.floor(layoutSize.w * dpr);
+    canvas.height = Math.floor(layoutSize.h * dpr);
+
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (ctx) {
+      // scale drawing operations so we can use CSS pixels in drawing code
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctxRef.current = ctx;
+    }
+
+    // resize/rehydrate grid when dimensions change
+    const newCols = Math.max(1, Math.floor(layoutSize.w / cellSize));
+    const newRows = Math.max(1, Math.floor(layoutSize.h / cellSize));
+    const prevCols = prevColsRef.current || 0;
+    const prevRows = prevRowsRef.current || 0;
+
+    if (!gridRef.current || prevCols === 0 || prevRows === 0) {
+      // first time create grid sized to new dims
+      gridRef.current = new Uint8Array(newCols * newRows);
+      colorDataRef.current = new Uint32Array(newCols * newRows);
+      // randomize a bit
+      for (let i = 0; i < newCols * newRows; i++) {
+        if (Math.random() > 0.7) {
+          gridRef.current[i] = 1;
+          colorDataRef.current[i] = 0xFF000000 | Math.floor(Math.random() * 0xFFFFFF);
+        }
+      }
+      prevColsRef.current = newCols;
+      prevRowsRef.current = newRows;
+      setGeneration(0);
+      // compute population
+      let cnt = 0;
+      for (let i = 0; i < gridRef.current.length; i++) if (gridRef.current[i] > 0) cnt++;
+      setPopulation(cnt);
+      return;
+    }
+
+    // if size changed, create new arrays and copy overlapping region
+    if (newCols !== prevCols || newRows !== prevRows) {
+      const newGrid = new Uint8Array(newCols * newRows);
+      const newColor = new Uint32Array(newCols * newRows);
+
+      const copyCols = Math.min(prevCols, newCols);
+      const copyRows = Math.min(prevRows, newRows);
+
+      for (let r = 0; r < copyRows; r++) {
+        for (let c = 0; c < copyCols; c++) {
+          const oldIndex = r * prevCols + c;
+          const newIndex = r * newCols + c;
+          newGrid[newIndex] = gridRef.current![oldIndex];
+          newColor[newIndex] = colorDataRef.current ? colorDataRef.current[oldIndex] : 0;
+        }
+      }
+
+      gridRef.current = newGrid;
+      colorDataRef.current = newColor;
+      prevColsRef.current = newCols;
+      prevRowsRef.current = newRows;
+
+      // recompute population
+      let cnt = 0;
+      for (let i = 0; i < gridRef.current.length; i++) if (gridRef.current[i] > 0) cnt++;
+      setPopulation(cnt);
+    }
+  }, [layoutSize, cellSize]);
+
+  /* -------------------------
+     Utility: countPopulation + initializeGrid (works with current GRID_SIZE)
+  ------------------------- */
   const countPopulation = useCallback(() => {
     if (!gridRef.current) return;
     let cnt = 0;
-    for (let i = 0; i < GRID_SIZE; i++) if (gridRef.current[i] > 0) cnt++;
+    for (let i = 0; i < gridRef.current.length; i++) if (gridRef.current[i] > 0) cnt++;
     setPopulation(cnt);
-  }, [GRID_SIZE]);
+  }, []);
 
   const initializeGrid = useCallback(() => {
-    gridRef.current = new Uint8Array(GRID_SIZE);
-    colorDataRef.current = new Uint32Array(GRID_SIZE);
-    for (let i = 0; i < GRID_SIZE; i++) {
+    const cols = Math.max(1, Math.floor(layoutSize.w / cellSize));
+    const rows = Math.max(1, Math.floor(layoutSize.h / cellSize));
+    const size = cols * rows;
+    gridRef.current = new Uint8Array(size);
+    colorDataRef.current = new Uint32Array(size);
+    for (let i = 0; i < size; i++) {
       if (Math.random() > 0.7) {
         gridRef.current[i] = 1;
-        colorDataRef.current[i] = 0xFF000000 | (Math.random() * 0xFFFFFF);
+        colorDataRef.current[i] = 0xFF000000 | Math.floor(Math.random() * 0xFFFFFF);
       }
     }
+    prevColsRef.current = cols;
+    prevRowsRef.current = rows;
     setGeneration(0);
     countPopulation();
-  }, [GRID_SIZE, countPopulation]);
+  }, [layoutSize.w, layoutSize.h, cellSize, countPopulation]);
 
-  // neighbor counting (toroidal)
-  const getNeighborCount = useCallback((index: number): number => {
+  /* -------------------------
+     Neighbors / update logic (wrap-around)
+  ------------------------- */
+  const getNeighborCount = useCallback((index: number, cols: number, rows: number): number => {
     if (!gridRef.current) return 0;
-    const row = Math.floor(index / COLS);
-    const col = index % COLS;
+    const row = Math.floor(index / cols);
+    const col = index % cols;
     let cnt = 0;
     for (let dr = -1; dr <= 1; dr++) {
       for (let dc = -1; dc <= 1; dc++) {
         if (dr === 0 && dc === 0) continue;
         let nr = row + dr;
         let nc = col + dc;
-        nr = (nr + ROWS) % ROWS;
-        nc = (nc + COLS) % COLS;
-        if (gridRef.current[nr * COLS + nc] > 0) cnt++;
+        nr = (nr + rows) % rows;
+        nc = (nc + cols) % cols;
+        if (gridRef.current[nr * cols + nc] > 0) cnt++;
       }
     }
     return cnt;
-  }, [ROWS, COLS]);
+  }, []);
 
-  // grid update
   const updateGrid = useCallback(() => {
     if (!gridRef.current) return;
-    const newGrid = new Uint8Array(GRID_SIZE);
+    const cols = Math.max(1, Math.floor(layoutSize.w / cellSize));
+    const rows = Math.max(1, Math.floor(layoutSize.h / cellSize));
+    const size = cols * rows;
+    const newGrid = new Uint8Array(size);
     const rules = RULES_LOOKUP[variant];
-    for (let i = 0; i < GRID_SIZE; i++) {
+
+    for (let i = 0; i < size; i++) {
       const alive = gridRef.current[i] > 0;
-      const neighbors = getNeighborCount(i);
+      const neighbors = getNeighborCount(i, cols, rows);
       const shouldLive = alive ? rules.survive.includes(neighbors) : rules.birth.includes(neighbors);
       if (shouldLive) {
-        newGrid[i] = alive ? Math.min(255, gridRef.current[i] + 1) : 1;
+        newGrid[i] = alive ? Math.min(255, (gridRef.current[i] || 1) + 1) : 1;
       }
     }
     gridRef.current = newGrid;
     setGeneration(g => g + 1);
     countPopulation();
-  }, [GRID_SIZE, variant, getNeighborCount, countPopulation]);
+  }, [layoutSize.w, layoutSize.h, cellSize, variant, getNeighborCount, countPopulation]);
 
-  // hsl->rgb
+  /* -------------------------
+     hsl->rgb
+  ------------------------- */
   const hslToRgb = useCallback((h: number, s: number, l: number): [number, number, number] => {
     let r: number, g: number, b: number;
     if (s === 0) {
@@ -319,21 +447,25 @@ export default function LifeSimulation({
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
   }, []);
 
-  // rendering
+  /* -------------------------
+     Rendering using scaled ctx (we use fillRect per cell; simple & correct with DPR scaling)
+  ------------------------- */
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = ctxRef.current;
     if (!canvas || !ctx || !gridRef.current) return;
 
+    // clear
     ctx.fillStyle = isDark ? "#0f172a" : "#f8fafc";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
 
-    const imageData = ctx.createImageData(canvas.width, canvas.height);
-    const data = imageData.data;
+    const cols = Math.max(1, Math.floor(layoutSize.w / cellSize));
+    const rows = Math.max(1, Math.floor(layoutSize.h / cellSize));
 
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
-        const gridIndex = row * COLS + col;
+    // draw cells
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        const gridIndex = row * cols + col;
         const cell = gridRef.current[gridIndex];
         if (cell > 0) {
           const x = col * cellSize;
@@ -362,45 +494,37 @@ export default function LifeSimulation({
               g = isDark ? 222 : 197;
               b = isDark ? 128 : 94;
           }
-
-          for (let py = 0; py < cellSize; py++) {
-            for (let px = 0; px < cellSize; px++) {
-              const pixelIndex = ((y + py) * canvas.width + (x + px)) * 4;
-              data[pixelIndex] = r;
-              data[pixelIndex + 1] = g;
-              data[pixelIndex + 2] = b;
-              data[pixelIndex + 3] = 255;
-            }
-          }
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillRect(x, y, cellSize, cellSize);
         }
       }
     }
-
-    ctx.putImageData(imageData, 0, 0);
 
     // grid overlay
     if (showGrid && cellSize >= 4) {
       ctx.strokeStyle = isDark ? "rgba(100, 116, 139, 0.2)" : "rgba(148, 163, 184, 0.2)";
       ctx.lineWidth = 0.5;
       ctx.beginPath();
-      for (let x = 0; x <= canvas.width; x += cellSize) {
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
+      for (let x = 0; x <= layoutSize.w; x += cellSize) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, layoutSize.h);
       }
-      for (let y = 0; y <= canvas.height; y += cellSize) {
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
+      for (let y = 0; y <= layoutSize.h; y += cellSize) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(layoutSize.w, y + 0.5);
       }
       ctx.stroke();
     }
-  }, [ROWS, COLS, cellSize, colorMode, isDark, showGrid, hslToRgb]);
+  }, [layoutSize.w, layoutSize.h, cellSize, colorMode, isDark, showGrid, hslToRgb]);
 
-  // animation loop
+  /* -------------------------
+     Animation loop
+  ------------------------- */
   useEffect(() => {
     if (!isPlaying) return;
     const animate = (timestamp: number) => {
       const elapsed = timestamp - lastUpdateRef.current;
-      if (elapsed >= 100 / simSpeed) {
+      if (elapsed >= 100 / Math.max(1, simSpeed)) {
         updateGrid();
         lastUpdateRef.current = timestamp;
       }
@@ -411,18 +535,31 @@ export default function LifeSimulation({
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
   }, [isPlaying, simSpeed, updateGrid, render]);
 
-  // init canvas & grid
+  /* -------------------------
+     Init: only once, when component mounts ensure grid exists and canvas ctx is created
+  ------------------------- */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
-      ctxRef.current = canvas.getContext("2d", { alpha: false });
-      initializeGrid();
-      render();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      canvas.style.width = `${layoutSize.w}px`;
+      canvas.style.height = `${layoutSize.h}px`;
+      canvas.width = Math.floor(layoutSize.w * dpr);
+      canvas.height = Math.floor(layoutSize.h * dpr);
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (ctx) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctxRef.current = ctx;
+      }
     }
+    // initialize grid if missing
+    if (!gridRef.current) initializeGrid();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initializeGrid]);
+  }, []);
 
-  // click handling to toggle cell
+  /* -------------------------
+     Canvas click -> toggle cell (works correctly with layout scaling)
+  ------------------------- */
   const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas || !gridRef.current) return;
@@ -431,36 +568,44 @@ export default function LifeSimulation({
     const y = e.clientY - rect.top;
     const col = Math.floor(x / cellSize);
     const row = Math.floor(y / cellSize);
-    if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
-      const index = row * COLS + col;
+    const cols = Math.max(1, Math.floor(layoutSize.w / cellSize));
+    const rows = Math.max(1, Math.floor(layoutSize.h / cellSize));
+    if (row >= 0 && row < rows && col >= 0 && col < cols) {
+      const index = row * cols + col;
       gridRef.current[index] = gridRef.current[index] > 0 ? 0 : 1;
       countPopulation();
       render();
     }
-  }, [cellSize, ROWS, COLS, countPopulation, render]);
+  }, [cellSize, layoutSize.w, layoutSize.h, countPopulation, render]);
 
-  // load pattern
+  /* -------------------------
+     Load pattern (centers pattern in current grid)
+  ------------------------- */
   const loadPattern = useCallback((pattern: Pattern) => {
     if (!gridRef.current) return;
+    const cols = Math.max(1, Math.floor(layoutSize.w / cellSize));
+    const rows = Math.max(1, Math.floor(layoutSize.h / cellSize));
     gridRef.current.fill(0);
-    const centerX = Math.floor(COLS / 2);
-    const centerY = Math.floor(ROWS / 2);
+    colorDataRef.current = new Uint32Array(cols * rows);
+    const centerX = Math.floor(cols / 2);
+    const centerY = Math.floor(rows / 2);
     const offsetX = Math.floor(pattern.matrix[0].length / 2);
     const offsetY = Math.floor(pattern.matrix.length / 2);
     for (let r = 0; r < pattern.matrix.length; r++) {
       for (let c = 0; c < pattern.matrix[0].length; c++) {
         const gridRow = centerY - offsetY + r;
         const gridCol = centerX - offsetX + c;
-        if (gridRow >= 0 && gridRow < ROWS && gridCol >= 0 && gridCol < COLS) {
-          const index = gridRow * COLS + gridCol;
+        if (gridRow >= 0 && gridRow < rows && gridCol >= 0 && gridCol < cols) {
+          const index = gridRow * cols + gridCol;
           gridRef.current[index] = pattern.matrix[r][c];
+          colorDataRef.current[index] = 0xFF000000 | Math.floor(Math.random() * 0xFFFFFF);
         }
       }
     }
     setGeneration(0);
     countPopulation();
     render();
-  }, [ROWS, COLS, countPopulation, render]);
+  }, [layoutSize.w, layoutSize.h, cellSize, countPopulation, render]);
 
   return (
     <SimulationContainer $isDark={isDark}>
@@ -470,20 +615,17 @@ export default function LifeSimulation({
           <Subtitle>High-performance Conway's Game of Life simulation</Subtitle>
         </Header>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '1.25rem' }}>
+        <GridLayout>
           {/* Left column: video + controls stacked */}
           <div>
             <VideoInner>
               <VideoSection>
-                <CanvasContainer>
+                <CanvasWrapper ref={canvasContainerRef}>
                   <SimCanvas
                     ref={canvasRef}
-                    width={canvasSize.w}
-                    height={canvasSize.h}
                     onClick={handleCanvasClick}
                   />
-
-                  {/* HUD stays overlayed */}
+                  {/* HUD overlay */}
                   <HUD $isDark={isDark}>
                     <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <BarChart3 size={16} />
@@ -496,7 +638,7 @@ export default function LifeSimulation({
                       <StatRow><span>Grid Size:</span><span>{ROWS}×{COLS}</span></StatRow>
                     </StatList>
                   </HUD>
-                </CanvasContainer>
+                </CanvasWrapper>
               </VideoSection>
 
               {/* Controls bar below the canvas (YouTube-style layout) */}
@@ -509,13 +651,13 @@ export default function LifeSimulation({
                   <RotateCcw size={16} />
                 </button>
 
-                <button onClick={() => setCellSize(Math.max(2, cellSize - 1))} aria-label="Zoom out">
+                <button onClick={() => { setCellSize(Math.max(2, cellSize - 1)); }} aria-label="Zoom out">
                   <ZoomOut size={16} />
                 </button>
 
                 <div className="sizeBadge">{cellSize}px</div>
 
-                <button onClick={() => setCellSize(Math.min(20, cellSize + 1))} aria-label="Zoom in">
+                <button onClick={() => { setCellSize(Math.min(20, cellSize + 1)); }} aria-label="Zoom in">
                   <ZoomIn size={16} />
                 </button>
 
@@ -603,7 +745,7 @@ export default function LifeSimulation({
               )}
             </TabContent>
           </ControlsSection>
-        </div>
+        </GridLayout>
       </PageWrapper>
     </SimulationContainer>
   );

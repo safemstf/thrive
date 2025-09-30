@@ -844,3 +844,97 @@ export const KeyRow = styled.div`
   border-top: 1px dashed var(--color-border-light);
   &:first-of-type { border-top: none; padding-top: 0; }
 `;
+
+export const RightSidebarOverlay = styled.div<{ $visible: boolean }>`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 4999;
+  opacity: ${props => props.$visible ? 1 : 0};
+  pointer-events: ${props => props.$visible ? 'auto' : 'none'};
+  transition: opacity 0.2s ease;
+  backdrop-filter: blur(4px);
+
+  @media (min-width: 769px) {
+    display: none;
+  }
+`;
+
+export const RightSidebarContainer = styled.aside<{ $visible: boolean }>`
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 60px; /* Stop before taskbar */
+  width: 280px;
+  z-index: 5001;
+  
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+  
+  transform: translateX(${props => props.$visible ? '0' : '100%'});
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+  }
+`;
+
+export const RightSidebarHeader = styled.div`
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.03), rgba(139, 92, 246, 0.03));
+`;
+
+export const RightSidebarTitle = styled.h2`
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0;
+`;
+
+export const RightSidebarNav = styled.nav`
+  padding: 1rem;
+`;
+
+export const RightNavItem = styled(Link)<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  text-decoration: none;
+  color: ${props => props.$active ? '#1a1a1a' : '#666666'};
+  font-size: 1rem;
+  font-weight: ${props => props.$active ? '600' : '400'};
+  transition: all 0.2s ease;
+  background: ${props => props.$active ? 'rgba(59, 130, 246, 0.08)' : 'transparent'};
+  border: 1px solid ${props => props.$active ? 'rgba(59, 130, 246, 0.2)' : 'transparent'};
+  margin-bottom: 0.5rem;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.06);
+    color: #1a1a1a;
+    border-color: rgba(59, 130, 246, 0.15);
+    transform: translateX(-4px);
+  }
+  
+  svg {
+    flex-shrink: 0;
+  }
+`;
