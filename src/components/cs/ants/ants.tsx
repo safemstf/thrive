@@ -1,12 +1,11 @@
-// src/components/cs/ants/ants.tsx
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, Zap, Sparkles, Map as MapIcon, TrendingUp, Award, Brain, Circle, Grid3x3, Shuffle, Eye, EyeOff, Volume2, VolumeX, Trophy, Flame, Target, Cpu, BarChart3, Timer, Activity, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { Play, Pause, Zap, Sparkles, Map as MapIcon, TrendingUp, Award, Brain, Circle, Grid3x3, Shuffle, Eye, EyeOff, Volume2, VolumeX, Trophy, Flame, Target, Cpu, BarChart3, Timer, Activity, ChevronDown, ChevronUp, Info, X, Maximize2 } from 'lucide-react';
 
 // Constants
-const CANVAS_WIDTH = 1200;
-const CANVAS_HEIGHT = 1500;
+const CANVAS_BASE_WIDTH = 800;
+const CANVAS_BASE_HEIGHT = 800;
 
 // Types
 type AlgorithmType = 'greedy' | 'twoOpt' | 'annealing' | 'genetic' | 'antColony';
@@ -49,22 +48,20 @@ interface Particle {
   color: string;
 }
 
-// Props interface for the component
 interface TSPAlgorithmRaceProps {
   isRunning: boolean;
   speed: number;
 }
 
-// Enhanced Theme configurations with BLUE Matrix (matching your Matrix Rain)
 const themes: Record<ThemeMode, any> = {
   matrix: {
-    bg: 'rgba(0, 0, 0, 0.85)', // Semi-transparent for matrix rain
-    grid: 'rgba(59, 130, 246, 0.02)', // Blue grid to match rain
-    city: '#3b82f6', // Blue cities
-    glow: 'rgba(59, 130, 246, 0.6)', // Blue glow
-    text: '#3b82f6', // Blue text
-    panel: 'rgba(0, 10, 20, 0.9)', // Dark blue panel
-    border: 'rgba(59, 130, 246, 0.3)' // Blue border
+    bg: 'rgba(0, 0, 0, 0.85)',
+    grid: 'rgba(59, 130, 246, 0.02)',
+    city: '#3b82f6',
+    glow: 'rgba(59, 130, 246, 0.6)',
+    text: '#3b82f6',
+    panel: 'rgba(0, 10, 20, 0.9)',
+    border: 'rgba(59, 130, 246, 0.3)'
   },
   cyber: {
     bg: '#0a0f1b',
@@ -95,12 +92,11 @@ const themes: Record<ThemeMode, any> = {
   }
 };
 
-// Enhanced Algorithm configurations with Matrix-blue colors
 const algorithmConfigs = {
   greedy: {
     name: 'Greedy',
     emoji: '🏃',
-    color: '#3b82f6', // Blue
+    color: '#3b82f6',
     glow: '#60a5fa',
     description: 'Fast & furious, picks nearest city',
     funFact: 'O(n²) complexity - Quick but not optimal'
@@ -108,7 +104,7 @@ const algorithmConfigs = {
   twoOpt: {
     name: '2-Opt',
     emoji: '✂️',
-    color: '#06b6d4', // Cyan
+    color: '#06b6d4',
     glow: '#22d3ee',
     description: 'The perfectionist, keeps tweaking',
     funFact: 'Improves by swapping edge pairs'
@@ -116,7 +112,7 @@ const algorithmConfigs = {
   annealing: {
     name: 'Simulated Annealing',
     emoji: '🔥',
-    color: '#f59e0b', // Amber
+    color: '#f59e0b',
     glow: '#fbbf24',
     description: 'Hot-headed but cools down',
     funFact: 'Escapes local minima with probability'
@@ -124,7 +120,7 @@ const algorithmConfigs = {
   genetic: {
     name: 'Genetic',
     emoji: '🧬',
-    color: '#8b5cf6', // Violet
+    color: '#8b5cf6',
     glow: '#a78bfa',
     description: 'Darwin\'s favorite algorithm',
     funFact: 'Evolves solutions through generations'
@@ -132,7 +128,7 @@ const algorithmConfigs = {
   antColony: {
     name: 'Ant Colony',
     emoji: '🐜',
-    color: '#10b981', // Emerald
+    color: '#10b981',
     glow: '#34d399',
     description: 'Follow the pheromone highway',
     funFact: 'Inspired by real ant behavior'
@@ -343,16 +339,15 @@ class TSP {
   }
 }
 
-// City generation
-const generateCities = (count: number, mode: CityMode): City[] => {
+const generateCities = (count: number, mode: CityMode, canvasWidth: number, canvasHeight: number): City[] => {
   const cities: City[] = [];
   const margin = 60;
   
   switch (mode) {
     case 'circle':
-      const centerX = CANVAS_WIDTH / 2;
-      const centerY = CANVAS_HEIGHT / 2;
-      const radius = Math.min(CANVAS_WIDTH, CANVAS_HEIGHT) / 2 - margin * 2;
+      const centerX = canvasWidth / 2;
+      const centerY = canvasHeight / 2;
+      const radius = Math.min(canvasWidth, canvasHeight) / 2 - margin * 2;
       
       for (let i = 0; i < count; i++) {
         const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
@@ -365,10 +360,10 @@ const generateCities = (count: number, mode: CityMode): City[] => {
       break;
       
     case 'grid':
-      const cols = Math.ceil(Math.sqrt(count * (CANVAS_WIDTH / CANVAS_HEIGHT)));
+      const cols = Math.ceil(Math.sqrt(count * (canvasWidth / canvasHeight)));
       const rows = Math.ceil(count / cols);
-      const spacingX = (CANVAS_WIDTH - 2 * margin) / Math.max(1, cols - 1);
-      const spacingY = (CANVAS_HEIGHT - 2 * margin) / Math.max(1, rows - 1);
+      const spacingX = (canvasWidth - 2 * margin) / Math.max(1, cols - 1);
+      const spacingY = (canvasHeight - 2 * margin) / Math.max(1, rows - 1);
       
       for (let i = 0; i < count; i++) {
         const col = i % cols;
@@ -387,8 +382,8 @@ const generateCities = (count: number, mode: CityMode): City[] => {
       
       for (let i = 0; i < numClusters; i++) {
         clusters.push({
-          x: margin * 2 + Math.random() * (CANVAS_WIDTH - margin * 4),
-          y: margin * 2 + Math.random() * (CANVAS_HEIGHT - margin * 4)
+          x: margin * 2 + Math.random() * (canvasWidth - margin * 4),
+          y: margin * 2 + Math.random() * (canvasHeight - margin * 4)
         });
       }
       
@@ -398,16 +393,16 @@ const generateCities = (count: number, mode: CityMode): City[] => {
         const dist = Math.random() * 80;
         cities.push({
           id: i,
-          x: Math.max(margin, Math.min(CANVAS_WIDTH - margin, cluster.x + Math.cos(angle) * dist)),
-          y: Math.max(margin, Math.min(CANVAS_HEIGHT - margin, cluster.y + Math.sin(angle) * dist))
+          x: Math.max(margin, Math.min(canvasWidth - margin, cluster.x + Math.cos(angle) * dist)),
+          y: Math.max(margin, Math.min(canvasHeight - margin, cluster.y + Math.sin(angle) * dist))
         });
       }
       break;
       
     case 'spiral':
-      const spiralCenterX = CANVAS_WIDTH / 2;
-      const spiralCenterY = CANVAS_HEIGHT / 2;
-      const maxRadius = Math.min(CANVAS_WIDTH, CANVAS_HEIGHT) / 2 - margin;
+      const spiralCenterX = canvasWidth / 2;
+      const spiralCenterY = canvasHeight / 2;
+      const maxRadius = Math.min(canvasWidth, canvasHeight) / 2 - margin;
       
       for (let i = 0; i < count; i++) {
         const t = i / count;
@@ -425,8 +420,8 @@ const generateCities = (count: number, mode: CityMode): City[] => {
       for (let i = 0; i < count; i++) {
         cities.push({
           id: i,
-          x: margin + Math.random() * (CANVAS_WIDTH - 2 * margin),
-          y: margin + Math.random() * (CANVAS_HEIGHT - 2 * margin)
+          x: margin + Math.random() * (canvasWidth - 2 * margin),
+          y: margin + Math.random() * (canvasHeight - 2 * margin)
         });
       }
   }
@@ -435,10 +430,6 @@ const generateCities = (count: number, mode: CityMode): City[] => {
 };
 
 export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceProps) {
-  // REMOVED: const [isClient, setIsClient] = useState(false);
-  // Since this component is dynamically imported with ssr: false, 
-  // we don't need client-side initialization checks
-  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPlaying, setIsPlaying] = useState(isRunning);
   const [localSpeed, setLocalSpeed] = useState(speed);
@@ -449,11 +440,10 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
   const [cityMode, setCityMode] = useState<CityMode>('random');
   const [theme, setTheme] = useState<ThemeMode>('matrix');
   const [showTrails, setShowTrails] = useState(true);
-  const [showInfo, setShowInfo] = useState(true);
   const [winner, setWinner] = useState<string | null>(null);
-  const [soundEnabled, setSoundEnabled] = useState(false);
   const [showStats, setShowStats] = useState(true);
   const [expandedStats, setExpandedStats] = useState(false);
+  const [mobileViewing, setMobileViewing] = useState(false);
   
   const frameRef = useRef<number>(0);
   const tempRef = useRef(100);
@@ -461,10 +451,8 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
   const pheromonesRef = useRef<number[][]>([]);
   const timeRef = useRef(0);
   const trailsRef = useRef<Map<string, Array<{x: number, y: number, alpha: number}>>>(new Map());
+  const previouslyRunningRef = useRef<boolean>(false);
 
-  // REMOVED: useEffect(() => { setIsClient(true); }, []);
-
-  // Use prop values when available
   useEffect(() => {
     setIsPlaying(isRunning);
   }, [isRunning]);
@@ -473,9 +461,115 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     setLocalSpeed(speed);
   }, [speed]);
 
-  // Initialize simulation (runs immediately since this is client-only)
+  // Mobile viewing lifecycle
+  useEffect(() => {
+    if (!mobileViewing) return;
+
+    const enterMobileView = async () => {
+      previouslyRunningRef.current = isPlaying;
+      
+      // Start algorithms and simulation
+      if (!isPlaying) {
+        setAlgorithms(prev => prev.map(a => ({ ...a, status: 'running' })));
+        setIsPlaying(true);
+      }
+
+      try {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        const container = canvas.parentElement;
+        if (!container) return;
+
+        const doc = window.document as any;
+        if (container && !doc.fullscreenElement) {
+          if ((container as any).requestFullscreen) await (container as any).requestFullscreen();
+          else if ((container as any).webkitRequestFullscreen) await (container as any).webkitRequestFullscreen();
+          else if ((container as any).mozRequestFullScreen) await (container as any).mozRequestFullScreen();
+        }
+      } catch (err) {
+        console.warn('Fullscreen failed', err);
+      }
+
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 100);
+    };
+
+    enterMobileView();
+  }, [mobileViewing, isPlaying]);
+
+  // Exit fullscreen handler
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const doc = document as any;
+      const isFS = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement);
+      if (!isFS && mobileViewing) {
+        setMobileViewing(false);
+        if (!previouslyRunningRef.current) setIsPlaying(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+    };
+  }, [mobileViewing]);
+
+  // Canvas resize handling
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const updateCanvasSize = () => {
+      const container = canvas.parentElement;
+      if (!container) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      
+      // For mobile fullscreen, use full viewport
+      if (mobileViewing) {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+      } else {
+        // For desktop, maintain aspect ratio
+        canvas.width = CANVAS_BASE_WIDTH * dpr;
+        canvas.height = CANVAS_BASE_HEIGHT * dpr;
+        canvas.style.width = `${CANVAS_BASE_WIDTH}px`;
+        canvas.style.height = `${CANVAS_BASE_HEIGHT}px`;
+      }
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.scale(dpr, dpr);
+      }
+    };
+
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    window.addEventListener('orientationchange', updateCanvasSize);
+
+    return () => {
+      window.removeEventListener('resize', updateCanvasSize);
+      window.removeEventListener('orientationchange', updateCanvasSize);
+    };
+  }, [mobileViewing]);
+
   const initializeSimulation = useCallback(() => {
-    const newCities = generateCities(cityCount, cityMode);
+    const canvas = canvasRef.current;
+    const width = canvas ? canvas.width / (window.devicePixelRatio || 1) : CANVAS_BASE_WIDTH;
+    const height = canvas ? canvas.height / (window.devicePixelRatio || 1) : CANVAS_BASE_HEIGHT;
+    
+    const newCities = generateCities(cityCount, cityMode, width, height);
     setCities(newCities);
     
     tempRef.current = 100;
@@ -510,7 +604,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     setAlgorithms(algos);
   }, [cityCount, cityMode, selectedAlgos]);
 
-  // Update algorithms with history tracking
   const updateAlgorithms = useCallback(() => {
     if (cities.length === 0) return;
     
@@ -575,16 +668,13 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
         
         const newDistance = TSP.distance(cities, newTour);
         
-        // Track history
         const history = [...(algo.history || []), newDistance];
         if (history.length > 50) history.shift();
         
-        // Calculate improvement rate
         const improvementRate = improved ? 
           ((algo.bestDistance - newDistance) / algo.bestDistance * 100) : 
           algo.improvementRate || 0;
         
-        // Add particles for improvements
         let particles = algo.particles || [];
         if (improved && newDistance < algo.bestDistance) {
           const cityIdx = newTour[Math.floor(Math.random() * newTour.length)];
@@ -601,7 +691,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
           }
         }
         
-        // Update particles
         particles = particles
           .map(p => ({ ...p, x: p.x + p.vx, y: p.y + p.vy, life: p.life - 0.02 }))
           .filter(p => p.life > 0);
@@ -621,7 +710,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
         };
       });
       
-      // Check for winner
       if (updated.every(a => a.status === 'finished') && !winner) {
         const champion = updated.reduce((best, current) => 
           current.bestDistance < best.bestDistance ? current : best
@@ -636,7 +724,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     });
   }, [cities, winner]);
 
-  // Enhanced render with Blue Matrix theme
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -645,62 +732,58 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     if (!ctx) return;
     
     const currentTheme = themes[theme];
+    const width = canvas.width / (window.devicePixelRatio || 1);
+    const height = canvas.height / (window.devicePixelRatio || 1);
     
-    // Background (semi-transparent for matrix theme)
     ctx.fillStyle = currentTheme.bg;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.fillRect(0, 0, width, height);
     
-    // Matrix-style grid with blue theme
     if (theme === 'matrix') {
-      // Digital rain effect grid with BLUE
       const gridSize = 30;
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)'; // Blue grid
+      ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)';
       ctx.lineWidth = 0.5;
       
-      for (let x = 0; x <= CANVAS_WIDTH; x += gridSize) {
+      for (let x = 0; x <= width; x += gridSize) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, CANVAS_HEIGHT);
+        ctx.lineTo(x, height);
         ctx.stroke();
       }
-      for (let y = 0; y <= CANVAS_HEIGHT; y += gridSize) {
+      for (let y = 0; y <= height; y += gridSize) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.lineTo(CANVAS_WIDTH, y);
+        ctx.lineTo(width, y);
         ctx.stroke();
       }
       
-      // Random matrix characters with Arabic influence
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.15)'; // Blue characters
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
       ctx.font = '12px monospace';
       const matrixChars = '01░▒▓█الم';
       for (let i = 0; i < 20; i++) {
-        const x = Math.random() * CANVAS_WIDTH;
-        const y = Math.random() * CANVAS_HEIGHT;
+        const x = Math.random() * width;
+        const y = Math.random() * height;
         const char = matrixChars[Math.floor(Math.random() * matrixChars.length)];
         ctx.fillText(char, x, y);
       }
     } else {
-      // Original animated grid for other themes
       const gridOffset = (timeRef.current * 0.05) % 50;
       ctx.strokeStyle = currentTheme.grid;
       ctx.lineWidth = 1;
       
-      for (let x = -gridOffset; x <= CANVAS_WIDTH + 50; x += 50) {
+      for (let x = -gridOffset; x <= width + 50; x += 50) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, CANVAS_HEIGHT);
+        ctx.lineTo(x, height);
         ctx.stroke();
       }
-      for (let y = -gridOffset; y <= CANVAS_HEIGHT + 50; y += 50) {
+      for (let y = -gridOffset; y <= height + 50; y += 50) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.lineTo(CANVAS_WIDTH, y);
+        ctx.lineTo(width, y);
         ctx.stroke();
       }
     }
     
-    // Draw pheromone trails for ant colony
     const antAlgo = algorithms.find(a => a.id === 'antColony');
     if (antAlgo && pheromonesRef.current.length > 0 && showTrails) {
       const maxPheromone = Math.max(...pheromonesRef.current.flat());
@@ -709,7 +792,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
           const intensity = pheromonesRef.current[i]?.[j] / maxPheromone || 0;
           if (intensity > 0.1) {
             ctx.strokeStyle = theme === 'matrix' ? 
-              `rgba(59, 130, 246, ${intensity * 0.4})` : // Blue pheromones for matrix
+              `rgba(59, 130, 246, ${intensity * 0.4})` :
               `${antAlgo.glow}${Math.floor(intensity * 40).toString(16).padStart(2, '0')}`;
             ctx.lineWidth = intensity * 4;
             ctx.beginPath();
@@ -721,11 +804,9 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
       }
     }
     
-    // Draw algorithm paths
     algorithms.forEach((algo) => {
       if (algo.tour.length === 0) return;
       
-      // Trail effect
       if (showTrails) {
         const trail = trailsRef.current.get(algo.id) || [];
         trail.forEach((point, i) => {
@@ -739,7 +820,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
         if (trail.length > 100) trail.shift();
       }
       
-      // Main path
       ctx.strokeStyle = algo.color;
       ctx.lineWidth = algo.status === 'winner' ? 4 : 2;
       ctx.shadowColor = algo.glow;
@@ -755,7 +835,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
           ctx.lineTo(city.x, city.y);
         }
         
-        // Add to trail
         if (showTrails && i > 0 && Math.random() < 0.1) {
           let trail = trailsRef.current.get(algo.id);
           if (!trail) {
@@ -768,7 +847,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
       ctx.stroke();
       ctx.shadowBlur = 0;
       
-      // Draw particles
       algo.particles?.forEach(p => {
         ctx.fillStyle = `${p.color}${Math.floor(p.life * 255).toString(16).padStart(2, '0')}`;
         ctx.beginPath();
@@ -777,16 +855,13 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
       });
     });
     
-    // Draw cities with Matrix theme enhancements
     cities.forEach((city, idx) => {
-      // Glow
       const gradient = ctx.createRadialGradient(city.x, city.y, 0, city.x, city.y, 25);
       gradient.addColorStop(0, currentTheme.glow);
       gradient.addColorStop(1, 'transparent');
       ctx.fillStyle = gradient;
       ctx.fillRect(city.x - 25, city.y - 25, 50, 50);
       
-      // City circle
       ctx.fillStyle = currentTheme.city;
       ctx.strokeStyle = theme === 'matrix' ? '#001122' : '#000';
       ctx.lineWidth = 2;
@@ -798,7 +873,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
       ctx.stroke();
       ctx.shadowBlur = 0;
       
-      // City number
       ctx.fillStyle = theme === 'matrix' ? '#fff' : '#000';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
@@ -809,7 +883,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     timeRef.current++;
   }, [cities, algorithms, theme, showTrails]);
 
-  // Animation loop
   useEffect(() => {
     const animate = () => {
       for (let i = 0; i < localSpeed; i++) {
@@ -835,7 +908,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     };
   }, [isPlaying, localSpeed, updateAlgorithms, render]);
 
-  // Initialize on mount - runs immediately since this is client-only
   useEffect(() => {
     initializeSimulation();
   }, [initializeSimulation]);
@@ -852,6 +924,21 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     initializeSimulation();
   };
 
+  const exitMobileView = async () => {
+    setMobileViewing(false);
+    
+    try {
+      const doc = window.document as any;
+      if (doc && doc.fullscreenElement) {
+        if (doc.exitFullscreen) await doc.exitFullscreen();
+        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+        else if (doc.mozCancelFullScreen) await doc.mozCancelFullScreen();
+      }
+    } catch (err) {
+      console.warn('Exit fullscreen failed', err);
+    }
+  };
+
   const cityModeIcons = {
     random: <Sparkles size={18} />,
     circle: <Circle size={18} />,
@@ -863,93 +950,200 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
   const currentTheme = themes[theme];
 
   return (
-    <div style={{ 
-      display: 'flex', 
-      flexDirection: 'column', 
-      height: '100vh', 
-      background: theme === 'matrix' ? 'transparent' : 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)',
-      color: '#fff',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      overflow: 'hidden'
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '16px 32px',
-        background: currentTheme.panel,
-        backdropFilter: 'blur(10px)',
-        borderBottom: `1px solid ${currentTheme.border}`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '24px'
-      }}>
-        <h1 style={{ 
-          margin: 0, 
-          fontSize: '28px', 
-          fontWeight: 700,
-          color: currentTheme.text,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          textShadow: theme === 'matrix' ? '0 0 10px rgba(59, 130, 246, 0.5)' : 'none'
-        }}>
-          <Cpu size={32} />
-          TSP Algorithm Battle Arena
-        </h1>
-        
-        <div style={{ 
-          padding: '8px 16px',
-          background: `${currentTheme.city}22`,
-          borderRadius: '24px',
-          fontSize: '14px',
-          border: `1px solid ${currentTheme.border}`,
-          fontWeight: 500
-        }}>
-          {cities.length} Cities • {algorithms.length} Algorithms
-        </div>
-        
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px' }}>
-          {Object.keys(themes).map(t => (
-            <button
-              key={t}
-              onClick={() => setTheme(t as ThemeMode)}
-              style={{
-                padding: '8px 16px',
-                background: theme === t ? themes[t as ThemeMode].city : 'transparent',
-                border: `2px solid ${theme === t ? themes[t as ThemeMode].city : currentTheme.border}`,
-                borderRadius: '8px',
-                color: theme === t ? (t === 'matrix' ? '#000' : '#000') : currentTheme.text,
-                fontSize: '14px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                textTransform: 'capitalize',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
+    <>
+      <style>{`
+        .tsp-container {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          background: ${theme === 'matrix' ? 'transparent' : 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)'};
+          color: #fff;
+          font-family: system-ui, -apple-system, sans-serif;
+          overflow: hidden;
+        }
 
-      {/* Main Area */}
-      <div style={{ flex: 1, display: 'flex', padding: '24px', gap: '24px', overflow: 'hidden' }}>
-        {/* Canvas and Stats Container */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Canvas */}
-          <div style={{ 
-            flex: 1,
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            background: currentTheme.panel,
-            borderRadius: '16px',
-            border: `1px solid ${currentTheme.border}`,
-            position: 'relative'
+        .tsp-header {
+          padding: 16px 32px;
+          background: ${currentTheme.panel};
+          backdrop-filter: blur(10px);
+          border-bottom: 1px solid ${currentTheme.border};
+          display: flex;
+          align-items: center;
+          gap: 24px;
+        }
+
+        .tsp-main {
+          flex: 1;
+          display: flex;
+          padding: 24px;
+          gap: 24px;
+          overflow: hidden;
+        }
+
+        .tsp-canvas-area {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justifyContent: center;
+          background: ${currentTheme.panel};
+          border-radius: 16px;
+          border: 1px solid ${currentTheme.border};
+          position: relative;
+        }
+
+        .tsp-sidebar {
+          width: 400px;
+          background: ${currentTheme.panel};
+          backdrop-filter: blur(10px);
+          border-radius: 16px;
+          border: 1px solid ${currentTheme.border};
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+          overflow-y: auto;
+        }
+
+        .tsp-view-btn {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .tsp-container {
+            display: block;
+            height: auto;
+            min-height: 100vh;
+            padding: 1rem;
+          }
+
+          .tsp-header {
+            padding: 12px 16px;
+            margin-bottom: 1rem;
+            border-radius: 12px;
+          }
+
+          .tsp-main {
+            display: block;
+            padding: 0;
+          }
+
+          .tsp-canvas-area {
+            display: none;
+          }
+
+          .tsp-sidebar {
+            width: 100%;
+            padding: 16px;
+            margin-bottom: 1rem;
+          }
+
+          .tsp-view-btn {
+            display: flex !important;
+            width: 100%;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1.25rem;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            border: none;
+            border-radius: 1rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+          }
+
+          .tsp-view-btn:active {
+            transform: scale(0.98);
+          }
+
+          .tsp-canvas-area.mobile-viewing {
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            z-index: 10000 !important;
+          }
+        }
+
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
+      `}</style>
+
+      <div className="tsp-container">
+        <div className="tsp-header">
+          <h1 style={{ 
+            margin: 0, 
+            fontSize: '28px', 
+            fontWeight: 700,
+            color: currentTheme.text,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            textShadow: theme === 'matrix' ? '0 0 10px rgba(59, 130, 246, 0.5)' : 'none'
           }}>
+            <Cpu size={32} />
+            TSP Algorithm Battle Arena
+          </h1>
+          
+          <div style={{ 
+            padding: '8px 16px',
+            background: `${currentTheme.city}22`,
+            borderRadius: '24px',
+            fontSize: '14px',
+            border: `1px solid ${currentTheme.border}`,
+            fontWeight: 500
+          }}>
+            {cities.length} Cities • {algorithms.length} Algorithms
+          </div>
+          
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px' }}>
+            {Object.keys(themes).map(t => (
+              <button
+                key={t}
+                onClick={() => setTheme(t as ThemeMode)}
+                style={{
+                  padding: '8px 16px',
+                  background: theme === t ? themes[t as ThemeMode].city : 'transparent',
+                  border: `2px solid ${theme === t ? themes[t as ThemeMode].city : currentTheme.border}`,
+                  borderRadius: '8px',
+                  color: theme === t ? '#000' : currentTheme.text,
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textTransform: 'capitalize'
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button 
+          className="tsp-view-btn"
+          onClick={() => setMobileViewing(true)}
+        >
+          <Maximize2 size={24} />
+          View Simulation
+        </button>
+
+        <div className="tsp-main">
+          <div className={`tsp-canvas-area ${mobileViewing ? 'mobile-viewing' : ''}`}>
             <canvas
               ref={canvasRef}
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
               style={{ 
                 maxWidth: '100%',
                 maxHeight: '100%',
@@ -957,8 +1151,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
               }}
             />
             
-            {/* Overlay Stats */}
-            {showStats && (
+            {showStats && !mobileViewing && (
               <div style={{
                 position: 'absolute',
                 top: '20px',
@@ -968,7 +1161,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
                 padding: expandedStats ? '20px' : '16px',
                 border: `1px solid ${currentTheme.border}`,
                 minWidth: expandedStats ? '400px' : '360px',
-                transition: 'all 0.3s ease'
+                maxWidth: '90%'
               }}>
                 <div style={{ 
                   display: 'flex', 
@@ -1056,7 +1249,8 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
                           fontSize: '14px', 
                           color: '#94a3b8',
                           display: 'flex',
-                          gap: '16px'
+                          gap: '16px',
+                          flexWrap: 'wrap'
                         }}>
                           <span>Distance: <strong style={{ color: currentTheme.text }}>
                             {algo.bestDistance.toFixed(0)}
@@ -1064,44 +1258,14 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
                           <span>Improvements: <strong style={{ color: currentTheme.text }}>
                             {algo.improvements}
                           </strong></span>
-                          {expandedStats && (
-                            <>
-                              <span>Iterations: <strong style={{ color: currentTheme.text }}>
-                                {algo.iterations}
-                              </strong></span>
-                              {algo.improvementRate && algo.improvementRate > 0 && (
-                                <span>Rate: <strong style={{ color: '#10b981' }}>
-                                  {algo.improvementRate.toFixed(1)}%
-                                </strong></span>
-                              )}
-                            </>
-                          )}
                         </div>
-                        
-                        {expandedStats && (
-                          <div style={{ marginTop: '8px' }}>
-                            <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                              {algo.description}
-                            </div>
-                            {algo.temperature !== undefined && (
-                              <div style={{ 
-                                marginTop: '4px',
-                                fontSize: '12px',
-                                color: '#ef4444'
-                              }}>
-                                Temperature: {algo.temperature.toFixed(2)}°
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </div>
                   ))}
               </div>
             )}
-            
-            {/* Winner Announcement */}
-            {winner && (
+
+            {winner && !mobileViewing && (
               <div style={{
                 position: 'absolute',
                 top: '50%',
@@ -1112,7 +1276,8 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
                 padding: '32px',
                 border: `2px solid ${algorithms.find(a => a.id === winner)?.color}`,
                 textAlign: 'center',
-                boxShadow: `0 0 40px ${algorithms.find(a => a.id === winner)?.glow}`
+                boxShadow: `0 0 40px ${algorithms.find(a => a.id === winner)?.glow}`,
+                maxWidth: '90%'
               }}>
                 <h2 style={{ 
                   fontSize: '36px', 
@@ -1129,266 +1294,302 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
                 </p>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Control Panel */}
-        <div style={{
-          width: '400px',
-          background: currentTheme.panel,
-          backdropFilter: 'blur(10px)',
-          borderRadius: '16px',
-          border: `1px solid ${currentTheme.border}`,
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '24px',
-          overflowY: 'auto'
-        }}>
-          {/* Play Controls */}
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={handlePlay}
-              style={{
-                flex: 1,
-                padding: '14px',
-                background: isPlaying ? '#ef4444' : currentTheme.city,
-                border: 'none',
-                borderRadius: '10px',
-                color: theme === 'matrix' ? '#fff' : 'white',
-                fontSize: '16px',
-                fontWeight: 600,
-                cursor: 'pointer',
+            {mobileViewing && (
+              <div style={{
+                position: 'absolute',
+                top: 'calc(1rem + env(safe-area-inset-top))',
+                right: '1rem',
+                zIndex: 10001,
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {isPlaying ? <Pause size={22} /> : <Play size={22} />}
-              {isPlaying ? 'Pause' : 'Start Race'}
-            </button>
-            
-            <button
-              onClick={handleReset}
-              style={{
-                padding: '14px',
-                background: 'rgba(255,255,255,0.1)',
-                border: `2px solid ${currentTheme.border}`,
-                borderRadius: '10px',
-                color: currentTheme.text,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              <Shuffle size={22} />
-            </button>
-            
-            <button
-              onClick={() => setShowTrails(!showTrails)}
-              style={{
-                padding: '14px',
-                background: showTrails ? `${currentTheme.city}22` : 'rgba(255,255,255,0.1)',
-                border: `2px solid ${showTrails ? currentTheme.city : currentTheme.border}`,
-                borderRadius: '10px',
-                color: currentTheme.text,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {showTrails ? <Eye size={22} /> : <EyeOff size={22} />}
-            </button>
-            
-            <button
-              onClick={() => setShowStats(!showStats)}
-              style={{
-                padding: '14px',
-                background: showStats ? `${currentTheme.city}22` : 'rgba(255,255,255,0.1)',
-                border: `2px solid ${showStats ? currentTheme.city : currentTheme.border}`,
-                borderRadius: '10px',
-                color: currentTheme.text,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              <BarChart3 size={22} />
-            </button>
-          </div>
-
-          {/* Speed Control */}
-          <div>
-            <label style={{ 
-              fontSize: '14px', 
-              color: '#94a3b8', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px', 
-              marginBottom: '12px',
-              fontWeight: 500
-            }}>
-              <Zap size={16} />
-              Simulation Speed: {localSpeed}x
-            </label>
-            <input
-              type="range"
-              min="0.5"
-              max="5"
-              step="0.5"
-              value={localSpeed}
-              onChange={(e) => setLocalSpeed(Number(e.target.value))}
-              style={{ 
-                width: '100%',
-                accentColor: currentTheme.city
-              }}
-            />
-          </div>
-
-          {/* City Configuration */}
-          <div>
-            <h3 style={{ 
-              fontSize: '16px', 
-              marginBottom: '12px', 
-              color: currentTheme.text,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <MapIcon size={18} />
-              City Configuration
-            </h3>
-            
-            <label style={{ 
-              fontSize: '14px', 
-              color: '#94a3b8', 
-              marginBottom: '8px', 
-              display: 'block',
-              fontWeight: 500
-            }}>
-              Number of Cities: {cityCount}
-            </label>
-            <input
-              type="range"
-              min="5"
-              max="25"
-              value={cityCount}
-              onChange={(e) => setCityCount(Number(e.target.value))}
-              style={{ 
-                width: '100%', 
-                marginBottom: '16px',
-                accentColor: currentTheme.city
-              }}
-            />
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-              {Object.entries(cityModeIcons).map(([mode, icon]) => (
-                <button
-                  key={mode}
-                  onClick={() => {
-                    setCityMode(mode as CityMode);
-                    setTimeout(initializeSimulation, 0);
-                  }}
+                gap: '0.5rem',
+                background: 'rgba(0,0,0,0.95)',
+                padding: '0.6rem',
+                borderRadius: '999px',
+                border: `1px solid ${currentTheme.border}`
+              }}>
+                <button 
+                  onClick={handlePlay}
                   style={{
-                    padding: '12px',
-                    background: cityMode === mode ? `${currentTheme.city}22` : 'rgba(255,255,255,0.05)',
-                    border: `2px solid ${cityMode === mode ? currentTheme.city : currentTheme.border}`,
-                    borderRadius: '10px',
-                    color: currentTheme.text,
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: '#6366f1',
+                    color: 'white',
                     display: 'flex',
-                    flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.3s ease'
+                    justifyContent: 'center',
+                    cursor: 'pointer'
                   }}
                 >
-                  {icon}
-                  <span style={{ textTransform: 'capitalize' }}>{mode}</span>
+                  {isPlaying ? <Pause size={20} /> : <Play size={20} />}
                 </button>
+                <button 
+                  onClick={handleReset}
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: 'rgba(51,65,85,0.8)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Shuffle size={20} />
+                </button>
+                <button 
+                  onClick={exitMobileView}
+                  style={{
+                    width: '44px',
+                    height: '44px',
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: '#ef4444',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="tsp-sidebar">
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={handlePlay}
+                style={{
+                  flex: 1,
+                  padding: '14px',
+                  background: isPlaying ? '#ef4444' : currentTheme.city,
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: 'white',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                {isPlaying ? <><Pause size={22} />Pause</> : <><Play size={22} />Start Race</>}
+              </button>
+              
+              <button
+                onClick={handleReset}
+                style={{
+                  padding: '14px',
+                  background: 'rgba(255,255,255,0.1)',
+                  border: `2px solid ${currentTheme.border}`,
+                  borderRadius: '10px',
+                  color: currentTheme.text,
+                  cursor: 'pointer'
+                }}
+              >
+                <Shuffle size={22} />
+              </button>
+              
+              <button
+                onClick={() => setShowTrails(!showTrails)}
+                style={{
+                  padding: '14px',
+                  background: showTrails ? `${currentTheme.city}22` : 'rgba(255,255,255,0.1)',
+                  border: `2px solid ${showTrails ? currentTheme.city : currentTheme.border}`,
+                  borderRadius: '10px',
+                  color: currentTheme.text,
+                  cursor: 'pointer'
+                }}
+              >
+                {showTrails ? <Eye size={22} /> : <EyeOff size={22} />}
+              </button>
+              
+              <button
+                onClick={() => setShowStats(!showStats)}
+                style={{
+                  padding: '14px',
+                  background: showStats ? `${currentTheme.city}22` : 'rgba(255,255,255,0.1)',
+                  border: `2px solid ${showStats ? currentTheme.city : currentTheme.border}`,
+                  borderRadius: '10px',
+                  color: currentTheme.text,
+                  cursor: 'pointer'
+                }}
+              >
+                <BarChart3 size={22} />
+              </button>
+            </div>
+
+            <div>
+              <label style={{ 
+                fontSize: '14px', 
+                color: '#94a3b8', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                marginBottom: '12px',
+                fontWeight: 500
+              }}>
+                <Zap size={16} />
+                Simulation Speed: {localSpeed}x
+              </label>
+              <input
+                type="range"
+                min="0.5"
+                max="5"
+                step="0.5"
+                value={localSpeed}
+                onChange={(e) => setLocalSpeed(Number(e.target.value))}
+                style={{ 
+                  width: '100%',
+                  accentColor: currentTheme.city
+                }}
+              />
+            </div>
+
+            <div>
+              <h3 style={{ 
+                fontSize: '16px', 
+                marginBottom: '12px', 
+                color: currentTheme.text,
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <MapIcon size={18} />
+                City Configuration
+              </h3>
+              
+              <label style={{ 
+                fontSize: '14px', 
+                color: '#94a3b8', 
+                marginBottom: '8px', 
+                display: 'block',
+                fontWeight: 500
+              }}>
+                Number of Cities: {cityCount}
+              </label>
+              <input
+                type="range"
+                min="5"
+                max="25"
+                value={cityCount}
+                onChange={(e) => setCityCount(Number(e.target.value))}
+                style={{ 
+                  width: '100%', 
+                  marginBottom: '16px',
+                  accentColor: currentTheme.city
+                }}
+              />
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                {Object.entries(cityModeIcons).map(([mode, icon]) => (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      setCityMode(mode as CityMode);
+                      setTimeout(initializeSimulation, 0);
+                    }}
+                    style={{
+                      padding: '12px',
+                      background: cityMode === mode ? `${currentTheme.city}22` : 'rgba(255,255,255,0.05)',
+                      border: `2px solid ${cityMode === mode ? currentTheme.city : currentTheme.border}`,
+                      borderRadius: '10px',
+                      color: currentTheme.text,
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    {icon}
+                    <span style={{ textTransform: 'capitalize' }}>{mode}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 style={{ 
+                fontSize: '16px', 
+                marginBottom: '12px', 
+                color: currentTheme.text,
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <Brain size={18} />
+                Select Algorithms
+              </h3>
+              
+              {Object.entries(algorithmConfigs).map(([id, config]) => (
+                <label
+                  key={id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    padding: '14px',
+                    marginBottom: '10px',
+                    background: selectedAlgos.includes(id as AlgorithmType) ? 
+                      `${config.color}15` : 
+                      'rgba(255,255,255,0.05)',
+                    border: `2px solid ${selectedAlgos.includes(id as AlgorithmType) ? 
+                      config.color : 'transparent'}`,
+                    borderRadius: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedAlgos.includes(id as AlgorithmType)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedAlgos([...selectedAlgos, id as AlgorithmType]);
+                      } else {
+                        setSelectedAlgos(selectedAlgos.filter(a => a !== id));
+                      }
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                  <span style={{ fontSize: '24px' }}>{config.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ 
+                      fontSize: '15px', 
+                      fontWeight: 600,
+                      color: selectedAlgos.includes(id as AlgorithmType) ? 
+                        config.color : currentTheme.text
+                    }}>
+                      {config.name}
+                    </div>
+                    <div style={{ 
+                      fontSize: '13px', 
+                      color: '#94a3b8',
+                      marginTop: '2px'
+                    }}>
+                      {config.funFact}
+                    </div>
+                  </div>
+                </label>
               ))}
             </div>
           </div>
-
-          {/* Algorithm Selection */}
-          <div>
-            <h3 style={{ 
-              fontSize: '16px', 
-              marginBottom: '12px', 
-              color: currentTheme.text,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <Brain size={18} />
-              Select Algorithms
-            </h3>
-            
-            {Object.entries(algorithmConfigs).map(([id, config]) => (
-              <label
-                key={id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '14px',
-                  padding: '14px',
-                  marginBottom: '10px',
-                  background: selectedAlgos.includes(id as AlgorithmType) ? 
-                    `${config.color}15` : 
-                    'rgba(255,255,255,0.05)',
-                  border: `2px solid ${selectedAlgos.includes(id as AlgorithmType) ? 
-                    config.color : 'transparent'}`,
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedAlgos.includes(id as AlgorithmType)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedAlgos([...selectedAlgos, id as AlgorithmType]);
-                    } else {
-                      setSelectedAlgos(selectedAlgos.filter(a => a !== id));
-                    }
-                  }}
-                  style={{ display: 'none' }}
-                />
-                <span style={{ fontSize: '24px' }}>{config.emoji}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ 
-                    fontSize: '15px', 
-                    fontWeight: 600,
-                    color: selectedAlgos.includes(id as AlgorithmType) ? 
-                      config.color : currentTheme.text
-                  }}>
-                    {config.name}
-                  </div>
-                  <div style={{ 
-                    fontSize: '13px', 
-                    color: '#94a3b8',
-                    marginTop: '2px'
-                  }}>
-                    {config.funFact}
-                  </div>
-                </div>
-              </label>
-            ))}
-          </div>
         </div>
       </div>
-      
-      <style>{`
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.5; }
-          100% { opacity: 1; }
-        }
-      `}</style>
-    </div>
+    </>
   );
 }
