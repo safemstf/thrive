@@ -1,12 +1,12 @@
 'use client'
 // src/components/cs/nb/nb.tsx
-// N-Body Sandbox - Main React Component (Refined Mobile UI)
+// N-Body Sandbox - No Sidebar Pattern
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   Play, Pause, RotateCcw, Settings, Target, Zap, Star, Users, Activity,
   Clock, Cpu, Eye, Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle,
-  Grid, Maximize2, Menu, X
+  Grid, Maximize2, X
 } from 'lucide-react';
 
 import { useNBodySimulation, PerformanceMetrics, PhysicsUpdate } from './nb.logic';
@@ -20,14 +20,8 @@ import {
   SimulationContainer, CanvasContainer, FloatingPanel, PanelHeader, PanelContent,
   IconButton, PrimaryButton, SliderContainer, CustomSlider, InputGroup,
   MetricCard, StatusIndicator, ScenarioGrid, ScenarioCard, LoadingOverlay,
-  ProgressBar, NBodyGlobalStyles, MobileMenuButton, MobileStatusBar,
-  MobileDrawer, MobileDrawerOverlay, MobileDrawerContent, MobileDrawerHeader,
-  MobileDrawerSection, MobileQuickActions, MobileQuickAction
+  ProgressBar, NBodyGlobalStyles
 } from './nb.styles';
-
-// ========================================
-// INTERFACES & TYPES
-// ========================================
 
 interface NBodySandboxProps {
   isRunning?: boolean;
@@ -46,27 +40,18 @@ interface UIState {
   showVelocityVectors: boolean;
   showLabels: boolean;
   showGrid: boolean;
-  isFullscreen: boolean;
-  fullscreenControlsVisible: boolean;
-  hudMode: boolean;
-  mobileMenuOpen: boolean;
+  mobileViewing: boolean;
 }
-
-// ========================================
-// MAIN COMPONENT
-// ========================================
 
 const NBodySandbox: React.FC<NBodySandboxProps> = ({
   isRunning: externalRunning = false,
   speed: externalSpeed = 1,
   isDark = true
 }) => {
-
-  // ===== REFS =====
+  
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
-  const controlsTimeoutRef = useRef<number | null>(null);
+  const previouslyRunningRef = useRef<boolean>(false);
 
-  // ===== STATE =====
   const [uiState, setUIState] = useState<UIState>({
     selectedScenario: 'solar-system',
     activePanel: null,
@@ -78,10 +63,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     showVelocityVectors: false,
     showLabels: true,
     showGrid: false,
-    isFullscreen: false,
-    fullscreenControlsVisible: true,
-    hudMode: false,
-    mobileMenuOpen: false
+    mobileViewing: false
   });
 
   const [physicsConfig, setPhysicsConfig] = useState(DEFAULT_PHYSICS);
@@ -94,12 +76,11 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
   });
   const [cameraConfig, setCameraConfig] = useState(DEFAULT_CAMERA);
 
-  // ===== SIMULATION & RENDERING =====
   const simulation = useNBodySimulation({
     config: physicsConfig,
     initialScenario: PREDEFINED_SCENARIOS[uiState.selectedScenario || 'solar-system'],
-    onBodyUpdate: useCallback((updates: PhysicsUpdate[]) => { }, []),
-    onPerformanceUpdate: useCallback((metrics: PerformanceMetrics) => { }, [])
+    onBodyUpdate: useCallback((updates: PhysicsUpdate[]) => {}, []),
+    onPerformanceUpdate: useCallback((metrics: PerformanceMetrics) => {}, [])
   });
 
   const rendering = useNBodyRendering({
@@ -108,7 +89,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     selectedBodies: simulation.getSelectedBodies(),
     visualConfig,
     cameraConfig,
-    onCameraUpdate: useCallback((position: Vector3Data, target: Vector3Data) => { }, []),
+    onCameraUpdate: useCallback((position: Vector3Data, target: Vector3Data) => {}, []),
     onBodyClick: useCallback((bodyId: string, event: MouseEvent) => {
       simulation.selectBody(bodyId, event.ctrlKey);
       setUIState(prev => ({ ...prev, selectedBodyId: bodyId }));
@@ -123,10 +104,6 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     }, [simulation])
   });
 
-  // ========================================
-  // EFFECTS
-  // ========================================
-
   useEffect(() => {
     if (externalRunning && !simulation.simulationState.isRunning) {
       simulation.start();
@@ -135,51 +112,72 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     }
   }, [externalRunning, simulation]);
 
+  // Mobile viewing lifecycle
+  useEffect(() => {
+    if (!uiState.mobileViewing) return;
+
+    const enterMobileView = async () => {
+      previouslyRunningRef.current = simulation.simulationState.isRunning;
+      if (!simulation.simulationState.isRunning) simulation.start();
+
+      try {
+        const el = canvasContainerRef.current;
+        const doc = window.document as any;
+        if (el && !doc.fullscreenElement) {
+          if ((el as any).requestFullscreen) await (el as any).requestFullscreen();
+          else if ((el as any).webkitRequestFullscreen) await (el as any).webkitRequestFullscreen();
+          else if ((el as any).mozRequestFullScreen) await (el as any).mozRequestFullScreen();
+        }
+      } catch (err) {
+        console.warn('Fullscreen failed', err);
+      }
+
+      // Trigger window resize event to ensure canvas resizes
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 100);
+    };
+
+    enterMobileView();
+  }, [uiState.mobileViewing, simulation]);
+
+  // Exit fullscreen handler + orientation change
   useEffect(() => {
     const handleFullscreenChange = () => {
       const doc = document as any;
       const isFS = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement);
-      setUIState(prev => ({ ...prev, isFullscreen: isFS }));
+      if (!isFS && uiState.mobileViewing) {
+        setUIState(prev => ({ ...prev, mobileViewing: false }));
+        if (!previouslyRunningRef.current) simulation.pause();
+      }
     };
 
-    const handleMouseMove = () => {
-      if (uiState.isFullscreen) {
-        setUIState(prev => ({ ...prev, fullscreenControlsVisible: true }));
-        if (controlsTimeoutRef.current !== null) {
-          window.clearTimeout(controlsTimeoutRef.current);
-        }
-        controlsTimeoutRef.current = window.setTimeout(() => {
-          setUIState(prev => ({ ...prev, fullscreenControlsVisible: false }));
-        }, 3000);
+    const handleOrientationChange = () => {
+      if (uiState.mobileViewing) {
+        // Small delay to let orientation complete
+        setTimeout(() => {
+          window.dispatchEvent(new Event('resize'));
+        }, 200);
       }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('resize', handleOrientationChange);
 
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mousemove', handleMouseMove);
-      if (controlsTimeoutRef.current !== null) {
-        window.clearTimeout(controlsTimeoutRef.current);
-      }
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      window.removeEventListener('resize', handleOrientationChange);
     };
-  }, [uiState.isFullscreen]);
-
-  // ========================================
-  // EVENT HANDLERS
-  // ========================================
+  }, [uiState.mobileViewing, simulation]);
 
   const handlePlayPause = useCallback(() => {
-    if (simulation.simulationState.isRunning) {
-      simulation.pause();
-    } else {
-      simulation.start();
-    }
+    simulation.simulationState.isRunning ? simulation.pause() : simulation.start();
   }, [simulation]);
 
   const handleReset = useCallback(() => {
@@ -195,26 +193,6 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
   const handleTimeStepChange = useCallback((value: number) => {
     simulation.setTimeStep(value);
   }, [simulation]);
-
-  const handleFullscreenToggle = useCallback(async () => {
-    const el = canvasContainerRef.current;
-    if (!el) return;
-
-    try {
-      const doc = window.document as any;
-      if (!doc.fullscreenElement) {
-        if ((el as any).requestFullscreen) await (el as any).requestFullscreen();
-        else if ((el as any).webkitRequestFullscreen) await (el as any).webkitRequestFullscreen();
-        else if ((el as any).mozRequestFullScreen) await (el as any).mozRequestFullScreen();
-      } else {
-        if (doc.exitFullscreen) await doc.exitFullscreen();
-        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
-        else if (doc.mozCancelFullScreen) await doc.mozCancelFullScreen();
-      }
-    } catch (err) {
-      console.warn('Fullscreen API failed', err);
-    }
-  }, []);
 
   const toggleCameraFollow = useCallback(() => {
     const selectedBodies = simulation.getSelectedBodies();
@@ -313,463 +291,356 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     }
   }, [simulation, rendering]);
 
-  const toggleMobileMenu = useCallback(() => {
-    setUIState(prev => ({ ...prev, mobileMenuOpen: !prev.mobileMenuOpen }));
+  const exitMobileView = useCallback(async () => {
+    setUIState(prev => ({ ...prev, mobileViewing: false }));
+    
+    try {
+      const doc = window.document as any;
+      if (doc && doc.fullscreenElement) {
+        if (doc.exitFullscreen) await doc.exitFullscreen();
+        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+        else if (doc.mozCancelFullScreen) await doc.mozCancelFullScreen();
+      }
+    } catch (err) {
+      console.warn('Exit fullscreen failed', err);
+    }
   }, []);
 
-  // ========================================
-  // DESKTOP UI RENDER FUNCTIONS
-  // ========================================
+  const timeInDays = simulation.simulationState.currentTime / 86400;
+  const timeInYears = timeInDays / 365.25;
 
-  const renderScenarioPanel = () => (
-    <FloatingPanel $position="top-left" $width="320px">
-      <PanelHeader>
-        <div className="title">
-          <Star className="icon" />
-          <h3>Scenarios</h3>
-        </div>
-        <div className="actions">
-          <IconButton onClick={() => togglePanel('scenarios')} $active={uiState.activePanel === 'scenarios'}>
-            {uiState.activePanel === 'scenarios' ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </IconButton>
-        </div>
-      </PanelHeader>
-
-      {uiState.activePanel === 'scenarios' && (
-        <PanelContent>
-          <ScenarioGrid>
-            {Object.entries(PREDEFINED_SCENARIOS).map(([id, scenario]) => {
-              const isFeatured = scenario.category === 'educational' || scenario.difficulty === 'beginner';
-              return (
-                <ScenarioCard
-                  key={id}
-                  $active={uiState.selectedScenario === id}
-                  $featured={isFeatured}
-                  onClick={() => handleScenarioSelect(id)}
-                >
-                  <div className="header">
-                    <h4>{scenario.name}</h4>
-                    {isFeatured && <div className="badge">Featured</div>}
-                  </div>
-                  <div className="description">{scenario.description}</div>
-                  <div className="stats">
-                    <div className="stat">
-                      <Users size={12} />
-                      <span>{scenario.bodies.length} bodies</span>
-                    </div>
-                    <div className="stat">
-                      <Clock size={12} />
-                      <span>{Math.round(scenario.estimatedDuration / 60)}min</span>
-                    </div>
-                  </div>
-                </ScenarioCard>
-              );
-            })}
-          </ScenarioGrid>
-        </PanelContent>
-      )}
-    </FloatingPanel>
-  );
-
-  const renderControlsPanel = () => (
-    <FloatingPanel $position="top-right" $width="300px" $hidden={uiState.isFullscreen && !uiState.fullscreenControlsVisible}>
-      <PanelHeader>
-        <div className="title">
-          <Settings className="icon" />
-          <h3>Simulation Controls</h3>
-        </div>
-      </PanelHeader>
-
-      <PanelContent>
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
-          <PrimaryButton onClick={handlePlayPause}>
-            {simulation.simulationState.isRunning ? (
-              <><Pause size={16} />Pause</>
-            ) : (
-              <><Play size={16} />Play</>
-            )}
-          </PrimaryButton>
-          <IconButton onClick={handleReset} $variant="secondary">
-            <RotateCcw size={16} />
-          </IconButton>
-          <IconButton onClick={handleFullscreenToggle} $variant="secondary" title="Toggle fullscreen">
-            <Maximize2 size={16} />
-          </IconButton>
-          <IconButton
-            onClick={toggleCameraFollow}
-            $variant="secondary"
-            $active={!!uiState.cameraFollowTarget}
-            title="Follow selected body"
-          >
-            <Target size={16} />
-          </IconButton>
-        </div>
-
-        <SliderContainer>
-          <div className="label">
-            <span>Simulation Speed</span>
-            <span className="value">{simulation.simulationState.speed.toFixed(1)}x</span>
-          </div>
-          <CustomSlider
-            min={0.1}
-            max={10}
-            step={0.1}
-            value={simulation.simulationState.speed}
-            onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-          />
-        </SliderContainer>
-
-        <SliderContainer>
-          <div className="label">
-            <span>Time Step</span>
-            <span className="value">{(simulation.simulationState.timeStep / 86400).toFixed(1)} days</span>
-          </div>
-          <CustomSlider
-            min={3600}
-            max={86400 * 30}
-            step={3600}
-            value={simulation.simulationState.timeStep}
-            onChange={(e) => handleTimeStepChange(parseInt(e.target.value))}
-          />
-        </SliderContainer>
-
-        <div style={{ marginTop: '1.5rem' }}>
-          <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#94a3b8' }}>Visual Options</h4>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <IconButton
-              onClick={() => updateVisualSetting('showTrails', !uiState.showTrails)}
-              $active={uiState.showTrails}
-              $size="sm"
-              title="Orbital Trails"
-            >
-              <Activity size={14} />
-            </IconButton>
-            <IconButton
-              onClick={() => updateVisualSetting('showVelocityVectors', !uiState.showVelocityVectors)}
-              $active={uiState.showVelocityVectors}
-              $size="sm"
-              title="Velocity Vectors"
-            >
-              <Zap size={14} />
-            </IconButton>
-            <IconButton
-              onClick={() => updateVisualSetting('showLabels', !uiState.showLabels)}
-              $active={uiState.showLabels}
-              $size="sm"
-              title="Body Labels"
-            >
-              <Eye size={14} />
-            </IconButton>
-            <IconButton
-              onClick={() => updateVisualSetting('showGrid', !uiState.showGrid)}
-              $active={uiState.showGrid}
-              $size="sm"
-              title="Grid"
-            >
-              <Grid size={14} />
-            </IconButton>
-          </div>
-        </div>
-
-        <div style={{ marginTop: '1.5rem' }}>
-          <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#94a3b8' }}>Body Management</h4>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <PrimaryButton onClick={handleAddBody} $variant="secondary">
-              <Plus size={16} />
-              Add Body
-            </PrimaryButton>
-            {uiState.selectedBodyId && (
-              <IconButton
-                onClick={() => uiState.selectedBodyId && handleRemoveBody(uiState.selectedBodyId)}
-                $variant="danger"
-              >
-                <Trash2 size={16} />
-              </IconButton>
-            )}
-          </div>
-        </div>
-      </PanelContent>
-    </FloatingPanel>
-  );
-
-  const renderMetricsPanel = () => (
-    <FloatingPanel $position="bottom-right" $width="280px">
-      <PanelHeader $variant="secondary">
-        <div className="title">
-          <Activity className="icon" />
-          <h3>Performance</h3>
-        </div>
-        <div className="actions">
-          <IconButton
-            onClick={() => setUIState(prev => ({ ...prev, showMetrics: !prev.showMetrics }))}
-            $active={uiState.showMetrics}
-          >
-            {uiState.showMetrics ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-          </IconButton>
-        </div>
-      </PanelHeader>
-
-      {uiState.showMetrics && (
-        <PanelContent>
-          <MetricCard $variant="primary">
-            <div className="label">
-              <Cpu className="icon" />
-              <span>Simulation FPS</span>
-            </div>
-            <div className="value">{simulation.simulationState.fps}</div>
-          </MetricCard>
-
-          <MetricCard $variant="success">
-            <div className="label">
-              <Eye className="icon" />
-              <span>Render FPS</span>
-            </div>
-            <div className="value">{rendering.renderingState.renderFPS}</div>
-          </MetricCard>
-
-          <MetricCard $variant="primary">
-            <div className="label">
-              <Users className="icon" />
-              <span>Bodies</span>
-            </div>
-            <div className="value">{simulation.simulationState.bodyCount}</div>
-          </MetricCard>
-
-          <MetricCard $variant="warning">
-            <div className="label">
-              <Clock className="icon" />
-              <span>Physics Time</span>
-            </div>
-            <div className="value">{simulation.simulationState.physicsTime.toFixed(1)}ms</div>
-          </MetricCard>
-
-          <MetricCard $variant="primary">
-            <div className="label">
-              <Activity className="icon" />
-              <span>Total Steps</span>
-            </div>
-            <div className="value">{simulation.simulationState.totalSteps.toLocaleString()}</div>
-          </MetricCard>
-
-          {typeof simulation.simulationState.energyDrift === 'number' &&
-            isFinite(simulation.simulationState.energyDrift) &&
-            simulation.simulationState.energyDrift > 0.01 && (
-              <MetricCard $variant="danger">
-                <div className="label">
-                  <AlertTriangle className="icon" />
-                  <span>Energy Drift</span>
-                </div>
-                <div className="value">{(simulation.simulationState.energyDrift * 100).toFixed(2)}%</div>
-              </MetricCard>
-            )}
-        </PanelContent>
-      )}
-    </FloatingPanel>
-  );
-
-  const renderStatusPanel = () => {
-    const timeInDays = simulation.simulationState.currentTime / 86400;
-    const timeInYears = timeInDays / 365.25;
-
-    const hidden = uiState.isFullscreen && !uiState.fullscreenControlsVisible && !uiState.hudMode;
-
-    return (
-      <FloatingPanel
-        $position="bottom-center"
-        $width="600px"
-        $minimal={uiState.hudMode}
-        $hidden={hidden}
-      >
-        <PanelContent $padding={false}>
-          <div style={{
-            padding: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'rgba(0, 0, 0, 0.2)',
-            borderRadius: '16px'
-          }}>
-            <StatusIndicator
-              $status={
-                simulation.simulationState.isRunning
-                  ? 'running'
-                  : simulation.simulationState.isPaused
-                    ? 'paused'
-                    : 'stopped'
-              }
-            >
-              <div className="dot" />
-              <span>
-                {simulation.simulationState.isRunning
-                  ? 'Simulating'
-                  : simulation.simulationState.isPaused
-                    ? 'Paused'
-                    : 'Stopped'}
-              </span>
-            </StatusIndicator>
-
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              fontSize: '0.8rem',
-              color: '#94a3b8',
-              fontFamily: 'JetBrains Mono, monospace'
-            }}>
-              <div>
-                {timeInYears >= 1 ? `${timeInYears.toFixed(2)} years` : `${timeInDays.toFixed(1)} days`}
-              </div>
-            </div>
-
-            <div style={{
-              fontSize: '0.8rem',
-              color: '#60a5fa',
-              fontFamily: 'JetBrains Mono, monospace'
-            }}>
-              {simulation.simulationState.speed.toFixed(1)}×
-            </div>
-
-            {uiState.selectedScenario && (
-              <div style={{ fontSize: '0.8rem', color: '#60a5fa' }}>
-                {PREDEFINED_SCENARIOS[uiState.selectedScenario]?.name}
-              </div>
-            )}
-          </div>
-
-          {uiState.selectedScenario && PREDEFINED_SCENARIOS[uiState.selectedScenario] && (
-            <ProgressBar
-              $progress={simulation.simulationState.scenarioProgress * 100}
-              $color="#60a5fa"
-            />
-          )}
-        </PanelContent>
-      </FloatingPanel>
-    );
-  };
-
-  // ========================================
-  // MOBILE UI RENDER FUNCTIONS
-  // ========================================
-
-  const renderMobileStatusBar = () => {
-    const timeInDays = simulation.simulationState.currentTime / 86400;
-    const timeInYears = timeInDays / 365.25;
-
-    return (
-      <MobileStatusBar>
-        <div className="status-item">
-          <Activity className="icon" size={14} />
-          <span className="value">
-            {simulation.simulationState.isRunning ? 'Running' : 'Paused'}
-          </span>
-        </div>
-
-        <div className="divider" />
-
-        <div className="status-item">
-          <Clock className="icon" size={14} />
-          <span className="value">
-            {timeInYears >= 1 ? `${timeInYears.toFixed(1)}y` : `${timeInDays.toFixed(0)}d`}
-          </span>
-        </div>
-
-        <div className="divider" />
-
-        <div className="status-item">
-          <Zap className="icon" size={14} />
-          <span className="value">{simulation.simulationState.speed.toFixed(1)}×</span>
-        </div>
-      </MobileStatusBar>
-    );
-  };
-
-  const renderMobileMenu = () => (
+  return (
     <>
-      <MobileMenuButton
-        $isOpen={uiState.mobileMenuOpen}
-        onClick={toggleMobileMenu}
-      >
-        {uiState.mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-      </MobileMenuButton>
+      <NBodyGlobalStyles />
+      <style>{`
+        .nb-wrapper {
+          width: 100%;
+          min-height: 100vh;
+          background: radial-gradient(ellipse at center, #0a0f1c 0%, #000 70%, #000 100%);
+          color: #e6eef8;
+          padding: 2rem 1rem;
+          box-sizing: border-box;
+        }
 
-      <MobileDrawerOverlay
-        $isOpen={uiState.mobileMenuOpen}
-      />
+        .nb-max-width {
+          max-width: 1400px;
+          margin: 0 auto;
+        }
 
-      <MobileDrawer $isOpen={uiState.mobileMenuOpen}>
-        <MobileDrawerHeader>
-          <div className="header-content">
-            <div className="icon">
-              <Settings size={20} />
-            </div>
-            <h2>Simulation Controls</h2>
-          </div>
-        </MobileDrawerHeader>
+        .nb-header {
+          text-align: center;
+          margin-bottom: 2rem;
+        }
 
-        <MobileDrawerContent>
-          {/* Quick Actions */}
-          <MobileDrawerSection style={{ '--section-index': 0 } as React.CSSProperties}>
-            <div className="section-title">
-              <Zap className="icon" />
-              <span>Quick Actions</span>
-            </div>
-            <div className="section-content">
-              <MobileQuickActions>
-                <MobileQuickAction
-                  onClick={handlePlayPause}
-                  $active={simulation.simulationState.isRunning}
-                  $variant="primary"
-                >
-                  <div className="icon">
-                    {simulation.simulationState.isRunning ? <Pause size={24} /> : <Play size={24} />}
-                  </div>
-                  <div className="label">
-                    {simulation.simulationState.isRunning ? 'Pause' : 'Play'}
-                  </div>
-                </MobileQuickAction>
+        .nb-title {
+          font-size: 2.5rem;
+          font-weight: 700;
+          color: #fff;
+          margin-bottom: 0.5rem;
+        }
 
-                <MobileQuickAction onClick={handleReset} $variant="warning">
-                  <div className="icon"><RotateCcw size={24} /></div>
-                  <div className="label">Reset</div>
-                </MobileQuickAction>
+        .nb-subtitle {
+          font-size: 1rem;
+          color: #94a3b8;
+        }
 
-                <MobileQuickAction onClick={handleFullscreenToggle}>
-                  <div className="icon"><Maximize2 size={24} /></div>
-                  <div className="label">Fullscreen</div>
-                </MobileQuickAction>
+        .nb-view-btn {
+          display: none;
+        }
 
-                <MobileQuickAction
-                  onClick={toggleCameraFollow}
-                  $active={!!uiState.cameraFollowTarget}
-                >
-                  <div className="icon"><Target size={24} /></div>
-                  <div className="label">Follow</div>
-                </MobileQuickAction>
-              </MobileQuickActions>
-            </div>
-          </MobileDrawerSection>
+        .nb-canvas-section {
+          width: 100%;
+          background: linear-gradient(135deg, rgba(0,0,0,0.88), rgba(5,10,20,0.9));
+          border-radius: 12px;
+          overflow: hidden;
+          border: 2px solid rgba(59,130,246,0.22);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.32);
+          margin-bottom: 1.5rem;
+          aspect-ratio: 16 / 9;
+          max-height: 70vh;
+          position: relative;
+        }
 
-          {/* Simulation Controls */}
-          <MobileDrawerSection style={{ '--section-index': 1 } as React.CSSProperties}>
-            <div className="section-title">
-              <Settings className="icon" />
-              <span>Simulation</span>
-            </div>
-            <div className="section-content">
-              <SliderContainer>
-                <div className="label">
-                  <span>Speed</span>
-                  <span className="value">{simulation.simulationState.speed.toFixed(1)}x</span>
+        .nb-canvas-container {
+          width: 100%;
+          height: 100%;
+          position: relative;
+          touch-action: none;
+          -webkit-touch-callout: none;
+          -webkit-user-select: none;
+          user-select: none;
+        }
+
+        .nb-canvas-container canvas {
+          width: 100% !important;
+          height: 100% !important;
+          display: block;
+          touch-action: none;
+        }
+
+        .nb-hud {
+          position: absolute;
+          top: 1rem;
+          left: 1rem;
+          padding: 1rem;
+          border-radius: 10px;
+          background: rgba(0,0,0,0.85);
+          backdrop-filter: blur(10px);
+          color: #e2e8f0;
+          border: 1px solid rgba(59,130,246,0.3);
+          font-size: 0.9rem;
+          z-index: 10;
+          min-width: 200px;
+        }
+
+        .nb-hud-title {
+          font-size: 1.25rem;
+          font-weight: 700;
+          margin-bottom: 0.75rem;
+        }
+
+        .nb-hud-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 0.5rem;
+        }
+
+        .nb-overlay-controls {
+          position: absolute;
+          top: calc(1rem + env(safe-area-inset-top));
+          right: 1rem;
+          z-index: 10001;
+          display: none;
+          gap: 0.5rem;
+          background: rgba(0,0,0,0.95);
+          padding: 0.6rem;
+          border-radius: 999px;
+          border: 1px solid rgba(59,130,246,0.5);
+        }
+
+        .nb-overlay-controls.active {
+          display: flex;
+        }
+
+        .nb-overlay-btn {
+          width: 44px;
+          height: 44px;
+          min-width: 44px;
+          min-height: 44px;
+          border-radius: 50%;
+          border: none;
+          background: rgba(51,65,85,0.8);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        .nb-overlay-btn.primary {
+          background: #6366f1;
+        }
+
+        .nb-overlay-btn.danger {
+          background: #ef4444;
+        }
+
+        .nb-controls-section {
+          width: 100%;
+          padding: 1.5rem;
+          border-radius: 12px;
+          background: rgba(8,12,20,0.6);
+          border: 1px solid rgba(59,130,246,0.1);
+          margin-bottom: 1.5rem;
+        }
+
+        .nb-section-title {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 1.125rem;
+          font-weight: 700;
+          margin-bottom: 1rem;
+          color: #fff;
+        }
+
+        .nb-button-group {
+          display: flex;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+          margin-bottom: 1.5rem;
+        }
+
+        .nb-slider-group {
+          margin-bottom: 1rem;
+        }
+
+        .nb-visual-options {
+          margin-top: 1.5rem;
+        }
+
+        .nb-visual-title {
+          margin: 0 0 1rem 0;
+          font-size: 0.9rem;
+          color: #94a3b8;
+        }
+
+        .nb-visual-grid {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .nb-body-management {
+          margin-top: 1.5rem;
+        }
+
+        .nb-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+          .nb-wrapper {
+            padding: 1rem 0.75rem;
+          }
+
+          .nb-title {
+            font-size: 2rem;
+          }
+
+          .nb-view-btn {
+            display: flex !important;
+            width: 100%;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1.25rem;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            border: none;
+            border-radius: 1rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+          }
+
+          .nb-view-btn:active {
+            transform: scale(0.98);
+          }
+
+          .nb-canvas-section {
+            display: none !important;
+          }
+
+          .nb-canvas-section.mobile-viewing {
+            display: block !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-height: none !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            z-index: 10000 !important;
+          }
+
+          .nb-controls-section {
+            padding: 1rem;
+          }
+
+          .nb-stats-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+
+      <div className="nb-wrapper">
+        <div className="nb-max-width">
+          <header className="nb-header">
+            <h1 className="nb-title">N-Body Gravity Sandbox</h1>
+            <p className="nb-subtitle">Simulate celestial mechanics in real-time</p>
+          </header>
+
+          <button 
+            className="nb-view-btn"
+            onClick={() => setUIState(prev => ({ ...prev, mobileViewing: true }))}
+          >
+            <Maximize2 size={24} />
+            View Simulation
+          </button>
+
+          <section className={`nb-canvas-section ${uiState.mobileViewing ? 'mobile-viewing' : ''}`}>
+            <div ref={canvasContainerRef} className="nb-canvas-container">
+              <div className="nb-hud">
+                <div className="nb-hud-title">Day {Math.floor(timeInDays)}</div>
+                <div className="nb-hud-row">
+                  <span style={{ opacity: 0.7 }}>Bodies:</span>
+                  <span style={{ fontWeight: 600, color: '#60a5fa' }}>{simulation.simulationState.bodyCount}</span>
                 </div>
-                <CustomSlider
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                  value={simulation.simulationState.speed}
-                  onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-                />
-              </SliderContainer>
+                <div className="nb-hud-row">
+                  <span style={{ opacity: 0.7 }}>Speed:</span>
+                  <span style={{ fontWeight: 600, color: '#60a5fa' }}>{simulation.simulationState.speed.toFixed(1)}×</span>
+                </div>
+                <div className="nb-hud-row">
+                  <span style={{ opacity: 0.7 }}>FPS:</span>
+                  <span style={{ fontWeight: 600, color: '#60a5fa' }}>{simulation.simulationState.fps}</span>
+                </div>
+              </div>
 
+              <div className={`nb-overlay-controls ${uiState.mobileViewing ? 'active' : ''}`}>
+                <button className="nb-overlay-btn primary" onClick={handlePlayPause}>
+                  {simulation.simulationState.isRunning ? <Pause size={20} /> : <Play size={20} />}
+                </button>
+                <button className="nb-overlay-btn" onClick={handleReset}>
+                  <RotateCcw size={20} />
+                </button>
+                <button className="nb-overlay-btn danger" onClick={exitMobileView}>
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <div className="nb-controls-section">
+            <div className="nb-section-title">
+              <Settings size={20} />
+              Simulation Controls
+            </div>
+
+            <div className="nb-button-group">
+              <PrimaryButton onClick={handlePlayPause}>
+                {simulation.simulationState.isRunning ? <><Pause size={16} />Pause</> : <><Play size={16} />Play</>}
+              </PrimaryButton>
+              <IconButton onClick={handleReset} $variant="secondary">
+                <RotateCcw size={16} />
+              </IconButton>
+              <IconButton onClick={toggleCameraFollow} $variant="secondary" $active={!!uiState.cameraFollowTarget}>
+                <Target size={16} />
+              </IconButton>
+            </div>
+
+            <SliderContainer>
+              <div className="label">
+                <span>Simulation Speed</span>
+                <span className="value">{simulation.simulationState.speed.toFixed(1)}×</span>
+              </div>
+              <CustomSlider
+                min={0.1}
+                max={10}
+                step={0.1}
+                value={simulation.simulationState.speed}
+                onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
+              />
+            </SliderContainer>
+
+            <div className="nb-slider-group">
               <SliderContainer>
                 <div className="label">
                   <span>Time Step</span>
@@ -784,90 +655,85 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
                 />
               </SliderContainer>
             </div>
-          </MobileDrawerSection>
 
-          {/* Visual Options */}
-          <MobileDrawerSection style={{ '--section-index': 2 } as React.CSSProperties}>
-            <div className="section-title">
-              <Eye className="icon" />
-              <span>Visual Options</span>
+            <div className="nb-visual-options">
+              <h4 className="nb-visual-title">Visual Options</h4>
+              <div className="nb-visual-grid">
+                <IconButton onClick={() => updateVisualSetting('showTrails', !uiState.showTrails)} $active={uiState.showTrails} $size="sm">
+                  <Activity size={14} />
+                </IconButton>
+                <IconButton onClick={() => updateVisualSetting('showVelocityVectors', !uiState.showVelocityVectors)} $active={uiState.showVelocityVectors} $size="sm">
+                  <Zap size={14} />
+                </IconButton>
+                <IconButton onClick={() => updateVisualSetting('showLabels', !uiState.showLabels)} $active={uiState.showLabels} $size="sm">
+                  <Eye size={14} />
+                </IconButton>
+                <IconButton onClick={() => updateVisualSetting('showGrid', !uiState.showGrid)} $active={uiState.showGrid} $size="sm">
+                  <Grid size={14} />
+                </IconButton>
+              </div>
             </div>
-            <div className="section-content">
-              <MobileQuickActions>
-                <MobileQuickAction
-                  onClick={() => updateVisualSetting('showTrails', !uiState.showTrails)}
-                  $active={uiState.showTrails}
-                >
-                  <div className="icon"><Activity size={24} /></div>
-                  <div className="label">Trails</div>
-                </MobileQuickAction>
 
-                <MobileQuickAction
-                  onClick={() => updateVisualSetting('showVelocityVectors', !uiState.showVelocityVectors)}
-                  $active={uiState.showVelocityVectors}
-                >
-                  <div className="icon"><Zap size={24} /></div>
-                  <div className="label">Vectors</div>
-                </MobileQuickAction>
-
-                <MobileQuickAction
-                  onClick={() => updateVisualSetting('showLabels', !uiState.showLabels)}
-                  $active={uiState.showLabels}
-                >
-                  <div className="icon"><Eye size={24} /></div>
-                  <div className="label">Labels</div>
-                </MobileQuickAction>
-
-                <MobileQuickAction
-                  onClick={() => updateVisualSetting('showGrid', !uiState.showGrid)}
-                  $active={uiState.showGrid}
-                >
-                  <div className="icon"><Grid size={24} /></div>
-                  <div className="label">Grid</div>
-                </MobileQuickAction>
-              </MobileQuickActions>
+            <div className="nb-body-management">
+              <h4 className="nb-visual-title">Body Management</h4>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <PrimaryButton onClick={handleAddBody} $variant="secondary">
+                  <Plus size={16} />
+                  Add Body
+                </PrimaryButton>
+                {uiState.selectedBodyId && (
+                  <IconButton onClick={() => uiState.selectedBodyId && handleRemoveBody(uiState.selectedBodyId)} $variant="danger">
+                    <Trash2 size={16} />
+                  </IconButton>
+                )}
+              </div>
             </div>
-          </MobileDrawerSection>
+          </div>
 
-          {/* Scenarios */}
-          <MobileDrawerSection style={{ '--section-index': 3 } as React.CSSProperties}>
-            <div className="section-title">
-              <Star className="icon" />
-              <span>Scenarios</span>
+          <div className="nb-controls-section">
+            <div className="nb-section-title">
+              <Star size={20} />
+              Scenarios
             </div>
-            <div className="section-content">
-              <ScenarioGrid>
-                {Object.entries(PREDEFINED_SCENARIOS).map(([id, scenario]) => (
+
+            <ScenarioGrid>
+              {Object.entries(PREDEFINED_SCENARIOS).map(([id, scenario]) => {
+                const isFeatured = scenario.category === 'educational' || scenario.difficulty === 'beginner';
+                return (
                   <ScenarioCard
                     key={id}
                     $active={uiState.selectedScenario === id}
-                    onClick={() => {
-                      handleScenarioSelect(id);
-                    }}
+                    $featured={isFeatured}
+                    onClick={() => handleScenarioSelect(id)}
                   >
                     <div className="header">
                       <h4>{scenario.name}</h4>
+                      {isFeatured && <div className="badge">Featured</div>}
                     </div>
                     <div className="description">{scenario.description}</div>
                     <div className="stats">
                       <div className="stat">
                         <Users size={12} />
-                        <span>{scenario.bodies.length}</span>
+                        <span>{scenario.bodies.length} bodies</span>
+                      </div>
+                      <div className="stat">
+                        <Clock size={12} />
+                        <span>{Math.round(scenario.estimatedDuration / 60)}min</span>
                       </div>
                     </div>
                   </ScenarioCard>
-                ))}
-              </ScenarioGrid>
-            </div>
-          </MobileDrawerSection>
+                );
+              })}
+            </ScenarioGrid>
+          </div>
 
-          {/* Performance Metrics */}
-          <MobileDrawerSection style={{ '--section-index': 4 } as React.CSSProperties}>
-            <div className="section-title">
-              <Activity className="icon" />
-              <span>Performance</span>
+          <div className="nb-controls-section">
+            <div className="nb-section-title">
+              <Activity size={20} />
+              Performance & Statistics
             </div>
-            <div className="section-content">
+
+            <div className="nb-stats-grid">
               <MetricCard $variant="primary">
                 <div className="label">
                   <Cpu className="icon" />
@@ -900,123 +766,20 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
                 <div className="value">{simulation.simulationState.physicsTime.toFixed(1)}ms</div>
               </MetricCard>
             </div>
-          </MobileDrawerSection>
-        </MobileDrawerContent>
-      </MobileDrawer>
-    </>
-  );
-// ========================================
-  // MOBILE VIEW BUTTON
-  // ========================================
-
-  const renderViewSimButton = () => (
-    <div style={{
-      display: 'none',
-      '@media (max-width: 768px)': {
-        display: 'flex'
-      }
-    } as React.CSSProperties}>
-      <style>
-        {`
-          @media (max-width: 768px) {
-            .mobile-view-button {
-              display: flex !important;
-              width: 100%;
-              align-items: center;
-              justify-content: center;
-              gap: 0.75rem;
-              padding: 1.25rem;
-              background: linear-gradient(135deg, #6366f1, #8b5cf6);
-              color: white;
-              border: none;
-              border-radius: 1rem;
-              font-size: 1.125rem;
-              font-weight: 600;
-              cursor: pointer;
-              margin-bottom: 1.5rem;
-              box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-            }
-            .mobile-view-button:active {
-              transform: scale(0.98);
-            }
-            .canvas-container-desktop-only {
-              display: none !important;
-            }
-            .desktop-panels {
-              display: block !important;
-            }
-          }
-          @media (min-width: 769px) {
-            .mobile-view-button {
-              display: none !important;
-            }
-            .canvas-container-desktop-only {
-              display: block !important;
-            }
-            .mobile-only {
-              display: none !important;
-            }
-          }
-        `}
-      </style>
-      <button 
-        className="mobile-view-button"
-        onClick={() => {
-          handleFullscreenToggle();
-          if (!simulation.simulationState.isRunning) {
-            simulation.start();
-          }
-        }}
-      >
-        <Maximize2 size={24} />
-        View Simulation
-      </button>
-    </div>
-  );
-
-  // ========================================
-  // MAIN RENDER
-  // ========================================
-
-  return (
-    <>
-      <NBodyGlobalStyles />
-      <SimulationContainer className="n-body-simulation">
-        {/* Mobile View Button */}
-        {renderViewSimButton()}
-
-        {/* Canvas - Desktop always visible, Mobile hidden until fullscreen */}
-        <CanvasContainer 
-          ref={canvasContainerRef}
-          className="canvas-container-desktop-only"
-        />
-
-        {/* Desktop UI - Floating Panels */}
-        <div className="desktop-panels">
-          {renderScenarioPanel()}
-          {renderControlsPanel()}
-          {renderMetricsPanel()}
-          {renderStatusPanel()}
+          </div>
         </div>
+      </div>
 
-        {/* Mobile UI - Status Bar + Drawer Menu (always available for configuration) */}
-        <div className="mobile-only">
-          {!uiState.isFullscreen && renderMobileStatusBar()}
-          {!uiState.isFullscreen && renderMobileMenu()}
-        </div>
-
-        {/* Loading Overlay */}
-        {uiState.isLoading && (
-          <LoadingOverlay>
-            <div className="spinner" />
-            <div className="message">
-              Loading scenario...
-              <br />
-              Calculating initial conditions
-            </div>
-          </LoadingOverlay>
-        )}
-      </SimulationContainer>
+      {uiState.isLoading && (
+        <LoadingOverlay>
+          <div className="spinner" />
+          <div className="message">
+            Loading scenario...
+            <br />
+            Calculating initial conditions
+          </div>
+        </LoadingOverlay>
+      )}
     </>
   );
 };
