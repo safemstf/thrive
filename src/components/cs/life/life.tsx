@@ -88,16 +88,16 @@ class Simulation {
     const oldCells = this.grid.getCells().slice();
     const cols = this.grid.getCols();
     const rows = this.grid.getRows();
-    
+
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const idx = row * cols + col;
         const alive = oldCells[idx] > 0;
         const neighbors = this.grid.getNeighborCount(row, col);
-        const shouldLive = alive 
+        const shouldLive = alive
           ? this.rules.survive.includes(neighbors)
           : this.rules.birth.includes(neighbors);
-        
+
         if (shouldLive) {
           this.grid.setCell(row, col, alive ? Math.min(255, oldCells[idx] + 1) : 1);
         } else {
@@ -117,7 +117,7 @@ class Simulation {
     this.grid.clear();
     const offsetX = Math.floor(pattern[0].length / 2);
     const offsetY = Math.floor(pattern.length / 2);
-    
+
     for (let r = 0; r < pattern.length; r++) {
       for (let c = 0; c < pattern[0].length; c++) {
         const row = centerY - offsetY + r;
@@ -174,7 +174,7 @@ class Renderer {
   render(grid: Grid) {
     const ctx = this.ctx;
     const canvas = ctx.canvas;
-    
+
     ctx.fillStyle = "#0a0e1a";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -218,7 +218,7 @@ class Renderer {
 
   private getCellColor(age: number): string {
     let r = 0, g = 0, b = 0;
-    
+
     switch (this.colorMode) {
       case "age": {
         const hue = (age * 15) % 360;
@@ -251,16 +251,16 @@ class Renderer {
       const hue2rgb = (p: number, q: number, t: number) => {
         if (t < 0) t += 1;
         if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
         return p;
       };
       const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
       const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1/3);
+      r = hue2rgb(p, q, h + 1 / 3);
       g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1/3);
+      b = hue2rgb(p, q, h - 1 / 3);
     }
     return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
   }
@@ -283,12 +283,12 @@ const RULES: Record<Variant, RuleSet> = {
 };
 
 const PATTERNS: Pattern[] = [
-  { name: "Blinker", description: "Period-2", matrix: [[0,1,0],[0,1,0],[0,1,0]] },
-  { name: "Glider", description: "Diagonal ship", matrix: [[0,1,0],[0,0,1],[1,1,1]] },
-  { name: "Block", description: "2×2 still", matrix: [[1,1],[1,1]] },
-  { name: "Toad", description: "Period-2", matrix: [[0,1,1,1],[1,1,1,0]] },
-  { name: "Pulsar", description: "Period-3", matrix: [[0,0,1,1,1,0,0,0,1,1,1,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[0,0,1,1,1,0,0,0,1,1,1,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,1,1,1,0,0,0,1,1,1,0,0],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,1,1,1,0,0,0,1,1,1,0,0]] },
-  { name: "LWSS", description: "Ship", matrix: [[0,1,0,0,1],[1,0,0,0,0],[1,0,0,0,1],[1,1,1,1,0]] }
+  { name: "Blinker", description: "Period-2", matrix: [[0, 1, 0], [0, 1, 0], [0, 1, 0]] },
+  { name: "Glider", description: "Diagonal ship", matrix: [[0, 1, 0], [0, 0, 1], [1, 1, 1]] },
+  { name: "Block", description: "2×2 still", matrix: [[1, 1], [1, 1]] },
+  { name: "Toad", description: "Period-2", matrix: [[0, 1, 1, 1], [1, 1, 1, 0]] },
+  { name: "Pulsar", description: "Period-3", matrix: [[0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0]] },
+  { name: "LWSS", description: "Ship", matrix: [[0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [1, 0, 0, 0, 1], [1, 1, 1, 1, 0]] }
 ];
 
 // ============================================================================
@@ -724,12 +724,22 @@ const Hint = styled.div`
   font-size: 0.75rem;
   text-align: center;
 `;
+interface LifeSimulationProps {
+  isDark?: boolean;
+  isRunning?: boolean;
+  speed?: number;
+}
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export default function LifeSimulation() {
+export default function LifeSimulation({
+  isDark = false,
+  isRunning = true,
+  speed = 1
+}: LifeSimulationProps) {
+
   const desktopCanvasRef = useRef<HTMLCanvasElement>(null);
   const fullscreenCanvasRef = useRef<HTMLCanvasElement>(null);
   const simRef = useRef<Simulation | null>(null);
@@ -762,19 +772,40 @@ export default function LifeSimulation() {
     const dpr = window.devicePixelRatio || 1;
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
-    
+
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
 
     const cols = Math.floor(width / cellSize);
     const rows = Math.floor(height / cellSize);
-    
+
     const sim = new Simulation(cols, rows, RULES[variant]);
     sim.reset();
-    
+
     return { sim, ctx };
   }, [cellSize, variant]);
+
+  useEffect(() => {
+    setIsPlaying(isRunning);
+  }, [isRunning]);
+
+  // Sync speed prop with internal simSpeed state
+  useEffect(() => {
+    setSimSpeed(speed);
+  }, [speed]);
+
+  // You can also use isDark to adjust colors/theme if needed
+  useEffect(() => {
+    if (isDark) {
+      // Apply dark theme colors to renderer if you have that capability
+      // For example:
+      // desktopRendererRef.current?.setTheme('dark');
+      // fullscreenRendererRef.current?.setTheme('dark');
+    } else {
+      // Apply light theme
+    }
+  }, [isDark]);
 
   useEffect(() => {
     const canvas = desktopCanvasRef.current;
@@ -787,10 +818,10 @@ export default function LifeSimulation() {
     desktopRendererRef.current = new Renderer(result.ctx, cellSize);
     desktopRendererRef.current.setColorMode(colorMode);
     desktopRendererRef.current.setShowGrid(showGrid);
-    
+
     setGeneration(result.sim.getGeneration());
     setPopulation(result.sim.getGrid().countPopulation());
-    
+
     if (desktopRendererRef.current) {
       desktopRendererRef.current.render(result.sim.getGrid());
     }
@@ -813,7 +844,7 @@ export default function LifeSimulation() {
 
   useEffect(() => {
     if (!isFullscreen) return;
-    
+
     const canvas = fullscreenCanvasRef.current;
     if (!canvas) return;
 
@@ -824,7 +855,7 @@ export default function LifeSimulation() {
     fullscreenRendererRef.current = new Renderer(result.ctx, cellSize);
     fullscreenRendererRef.current.setColorMode(colorMode);
     fullscreenRendererRef.current.setShowGrid(showGrid);
-    
+
     if (fullscreenRendererRef.current) {
       fullscreenRendererRef.current.render(result.sim.getGrid());
     }
@@ -849,11 +880,17 @@ export default function LifeSimulation() {
   }, [showGrid]);
 
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying) {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = 0;
+      }
+      return;
+    }
 
     const animate = (timestamp: number) => {
       const elapsed = timestamp - lastUpdateRef.current;
-      
+
       if (elapsed >= 100 / simSpeed) {
         if (simRef.current) {
           simRef.current.step();
@@ -868,12 +905,11 @@ export default function LifeSimulation() {
         renderer.render(simRef.current.getGrid());
       }
 
-      if (isPlaying) {
-        animationRef.current = requestAnimationFrame(animate);
-      }
+      animationRef.current = requestAnimationFrame(animate);
     };
 
     animationRef.current = requestAnimationFrame(animate);
+
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
@@ -886,7 +922,7 @@ export default function LifeSimulation() {
       simRef.current.reset();
       setGeneration(simRef.current.getGeneration());
       setPopulation(simRef.current.getGrid().countPopulation());
-      
+
       const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
       if (renderer) {
         renderer.render(simRef.current.getGrid());
@@ -902,7 +938,7 @@ export default function LifeSimulation() {
       simRef.current.loadPattern(pattern.matrix, centerX, centerY);
       setGeneration(simRef.current.getGeneration());
       setPopulation(simRef.current.getGrid().countPopulation());
-      
+
       const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
       if (renderer) {
         renderer.render(simRef.current.getGrid());
@@ -915,7 +951,7 @@ export default function LifeSimulation() {
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.max(0.1, Math.min(5, zoom * delta));
     setZoom(newZoom);
-    
+
     const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
     if (renderer) {
       renderer.setZoom(newZoom);
@@ -934,11 +970,11 @@ export default function LifeSimulation() {
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isPanning) return;
-    
+
     const newX = e.clientX - panStartRef.current.x;
     const newY = e.clientY - panStartRef.current.y;
     panOffsetRef.current = { x: newX, y: newY };
-    
+
     const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
     if (renderer) {
       renderer.setPan(newX, newY);
@@ -972,7 +1008,7 @@ export default function LifeSimulation() {
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
-    
+
     if (e.touches.length === 2) {
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
@@ -980,12 +1016,12 @@ export default function LifeSimulation() {
         touch2.clientX - touch1.clientX,
         touch2.clientY - touch1.clientY
       );
-      
+
       if (touchStartDistanceRef.current > 0) {
         const scale = distance / touchStartDistanceRef.current;
         const newZoom = Math.max(0.1, Math.min(5, lastZoomRef.current * scale));
         setZoom(newZoom);
-        
+
         if (fullscreenRendererRef.current) {
           fullscreenRendererRef.current.setZoom(newZoom);
           if (simRef.current) {
@@ -998,7 +1034,7 @@ export default function LifeSimulation() {
       const newX = touch.clientX - panStartRef.current.x;
       const newY = touch.clientY - panStartRef.current.y;
       panOffsetRef.current = { x: newX, y: newY };
-      
+
       if (fullscreenRendererRef.current) {
         fullscreenRendererRef.current.setPan(newX, newY);
         if (simRef.current) {
@@ -1016,7 +1052,7 @@ export default function LifeSimulation() {
   const resetView = () => {
     setZoom(1);
     panOffsetRef.current = { x: 0, y: 0 };
-    
+
     const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
     if (renderer) {
       renderer.setPan(0, 0);
@@ -1057,7 +1093,7 @@ export default function LifeSimulation() {
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             />
-            
+
             <Overlay>
               <OverlayRow>
                 <span>Generation:</span>
@@ -1090,7 +1126,7 @@ export default function LifeSimulation() {
               <Settings size={20} />
               Controls
             </SectionTitle>
-            
+
             <FormGroup>
               <Row>
                 <Btn onClick={handleReset}>
@@ -1130,7 +1166,7 @@ export default function LifeSimulation() {
               <Palette size={20} />
               Visual Settings
             </SectionTitle>
-            
+
             <FormGroup>
               <Label>Color Mode</Label>
               <Select value={colorMode} onChange={(e) => setColorMode(e.target.value as ColorMode)}>
@@ -1140,7 +1176,7 @@ export default function LifeSimulation() {
                 <option value="heat">Heat Map</option>
               </Select>
             </FormGroup>
-            
+
             <FormGroup>
               <Label>Rule Variant</Label>
               <Select value={variant} onChange={(e) => setVariant(e.target.value as Variant)}>
@@ -1159,7 +1195,7 @@ export default function LifeSimulation() {
               <Shapes size={20} />
               Patterns
             </SectionTitle>
-            
+
             <PatternGrid>
               {PATTERNS.map((p) => (
                 <PatternCard key={p.name} onClick={() => handleLoadPattern(p)}>
@@ -1183,7 +1219,7 @@ export default function LifeSimulation() {
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         />
-        
+
         <FSOverlay>
           <OverlayRow>
             <span>Generation:</span>

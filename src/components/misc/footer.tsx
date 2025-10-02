@@ -2,6 +2,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Script from 'next/script';
 import styled, { keyframes, css } from 'styled-components';
 import { useMatrix } from '@/hooks/useMatrix';
 
@@ -191,6 +192,21 @@ const BrandSection = styled(FooterSection)`
   }
 `;
 
+const LinkedInBadgeWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0.5rem 0;
+  
+  .badge-base {
+    max-width: 100%;
+  }
+
+  @media (max-width: 768px) {
+    justify-content: center;
+  }
+`;
+
 export function Footer({ className }: FooterProps) {
   const [currentYear] = useState(() => new Date().getFullYear());
   const { isMatrixOn } = useMatrixSafe();
@@ -200,38 +216,59 @@ export function Footer({ className }: FooterProps) {
   }, []);
 
   return (
-    <FooterContainer className={className}>
-      <FooterContent>
-        <BrandSection>
-          <h3>LearnMorra</h3>
-          <FooterText>
-            Master the art of responsible bragging through strategic gameplay and community interaction.
-            Join thousands of players in our immersive digital ecosystem.
-          </FooterText>
-        </BrandSection>
+    <>
+      <Script 
+        src="https://platform.linkedin.com/badges/js/profile.js" 
+        strategy="lazyOnload"
+      />
+      <FooterContainer className={className}>
+        <FooterContent>
+          <FooterSection>
+            <h3>Navigate</h3>
+            <FooterLink href="/">Home</FooterLink>
+            <FooterLink href="/thrive">Thrive</FooterLink>
+            <FooterLink href="/simulations">The Matrix</FooterLink>
+            <FooterLink href="/dashboard">Dashboard</FooterLink>
+          </FooterSection>
 
-        <FooterSection>
-          <h3>Navigate</h3>
-          <FooterLink href="/">Home</FooterLink>
-          <FooterLink href="/thrive">Thrive</FooterLink>
-          <FooterLink href="/simulations">The Matrix</FooterLink>
-          <FooterLink href="/dashboard">Dashboard</FooterLink>
-        </FooterSection>
+          <FooterSection>
+            <h3>Community</h3>
+            <FooterLink href="/about">About Us</FooterLink>
+            <FooterLink href="/contact">Contact</FooterLink>
+            <FooterLink href="/privacy">Privacy Policy</FooterLink>
+            <FooterLink href="/terms">Terms of Service</FooterLink>
+          </FooterSection>
 
-        <FooterSection>
-          <h3>Community</h3>
-          <FooterLink href="/about">About Us</FooterLink>
-          <FooterLink href="/contact">Contact</FooterLink>
-          <FooterLink href="/privacy">Privacy Policy</FooterLink>
-          <FooterLink href="/terms">Terms of Service</FooterLink>
-        </FooterSection>
-      </FooterContent>
+          <FooterSection>
+            <h3>Connect</h3>
+            <FooterText>Feel free to message me</FooterText>
+            <LinkedInBadgeWrapper>
+              <div 
+                className="badge-base LI-profile-badge" 
+                data-locale="en_US" 
+                data-size="medium" 
+                data-theme="dark" 
+                data-type="HORIZONTAL" 
+                data-vanity="safe-mufasa" 
+                data-version="v1"
+              >
+                <a 
+                  className="badge-base__link LI-simple-link" 
+                  href="https://www.linkedin.com/in/safe-mufasa?trk=profile-badge"
+                >
+                  Safe Mustafa
+                </a>
+              </div>
+            </LinkedInBadgeWrapper>
+          </FooterSection>
+        </FooterContent>
 
-      <FooterBottom>
-        <p>
-          © {currentYear} LearnMorra. All rights reserved. Brag Responsibly. ✨
-        </p>
-      </FooterBottom>
-    </FooterContainer>
+        <FooterBottom>
+          <p>
+            © {currentYear} LearnMorra. All rights reserved. Brag Responsibly. ✨
+          </p>
+        </FooterBottom>
+      </FooterContainer>
+    </>
   );
 }

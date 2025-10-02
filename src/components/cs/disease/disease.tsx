@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { 
+import {
   PlayCircle, PauseCircle, RefreshCw, Shield, Users, Heart,
   BarChart3, Settings, Zap, Home, Building2,
   Bug, ChevronDown, Download, Activity, Network, Maximize, X
@@ -636,13 +636,26 @@ const DiseaseButton = styled.button<{ $color: string; $selected: boolean }>`
   }
 `;
 
-export default function DiseaseSimulation() {
+interface DiseaseSimulationProps {
+  isDark?: boolean;
+  isRunning?: boolean;
+  speed?: number;
+}
+
+
+export default function DiseaseSimulation({
+  isDark = false,
+  isRunning: isRunningProp = false,
+  speed: speedProp = 1
+}: DiseaseSimulationProps) {
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fullscreenCanvasRef = useRef<HTMLCanvasElement>(null);
   const agents = useRef<Agent[]>([]);
   const animationRef = useRef<number | null>(null);
   const networkConnections = useRef<Map<number, Set<number>>>(new Map());
   const ticksPerDay = 30;
+
 
   // Pan & Zoom
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -700,18 +713,18 @@ export default function DiseaseSimulation() {
     const connections = new Map<number, Set<number>>();
     const numClusters = 6;
     const clusters: { x: number; y: number; members: number[] }[] = [];
-    
+
     for (let i = 0; i < numClusters; i++) {
       clusters.push({ x: Math.random() * width, y: Math.random() * height, members: [] });
     }
-    
+
     agents.forEach((agent, idx) => {
       const distances = clusters.map(c => Math.sqrt((agent.x - c.x) ** 2 + (agent.y - c.y) ** 2));
       const closest = distances.indexOf(Math.min(...distances));
       clusters[closest].members.push(idx);
       agent.community = closest;
     });
-    
+
     clusters.forEach(cluster => {
       cluster.members.forEach(i => {
         if (!connections.has(i)) connections.set(i, new Set());
@@ -726,7 +739,7 @@ export default function DiseaseSimulation() {
         }
       });
     });
-    
+
     return connections;
   };
 
@@ -735,13 +748,13 @@ export default function DiseaseSimulation() {
     const width = canvasWidth.current;
     const height = canvasHeight.current;
     const newAgents: Agent[] = [];
-    
+
     for (let i = 0; i < population; i++) {
       const rand = Math.random();
       let ageGroup: 'child' | 'adult' | 'elderly';
       let age: number;
       let mobility: number;
-      
+
       if (rand < 0.2) {
         ageGroup = 'child';
         age = Math.floor(Math.random() * 18);
@@ -755,7 +768,7 @@ export default function DiseaseSimulation() {
         age = 65 + Math.floor(Math.random() * 35);
         mobility = 0.5;
       }
-      
+
       newAgents.push({
         id: i,
         x: Math.random() * width,
@@ -815,16 +828,16 @@ export default function DiseaseSimulation() {
   const updateStats = (agentList: Agent[]) => {
     const counts = { S: 0, E: 0, I: 0, R: 0, D: 0, V: 0 };
     let newCases = 0;
-    
+
     for (const a of agentList) {
       counts[a.state]++;
       if (a.infectionTime === tickCount) newCases++;
     }
-    
+
     const totalCases = counts.I + counts.R + counts.D;
     const peakInfected = Math.max(stats.peakInfected, counts.I);
     const rt = counts.I > 0 ? (newCases / counts.I) * disease.infectiousDays.mean : 0;
-    
+
     setStats({
       ...counts,
       rt,
@@ -842,29 +855,29 @@ export default function DiseaseSimulation() {
 
     const width = canvasWidth.current;
     const height = canvasHeight.current;
-    
+
     const maskEffect = maskWearing ? (1 - disease.interventions.masks.efficacy) : 1;
     const distanceEffect = socialDistancing ? (1 - disease.interventions.distancing.efficacy) : 1;
     const lockdownEffect = lockdown ? (1 - disease.interventions.lockdown.efficacy) : 1;
     const effectiveTransmissionProb = disease.transmissionProb * maskEffect * distanceEffect * lockdownEffect;
     const speedMultiplier = lockdown ? 0.1 : (socialDistancing ? 0.5 : 1.0);
-    
+
     for (const agent of agents.current) {
       if (!agent.quarantined) {
         const mobility = agent.mobility * speedMultiplier * speed;
         agent.vx += (Math.random() - 0.5) * 0.5 * mobility;
         agent.vy += (Math.random() - 0.5) * 0.5 * mobility;
-        
+
         const maxSpeed = 3 * mobility;
         const currentSpeed = Math.sqrt(agent.vx * agent.vx + agent.vy * agent.vy);
         if (currentSpeed > maxSpeed) {
           agent.vx = (agent.vx / currentSpeed) * maxSpeed;
           agent.vy = (agent.vy / currentSpeed) * maxSpeed;
         }
-        
+
         agent.x += agent.vx;
         agent.y += agent.vy;
-        
+
         if (agent.x <= 5 || agent.x >= width - 5) {
           agent.vx *= -0.9;
           agent.x = Math.max(5, Math.min(width - 5, agent.x));
@@ -874,7 +887,7 @@ export default function DiseaseSimulation() {
           agent.y = Math.max(5, Math.min(height - 5, agent.y));
         }
       }
-      
+
       if (agent.state === "E" && agent.exposedTimer) {
         agent.exposedTimer--;
         if (agent.exposedTimer <= 0) {
@@ -900,17 +913,17 @@ export default function DiseaseSimulation() {
         }
       }
     }
-    
+
     if (simulationMode === 'spatial-network' && networkConnections.current.size > 0) {
       for (const infected of agents.current.filter(a => a.state === "I")) {
         const connections = networkConnections.current.get(infected.id) || new Set();
         for (const targetId of connections) {
           const susceptible = agents.current[targetId];
           if (!susceptible || (susceptible.state !== "S" && susceptible.state !== "V")) continue;
-          
+
           let transmissionChance = effectiveTransmissionProb;
           if (susceptible.immunity > 0) transmissionChance *= (1 - susceptible.immunity);
-          
+
           if (Math.random() < transmissionChance) {
             susceptible.state = "E";
             susceptible.exposedTimer = Math.floor(disease.incubationDays.mean * ticksPerDay);
@@ -923,15 +936,15 @@ export default function DiseaseSimulation() {
       for (const infected of agents.current.filter(a => a.state === "I")) {
         for (const susceptible of agents.current) {
           if (susceptible.state !== "S" && susceptible.state !== "V") continue;
-          
+
           const dx = infected.x - susceptible.x;
           const dy = infected.y - susceptible.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          
+
           if (distance < 50) {
             let transmissionChance = effectiveTransmissionProb * (1 - distance / 50);
             if (susceptible.immunity > 0) transmissionChance *= (1 - susceptible.immunity);
-            
+
             if (Math.random() < transmissionChance) {
               susceptible.state = "E";
               susceptible.exposedTimer = Math.floor(disease.incubationDays.mean * ticksPerDay);
@@ -941,9 +954,9 @@ export default function DiseaseSimulation() {
         }
       }
     }
-    
+
     updateStats(agents.current);
-    
+
     if (tickCount % 5 === 0) {
       setHistory(prev => [...prev.slice(-200), {
         t: tickCount,
@@ -955,7 +968,7 @@ export default function DiseaseSimulation() {
         V: stats.V
       }]);
     }
-    
+
     setTickCount(prev => prev + 1);
   }, [isRunning, speed, disease, socialDistancing, maskWearing, quarantine, lockdown, tickCount, simulationMode, stats]);
 
@@ -993,7 +1006,7 @@ export default function DiseaseSimulation() {
       if (a.state === 'D') continue;
       let size = a.ageGroup === 'child' ? 2.5 : a.ageGroup === 'elderly' ? 3.5 : 3;
       let color = '#3b82f6';
-      
+
       switch (a.state) {
         case 'S': color = '#3b82f6'; break;
         case 'E': color = '#fbbf24'; size += 0.5; break;
@@ -1001,7 +1014,7 @@ export default function DiseaseSimulation() {
         case 'R': color = '#22c55e'; break;
         case 'V': color = '#8b5cf6'; break;
       }
-      
+
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(a.x, a.y, size, 0, Math.PI * 2);
@@ -1068,6 +1081,23 @@ export default function DiseaseSimulation() {
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(1);
   };
+  // Sync isRunning prop with internal state
+  useEffect(() => {
+    setIsRunning(isRunningProp);
+  }, [isRunningProp]);
+
+  // Sync speed prop with internal state
+  useEffect(() => {
+    setSpeed(speedProp);
+  }, [speedProp]);
+
+  // Optional: Use isDark for theme adjustments
+  useEffect(() => {
+    if (isDark) {
+      // Apply dark theme colors if you want different rendering for dark mode
+      // For example, you could adjust the canvas background or particle colors
+    }
+  }, [isDark]);
 
   useEffect(() => {
     const animate = () => {
@@ -1083,7 +1113,7 @@ export default function DiseaseSimulation() {
   useEffect(() => {
     const canvas = isFullscreen ? fullscreenCanvasRef.current : canvasRef.current;
     if (!canvas) return;
-    
+
     const updateSize = () => {
       const container = canvas.parentElement;
       if (!container) return;
@@ -1096,7 +1126,7 @@ export default function DiseaseSimulation() {
       const ctx = canvas.getContext('2d');
       if (ctx) ctx.scale(dpr, dpr);
     };
-    
+
     updateSize();
     window.addEventListener('resize', updateSize);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
@@ -1182,7 +1212,7 @@ export default function DiseaseSimulation() {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
               />
-              
+
               <HUD>
                 <div style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>
                   Day {stats.day}
@@ -1228,7 +1258,7 @@ export default function DiseaseSimulation() {
                   </div>
                 </NetworkOverlay>
               )}
-              
+
               <PlaybackControls>
                 <button onClick={() => setIsRunning(!isRunning)}>
                   {isRunning ? <PauseCircle size={32} /> : <PlayCircle size={32} />}
@@ -1244,13 +1274,13 @@ export default function DiseaseSimulation() {
               </PlaybackControls>
             </CanvasContainer>
           </VideoSection>
-          
+
           <ControlsSection>
             <SectionTitle>
               <Bug size={20} />
               Disease Selection
             </SectionTitle>
-            
+
             <DiseaseSelector>
               {Object.values(DISEASE_PROFILES).map(d => (
                 <DiseaseButton
@@ -1289,7 +1319,7 @@ export default function DiseaseSimulation() {
                 Statistics
               </Tab>
             </TabContainer>
-            
+
             <TabContent>
               {activeTab === 'parameters' && (
                 <Grid $columns={3}>
@@ -1300,7 +1330,7 @@ export default function DiseaseSimulation() {
                     </div>
                     <input type="range" min={100} max={2000} step={50} value={population} onChange={(e) => setPopulation(Number(e.target.value))} disabled={isRunning} />
                   </ParameterControl>
-                  
+
                   <ParameterControl>
                     <div className="header">
                       <span className="label">Initial Cases</span>
@@ -1308,7 +1338,7 @@ export default function DiseaseSimulation() {
                     </div>
                     <input type="range" min={1} max={20} value={initialInfected} onChange={(e) => setInitialInfected(Number(e.target.value))} disabled={isRunning} />
                   </ParameterControl>
-                  
+
                   <ParameterControl>
                     <div className="header">
                       <span className="label">Network Model</span>
@@ -1323,7 +1353,7 @@ export default function DiseaseSimulation() {
                       <option value="mobility-network">Mobility Network</option>
                     </select>
                   </ParameterControl>
-                  
+
                   <ParameterControl>
                     <div className="header">
                       <span className="label">Contact Rate</span>
@@ -1331,7 +1361,7 @@ export default function DiseaseSimulation() {
                     </div>
                     <input type="range" min={1} max={30} value={contactRate} onChange={(e) => setContactRate(Number(e.target.value))} />
                   </ParameterControl>
-                  
+
                   <ParameterControl>
                     <div className="header">
                       <span className="label">Testing Rate</span>
@@ -1339,7 +1369,7 @@ export default function DiseaseSimulation() {
                     </div>
                     <input type="range" min={0} max={0.2} step={0.01} value={testingRate} onChange={(e) => setTestingRate(Number(e.target.value))} />
                   </ParameterControl>
-                  
+
                   <ParameterControl>
                     <div className="header">
                       <span className="label">Travel Rate</span>
@@ -1349,7 +1379,7 @@ export default function DiseaseSimulation() {
                   </ParameterControl>
                 </Grid>
               )}
-              
+
               {activeTab === 'interventions' && (
                 <div>
                   <InterventionGrid>
@@ -1377,7 +1407,7 @@ export default function DiseaseSimulation() {
                       </InterventionCard>
                     ))}
                   </InterventionGrid>
-                  
+
                   {vaccination && (
                     <div style={{ marginTop: '1.5rem' }}>
                       <ParameterControl>
@@ -1391,7 +1421,7 @@ export default function DiseaseSimulation() {
                   )}
                 </div>
               )}
-              
+
               {activeTab === 'statistics' && (
                 <div>
                   <Grid $columns={4}>
@@ -1400,26 +1430,26 @@ export default function DiseaseSimulation() {
                       <div className="value">{((stats.totalCases / population) * 100).toFixed(1)}%</div>
                       <div className="change">Total cases: {stats.totalCases}</div>
                     </StatCard>
-                    
+
                     <StatCard $color={stats.rt > 1 ? '#ef4444' : '#22c55e'}>
                       <div className="label">R(t)</div>
                       <div className="value">{stats.rt.toFixed(2)}</div>
                       <div className="change">{stats.rt > 1 ? 'Outbreak growing' : 'Outbreak declining'}</div>
                     </StatCard>
-                    
+
                     <StatCard $color="#fbbf24">
                       <div className="label">Peak Infected</div>
                       <div className="value">{stats.peakInfected}</div>
                       <div className="change">{((stats.peakInfected / population) * 100).toFixed(1)}% of population</div>
                     </StatCard>
-                    
+
                     <StatCard $color="#dc2626">
                       <div className="label">Case Fatality</div>
                       <div className="value">{stats.D > 0 ? ((stats.D / stats.totalCases) * 100).toFixed(1) : '0'}%</div>
                       <div className="change">Deaths: {stats.D}</div>
                     </StatCard>
                   </Grid>
-                  
+
                   <div style={{ height: '250px', background: 'rgba(0, 0, 0, 0.5)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '1rem' }}>
                     <Line data={chartData} options={chartOptions} />
                   </div>
@@ -1441,7 +1471,7 @@ export default function DiseaseSimulation() {
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         />
-        
+
         <HUD>
           <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Day {stats.day}</div>
           <div style={{ display: 'grid', gap: '0.4rem', fontSize: '0.8rem' }}>
@@ -1477,7 +1507,7 @@ export default function DiseaseSimulation() {
         <div style={{ position: 'absolute', bottom: 'calc(6rem + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', textAlign: 'center' }}>
           Pinch to zoom • Drag to pan
         </div>
-        
+
         <FullscreenControls>
           <FullscreenButton $primary onClick={() => setIsRunning(!isRunning)}>
             {isRunning ? <PauseCircle size={20} /> : <PlayCircle size={20} />}
@@ -1489,7 +1519,7 @@ export default function DiseaseSimulation() {
             <Maximize size={20} />
           </FullscreenButton>
         </FullscreenControls>
-        
+
         <ExitButton onClick={exitFullscreen}>
           <X size={20} />
         </ExitButton>

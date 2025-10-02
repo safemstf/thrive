@@ -152,6 +152,188 @@ html.matrix-active * {
   }
 }
 
+/* ============================
+   App layout global styles (moved from layout.tsx)
+   ============================ */
+
+/*
+  Z-INDEX HIERARCHY (GLOBAL REFERENCE)
+  0-999:     Normal content layers
+  1000:      Header (sticky)
+  1001-1099: Header components
+  5000:      Taskbar/Bottom Navigation (MOBILE)
+  9000-9999: Global overlays (HODA)
+  10000+:    Critical UI (modals, mobile menu)
+*/
+
+/* Base scroll strategy and base layout */
+html, body {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app-wrapper {
+  min-height: 100%;
+  position: relative;
+  overflow-x: hidden;
+}
+
+#main-content {
+  min-height: 100dvh;
+  position: relative;
+  z-index: 1;
+}
+
+/* SCROLL LOCK: ConditionalLayout handles scroll lock via .scroll-locked class.
+   Do not duplicate body.modal-open here if the component manages it. */
+
+/* HODA INTEGRATION (z-index: 9999) */
+.hoda-overlay {
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.hoda-overlay > * {
+  pointer-events: auto;
+}
+
+/* TASKBAR PROTECTION (z-index: 5000) */
+[data-taskbar],
+.taskbar,
+.bottom-navigation {
+  z-index: 5000 !important;
+}
+
+/* Modal overlays above taskbar but allow interaction */
+[role="dialog"],
+.modal-overlay {
+  z-index: 10000;
+}
+
+/* Sidebar below modals but above taskbar */
+.sidebar-overlay {
+  z-index: 9500;
+}
+
+/* MOBILE OPTIMIZATIONS */
+@media (max-width: 768px) {
+  /* Prevent zoom on input focus */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Safe area support */
+  @supports (padding: max(0px)) {
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
+  /* Prevent overscroll */
+  body {
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Reserve space for taskbar */
+  #main-content {
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ACCESSIBILITY - reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .hoda-overlay *,
+  .n-body-simulation *,
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* PERFORMANCE OPTIMIZATIONS */
+/* GPU acceleration for fixed/sticky elements */
+header,
+.hoda-overlay,
+[class*="mobile-menu"],
+[class*="sidebar"],
+[data-taskbar],
+.taskbar {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Smooth scrolling (if user prefers) */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Hide content during initial load (body will get .loaded via script) */
+body:not(.loaded) {
+  visibility: hidden;
+  opacity: 0;
+}
+
+body.loaded {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
+/* ---- optional matrix-specific rules (keep if you use the matrix theme) ---- */
+html.matrix-active {
+  background: radial-gradient(circle at center, rgba(0,20,0,0.1) 0%, transparent 70%);
+}
+
+html.matrix-active ::-webkit-scrollbar { width: 8px; background: rgba(0,20,0,0.3); }
+html.matrix-active ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,#22c55e, rgba(34,197,94,0.6));
+  border-radius: 4px;
+}
+html.matrix-active ::selection { background: rgba(34,197,94,0.3); color: #22c55e; }
+html.matrix-active *:focus-visible {
+  outline: 2px solid #22c55e !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 8px rgba(34,197,94,0.4) !important;
+}
+html.matrix-active input, html.matrix-active textarea, html.matrix-active select {
+  border-color: rgba(34,197,94,0.3) !important;
+  background: rgba(0,20,0,0.1) !important;
+}
+html.matrix-active input:focus, html.matrix-active textarea:focus, html.matrix-active select:focus {
+  border-color: #22c55e !important;
+  background: rgba(0,20,0,0.2) !important;
+  box-shadow: 0 0 10px rgba(34,197,94,0.2) !important;
+}
+html.matrix-active button:not([data-no-matrix]):hover {
+  box-shadow: 0 0 15px rgba(34,197,94,0.3) !important;
+}
+html.matrix-active h1, html.matrix-active h2, html.matrix-active h3 {
+  text-shadow: 0 0 5px rgba(34,197,94,0.2);
+}
+
+/* MOBILE TASKBAR ACCESSIBILITY FIX (place at end of file for specificity) */
+@media (max-width: 1024px) {
+  body.sidebar-open [data-taskbar],
+  body.sidebar-open .taskbar {
+    z-index: 5000 !important;
+    position: fixed !important;
+    pointer-events: auto !important;
+  }
+
+  body.sidebar-open .sidebar-overlay {
+    bottom: 60px !important; /* adjust to your taskbar height */
+  }
+}
+
 /* ==============================================
    UTILITY CLASSES FOR THEME SYSTEM
    ============================================== */
