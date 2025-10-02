@@ -9,10 +9,10 @@ const COLORS = {
   bg2: '#1a1a2e',       // secondary dark
   surface: 'rgba(0,0,0,0.5)',
   textPrimary: '#e6eef8',
-  textMuted: '#94a3b8',
+  textMuted: '#dee5efff',
   accent: '#3b82f6',    // primary blue
   accentSoft: '#60a5fa',
-  purple: '#8b5cf6',
+  purple: '#d5c7f5ff',
   success: '#22c55e',
   warn: '#fbbf24',
   danger: '#ef4444',
@@ -175,8 +175,7 @@ const MainContainer = styled.div`
   color: ${COLORS.textPrimary};
   display: flex;
   flex-direction: column;
-  padding: 1rem;
-  box-sizing: border-box;
+  padding: 4rem;
   position: relative;
   overflow: hidden;
   
@@ -306,7 +305,7 @@ const CodeLine = styled.div<{ $active: boolean }>`
   .line-number {
     display: inline-block;
     width: 2rem;
-    color: #475569;
+    color: #d0d7e1ff;
     text-align: right;
     margin-right: 1rem;
     user-select: none;
@@ -319,7 +318,7 @@ const CodeLine = styled.div<{ $active: boolean }>`
   
   .keyword { color: #f472b6; font-weight: 600; }
   .function { color: ${COLORS.accentSoft}; }
-  .comment { color: #64748b; font-style: italic; }
+  .comment { color: ${COLORS.accentSoft}; font-style: italic; }
   .number { color: ${COLORS.warn}; }
 `;
 
@@ -1074,7 +1073,7 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
             ))}
             {discoveredPermutations.length === 0 && (
               <div style={{
-                color: '#64748b',
+                color: '#fbfcfcff',
                 textAlign: 'center',
                 padding: '1rem',
                 fontSize: '0.8rem',

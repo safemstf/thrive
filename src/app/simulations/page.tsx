@@ -511,7 +511,6 @@ const SimulationWindow = styled.div<{ $fullscreen?: boolean }>`
   background: ${({ $fullscreen }) => $fullscreen ? '#000000' : 'white'};
   border: ${({ $fullscreen }) => $fullscreen ? 'none' : '1px solid rgba(148, 163, 184, 0.2)'};
   border-radius: ${({ $fullscreen }) => $fullscreen ? '0' : '16px'};
-  padding: ${({ $fullscreen }) => $fullscreen ? '0' : '2rem'};
   min-height: ${({ $fullscreen }) => $fullscreen ? '100vh' : '600px'};
   display: flex;
   align-items: center;
