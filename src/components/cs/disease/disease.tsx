@@ -279,6 +279,7 @@ const HUD = styled.div<{ $theater?: boolean }>`
   border: 1px solid rgba(59,130,246,0.3);
   font-size: 0.9rem;
   z-index: 50;
+  margin-top: 120px;
   min-width: 180px;
 `;
 
