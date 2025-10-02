@@ -1,6 +1,23 @@
+// PermutationSimulation.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Code, Users, Zap, Star, ChevronRight, Hash, Timer, Turtle, FileCode, Sparkles, Activity } from 'lucide-react';
 import styled, { keyframes, css } from 'styled-components';
+
+// --- Color palette to match the other simulation ---
+const COLORS = {
+  bg1: '#0a0e1a',       // page background
+  bg2: '#1a1a2e',       // secondary dark
+  surface: 'rgba(0,0,0,0.5)',
+  textPrimary: '#e6eef8',
+  textMuted: '#94a3b8',
+  accent: '#3b82f6',    // primary blue
+  accentSoft: '#60a5fa',
+  purple: '#8b5cf6',
+  success: '#22c55e',
+  warn: '#fbbf24',
+  danger: '#ef4444',
+  borderAccent: 'rgba(59, 130, 246, 0.15)'
+};
 
 // TypeScript interfaces
 interface PermutationStep {
@@ -131,19 +148,19 @@ const fadeIn = keyframes`
 `;
 
 const gentlePulse = keyframes`
-  0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(34, 197, 94, 0.4); }
-  50% { transform: scale(1.02); box-shadow: 0 0 25px rgba(34, 197, 94, 0.6); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(59,130,246,0.12); }
+  50% { transform: scale(1.02); box-shadow: 0 0 25px rgba(59,130,246,0.16); }
 `;
 
 const smoothGlow = keyframes`
-  0%, 100% { box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
-  50% { box-shadow: 0 4px 25px rgba(59, 130, 246, 0.5); }
+  0%, 100% { box-shadow: 0 4px 15px rgba(59, 130, 246, 0.15); }
+  50% { box-shadow: 0 4px 25px rgba(59, 130, 246, 0.22); }
 `;
 
 const lineHighlight = keyframes`
-  0% { background: rgba(34, 197, 94, 0); }
-  50% { background: rgba(34, 197, 94, 0.2); }
-  100% { background: rgba(34, 197, 94, 0.08); }
+  0% { background: rgba(139, 92, 246, 0); }
+  50% { background: rgba(139, 92, 246, 0.08); }
+  100% { background: rgba(139, 92, 246, 0.04); }
 `;
 
 const shimmer = keyframes`
@@ -154,8 +171,8 @@ const shimmer = keyframes`
 const MainContainer = styled.div`
   width: 100%;
   height: 100vh;
-  background: linear-gradient(135deg, #0a0f1c 0%, #0d1829 50%, #0a0f1c 100%);
-  color: #e6eef8;
+  background: linear-gradient(135deg, ${COLORS.bg1} 0%, ${COLORS.bg2} 50%, ${COLORS.bg1} 100%);
+  color: ${COLORS.textPrimary};
   display: flex;
   flex-direction: column;
   padding: 1rem;
@@ -170,8 +187,8 @@ const MainContainer = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
-                radial-gradient(circle at 80% 50%, rgba(168, 85, 247, 0.08) 0%, transparent 50%);
+    background: radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.86) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.86) 0%, transparent 50%);
     pointer-events: none;
   }
 `;
@@ -189,7 +206,7 @@ const VisualizationPanel = styled.div`
   background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
   backdrop-filter: blur(10px);
   border-radius: 16px;
-  border: 1px solid rgba(59, 130, 246, 0.18);
+  border: 1px solid ${COLORS.borderAccent};
   box-shadow: 0 20px 60px rgba(0,0,0,0.4);
   padding: 1.5rem;
   display: flex;
@@ -206,7 +223,7 @@ const VisualizationPanel = styled.div`
     height: 1px;
     background: linear-gradient(90deg, 
       transparent,
-      rgba(59, 130, 246, 0.4),
+      rgba(59, 130, 246, 0.35),
       transparent
     );
     background-size: 200% 100%;
@@ -218,7 +235,7 @@ const CodePanel = styled.div`
   background: linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,10,30,0.7) 100%);
   backdrop-filter: blur(10px);
   border-radius: 16px;
-  border: 1px solid rgba(59, 130, 246, 0.15);
+  border: 1px solid ${COLORS.borderAccent};
   box-shadow: 0 10px 40px rgba(0,0,0,0.4);
   display: flex;
   flex-direction: column;
@@ -236,14 +253,14 @@ const VisualizationContent = styled.div`
 
 const CodeHeader = styled.div`
   padding: 1rem 1.25rem;
-  background: rgba(0,0,0,0.3);
-  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+  background: rgba(0,0,0,0.28);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.08);
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #60a5fa;
+  color: ${COLORS.accentSoft};
   
   svg {
     width: 18px;
@@ -268,7 +285,7 @@ const CodeContent = styled.div`
   }
   
   &::-webkit-scrollbar-thumb {
-    background: rgba(59, 130, 246, 0.3);
+    background: rgba(59, 130, 246, 0.22);
     border-radius: 3px;
   }
 `;
@@ -281,8 +298,8 @@ const CodeLine = styled.div<{ $active: boolean }>`
   white-space: pre;
   
   ${({ $active }) => $active && css`
-    background: rgba(34, 197, 94, 0.15);
-    border-left: 3px solid #22c55e;
+    background: rgba(139, 92, 246, 0.08);
+    border-left: 3px solid ${COLORS.purple};
     animation: ${lineHighlight} 1s ease;
   `}
   
@@ -297,13 +314,13 @@ const CodeLine = styled.div<{ $active: boolean }>`
   }
   
   .code-text {
-    color: ${({ $active }) => $active ? '#e2e8f0' : '#94a3b8'};
+    color: ${({ $active }) => $active ? COLORS.textPrimary : COLORS.textMuted};
   }
   
   .keyword { color: #f472b6; font-weight: 600; }
-  .function { color: #60a5fa; }
+  .function { color: ${COLORS.accentSoft}; }
   .comment { color: #64748b; font-style: italic; }
-  .number { color: #fbbf24; }
+  .number { color: ${COLORS.warn}; }
 `;
 
 const BottomSection = styled.div`
@@ -319,7 +336,7 @@ const ControlsCard = styled.div`
   background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
   backdrop-filter: blur(10px);
   border-radius: 14px;
-  border: 1px solid rgba(59, 130, 246, 0.15);
+  border: 1px solid ${COLORS.borderAccent};
   padding: 1rem 1.5rem;
   display: flex;
   flex-direction: column;
@@ -331,7 +348,7 @@ const ResultsCard = styled.div`
   background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
   backdrop-filter: blur(10px);
   border-radius: 14px;
-  border: 1px solid rgba(59, 130, 246, 0.15);
+  border: 1px solid ${COLORS.borderAccent};
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -339,8 +356,8 @@ const ResultsCard = styled.div`
 
 const ResultsHeader = styled.div`
   padding: 0.75rem 1rem;
-  background: rgba(0,0,0,0.3);
-  border-bottom: 1px solid rgba(59, 130, 246, 0.1);
+  background: rgba(0,0,0,0.28);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -351,14 +368,15 @@ const ResultsHeader = styled.div`
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    color: #60a5fa;
+    color: ${COLORS.accentSoft};
   }
   
   .count {
-    background: rgba(59, 130, 246, 0.2);
+    background: rgba(59, 130, 246, 0.14);
     padding: 0.25rem 0.75rem;
     border-radius: 10px;
     font-size: 0.8rem;
+    color: ${COLORS.textPrimary};
   }
 `;
 
@@ -380,7 +398,7 @@ const ResultsList = styled.div`
   }
   
   &::-webkit-scrollbar-thumb {
-    background: rgba(59, 130, 246, 0.3);
+    background: rgba(59, 130, 246, 0.22);
     border-radius: 3px;
   }
 `;
@@ -388,8 +406,8 @@ const ResultsList = styled.div`
 const ResultItem = styled.div<{ $highlight?: boolean }>`
   padding: 0.5rem 0.75rem;
   border-radius: 10px;
-  background: ${({ $highlight }) => $highlight ? 'rgba(34, 197, 94, 0.15)' : 'rgba(0,0,0,0.3)'};
-  border: 1px solid ${({ $highlight }) => $highlight ? 'rgba(34, 197, 94, 0.3)' : 'rgba(59, 130, 246, 0.08)'};
+  background: ${({ $highlight }) => $highlight ? 'rgba(139,92,246,0.08)' : 'rgba(0,0,0,0.28)'};
+  border: 1px solid ${({ $highlight }) => $highlight ? 'rgba(139,92,246,0.14)' : 'rgba(59, 130, 246, 0.08)'};
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -401,8 +419,8 @@ const ResultItem = styled.div<{ $highlight?: boolean }>`
   
   &:hover {
     transform: translateY(-2px);
-    background: rgba(59, 130, 246, 0.08);
-    border-color: rgba(59, 130, 246, 0.2);
+    background: rgba(59, 130, 246, 0.06);
+    border-color: rgba(59, 130, 246, 0.12);
   }
   
   .index {
@@ -420,7 +438,7 @@ const InfoCard = styled.div`
   background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
   backdrop-filter: blur(10px);
   border-radius: 14px;
-  border: 1px solid rgba(59, 130, 246, 0.15);
+  border: 1px solid ${COLORS.borderAccent};
   padding: 1rem 1.5rem;
   display: flex;
   flex-direction: column;
@@ -434,9 +452,9 @@ const PlayButton = styled.button<{ $playing?: boolean }>`
   border-radius: 12px;
   border: 1px solid rgba(59, 130, 246, 0.3);
   background: ${({ $playing }) => $playing
-    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1))'
-    : 'linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1))'};
-  color: ${({ $playing }) => $playing ? '#f87171' : '#60a5fa'};
+    ? `linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.06))`
+    : `linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.06))`};
+  color: ${({ $playing }) => $playing ? COLORS.danger : COLORS.accentSoft};
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -446,8 +464,8 @@ const PlayButton = styled.button<{ $playing?: boolean }>`
   &:hover {
     transform: scale(1.1);
     box-shadow: 0 4px 20px ${({ $playing }) => $playing
-    ? 'rgba(239, 68, 68, 0.3)'
-    : 'rgba(59, 130, 246, 0.3)'};
+    ? 'rgba(239, 68, 68, 0.18)'
+    : 'rgba(59, 130, 246, 0.18)'};
   }
 `;
 
@@ -455,9 +473,9 @@ const ControlButton = styled.button`
   width: 38px;
   height: 38px;
   border-radius: 10px;
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  background: rgba(0,0,0,0.3);
-  color: #94a3b8;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: rgba(0,0,0,0.28);
+  color: ${COLORS.textMuted};
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -466,16 +484,16 @@ const ControlButton = styled.button`
   
   &:hover {
     transform: scale(1.05);
-    background: rgba(59, 130, 246, 0.1);
-    color: #60a5fa;
+    background: rgba(59, 130, 246, 0.06);
+    color: ${COLORS.accentSoft};
   }
 `;
 
 const SlowMoButton = styled(ControlButton)<{ $active: boolean }>`
   ${({ $active }) => $active && css`
-    background: rgba(34, 197, 94, 0.2);
-    border-color: rgba(34, 197, 94, 0.3);
-    color: #4ade80;
+    background: rgba(34, 197, 94, 0.06);
+    border-color: rgba(34, 197, 94, 0.12);
+    color: ${COLORS.success};
   `}
 `;
 
@@ -483,7 +501,7 @@ const SpeedSlider = styled.input`
   width: 120px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(59, 130, 246, 0.14);
   outline: none;
   
   &::-webkit-slider-thumb {
@@ -491,7 +509,7 @@ const SpeedSlider = styled.input`
     width: 14px;
     height: 14px;
     border-radius: 50%;
-    background: #60a5fa;
+    background: ${COLORS.accentSoft};
     cursor: pointer;
   }
   
@@ -511,7 +529,7 @@ const ModeButton = styled.button<{ $active: boolean; $color: string }>`
   padding: 0.5rem 1rem;
   border-radius: 10px;
   border: 1px solid ${({ $active, $color }) => $active ? $color : 'transparent'};
-  background: ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.1)' : 'transparent'};
+  background: ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.06)' : 'transparent'};
   color: ${({ $active, $color }) => $active ? $color : '#64748b'};
   font-size: 0.75rem;
   font-weight: 600;
@@ -524,7 +542,7 @@ const ModeButton = styled.button<{ $active: boolean; $color: string }>`
   width: 100%;
   
   &:hover {
-    background: rgba(59, 130, 246, 0.05);
+    background: rgba(59, 130, 246, 0.04);
     color: ${({ $color }) => $color};
   }
 `;
@@ -553,23 +571,23 @@ const ArrayElement = styled.div<{ $state: 'available' | 'used' | 'current' | 're
     switch ($state) {
       case 'available':
         return css`
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.05));
-          border-color: rgba(59, 130, 246, 0.3);
-          color: #60a5fa;
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
+          border-color: rgba(59, 130, 246, 0.22);
+          color: ${COLORS.accentSoft};
         `;
       case 'used':
         return css`
-          background: rgba(239, 68, 68, 0.05);
-          border-color: rgba(239, 68, 68, 0.2);
-          color: #6b7280;
-          opacity: 0.5;
+          background: rgba(0,0,0,0.18);
+          border-color: rgba(59,130,246,0.06);
+          color: #9ca3af;
+          opacity: 0.6;
           transform: scale(0.92);
         `;
       case 'current':
         return css`
-          background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(34, 197, 94, 0.1));
-          border-color: rgba(34, 197, 94, 0.5);
-          color: #4ade80;
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.04));
+          border-color: rgba(34, 197, 94, 0.2);
+          color: ${COLORS.success};
           transform: scale(1.08);
           animation: ${smoothGlow} 2s ease-in-out infinite;
         `;
@@ -578,9 +596,9 @@ const ArrayElement = styled.div<{ $state: 'available' | 'used' | 'current' | 're
           width: 24px;
           height: 24px;
           font-size: 0.8rem;
-          background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(168, 85, 247, 0.05));
-          border-color: rgba(168, 85, 247, 0.3);
-          color: #c084fc;
+          background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(139, 92, 246, 0.04));
+          border-color: rgba(139, 92, 246, 0.18);
+          color: ${COLORS.purple};
         `;
     }
   }}
@@ -589,14 +607,14 @@ const ArrayElement = styled.div<{ $state: 'available' | 'used' | 'current' | 're
 const StatusMessage = styled.div`
   text-align: center;
   padding: 1rem;
-  background: rgba(0,0,0,0.3);
+  background: rgba(0,0,0,0.28);
   border-radius: 12px;
-  border: 1px solid rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.08);
   
   .main {
     font-size: 1rem;
     font-weight: 600;
-    color: #60a5fa;
+    color: ${COLORS.accentSoft};
     margin-bottom: 0.5rem;
     font-family: 'Courier New', monospace;
   }
@@ -606,42 +624,40 @@ const StatusMessage = styled.div`
     justify-content: center;
     gap: 1.5rem;
     font-size: 0.7rem;
-    color: #64748b;
+    color: #8b99a8;
     
     .stat {
       display: flex;
       align-items: center;
       gap: 0.25rem;
       
-      svg {
-        width: 12px;
-        height: 12px;
-      }
+      svg { width: 12px; height: 12px; color: ${COLORS.accentSoft}; }
     }
   }
 `;
 
+// constants & modes
 const SLOWMO_SPEED = 500;
 
 const ALGORITHM_MODES: Record<AlgorithmMode, AlgorithmInfo> = {
   permute: {
     name: 'Permutations',
     icon: <Users className="w-4 h-4" />,
-    color: '#3b82f6',
+    color: COLORS.accent,
     description: 'Generate all unique arrangements',
     leetcode: 'LC 46'
   },
   permuteUnique: {
     name: 'Unique',
     icon: <Zap className="w-4 h-4" />,
-    color: '#f59e0b',
+    color: COLORS.warn,
     description: 'Handle duplicates efficiently',
     leetcode: 'LC 47'
   },
   specialPerm: {
     name: 'Beautiful',
     icon: <Star className="w-4 h-4" />,
-    color: '#ec4899',
+    color: COLORS.purple,
     description: 'Divisible adjacent elements',
     leetcode: 'LC 2741'
   }
@@ -888,17 +904,17 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
           <VisualizationContent>
             {/* Title */}
             <div style={{ textAlign: 'center' }}>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '0.5rem', color: '#e2e8f0' }}>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '0.5rem', color: COLORS.textPrimary }}>
                 Backtracking Visualization
               </h2>
-              <p style={{ fontSize: '0.875rem', color: '#64748b' }}>
+              <p style={{ fontSize: '0.875rem', color: '#8b99a8' }}>
                 {currentAlgorithm.name} • {currentAlgorithm.leetcode}
               </p>
             </div>
 
             {/* Input Array */}
             <div>
-              <h3 style={{ textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <h3 style={{ textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Input Array
               </h3>
               <ArrayContainer>
@@ -915,7 +931,7 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
 
             {/* Current Path */}
             <div>
-              <h3 style={{ textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <h3 style={{ textAlign: 'center', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Building Permutation
               </h3>
               <ArrayContainer>
@@ -925,13 +941,13 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
                       {num}
                     </ArrayElement>
                     {idx < currentPath.length - 1 && (
-                      <ChevronRight className="w-4 h-4 text-gray-500" />
+                      <ChevronRight className="w-4 h-4" style={{ color: '#6b7280' }} />
                     )}
                   </React.Fragment>
                 ))}
                 {currentPath.length < inputArray.length && currentPath.length > 0 && (
                   <>
-                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                    <ChevronRight className="w-4 h-4" style={{ color: '#6b7280' }} />
                     <ArrayElement $state="available">
                       ?
                     </ArrayElement>
@@ -968,10 +984,10 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
                 style={{
                   width: '100%',
                   padding: '0.5rem',
-                  background: 'rgba(0,0,0,0.3)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  background: 'rgba(0,0,0,0.28)',
+                  border: `1px solid ${COLORS.borderAccent}`,
                   borderRadius: '0.5rem',
-                  color: 'white',
+                  color: COLORS.textPrimary,
                   fontSize: '0.875rem',
                   textAlign: 'center'
                 }}
@@ -980,11 +996,11 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
             </div>
 
             {/* Progress Bar */}
-            <div style={{ width: '100%', maxWidth: '400px', height: '4px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ width: '100%', maxWidth: '400px', height: '4px', background: 'rgba(59, 130, 246, 0.08)', borderRadius: '2px', overflow: 'hidden' }}>
               <div style={{
                 width: `${progress}%`,
                 height: '100%',
-                background: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
+                background: `linear-gradient(90deg, ${COLORS.accent}, ${COLORS.accentSoft})`,
                 transition: 'width 0.3s ease'
               }} />
             </div>
@@ -1028,7 +1044,7 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
               onChange={handleSpeedChange}
               disabled={isSlowMo}
             />
-            <div style={{ fontSize: '0.75rem', color: isSlowMo ? '#4ade80' : '#60a5fa', fontWeight: '600', minWidth: '50px' }}>
+            <div style={{ fontSize: '0.75rem', color: isSlowMo ? COLORS.success : COLORS.accentSoft, fontWeight: '600', minWidth: '50px' }}>
               {isSlowMo ? 'SLOW' : `${baseSpeed}ms`}
             </div>
           </div>
@@ -1086,13 +1102,13 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
             ))}
           </ModeSelector>
           
-          <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.75rem', color: '#94a3b8' }}>
+          <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.75rem', color: COLORS.textMuted }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <Timer className="w-3 h-3" style={{ color: '#60a5fa' }} />
+              <Timer className="w-3 h-3" style={{ color: COLORS.accentSoft }} />
               <span>{actualSpeed}ms</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <Activity className="w-3 h-3" style={{ color: '#60a5fa' }} />
+              <Activity className="w-3 h-3" style={{ color: COLORS.accentSoft }} />
               <span>O(n!×n)</span>
             </div>
           </div>
