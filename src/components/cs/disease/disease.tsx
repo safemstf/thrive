@@ -182,6 +182,7 @@ const Container = styled.div`
   color: #e6eef8;
   padding: 2rem 1rem;
   box-sizing: border-box;
+  border-radius: 12px;
 
   @media (max-width: 768px) {
     padding: 1rem 0.75rem;

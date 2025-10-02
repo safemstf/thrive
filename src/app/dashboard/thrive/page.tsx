@@ -75,7 +75,8 @@ const PersonalWelcome = ({ user }: { user: any }) => {
 
   return (
     <DashboardHero>
-      <ConstrainedContent>
+      {/* added className so our global CSS can target this instance */}
+      <ConstrainedContent className="constrained">
         <LevelTitle>
           <WelcomeBadge>
             <Sparkles size={16} />
@@ -177,8 +178,9 @@ const NextSteps = ({ onAssessmentStart }: { onAssessmentStart: (id: string) => v
         </BodyText>
       </SectionHeader>
 
-      <ActionCardsGrid>
-        {nextSteps.map((step, index) => {
+      {/* add className for safe overflow behavior */}
+      <ActionCardsGrid className="action-cards-grid">
+        {nextSteps.map((step) => {
           const IconComponent = step.icon;
 
           return (
@@ -187,6 +189,7 @@ const NextSteps = ({ onAssessmentStart }: { onAssessmentStart: (id: string) => v
               $color={step.color}
               $urgent={step.priority}
               onClick={() => onAssessmentStart(step.id)}
+              className="premium-action-card"
             >
               {step.priority && <UrgentBadge>START HERE</UrgentBadge>}
               <CardContent>
@@ -220,7 +223,7 @@ const NextSteps = ({ onAssessmentStart }: { onAssessmentStart: (id: string) => v
 
 const FeaturedAssessment = ({ onStart }: { onStart: () => void }) => (
   <Section>
-    <FeaturedCard>
+    <FeaturedCard className="featured-card">
       <FeaturedBadge>
         <Star size={12} />
         MOST POPULAR
@@ -317,7 +320,7 @@ const BrowseAllAssessments = ({ onViewAll }: { onViewAll: () => void }) => {
         </BodyText>
       </SectionHeader>
 
-      <ResponsiveGrid $minWidth="280px">
+      <ResponsiveGrid $minWidth="280px" className="responsive-grid">
         {categories.map((category) => {
           const IconComponent = category.icon;
 
@@ -325,6 +328,7 @@ const BrowseAllAssessments = ({ onViewAll }: { onViewAll: () => void }) => {
             <div
               key={category.name}
               onClick={onViewAll}
+              className="category-tile"
               style={{
                 background: 'rgba(255, 255, 255, 0.06)',
                 backdropFilter: 'blur(15px)',
@@ -334,16 +338,6 @@ const BrowseAllAssessments = ({ onViewAll }: { onViewAll: () => void }) => {
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
                 textAlign: 'center'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.borderColor = `${category.color}40`;
-                e.currentTarget.style.boxShadow = `0 10px 30px ${category.color}20`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0px)';
-                e.currentTarget.style.borderColor = `${category.color}20`;
-                e.currentTarget.style.boxShadow = 'none';
               }}
             >
               <div style={{
@@ -425,20 +419,95 @@ const DashboardContent = () => {
   };
 
   return (
-    <PageContainer>
-      <PersonalWelcome user={user} />
+    // wrapper for viewport-safe styles
+    <div className="thrive-root">
+      <PageContainer>
+        {/* pass className to ConstrainedContent so global CSS can set overflow visible where needed */}
+        <PersonalWelcome user={user} />
 
-      <ConstrainedContent>
-        {/* Clear Next Steps - Primary CTA */}
-        <NextSteps onAssessmentStart={handleAssessmentStart} />
+        <ConstrainedContent className="constrained">
+          {/* Clear Next Steps - Primary CTA */}
+          <NextSteps onAssessmentStart={handleAssessmentStart} />
 
-        {/* Popular Choice - Social Proof */}
-        <FeaturedAssessment onStart={handleFeaturedStart} />
+          {/* Popular Choice - Social Proof */}
+          <FeaturedAssessment onStart={handleFeaturedStart} />
 
-        {/* Browse Option - Secondary Path */}
-        <BrowseAllAssessments onViewAll={handleViewAll} />
-      </ConstrainedContent>
-    </PageContainer>
+          {/* Browse Option - Secondary Path */}
+          <BrowseAllAssessments onViewAll={handleViewAll} />
+        </ConstrainedContent>
+      </PageContainer>
+
+      {/* GLOBAL STYLES: safe, conservative, non-breaking */}
+      <style jsx global>{`
+        /* Root wrapper to stabilize 100vh behavior (svh when available) */
+        .thrive-root {
+          min-height: 100svh; /* modern */
+          min-height: 100vh;  /* fallback */
+          padding-bottom: env(safe-area-inset-bottom, 16px);
+        }
+
+        /* Prevent horizontal scroll from minor visual offsets */
+        body {
+          overflow-x: hidden;
+        }
+
+        /* Allow constrained content to show glows / translated children */
+        .constrained {
+          overflow: visible !important;
+        }
+
+        /* Action cards container — allow overflow so hover translates aren't clipped */
+        .action-cards-grid {
+          overflow: visible !important;
+        }
+
+        /* Responsive grid safety */
+        .responsive-grid {
+          overflow: visible !important;
+        }
+
+        /* Category tiles: replace the inline mouse handlers with CSS hover */
+        .category-tile {
+          transition: transform .28s cubic-bezier(.2,.9,.3,1), box-shadow .28s, border-color .28s;
+          transform: translateY(0);
+          will-change: transform;
+          overflow: visible;
+        }
+
+        .category-tile:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+          border-color: rgba(0,0,0,0.12);
+        }
+
+        /* Premium action cards: smooth transform + hint to browser for compositing */
+        .premium-action-card {
+          transition: transform .25s ease, box-shadow .25s ease;
+          will-change: transform;
+          backface-visibility: hidden;
+          overflow: visible !important;
+        }
+
+        /* Featured card: ensure glows / shadows show */
+        .featured-card {
+          overflow: visible !important;
+          z-index: 1;
+        }
+
+        /* If some parent has transform/filter, avoid layout surprises by allowing visible overflow here */
+        .thrive-root * {
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Small screen grid fallback (reduces chance of horizontal overflow) */
+        @media (max-width: 520px) {
+          .responsive-grid {
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+          }
+        }
+      `}</style>
+    </div>
   );
 };
 

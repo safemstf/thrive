@@ -775,7 +775,7 @@ export default function HomePage() {
           </HeroFloatingElements>
 
           <HeroContent>
-            <HeroTitle>Discover <span>Creative</span> Excellence</HeroTitle>
+            <HeroTitle>Portfolios <span> & </span> Simulations</HeroTitle>
             <HeroSubtitle>
               Connect with talented creators, develop your skills, and showcase your work to a global community
             </HeroSubtitle>
