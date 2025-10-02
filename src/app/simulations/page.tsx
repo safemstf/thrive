@@ -6,9 +6,8 @@ import dynamic from "next/dynamic";
 import styled, { keyframes, css } from 'styled-components';
 import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
-  Bone, Zap, Users, Trophy, Shield, Crown, Cpu, Eye, Star, RotateCw, Microscope,
-  Droplet, Wifi, BookOpen, Sliders, Monitor, Beaker, Loader, Camera, Info,
-  Maximize2, X, ChevronLeft, ChevronRight, Gauge, HelpCircle
+  Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen, 
+  Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
@@ -73,9 +72,9 @@ const fadeIn = keyframes`
   to { opacity: 1; transform: translateY(0); }
 `;
 
-const slideIn = keyframes`
-  from { transform: translateY(100%); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+const slideInFromRight = keyframes`
+  from { transform: translate(100%, -50%); opacity: 0; }
+  to { transform: translate(0, -50%); opacity: 1; }
 `;
 
 const pulse = keyframes`
@@ -92,11 +91,6 @@ const shimmer = keyframes`
 const spin = keyframes`
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-`;
-
-const float = keyframes`
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
 `;
 
 // Loading Component
@@ -358,26 +352,12 @@ const Badge = styled.div<{ $variant?: string }>`
   }}
 `;
 
-// Theater Mode Components
-const TheaterOverlay = styled.div<{ $active: boolean }>`
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, ${({ $active }) => $active ? '0.6' : '0'});
-  /* make sure overlay sits under the simulation window */
-  z-index: ${({ $active }) => $active ? '900' : '-1'};
-  pointer-events: ${({ $active }) => $active ? 'auto' : 'none'};
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-`;
-
-/* Replace existing FadingElements */
 const FadingElements = styled.div<{ $theater: boolean }>`
-  /* transition only opacity+visibility to avoid creating stacking contexts */
   opacity: ${({ $theater }) => $theater ? '0' : '1'};
   visibility: ${({ $theater }) => $theater ? 'hidden' : 'visible'};
   pointer-events: ${({ $theater }) => $theater ? 'none' : 'auto'};
   transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1), visibility 0.35s;
 `;
-
 
 const ControlsContainer = styled.div`
   display: flex;
@@ -387,23 +367,26 @@ const ControlsContainer = styled.div`
   justify-content: center;
 `;
 
-const ControlButton = styled.button<{ $variant?: string; $active?: boolean }>`
+const ControlButton = styled.button<{ $variant?: string; $active?: boolean; $theater?: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.875rem 1.5rem;
   border-radius: 8px;
-  border: 1px solid ${({ $variant, $active }) => {
+  border: 1px solid ${({ $variant, $active, $theater }) => {
+    if ($theater) return $active ? 'rgba(59, 130, 246, 0.5)' : 'rgba(148, 163, 184, 0.3)';
     if ($variant === 'danger') return '#f87171';
     if ($active) return '#3b82f6';
     return '#e2e8f0';
   }};
-  background: ${({ $variant, $active }) => {
+  background: ${({ $variant, $active, $theater }) => {
+    if ($theater) return $active ? 'rgba(59, 130, 246, 0.25)' : 'rgba(51, 65, 85, 0.8)';
     if ($variant === 'danger') return '#fef2f2';
     if ($active) return '#eff6ff';
     return 'white';
   }};
-  color: ${({ $variant, $active }) => {
+  color: ${({ $variant, $active, $theater }) => {
+    if ($theater) return '#e2e8f0';
     if ($variant === 'danger') return '#dc2626';
     if ($active) return '#2563eb';
     return '#475569';
@@ -413,41 +396,47 @@ const ControlButton = styled.button<{ $variant?: string; $active?: boolean }>`
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  position: relative;
+  width: ${({ $theater }) => $theater ? '100%' : 'auto'};
+  justify-content: ${({ $theater }) => $theater ? 'center' : 'flex-start'};
 
   &:hover {
-    background: ${({ $variant, $active }) => {
+    background: ${({ $variant, $active, $theater }) => {
+    if ($theater) return $active ? 'rgba(59, 130, 246, 0.35)' : 'rgba(71, 85, 105, 0.9)';
     if ($variant === 'danger') return '#fee2e2';
     if ($active) return '#dbeafe';
     return '#f8fafc';
   }};
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px ${({ $variant }) =>
-    $variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)'
+    box-shadow: 0 4px 12px ${({ $variant, $theater }) =>
+    $theater ? 'rgba(59, 130, 246, 0.3)' : ($variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)')
   };
+    border-color: ${({ $theater }) => $theater ? 'rgba(59, 130, 246, 0.5)' : ''};
   }
 `;
 
-const SpeedControl = styled.div`
+const SpeedControl = styled.div<{ $theater?: boolean }>`
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   padding: 0.875rem 1.5rem;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background: white;
+  border: 1px solid ${({ $theater }) => $theater ? 'rgba(148, 163, 184, 0.3)' : '#e2e8f0'};
+  background: ${({ $theater }) => $theater ? 'rgba(51, 65, 85, 0.8)' : 'white'};
+  flex-direction: ${({ $theater }) => $theater ? 'column' : 'row'};
+  width: ${({ $theater }) => $theater ? '100%' : 'auto'};
   
   span {
     font-family: 'Inter', system-ui, sans-serif;
     font-weight: 600;
     font-size: 0.875rem;
-    color: #475569;
+    color: ${({ $theater }) => $theater ? '#e2e8f0' : '#475569'};
+    text-align: center;
   }
   
   input[type="range"] {
-    width: 120px;
+    width: ${({ $theater }) => $theater ? '100%' : '120px'};
     height: 4px;
-    background: #e2e8f0;
+    background: ${({ $theater }) => $theater ? 'rgba(148, 163, 184, 0.3)' : '#e2e8f0'};
     border-radius: 2px;
     outline: none;
     -webkit-appearance: none;
@@ -460,7 +449,7 @@ const SpeedControl = styled.div`
       background: linear-gradient(135deg, #3b82f6, #2563eb);
       cursor: pointer;
       transition: transform 0.2s ease;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
       
       &:hover {
         transform: scale(1.1);
@@ -469,109 +458,89 @@ const SpeedControl = styled.div`
   }
   
   .value {
-    color: #3b82f6;
+    color: ${({ $theater }) => $theater ? '#60a5fa' : '#3b82f6'};
     font-weight: 700;
-    min-width: 40px;
+    text-align: center;
   }
 `;
 
-const TheaterControls = styled(ControlsContainer) <{ $theater: boolean }>`
+const TheaterControls = styled(ControlsContainer)<{ $theater: boolean }>`
   ${({ $theater }) => $theater && css`
     position: fixed;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1001;
+    top: 50%;
+    right: 1rem;
+    transform: translateY(-50%);
+    z-index: 2100;
     background: rgba(15, 23, 42, 0.95);
-    padding: 1rem 1.5rem;
+    padding: 1rem;
     border-radius: 16px;
     border: 1px solid rgba(59, 130, 246, 0.3);
     backdrop-filter: blur(20px);
     margin-bottom: 0;
-    animation: ${slideIn} 0.5s ease-out;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 90vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 200px;
+    animation: ${slideInFromRight} 0.4s ease-out;
     
-    ${ControlButton} {
-      border-color: rgba(148, 163, 184, 0.3);
-      background: rgba(51, 65, 85, 0.8);
-      color: #e2e8f0;
-      
-      &:hover {
-        background: rgba(71, 85, 105, 0.9);
-        border-color: rgba(59, 130, 246, 0.5);
-      }
+    /* Custom scrollbar */
+    &::-webkit-scrollbar {
+      width: 4px;
     }
     
-    ${SpeedControl} {
-      background: rgba(51, 65, 85, 0.8);
-      border-color: rgba(148, 163, 184, 0.3);
+    &::-webkit-scrollbar-track {
+      background: rgba(51, 65, 85, 0.3);
+      border-radius: 2px;
+    }
+    
+    &::-webkit-scrollbar-thumb {
+      background: rgba(59, 130, 246, 0.5);
+      border-radius: 2px;
       
-      span {
-        color: #e2e8f0;
-      }
-      
-      .value {
-        color: #60a5fa;
+      &:hover {
+        background: rgba(59, 130, 246, 0.7);
       }
     }
   `}
 `;
 
-const SimulationWindow = styled.div`
-  background: white;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 16px;
-  padding: 2rem;
-  min-height: 600px;
+const SimulationWindow = styled.div<{ $fullscreen?: boolean }>`
+  background: ${({ $fullscreen }) => $fullscreen ? '#000000' : 'white'};
+  border: ${({ $fullscreen }) => $fullscreen ? 'none' : '1px solid rgba(148, 163, 184, 0.2)'};
+  border-radius: ${({ $fullscreen }) => $fullscreen ? '0' : '16px'};
+  padding: ${({ $fullscreen }) => $fullscreen ? '0' : '2rem'};
+  min-height: ${({ $fullscreen }) => $fullscreen ? '100vh' : '600px'};
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
+  position: ${({ $fullscreen }) => $fullscreen ? 'fixed' : 'relative'};
+  inset: ${({ $fullscreen }) => $fullscreen ? '0' : 'auto'};
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  box-shadow: ${({ $fullscreen }) => $fullscreen ? 'none' : '0 4px 20px rgba(0, 0, 0, 0.05)'};
+  z-index: ${({ $fullscreen }) => $fullscreen ? '2000' : '1'};
+  
+  &:fullscreen {
+    background: #000000;
+    padding: 0;
+  }
 `;
-
-const TheaterSimulationWindow = styled(SimulationWindow) <{ $theater: boolean }>`
-  ${({ $theater }) => $theater && css`
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 92vw;
-    height: 88vh;
-    z-index: 1001; /* above the overlay */
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
-    border: 1px solid rgba(59, 130, 246, 0.4);
-    min-height: unset;
-    animation: ${fadeIn} 0.5s ease-out;
-    padding: 1.5rem;
-    /* IMPORTANT: keep this transparent so the canvas area isn't tinted */
-    background: transparent;
-  `}
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-`;
-
 
 const SimulationContent = styled.div<{ $theater?: boolean }>`
   width: 100%;
   height: 100%;
-  min-height: ${({ $theater }) => $theater ? 'auto' : '550px'};
+  min-height: ${({ $theater }) => $theater ? '100vh' : '550px'};
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: ${({ $theater }) => $theater ? '12px' : '16px'};
-  /* Ensure the canvas area stays bright in theater mode */
-  background: ${({ $theater }) => $theater ? '#ffffff' : '#fafbfc'};
-  padding: ${({ $theater }) => $theater ? '0' : '2rem'};
-  overflow: hidden;
+  background: #ffffff;
   position: relative;
-  /* put the content above the overlay so it doesn't get dimmed */
-  z-index: ${({ $theater }) => $theater ? '1002' : '1'};
 
   > * {
     width: 100%;
     height: 100%;
-    /* if the simulation uses a canvas element, ensure it has explicit background where needed */
     background: transparent;
   }
 `;
@@ -595,28 +564,22 @@ const PlaceholderContent = styled.div`
 `;
 
 const StatusBar = styled.div<{ $theater?: boolean }>`
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
+  position: ${({ $theater }) => $theater ? 'fixed' : 'absolute'};
+  top: 1.5rem;
+  right: ${({ $theater }) => $theater ? '14rem' : '1rem'};
   display: flex;
   gap: 0.75rem;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
-  color: #475569;
   font-weight: 600;
-  z-index: 10;
-  
-  ${({ $theater }) => $theater && css`
-    top: 2rem;
-    right: 2rem;
-  `}
+  z-index: 2100;
   
   .status-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 0.875rem;
-    background: ${({ $theater }) => $theater ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.9)'};
+    background: ${({ $theater }) => $theater ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)'};
     border: 1px solid ${({ $theater }) => $theater ? 'rgba(59, 130, 246, 0.3)' : 'rgba(148, 163, 184, 0.2)'};
     border-radius: 8px;
     backdrop-filter: blur(10px);
@@ -637,7 +600,73 @@ const StatusBar = styled.div<{ $theater?: boolean }>`
   }
 `;
 
-// New Components
+const PerformancePanel = styled.div<{ $show: boolean; $theater?: boolean }>`
+  position: ${({ $theater }) => $theater ? 'fixed' : 'absolute'};
+  top: 1.5rem;
+  left: 1.5rem;
+  background: ${({ $theater }) => $theater ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)'};
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid ${({ $theater }) => $theater ? 'rgba(59, 130, 246, 0.3)' : 'rgba(148, 163, 184, 0.2)'};
+  opacity: ${({ $show }) => $show ? '1' : '0'};
+  pointer-events: ${({ $show }) => $show ? 'auto' : 'none'};
+  transition: opacity 0.3s ease;
+  backdrop-filter: blur(10px);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  z-index: 2100;
+  
+  .metric {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    color: ${({ $theater }) => $theater ? '#94a3b8' : '#64748b'};
+    
+    &:last-child {
+      margin-bottom: 0;
+    }
+    
+    .value {
+      color: ${({ $theater }) => $theater ? '#60a5fa' : '#3b82f6'};
+      font-weight: 600;
+    }
+  }
+`;
+
+const InfoPanel = styled.div<{ $show: boolean; $theater?: boolean }>`
+  position: ${({ $theater }) => $theater ? 'fixed' : 'absolute'};
+  bottom: 1.5rem;
+  left: ${({ $theater }) => $theater ? '1.5rem' : 'auto'};
+  right: ${({ $theater }) => $theater ? 'auto' : '1rem'};
+  max-width: 300px;
+  background: ${({ $theater }) => $theater ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)'};
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid ${({ $theater }) => $theater ? 'rgba(59, 130, 246, 0.3)' : 'rgba(148, 163, 184, 0.2)'};
+  backdrop-filter: blur(10px);
+  opacity: ${({ $show }) => $show ? '1' : '0'};
+  pointer-events: ${({ $show }) => $show ? 'auto' : 'none'};
+  transition: all 0.3s ease;
+  z-index: 2100;
+  
+  h4 {
+    color: ${({ $theater }) => $theater ? '#e2e8f0' : '#1e293b'};
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  p {
+    color: ${({ $theater }) => $theater ? '#94a3b8' : '#64748b'};
+    font-size: 0.75rem;
+    line-height: 1.5;
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+`;
+
 const KeyboardHintOverlay = styled.div<{ $show: boolean }>`
   position: fixed;
   top: 50%;
@@ -688,166 +717,6 @@ const HintItem = styled.div`
   }
 `;
 
-const PerformancePanel = styled.div<{ $show: boolean; $theater?: boolean }>`
-  position: absolute;
-  top: ${({ $theater }) => $theater ? '2rem' : '1rem'};
-  left: ${({ $theater }) => $theater ? '2rem' : '1rem'};
-  background: ${({ $theater }) => $theater ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.9)'};
-  padding: 1rem;
-  border-radius: 8px;
-  border: 1px solid ${({ $theater }) => $theater ? 'rgba(59, 130, 246, 0.3)' : 'rgba(148, 163, 184, 0.2)'};
-  opacity: ${({ $show }) => $show ? '1' : '0'};
-  pointer-events: ${({ $show }) => $show ? 'auto' : 'none'};
-  transition: opacity 0.3s ease;
-  backdrop-filter: blur(10px);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
-  z-index: 10;
-  
-  .metric {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
-    color: ${({ $theater }) => $theater ? '#94a3b8' : '#64748b'};
-    
-    &:last-child {
-      margin-bottom: 0;
-    }
-    
-    .value {
-      color: ${({ $theater }) => $theater ? '#60a5fa' : '#3b82f6'};
-      font-weight: 600;
-    }
-  }
-`;
-
-const ScreenshotButton = styled.button`
-  position: absolute;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 8px;
-  color: #475569;
-  font-family: 'Inter', system-ui, sans-serif;
-  font-weight: 600;
-  font-size: 0.75rem;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-  transition: all 0.2s ease;
-  z-index: 10;
-  
-  &:hover {
-    background: white;
-    transform: translateX(-50%) translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  }
-`;
-
-const QuickSwitcher = styled.div<{ $show: boolean }>`
-  position: fixed;
-  bottom: 8rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: rgba(15, 23, 42, 0.95);
-  border-radius: 12px;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  backdrop-filter: blur(20px);
-  z-index: 1002;
-  opacity: ${({ $show }) => $show ? '1' : '0'};
-  pointer-events: ${({ $show }) => $show ? 'auto' : 'none'};
-  transition: all 0.3s ease;
-  animation: ${slideIn} 0.3s ease-out;
-  max-width: 90vw;
-  overflow-x: auto;
-  
-  &::-webkit-scrollbar {
-    height: 4px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: rgba(51, 65, 85, 0.3);
-    border-radius: 2px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: rgba(59, 130, 246, 0.5);
-    border-radius: 2px;
-  }
-`;
-
-const QuickSimCard = styled.button<{ $active: boolean }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.2)' : 'rgba(51, 65, 85, 0.5)'};
-  border: 1px solid ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.5)' : 'rgba(148, 163, 184, 0.2)'};
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: #e2e8f0;
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 0.75rem;
-  font-weight: 600;
-  min-width: 80px;
-  
-  &:hover {
-    background: rgba(59, 130, 246, 0.3);
-    border-color: rgba(59, 130, 246, 0.5);
-  }
-  
-  .icon {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-`;
-
-const InfoPanel = styled.div<{ $show: boolean; $theater?: boolean }>`
-  position: absolute;
-  bottom: ${({ $theater }) => $theater ? '8rem' : '1rem'};
-  right: ${({ $theater }) => $theater ? '2rem' : '1rem'};
-  max-width: 300px;
-  background: ${({ $theater }) => $theater ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)'};
-  padding: 1rem;
-  border-radius: 12px;
-  border: 1px solid ${({ $theater }) => $theater ? 'rgba(59, 130, 246, 0.3)' : 'rgba(148, 163, 184, 0.2)'};
-  backdrop-filter: blur(10px);
-  opacity: ${({ $show }) => $show ? '1' : '0'};
-  pointer-events: ${({ $show }) => $show ? 'auto' : 'none'};
-  transition: all 0.3s ease;
-  z-index: 10;
-  
-  h4 {
-    color: ${({ $theater }) => $theater ? '#e2e8f0' : '#1e293b'};
-    font-size: 0.875rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    font-family: 'Inter', system-ui, sans-serif;
-  }
-  
-  p {
-    color: ${({ $theater }) => $theater ? '#94a3b8' : '#64748b'};
-    font-size: 0.75rem;
-    line-height: 1.5;
-    margin: 0;
-    font-family: 'Inter', system-ui, sans-serif;
-  }
-`;
-
 // Data
 const allItems: SimulationItem[] = [
   {
@@ -865,7 +734,7 @@ const allItems: SimulationItem[] = [
     label: 'Travelling Salesman',
     icon: <Users size={24} />,
     color: '#0077ff',
-    description: 'Neural swarm intelligence with real user integration and live rankings',
+    description: 'Neural swarm intelligence with real user integration',
     optimized: true,
     featured: true,
     special: true,
@@ -886,10 +755,9 @@ const allItems: SimulationItem[] = [
     label: 'Bacteria & Phages',
     icon: <Droplet size={24} />,
     color: '#059669',
-    description: 'Bacterial colony interactions with bacteriophage dynamics',
+    description: 'Bacterial colony interactions with bacteriophage',
     optimized: false,
     featured: false,
-    comingSoon: false,
     category: 'simulations'
   },
   {
@@ -897,7 +765,7 @@ const allItems: SimulationItem[] = [
     label: 'Predator–Prey Field',
     icon: <Zap size={24} />,
     color: '#10b981',
-    description: 'Spatial Lotka–Volterra agent patches for population dynamics',
+    description: 'Spatial Lotka–Volterra population dynamics',
     optimized: false,
     featured: false,
     comingSoon: true,
@@ -905,10 +773,10 @@ const allItems: SimulationItem[] = [
   },
   {
     key: 'chem-resonance',
-    label: 'Organic Chemistry Lab',
+    label: 'Chemistry Lab',
     icon: <Microscope size={24} />,
     color: '#a78bfa',
-    description: 'Interactive resonance & reaction visualizer with electron clouds',
+    description: 'Interactive molecular visualization',
     optimized: false,
     featured: false,
     comingSoon: true,
@@ -919,10 +787,9 @@ const allItems: SimulationItem[] = [
     label: 'Space & Stars',
     icon: <Star size={24} />,
     color: '#f97316',
-    description: 'Star & gravity sandbox with advanced physics integration',
+    description: 'N-body gravity sandbox',
     optimized: true,
     featured: true,
-    comingSoon: false,
     category: 'simulations'
   },
   {
@@ -930,7 +797,7 @@ const allItems: SimulationItem[] = [
     label: '3-Body Explorer',
     icon: <RotateCw size={24} />,
     color: '#ef4444',
-    description: '3-body problem presets with chaos and divergence visualization',
+    description: '3-body problem chaos visualization',
     optimized: false,
     featured: false,
     comingSoon: true,
@@ -941,17 +808,17 @@ const allItems: SimulationItem[] = [
     label: 'Pathfinding Derby',
     icon: <Grid size={24} />,
     color: '#8b5cf6',
-    description: 'Head-to-head algorithm comparisons with live metrics',
+    description: 'Algorithm comparison with live metrics',
     optimized: true,
     featured: true,
     category: 'algorithms'
   },
   {
     key: 'parallel-model',
-    label: 'Parallel Computing Lab',
+    label: 'Parallel Computing',
     icon: <Cpu size={24} />,
     color: '#f59e0b',
-    description: 'Task-DAG visualizer with scheduling strategies',
+    description: 'Task scheduling visualizer',
     optimized: true,
     featured: false,
     comingSoon: true,
@@ -959,13 +826,12 @@ const allItems: SimulationItem[] = [
   },
   {
     key: 'amdahl',
-    label: "Amdahl's Law Studio",
+    label: "Amdahl's Law",
     icon: <Sliders size={24} />,
     color: '#fb7185',
-    description: 'Interactive performance scaling law visualizer',
+    description: 'Performance scaling visualizer',
     optimized: true,
     featured: false,
-    comingSoon: true,
     category: 'algorithms'
   },
   {
@@ -973,32 +839,9 @@ const allItems: SimulationItem[] = [
     label: "Permutations",
     icon: <BookOpen size={24} />,
     color: '#7c3aed',
-    description: 'Recursion-tree visualizer for complexity analysis',
+    description: 'Recursion visualizer',
     optimized: true,
     featured: false,
-    comingSoon: false,
-    category: 'algorithms'
-  },
-  {
-    key: 'FourierTransform-NeuralNetwork',
-    label: 'Fourier Transform Neural Network',
-    icon: <Wifi size={24} />,
-    color: '#d47406ff',
-    description: 'Exploring Fourier transform in neural networks',
-    optimized: false,
-    featured: false,
-    comingSoon: true,
-    category: 'algorithms'
-  },
-  {
-    key: 'FourierTransformNetworkErrorCorrection',
-    label: 'Wireless Networks Error Corretion',
-    icon: <Wifi size={24} />,
-    color: '#06d4a0ff',
-    description: 'Exploring wirless network error correction',
-    optimized: false,
-    featured: false,
-    comingSoon: true,
     category: 'algorithms'
   },
   {
@@ -1006,10 +849,9 @@ const allItems: SimulationItem[] = [
     label: 'Network Protocols',
     icon: <Wifi size={24} />,
     color: '#06b6d4',
-    description: 'Wireless propagation, routing protocols and packet analysis',
+    description: 'OFDM and routing protocols',
     optimized: true,
     featured: true,
-    comingSoon: false,
     category: 'algorithms'
   }
 ];
@@ -1024,12 +866,12 @@ export default function SimulationsPage() {
   const [theaterMode, setTheaterMode] = useState(false);
   const [showKeyboardHints, setShowKeyboardHints] = useState(false);
   const [showPerformance, setShowPerformance] = useState(false);
-  const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [fps, setFps] = useState(60);
 
   const fpsRef = useRef<number[]>([]);
   const lastFrameTimeRef = useRef(performance.now());
+  const simulationWindowRef = useRef<HTMLDivElement>(null);
 
   const simulationItems = allItems.filter(item => item.category === 'simulations');
   const algorithmItems = allItems.filter(item => item.category === 'algorithms');
@@ -1061,64 +903,92 @@ export default function SimulationsPage() {
     return () => cancelAnimationFrame(frameId);
   }, [isRunning]);
 
-  // Trigger resize when theater mode changes to update canvas simulations
+  // Handle fullscreen on theater mode toggle
   useEffect(() => {
-    // Small delay to let DOM update
+    const enterFullscreen = async () => {
+      if (simulationWindowRef.current && !document.fullscreenElement) {
+        try {
+          await simulationWindowRef.current.requestFullscreen();
+        } catch (err) {
+          console.log('Fullscreen request failed:', err);
+        }
+      }
+    };
+
+    const exitFullscreen = async () => {
+      if (document.fullscreenElement) {
+        try {
+          await document.exitFullscreen();
+        } catch (err) {
+          console.log('Exit fullscreen failed:', err);
+        }
+      }
+    };
+
+    if (theaterMode) {
+      enterFullscreen();
+      document.body.style.overflow = 'hidden';
+    } else {
+      exitFullscreen();
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [theaterMode]);
+
+  // Sync with fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && theaterMode) {
+        setTheaterMode(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [theaterMode]);
+
+  // Trigger resize when theater mode changes
+  useEffect(() => {
     const timer = setTimeout(() => {
       window.dispatchEvent(new Event('resize'));
     }, 100);
-
     return () => clearTimeout(timer);
   }, [theaterMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Theater mode
       if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         setTheaterMode(prev => !prev);
       }
-
-      // Exit theater mode
       if (e.key === 'Escape' && theaterMode) {
         setTheaterMode(false);
       }
-
-      // Show keyboard hints
       if (e.key === '?' && e.shiftKey) {
         setShowKeyboardHints(prev => !prev);
       }
-
-      // Quick switcher
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setShowQuickSwitcher(prev => !prev);
-      }
-
-      // Play/Pause
       if (e.key === ' ' && theaterMode) {
         e.preventDefault();
         setIsRunning(prev => !prev);
       }
-
-      // Performance metrics
       if (e.key === 'p' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setShowPerformance(prev => !prev);
       }
-
-      // Info panel
       if (e.key === 'i') {
         setShowInfo(prev => !prev);
       }
-
-      // Speed control
       if (e.key === '+' || e.key === '=') {
-        setSpeed(prev => Math.min(3, prev + 0.1));
+        setSpeed(prev => Math.min(3, +(prev + 0.1).toFixed(1)));
       }
       if (e.key === '-' || e.key === '_') {
-        setSpeed(prev => Math.max(0.1, prev - 0.1));
+        setSpeed(prev => Math.max(0.1, +(prev - 0.1).toFixed(1)));
       }
     };
 
@@ -1140,13 +1010,7 @@ export default function SimulationsPage() {
     }, 100);
   }, []);
 
-  const handleScreenshot = () => {
-    // This would need to be implemented based on the specific simulation
-    console.log('Screenshot captured');
-  };
-
   const activeItem = allItems.find(item => item.key === activeSimulation);
-  const availableSimulations = allItems.filter(item => !item.comingSoon);
 
   const renderSimulation = () => {
     switch (activeSimulation) {
@@ -1186,11 +1050,6 @@ export default function SimulationsPage() {
 
   return (
     <PageContainer>
-      <TheaterOverlay
-        $active={theaterMode}
-        onClick={() => setTheaterMode(false)}
-      />
-
       <MatrixBackground>
         <MatrixRain fontSize={32} layers={3} />
       </MatrixBackground>
@@ -1243,7 +1102,7 @@ export default function SimulationsPage() {
                     <Badge $variant="social">Interactive</Badge>
                   )}
                   {item.comingSoon && (
-                    <Badge $variant="coming-soon">Coming Soon</Badge>
+                    <Badge $variant="coming-soon">Soon</Badge>
                   )}
                 </BadgeContainer>
 
@@ -1263,8 +1122,8 @@ export default function SimulationsPage() {
           </ItemsGrid>
         </FadingElements>
 
-        {activeItem && !activeItem.comingSoon && (
-          <TheaterControls $theater={theaterMode}>
+        {activeItem && !activeItem.comingSoon && !theaterMode && (
+          <TheaterControls $theater={false}>
             <ControlButton
               onClick={() => setIsRunning(!isRunning)}
               $variant={isRunning ? 'danger' : 'primary'}
@@ -1292,18 +1151,16 @@ export default function SimulationsPage() {
             </SpeedControl>
 
             <ControlButton
-              onClick={() => setTheaterMode(!theaterMode)}
-              $active={theaterMode}
-              title="Theater Mode (F)"
+              onClick={() => setTheaterMode(true)}
+              title="Fullscreen Focus Mode (F)"
             >
-              {theaterMode ? <Monitor size={18} /> : <Eye size={18} />}
+              <Maximize2 size={18} />
               Focus
             </ControlButton>
 
             <ControlButton
               onClick={() => setShowPerformance(!showPerformance)}
               $active={showPerformance}
-              title="Performance (Ctrl/Cmd + P)"
             >
               <Gauge size={18} />
             </ControlButton>
@@ -1311,7 +1168,6 @@ export default function SimulationsPage() {
             <ControlButton
               onClick={() => setShowInfo(!showInfo)}
               $active={showInfo}
-              title="Info (I)"
             >
               <Info size={18} />
             </ControlButton>
@@ -1323,16 +1179,13 @@ export default function SimulationsPage() {
               {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </ControlButton>
 
-            <ControlButton
-              onClick={() => setShowKeyboardHints(true)}
-              title="Keyboard Shortcuts (?)"
-            >
+            <ControlButton onClick={() => setShowKeyboardHints(true)}>
               <HelpCircle size={18} />
             </ControlButton>
           </TheaterControls>
         )}
 
-        <TheaterSimulationWindow $theater={theaterMode}>
+        <SimulationWindow ref={simulationWindowRef} $fullscreen={theaterMode}>
           {activeItem && (
             <>
               <StatusBar $theater={theaterMode}>
@@ -1346,7 +1199,7 @@ export default function SimulationsPage() {
                 {activeItem.optimized && (
                   <div className="status-item">
                     <div className="status-dot optimized" />
-                    GPU Accelerated
+                    GPU
                   </div>
                 )}
               </StatusBar>
@@ -1358,11 +1211,7 @@ export default function SimulationsPage() {
                 </div>
                 <div className="metric">
                   <span>Frame Time</span>
-                  <span className="value">{(1000 / fps).toFixed(1)}ms</span>
-                </div>
-                <div className="metric">
-                  <span>Speed</span>
-                  <span className="value">{speed.toFixed(1)}x</span>
+                  <span className="value">{(1000 / Math.max(1, fps)).toFixed(1)}ms</span>
                 </div>
               </PerformancePanel>
 
@@ -1371,50 +1220,94 @@ export default function SimulationsPage() {
                 <p>{activeItem.description}</p>
               </InfoPanel>
 
-              {theaterMode && (
-                <ScreenshotButton onClick={handleScreenshot}>
-                  <Camera size={16} />
-                  Capture
-                </ScreenshotButton>
-              )}
-
               <SimulationContent $theater={theaterMode}>
                 {renderSimulation()}
               </SimulationContent>
+
+              {theaterMode && (
+                <TheaterControls $theater>
+                  <ControlButton
+                    onClick={() => setIsRunning(!isRunning)}
+                    $variant={isRunning ? 'danger' : 'primary'}
+                    $theater
+                  >
+                    {isRunning ? <Pause size={18} /> : <Play size={18} />}
+                    {isRunning ? 'Pause' : 'Run'}
+                  </ControlButton>
+
+                  <ControlButton onClick={handleReset} $theater>
+                    <RotateCcw size={18} />
+                    Reset
+                  </ControlButton>
+
+                  <SpeedControl $theater>
+                    <span>Speed</span>
+                    <input
+                      type="range"
+                      min={0.1}
+                      max={3}
+                      step={0.1}
+                      value={speed}
+                      onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                    />
+                    <div className="value">{speed.toFixed(1)}x</div>
+                  </SpeedControl>
+
+                  <ControlButton
+                    onClick={() => setTheaterMode(false)}
+                    title="Exit Fullscreen (ESC)"
+                    $theater
+                  >
+                    <Eye size={18} />
+                    Exit
+                  </ControlButton>
+
+                  <ControlButton
+                    onClick={() => setShowPerformance(!showPerformance)}
+                    $active={showPerformance}
+                    $theater
+                  >
+                    <Gauge size={18} />
+                  </ControlButton>
+
+                  <ControlButton
+                    onClick={() => setShowInfo(!showInfo)}
+                    $active={showInfo}
+                    $theater
+                  >
+                    <Info size={18} />
+                  </ControlButton>
+
+                  <ControlButton
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    $active={soundEnabled}
+                    $theater
+                  >
+                    {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                  </ControlButton>
+
+                  <ControlButton
+                    onClick={() => setShowKeyboardHints(true)}
+                    $theater
+                  >
+                    <HelpCircle size={18} />
+                  </ControlButton>
+                </TheaterControls>
+              )}
             </>
           )}
-        </TheaterSimulationWindow>
-
-        <QuickSwitcher $show={showQuickSwitcher && theaterMode}>
-          {availableSimulations.map(item => (
-            <QuickSimCard
-              key={item.key}
-              $active={activeSimulation === item.key}
-              onClick={() => {
-                setActiveSimulation(item.key);
-                setShowQuickSwitcher(false);
-              }}
-            >
-              <div className="icon">{item.icon}</div>
-              <span>{item.label.split(' ')[0]}</span>
-            </QuickSimCard>
-          ))}
-        </QuickSwitcher>
+        </SimulationWindow>
 
         <KeyboardHintOverlay $show={showKeyboardHints}>
           <HintTitle>Keyboard Shortcuts</HintTitle>
           <HintGrid>
             <HintItem>
-              <span>Theater Mode</span>
+              <span>Fullscreen Focus</span>
               <span className="key">F</span>
             </HintItem>
             <HintItem>
               <span>Play / Pause</span>
               <span className="key">Space</span>
-            </HintItem>
-            <HintItem>
-              <span>Quick Switcher</span>
-              <span className="key">Ctrl/Cmd + K</span>
             </HintItem>
             <HintItem>
               <span>Performance</span>
@@ -1433,7 +1326,7 @@ export default function SimulationsPage() {
               <span className="key">-</span>
             </HintItem>
             <HintItem>
-              <span>Exit / Close</span>
+              <span>Exit Fullscreen</span>
               <span className="key">Esc</span>
             </HintItem>
           </HintGrid>

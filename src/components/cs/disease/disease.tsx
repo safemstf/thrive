@@ -3,8 +3,9 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import {
   PlayCircle, PauseCircle, RefreshCw, Shield, Users, Heart,
-  BarChart3, Settings, Zap, Home, Building2,
-  Bug, ChevronDown, Download, Activity, Network, Maximize, X
+  BarChart3, Settings, Zap, Home, Building2, Bug,
+  Activity, Network, ChevronUp, ChevronDown,
+  X
 } from "lucide-react";
 import {
   Chart as ChartJS,
@@ -17,176 +18,167 @@ import {
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import styled from 'styled-components';
+import { DISEASE_PROFILES, type Agent, type SimulationMode } from './disease.types';
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
-// Types
-interface Agent {
-  id: number;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  state: "S" | "E" | "I" | "R" | "D" | "V";
-  timer: number;
-  immunity: number;
-  age: number;
-  ageGroup: 'child' | 'adult' | 'elderly';
-  exposedTimer?: number;
-  infectedBy?: number;
-  infectionTime?: number;
-  community?: number;
-  mobility: number;
-  mask: boolean;
-  vaccinated: boolean;
-  quarantined: boolean;
-  contacts: Set<number>;
-}
-
-type SimulationMode = 'well-mixed' | 'spatial-network' | 'age-structured' | 'mobility-network' | 'small-world' | 'scale-free';
-
-interface DiseaseProfile {
-  id: string;
-  name: string;
-  pathogen: string;
-  color: string;
-  transmissionMode: string;
-  r0: { min: number; max: number; typical: number };
-  incubationDays: { min: number; max: number; mean: number };
-  infectiousDays: { min: number; max: number; mean: number };
-  cfr: number;
-  ageSpecificCFR: { child: number; adult: number; elderly: number };
-  transmissionProb: number;
-  asymptomaticRate: number;
-  hospitalizationRate: number;
-  vaccineEfficacy: number;
-  naturalImmunityDuration: number;
-  interventions: {
-    masks: { efficacy: number };
-    distancing: { efficacy: number };
-    quarantine: { efficacy: number };
-    vaccination: { efficacy: number };
-    lockdown: { efficacy: number };
-    testing: { efficacy: number };
-  };
-}
-
-const DISEASE_PROFILES: Record<string, DiseaseProfile> = {
-  'covid19': {
-    id: 'covid19',
-    name: 'COVID-19 (SARS-CoV-2)',
-    pathogen: 'Coronavirus',
-    color: '#ef4444',
-    transmissionMode: 'Airborne/Droplet',
-    r0: { min: 2, max: 8, typical: 3.5 },
-    incubationDays: { min: 2, max: 14, mean: 5 },
-    infectiousDays: { min: 5, max: 10, mean: 7 },
-    cfr: 0.01,
-    ageSpecificCFR: { child: 0.001, adult: 0.005, elderly: 0.08 },
-    transmissionProb: 0.06,
-    asymptomaticRate: 0.3,
-    hospitalizationRate: 0.05,
-    vaccineEfficacy: 0.85,
-    naturalImmunityDuration: 180,
-    interventions: {
-      masks: { efficacy: 0.5 },
-      distancing: { efficacy: 0.6 },
-      quarantine: { efficacy: 0.8 },
-      vaccination: { efficacy: 0.85 },
-      lockdown: { efficacy: 0.75 },
-      testing: { efficacy: 0.4 }
-    }
-  },
-  'influenza': {
-    id: 'influenza',
-    name: 'Seasonal Influenza',
-    pathogen: 'Influenza Virus',
-    color: '#3b82f6',
-    transmissionMode: 'Airborne/Droplet',
-    r0: { min: 1, max: 2, typical: 1.3 },
-    incubationDays: { min: 1, max: 4, mean: 2 },
-    infectiousDays: { min: 3, max: 7, mean: 5 },
-    cfr: 0.001,
-    ageSpecificCFR: { child: 0.0001, adult: 0.0005, elderly: 0.005 },
-    transmissionProb: 0.04,
-    asymptomaticRate: 0.2,
-    hospitalizationRate: 0.01,
-    vaccineEfficacy: 0.6,
-    naturalImmunityDuration: 365,
-    interventions: {
-      masks: { efficacy: 0.4 },
-      distancing: { efficacy: 0.5 },
-      quarantine: { efficacy: 0.7 },
-      vaccination: { efficacy: 0.6 },
-      lockdown: { efficacy: 0.6 },
-      testing: { efficacy: 0.3 }
-    }
-  },
-  'measles': {
-    id: 'measles',
-    name: 'Measles',
-    pathogen: 'Measles Virus',
-    color: '#f59e0b',
-    transmissionMode: 'Airborne',
-    r0: { min: 12, max: 18, typical: 15 },
-    incubationDays: { min: 7, max: 21, mean: 10 },
-    infectiousDays: { min: 4, max: 8, mean: 6 },
-    cfr: 0.002,
-    ageSpecificCFR: { child: 0.003, adult: 0.001, elderly: 0.002 },
-    transmissionProb: 0.15,
-    asymptomaticRate: 0.05,
-    hospitalizationRate: 0.02,
-    vaccineEfficacy: 0.97,
-    naturalImmunityDuration: 36500,
-    interventions: {
-      masks: { efficacy: 0.2 },
-      distancing: { efficacy: 0.3 },
-      quarantine: { efficacy: 0.9 },
-      vaccination: { efficacy: 0.97 },
-      lockdown: { efficacy: 0.8 },
-      testing: { efficacy: 0.5 }
-    }
-  },
-  'ebola': {
-    id: 'ebola',
-    name: 'Ebola',
-    pathogen: 'Ebola Virus',
-    color: '#7c3aed',
-    transmissionMode: 'Contact/Bodily Fluids',
-    r0: { min: 1.5, max: 2.5, typical: 2 },
-    incubationDays: { min: 2, max: 21, mean: 8 },
-    infectiousDays: { min: 7, max: 14, mean: 10 },
-    cfr: 0.5,
-    ageSpecificCFR: { child: 0.6, adult: 0.45, elderly: 0.7 },
-    transmissionProb: 0.03,
-    asymptomaticRate: 0.02,
-    hospitalizationRate: 0.95,
-    vaccineEfficacy: 0.75,
-    naturalImmunityDuration: 3650,
-    interventions: {
-      masks: { efficacy: 0.2 },
-      distancing: { efficacy: 0.7 },
-      quarantine: { efficacy: 0.98 },
-      vaccination: { efficacy: 0.75 },
-      lockdown: { efficacy: 0.9 },
-      testing: { efficacy: 0.7 }
-    }
-  }
-};
-
 // Styled Components
-const Container = styled.div`
+const Container = styled.div<{ $theater?: boolean }>`
   width: 100%;
-  min-height: 100vh;
-  background: linear-gradient(to bottom, #0a0e1a, #1a1a2e);
+  min-height: ${({ $theater }) => $theater ? '100vh' : '100vh'};
+  background: ${({ $theater }) => $theater ? 'transparent' : 'linear-gradient(to bottom, #0a0e1a, #1a1a2e)'};
   color: #e6eef8;
-  padding: 2rem 1rem;
+  padding: ${({ $theater }) => $theater ? '0' : '2rem 1rem'};
   box-sizing: border-box;
-  border-radius: 12px;
+  position: relative;
 
   @media (max-width: 768px) {
-    padding: 1rem 0.75rem;
+    padding: ${({ $theater }) => $theater ? '0' : '1rem 0.75rem'};
   }
+`;
+
+const TheaterCanvas = styled.canvas<{ $theater?: boolean }>`
+  position: ${({ $theater }) => $theater ? 'fixed' : 'relative'};
+  inset: ${({ $theater }) => $theater ? '0' : 'auto'};
+  width: 100%;
+  height: ${({ $theater }) => $theater ? '100vh' : '100%'};
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  z-index: 1;
+  
+  &:active {
+    cursor: grabbing;
+  }
+`;
+
+const ControlsDrawer = styled.div<{ $expanded: boolean }>`
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(10, 14, 26, 0.98);
+  backdrop-filter: blur(20px);
+  border-top: 2px solid rgba(59, 130, 246, 0.3);
+  z-index: 100;
+  max-height: ${({ $expanded }) => $expanded ? '70vh' : '60px'};
+  transition: max-height 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+`;
+
+const DrawerHandle = styled.button`
+  width: 100%;
+  padding: 1rem;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.1);
+  }
+`;
+
+const DrawerContent = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.5rem;
+  min-height: 0;
+  
+  /* Ensure proper scrolling */
+  -webkit-overflow-scrolling: touch;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(51, 65, 85, 0.3);
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.5);
+    border-radius: 3px;
+    
+    &:hover {
+      background: rgba(59, 130, 246, 0.7);
+    }
+  }
+`;
+
+const FullscreenOverlay = styled.div<{ $show: boolean }>`
+  position: fixed;
+  inset: 0;
+  background: #0a0e1a;
+  z-index: 10000;
+  display: ${({ $show }) => ($show ? 'flex' : 'none')};
+  flex-direction: column;
+`;
+
+const FullscreenCanvas = styled.canvas`
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+  
+  &:active {
+    cursor: grabbing;
+  }
+`;
+
+const FullscreenControls = styled.div`
+  position: absolute;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(0,0,0,0.95);
+  padding: 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(59,130,246,0.5);
+  z-index: 100;
+`;
+
+const FullscreenButton = styled.button<{ $primary?: boolean }>`
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: ${({ $primary }) => ($primary ? '#6366f1' : 'rgba(51,65,85,0.8)')};
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const ExitButton = styled.button`
+  position: absolute;
+  top: calc(1rem + env(safe-area-inset-top));
+  right: 1rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.9);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 1px solid rgba(59,130,246,0.5);
+  z-index: 100;
 `;
 
 const MaxWidthWrapper = styled.div`
@@ -197,10 +189,6 @@ const MaxWidthWrapper = styled.div`
 const Header = styled.header`
   text-align: center;
   margin-bottom: 2rem;
-  
-  @media (max-width: 768px) {
-    margin-bottom: 1.5rem;
-  }
 `;
 
 const Title = styled.h1`
@@ -217,10 +205,6 @@ const Title = styled.h1`
 const Subtitle = styled.p`
   font-size: 1rem;
   color: #94a3b8;
-  
-  @media (max-width: 768px) {
-    font-size: 0.9rem;
-  }
 `;
 
 const ViewSimButton = styled.button`
@@ -283,62 +267,34 @@ const SimCanvas = styled.canvas`
   }
 `;
 
-const HUD = styled.div`
-  position: absolute;
+const HUD = styled.div<{ $theater?: boolean }>`
+  position: fixed;
   top: 1rem;
   left: 1rem;
   padding: 0.75rem 1rem;
   border-radius: 10px;
-  background: rgba(0,0,0,0.85);
+  background: rgba(0,0,0,0.9);
   backdrop-filter: blur(10px);
   color: #e2e8f0;
   border: 1px solid rgba(59,130,246,0.3);
   font-size: 0.9rem;
-  z-index: 12;
+  z-index: 50;
   min-width: 180px;
 `;
 
 const NetworkOverlay = styled.div`
-  position: absolute;
+  position: fixed;
   top: 1rem;
   right: 1rem;
   padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.9);
   backdrop-filter: blur(10px);
   border-radius: 8px;
   border: 1px solid rgba(59, 130, 246, 0.3);
   font-size: 0.75rem;
   color: #fff;
-  z-index: 10;
+  z-index: 50;
   max-width: 250px;
-`;
-
-const PlaybackControls = styled.div`
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 1.25rem;
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  background: rgba(0,0,0,0.85);
-  padding: 0.6rem 1rem;
-  border-radius: 999px;
-  border: 1px solid rgba(59,130,246,0.3);
-  z-index: 12;
-  
-  button {
-    background: transparent;
-    border: none;
-    color: #e6eef8;
-    padding: 0.5rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    min-width: 44px;
-    min-height: 44px;
-    justify-content: center;
-  }
 `;
 
 const ControlsSection = styled.section`
@@ -348,11 +304,6 @@ const ControlsSection = styled.section`
   background: rgba(8,12,20,0.6);
   border: 1px solid rgba(59,130,246,0.1);
   margin-bottom: 1.5rem;
-  
-  @media (max-width: 768px) {
-    padding: 1rem;
-    margin-bottom: 1rem;
-  }
 `;
 
 const SectionTitle = styled.div`
@@ -370,10 +321,6 @@ const TabContainer = styled.div`
   gap: 0.5rem;
   margin-bottom: 1rem;
   overflow-x: auto;
-  
-  @media (max-width: 768px) {
-    gap: 0.3rem;
-  }
 `;
 
 const Tab = styled.button<{ $active?: boolean }>`
@@ -389,12 +336,6 @@ const Tab = styled.button<{ $active?: boolean }>`
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
-  
-  @media (max-width: 768px) {
-    padding: 0.5rem 0.8rem;
-    font-size: 0.85rem;
-    min-height: 44px;
-  }
 `;
 
 const TabContent = styled.div`
@@ -408,7 +349,6 @@ const Grid = styled.div<{ $columns: number }>`
   
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
-    gap: 0.75rem;
   }
 `;
 
@@ -458,11 +398,6 @@ const InterventionGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 0.8rem;
-  
-  @media (max-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.6rem;
-  }
 `;
 
 const InterventionCard = styled.button<{ $active?: boolean; $color?: string }>`
@@ -495,15 +430,6 @@ const InterventionCard = styled.button<{ $active?: boolean; $color?: string }>`
     color: #94a3b8;
     text-align: center;
   }
-  
-  @media (max-width: 768px) {
-    padding: 0.8rem;
-    min-height: 90px;
-    
-    .name {
-      font-size: 0.85rem;
-    }
-  }
 `;
 
 const StatCard = styled.div<{ $color?: string }>`
@@ -533,69 +459,6 @@ const StatCard = styled.div<{ $color?: string }>`
   }
 `;
 
-const FullscreenOverlay = styled.div<{ $show: boolean }>`
-  position: fixed;
-  inset: 0;
-  background: #0a0e1a;
-  z-index: 10000;
-  display: ${({ $show }) => ($show ? 'flex' : 'none')};
-  flex-direction: column;
-`;
-
-const FullscreenCanvas = styled.canvas`
-  width: 100%;
-  height: 100%;
-  cursor: grab;
-  touch-action: none;
-  
-  &:active {
-    cursor: grabbing;
-  }
-`;
-
-const FullscreenControls = styled.div`
-  position: absolute;
-  bottom: calc(1.5rem + env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 0.5rem;
-  background: rgba(0,0,0,0.95);
-  padding: 0.75rem;
-  border-radius: 999px;
-  border: 1px solid rgba(59,130,246,0.5);
-`;
-
-const FullscreenButton = styled.button<{ $primary?: boolean }>`
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  cursor: pointer;
-  background: ${({ $primary }) => ($primary ? '#6366f1' : 'rgba(51,65,85,0.8)')};
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const ExitButton = styled.button`
-  position: absolute;
-  top: calc(1rem + env(safe-area-inset-top));
-  right: 1rem;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0,0,0,0.9);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border: 1px solid rgba(59,130,246,0.5);
-`;
-
 const DiseaseSelector = styled.div`
   margin-bottom: 1.5rem;
 `;
@@ -612,6 +475,7 @@ const DiseaseButton = styled.button<{ $color: string; $selected: boolean }>`
   color: white;
   cursor: pointer;
   text-align: left;
+  margin-bottom: 0.5rem;
   
   .disease-icon {
     width: 10px;
@@ -641,22 +505,21 @@ interface DiseaseSimulationProps {
   isDark?: boolean;
   isRunning?: boolean;
   speed?: number;
+  isTheaterMode?: boolean;
 }
-
 
 export default function DiseaseSimulation({
   isDark = false,
   isRunning: isRunningProp = false,
-  speed: speedProp = 1
+  speed: speedProp = 1,
+  isTheaterMode = false
 }: DiseaseSimulationProps) {
-
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fullscreenCanvasRef = useRef<HTMLCanvasElement>(null);
+  const theaterCanvasRef = useRef<HTMLCanvasElement>(null);
   const agents = useRef<Agent[]>([]);
   const animationRef = useRef<number | null>(null);
   const networkConnections = useRef<Map<number, Set<number>>>(new Map());
   const ticksPerDay = 30;
-
 
   // Pan & Zoom
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -667,14 +530,15 @@ export default function DiseaseSimulation({
   const lastZoomRef = useRef<number>(1);
 
   // State
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [drawerExpanded, setDrawerExpanded] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [tickCount, setTickCount] = useState(0);
   const [history, setHistory] = useState<any[]>([]);
   const [selectedDisease, setSelectedDisease] = useState<string>('covid19');
   const [activeTab, setActiveTab] = useState<'parameters' | 'interventions' | 'statistics'>('parameters');
-  const [simulationMode, setSimulationMode] = useState<SimulationMode>('spatial-network');
+  const [simulationMode, setSimulationMode] = useState<SimulationMode>('homogeneous');
+  const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
 
   const disease = DISEASE_PROFILES[selectedDisease];
 
@@ -682,17 +546,12 @@ export default function DiseaseSimulation({
   const [population, setPopulation] = useState(800);
   const [initialInfected, setInitialInfected] = useState(3);
   const [vaccinationRate, setVaccinationRate] = useState(0);
-  const [contactRate, setContactRate] = useState(12);
-  const [testingRate, setTestingRate] = useState(0);
-  const [travelRate, setTravelRate] = useState(0.01);
 
   // Interventions
   const [socialDistancing, setSocialDistancing] = useState(false);
   const [vaccination, setVaccination] = useState(false);
   const [quarantine, setQuarantine] = useState(false);
   const [maskWearing, setMaskWearing] = useState(false);
-  const [lockdown, setLockdown] = useState(false);
-  const [contactTracing, setContactTracing] = useState(false);
 
   // Statistics
   const [stats, setStats] = useState({
@@ -701,15 +560,13 @@ export default function DiseaseSimulation({
     day: 0,
     newCases: 0,
     totalCases: 0,
-    peakInfected: 0,
-    activeOutbreaks: 0,
-    superspreaderEvents: 0
+    peakInfected: 0
   });
 
   const canvasWidth = useRef(1200);
   const canvasHeight = useRef(675);
 
-  // Network generation (simplified for brevity)
+  // Generate spatial network
   const generateSpatialNetwork = (agents: Agent[], width: number, height: number) => {
     const connections = new Map<number, Set<number>>();
     const numClusters = 6;
@@ -723,7 +580,7 @@ export default function DiseaseSimulation({
       const distances = clusters.map(c => Math.sqrt((agent.x - c.x) ** 2 + (agent.y - c.y) ** 2));
       const closest = distances.indexOf(Math.min(...distances));
       clusters[closest].members.push(idx);
-      agent.community = closest;
+      agent.region = closest;
     });
 
     clusters.forEach(cluster => {
@@ -751,42 +608,16 @@ export default function DiseaseSimulation({
     const newAgents: Agent[] = [];
 
     for (let i = 0; i < population; i++) {
-      const rand = Math.random();
-      let ageGroup: 'child' | 'adult' | 'elderly';
-      let age: number;
-      let mobility: number;
-
-      if (rand < 0.2) {
-        ageGroup = 'child';
-        age = Math.floor(Math.random() * 18);
-        mobility = 1.5;
-      } else if (rand < 0.85) {
-        ageGroup = 'adult';
-        age = 18 + Math.floor(Math.random() * 47);
-        mobility = 1.0;
-      } else {
-        ageGroup = 'elderly';
-        age = 65 + Math.floor(Math.random() * 35);
-        mobility = 0.5;
-      }
-
       newAgents.push({
         id: i,
         x: Math.random() * width,
         y: Math.random() * height,
-        vx: (Math.random() - 0.5) * 2 * mobility,
-        vy: (Math.random() - 0.5) * 2 * mobility,
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
         state: "S",
         timer: 0,
         immunity: 0,
-        age,
-        ageGroup,
-        mobility,
-        mask: false,
-        vaccinated: false,
-        quarantined: false,
-        contacts: new Set(),
-        community: Math.floor(Math.random() * 6)
+        region: Math.floor(Math.random() * 6)
       });
     }
 
@@ -804,19 +635,17 @@ export default function DiseaseSimulation({
     if (vaccination && vaccinationRate > 0) {
       const numToVaccinate = Math.floor(population * vaccinationRate);
       let vaccinated = 0;
-      const sortedByAge = [...newAgents].sort((a, b) => b.age - a.age);
-      for (const agent of sortedByAge) {
+      for (const agent of newAgents) {
         if (vaccinated >= numToVaccinate) break;
         if (agent.state === "S") {
           agent.state = "V";
-          agent.immunity = disease.vaccineEfficacy;
-          agent.vaccinated = true;
+          agent.immunity = disease.interventions.vaccination?.efficacy || 0.85;
           vaccinated++;
         }
       }
     }
 
-    if (simulationMode === 'spatial-network') {
+    if (simulationMode === 'regions') {
       networkConnections.current = generateSpatialNetwork(newAgents, width, height);
     }
 
@@ -845,9 +674,7 @@ export default function DiseaseSimulation({
       day: Math.floor(tickCount / ticksPerDay),
       newCases,
       totalCases,
-      peakInfected,
-      activeOutbreaks: 0,
-      superspreaderEvents: 0
+      peakInfected
     });
   };
 
@@ -857,15 +684,14 @@ export default function DiseaseSimulation({
     const width = canvasWidth.current;
     const height = canvasHeight.current;
 
-    const maskEffect = maskWearing ? (1 - disease.interventions.masks.efficacy) : 1;
-    const distanceEffect = socialDistancing ? (1 - disease.interventions.distancing.efficacy) : 1;
-    const lockdownEffect = lockdown ? (1 - disease.interventions.lockdown.efficacy) : 1;
-    const effectiveTransmissionProb = disease.transmissionProb * maskEffect * distanceEffect * lockdownEffect;
-    const speedMultiplier = lockdown ? 0.1 : (socialDistancing ? 0.5 : 1.0);
+    const maskEffect = maskWearing ? (1 - (disease.interventions.masks?.efficacy || 0)) : 1;
+    const distanceEffect = socialDistancing ? (1 - (disease.interventions.distancing?.efficacy || 0)) : 1;
+    const effectiveTransmissionProb = disease.transmissionProb * maskEffect * distanceEffect;
+    const speedMultiplier = socialDistancing ? 0.5 : 1.0;
 
     for (const agent of agents.current) {
-      if (!agent.quarantined) {
-        const mobility = agent.mobility * speedMultiplier * speed;
+      if (!quarantine || agent.state !== "I") {
+        const mobility = speedMultiplier * speed;
         agent.vx += (Math.random() - 0.5) * 0.5 * mobility;
         agent.vy += (Math.random() - 0.5) * 0.5 * mobility;
 
@@ -894,63 +720,39 @@ export default function DiseaseSimulation({
         if (agent.exposedTimer <= 0) {
           agent.state = "I";
           agent.timer = Math.floor(disease.infectiousDays.mean * ticksPerDay);
-          if (quarantine && Math.random() > disease.asymptomaticRate) {
-            agent.quarantined = true;
-          }
         }
       } else if (agent.state === "I") {
         agent.timer--;
         if (agent.timer <= 0) {
-          const cfr = disease.ageSpecificCFR[agent.ageGroup];
-          if (Math.random() < cfr) {
+          if (Math.random() < disease.cfr) {
             agent.state = "D";
             agent.vx = 0;
             agent.vy = 0;
           } else {
             agent.state = "R";
             agent.immunity = 0.95;
-            agent.quarantined = false;
           }
         }
       }
     }
 
-    if (simulationMode === 'spatial-network' && networkConnections.current.size > 0) {
-      for (const infected of agents.current.filter(a => a.state === "I")) {
-        const connections = networkConnections.current.get(infected.id) || new Set();
-        for (const targetId of connections) {
-          const susceptible = agents.current[targetId];
-          if (!susceptible || (susceptible.state !== "S" && susceptible.state !== "V")) continue;
+    // Transmission
+    for (const infected of agents.current.filter(a => a.state === "I")) {
+      for (const susceptible of agents.current) {
+        if (susceptible.state !== "S" && susceptible.state !== "V") continue;
 
-          let transmissionChance = effectiveTransmissionProb;
+        const dx = infected.x - susceptible.x;
+        const dy = infected.y - susceptible.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < disease.transmissionRadius) {
+          let transmissionChance = effectiveTransmissionProb * (1 - distance / disease.transmissionRadius);
           if (susceptible.immunity > 0) transmissionChance *= (1 - susceptible.immunity);
 
           if (Math.random() < transmissionChance) {
             susceptible.state = "E";
             susceptible.exposedTimer = Math.floor(disease.incubationDays.mean * ticksPerDay);
-            susceptible.infectedBy = infected.id;
             susceptible.infectionTime = tickCount;
-          }
-        }
-      }
-    } else {
-      for (const infected of agents.current.filter(a => a.state === "I")) {
-        for (const susceptible of agents.current) {
-          if (susceptible.state !== "S" && susceptible.state !== "V") continue;
-
-          const dx = infected.x - susceptible.x;
-          const dy = infected.y - susceptible.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < 50) {
-            let transmissionChance = effectiveTransmissionProb * (1 - distance / 50);
-            if (susceptible.immunity > 0) transmissionChance *= (1 - susceptible.immunity);
-
-            if (Math.random() < transmissionChance) {
-              susceptible.state = "E";
-              susceptible.exposedTimer = Math.floor(disease.incubationDays.mean * ticksPerDay);
-              susceptible.infectionTime = tickCount;
-            }
           }
         }
       }
@@ -971,7 +773,7 @@ export default function DiseaseSimulation({
     }
 
     setTickCount(prev => prev + 1);
-  }, [isRunning, speed, disease, socialDistancing, maskWearing, quarantine, lockdown, tickCount, simulationMode, stats]);
+  }, [isRunning, speed, disease, socialDistancing, maskWearing, quarantine, tickCount, stats]);
 
   const render = useCallback((canvas: HTMLCanvasElement | null) => {
     if (!canvas) return;
@@ -984,7 +786,7 @@ export default function DiseaseSimulation({
     ctx.translate(panOffset.x, panOffset.y);
     ctx.scale(zoomLevel, zoomLevel);
 
-    if (simulationMode === 'spatial-network' && networkConnections.current.size > 0) {
+    if (simulationMode === 'regions' && networkConnections.current.size > 0) {
       ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)';
       ctx.lineWidth = 1;
       networkConnections.current.forEach((connections, fromId) => {
@@ -1005,7 +807,7 @@ export default function DiseaseSimulation({
 
     for (const a of agents.current) {
       if (a.state === 'D') continue;
-      let size = a.ageGroup === 'child' ? 2.5 : a.ageGroup === 'elderly' ? 3.5 : 3;
+      let size = 3;
       let color = '#3b82f6';
 
       switch (a.state) {
@@ -1025,7 +827,7 @@ export default function DiseaseSimulation({
     ctx.restore();
   }, [disease, simulationMode, panOffset, zoomLevel]);
 
-  // Touch handlers
+  // Touch/mouse handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const touch1 = e.touches[0];
@@ -1082,48 +884,47 @@ export default function DiseaseSimulation({
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(1);
   };
-  // Sync isRunning prop with internal state
+
+  // Sync props
   useEffect(() => {
     setIsRunning(isRunningProp);
   }, [isRunningProp]);
 
-  // Sync speed prop with internal state
   useEffect(() => {
     setSpeed(speedProp);
   }, [speedProp]);
 
-  // Optional: Use isDark for theme adjustments
-  useEffect(() => {
-    if (isDark) {
-      // Apply dark theme colors if you want different rendering for dark mode
-      // For example, you could adjust the canvas background or particle colors
-    }
-  }, [isDark]);
-
+  // Animation loop
   useEffect(() => {
     const animate = () => {
       update();
-      if (!isFullscreen) render(canvasRef.current);
-      else render(fullscreenCanvasRef.current);
+      const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
+      render(canvas);
       if (isRunning) animationRef.current = requestAnimationFrame(animate);
     };
     if (isRunning) animationRef.current = requestAnimationFrame(animate);
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isRunning, update, render, isFullscreen]);
+  }, [isRunning, update, render, isTheaterMode]);
 
+  // Canvas sizing
   useEffect(() => {
-    const canvas = isFullscreen ? fullscreenCanvasRef.current : canvasRef.current;
+    const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
     if (!canvas) return;
 
     const updateSize = () => {
-      const container = canvas.parentElement;
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      canvasWidth.current = rect.width;
-      canvasHeight.current = rect.height;
+      if (isTheaterMode) {
+        canvasWidth.current = window.innerWidth;
+        canvasHeight.current = window.innerHeight;
+      } else {
+        const container = canvas.parentElement;
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        canvasWidth.current = rect.width;
+        canvasHeight.current = rect.height;
+      }
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+      canvas.width = canvasWidth.current * dpr;
+      canvas.height = canvasHeight.current * dpr;
       const ctx = canvas.getContext('2d');
       if (ctx) ctx.scale(dpr, dpr);
     };
@@ -1135,11 +936,14 @@ export default function DiseaseSimulation({
       window.removeEventListener('resize', updateSize);
       canvas.removeEventListener('wheel', handleWheel);
     };
-  }, [isFullscreen, handleWheel]);
+  }, [isTheaterMode, handleWheel]);
 
   useEffect(() => {
     initAgents();
-    setTimeout(() => render(canvasRef.current), 50);
+    setTimeout(() => {
+      const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
+      render(canvas);
+    }, 50);
   }, [population, initialInfected, selectedDisease, simulationMode]);
 
   const handleReset = () => {
@@ -1148,20 +952,16 @@ export default function DiseaseSimulation({
     setHistory([]);
     initAgents();
     resetView();
-    setTimeout(() => {
-      if (!isFullscreen) render(canvasRef.current);
-      else render(fullscreenCanvasRef.current);
-    }, 100);
   };
 
-  const enterFullscreen = () => {
-    setIsFullscreen(true);
+  const enterMobileFullscreen = () => {
+    setIsMobileFullscreen(true);
     setIsRunning(true);
     resetView();
   };
 
-  const exitFullscreen = () => {
-    setIsFullscreen(false);
+  const exitMobileFullscreen = () => {
+    setIsMobileFullscreen(false);
     setIsRunning(false);
     resetView();
   };
@@ -1187,6 +987,231 @@ export default function DiseaseSimulation({
     animation: { duration: 0 }
   };
 
+  // Theater mode rendering
+  if (isTheaterMode) {
+    return (
+      <Container $theater>
+        <TheaterCanvas
+          ref={theaterCanvasRef}
+          $theater
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        />
+
+        <HUD $theater>
+          <div style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>
+            Day {stats.day}
+          </div>
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.7 }}>Susceptible:</span>
+              <span style={{ fontWeight: 600, color: '#3b82f6' }}>{stats.S}</span>
+            </div>
+            {stats.E > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ opacity: 0.7 }}>Exposed:</span>
+                <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.E}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.7 }}>Infected:</span>
+              <span style={{ fontWeight: 600, color: disease.color }}>{stats.I}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.7 }}>Recovered:</span>
+              <span style={{ fontWeight: 600, color: '#22c55e' }}>{stats.R}</span>
+            </div>
+            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ opacity: 0.7 }}>R(t):</span>
+                <span style={{ fontWeight: 700, color: stats.rt > 1 ? '#ef4444' : '#22c55e' }}>
+                  {stats.rt.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </HUD>
+
+        {simulationMode === 'regions' && (
+          <NetworkOverlay>
+            <div style={{ fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Network size={14} />
+              Regional Network
+            </div>
+          </NetworkOverlay>
+        )}
+
+        <ControlsDrawer $expanded={drawerExpanded}>
+          <DrawerHandle onClick={() => setDrawerExpanded(!drawerExpanded)}>
+            {drawerExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+            <span>Controls & Settings</span>
+          </DrawerHandle>
+
+          <DrawerContent>
+            <MaxWidthWrapper>
+              <SectionTitle>
+                <Bug size={20} />
+                Disease Selection
+              </SectionTitle>
+
+              <DiseaseSelector>
+                {Object.values(DISEASE_PROFILES).map(d => (
+                  <DiseaseButton
+                    key={d.id}
+                    $color={d.color}
+                    $selected={d.id === selectedDisease}
+                    onClick={() => {
+                      setSelectedDisease(d.id);
+                      handleReset();
+                    }}
+                  >
+                    <div className="disease-icon" />
+                    <div className="disease-info">
+                      <div className="disease-name">{d.name}</div>
+                      <div className="disease-stats">
+                        R₀: {d.r0.typical} | CFR: {(d.cfr * 100).toFixed(1)}% | {d.transmissionMode}
+                      </div>
+                    </div>
+                  </DiseaseButton>
+                ))}
+              </DiseaseSelector>
+
+              <TabContainer>
+                <Tab $active={activeTab === 'parameters'} onClick={() => setActiveTab('parameters')}>
+                  <Settings size={16} />
+                  Parameters
+                </Tab>
+                <Tab $active={activeTab === 'interventions'} onClick={() => setActiveTab('interventions')}>
+                  <Shield size={16} />
+                  Interventions
+                </Tab>
+                <Tab $active={activeTab === 'statistics'} onClick={() => setActiveTab('statistics')}>
+                  <BarChart3 size={16} />
+                  Statistics
+                </Tab>
+              </TabContainer>
+
+              <TabContent>
+                {activeTab === 'parameters' && (
+                  <Grid $columns={3}>
+                    <ParameterControl>
+                      <div className="header">
+                        <span className="label">Population</span>
+                        <span className="value">{population}</span>
+                      </div>
+                      <input type="range" min={100} max={2000} step={50} value={population} onChange={(e) => setPopulation(Number(e.target.value))} disabled={isRunning} />
+                    </ParameterControl>
+
+                    <ParameterControl>
+                      <div className="header">
+                        <span className="label">Initial Cases</span>
+                        <span className="value">{initialInfected}</span>
+                      </div>
+                      <input type="range" min={1} max={20} value={initialInfected} onChange={(e) => setInitialInfected(Number(e.target.value))} disabled={isRunning} />
+                    </ParameterControl>
+
+                    <ParameterControl>
+                      <div className="header">
+                        <span className="label">Network Model</span>
+                      </div>
+                      <select value={simulationMode} onChange={(e) => setSimulationMode(e.target.value as SimulationMode)} disabled={isRunning}>
+                        <option value="homogeneous">Homogeneous</option>
+                        <option value="regions">Regional Clusters</option>
+                        <option value="households">Household Structure</option>
+                      </select>
+                    </ParameterControl>
+                  </Grid>
+                )}
+
+                {activeTab === 'interventions' && (
+                  <div>
+                    <InterventionGrid>
+                      {[
+                        { key: 'masks', state: maskWearing, setState: setMaskWearing, icon: Shield, label: 'Mask Mandate', color: '#10b981' },
+                        { key: 'distancing', state: socialDistancing, setState: setSocialDistancing, icon: Users, label: 'Social Distancing', color: '#3b82f6' },
+                        { key: 'quarantine', state: quarantine, setState: setQuarantine, icon: Home, label: 'Quarantine', color: '#f59e0b' },
+                        { key: 'vaccination', state: vaccination, setState: setVaccination, icon: Heart, label: 'Vaccination', color: '#8b5cf6' }
+                      ].map(intervention => {
+                        const efficacy = disease.interventions[intervention.key as keyof typeof disease.interventions]?.efficacy;
+                        return (
+                          <InterventionCard
+                            key={intervention.key}
+                            $active={intervention.state}
+                            $color={intervention.color}
+                            onClick={() => intervention.setState(!intervention.state)}
+                          >
+                            <div className="icon">
+                              <intervention.icon size={24} />
+                            </div>
+                            <div className="name">{intervention.label}</div>
+                            {efficacy && (
+                              <div className="efficacy">
+                                {Math.round(efficacy * 100)}% effective
+                              </div>
+                            )}
+                          </InterventionCard>
+                        );
+                      })}
+                    </InterventionGrid>
+
+                    {vaccination && (
+                      <div style={{ marginTop: '1.5rem' }}>
+                        <ParameterControl>
+                          <div className="header">
+                            <span className="label">Vaccination Coverage</span>
+                            <span className="value">{Math.round(vaccinationRate * 100)}%</span>
+                          </div>
+                          <input type="range" min={0} max={1} step={0.05} value={vaccinationRate} onChange={(e) => setVaccinationRate(Number(e.target.value))} disabled={isRunning} />
+                        </ParameterControl>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'statistics' && (
+                  <div>
+                    <Grid $columns={4}>
+                      <StatCard $color="#3b82f6">
+                        <div className="label">Attack Rate</div>
+                        <div className="value">{((stats.totalCases / population) * 100).toFixed(1)}%</div>
+                        <div className="change">Total: {stats.totalCases}</div>
+                      </StatCard>
+
+                      <StatCard $color={stats.rt > 1 ? '#ef4444' : '#22c55e'}>
+                        <div className="label">R(t)</div>
+                        <div className="value">{stats.rt.toFixed(2)}</div>
+                        <div className="change">{stats.rt > 1 ? 'Growing' : 'Declining'}</div>
+                      </StatCard>
+
+                      <StatCard $color="#fbbf24">
+                        <div className="label">Peak Infected</div>
+                        <div className="value">{stats.peakInfected}</div>
+                        <div className="change">{((stats.peakInfected / population) * 100).toFixed(1)}%</div>
+                      </StatCard>
+
+                      <StatCard $color="#dc2626">
+                        <div className="label">Case Fatality</div>
+                        <div className="value">{stats.D > 0 ? ((stats.D / stats.totalCases) * 100).toFixed(1) : '0'}%</div>
+                        <div className="change">Deaths: {stats.D}</div>
+                      </StatCard>
+                    </Grid>
+
+                    <div style={{ height: '250px', background: 'rgba(0, 0, 0, 0.5)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '1rem' }}>
+                      <Line data={chartData} options={chartOptions} />
+                    </div>
+                  </div>
+                )}
+              </TabContent>
+            </MaxWidthWrapper>
+          </DrawerContent>
+        </ControlsDrawer>
+      </Container>
+    );
+  }
+
+  // Normal mode rendering
   return (
     <>
       <Container>
@@ -1196,8 +1221,8 @@ export default function DiseaseSimulation({
             <Subtitle>Configure parameters and interventions below</Subtitle>
           </Header>
 
-          <ViewSimButton onClick={enterFullscreen}>
-            <Maximize size={24} />
+          <ViewSimButton onClick={enterMobileFullscreen}>
+            <Activity size={24} />
             View Simulation
           </ViewSimButton>
 
@@ -1247,151 +1272,97 @@ export default function DiseaseSimulation({
                   </div>
                 </div>
               </HUD>
-
-              {simulationMode === 'spatial-network' && (
-                <NetworkOverlay>
-                  <div style={{ fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Network size={14} />
-                    Spatial Network
-                  </div>
-                  <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>
-                    Clustered neighbors + bridges
-                  </div>
-                </NetworkOverlay>
-              )}
-
-              <PlaybackControls>
-                <button onClick={() => setIsRunning(!isRunning)}>
-                  {isRunning ? <PauseCircle size={32} /> : <PlayCircle size={32} />}
-                </button>
-                <button onClick={handleReset}>
-                  <RefreshCw size={24} />
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 1rem', borderLeft: '1px solid rgba(255, 255, 255, 0.2)' }}>
-                  <Zap size={14} />
-                  <input type="range" min={0.25} max={3} step={0.25} value={speed} onChange={(e) => setSpeed(Number(e.target.value))} style={{ width: '100px' }} />
-                  <span style={{ fontSize: '0.875rem', fontWeight: 600, minWidth: '35px' }}>{speed}x</span>
-                </div>
-              </PlaybackControls>
             </CanvasContainer>
           </VideoSection>
 
-          <ControlsSection>
-            <SectionTitle>
-              <Bug size={20} />
-              Disease Selection
-            </SectionTitle>
+        <ControlsSection>
+          <SectionTitle>
+            <Bug size={20} />
+            Disease Selection
+          </SectionTitle>
 
-            <DiseaseSelector>
-              {Object.values(DISEASE_PROFILES).map(d => (
-                <DiseaseButton
-                  key={d.id}
-                  $color={d.color}
-                  $selected={d.id === selectedDisease}
-                  onClick={() => {
-                    setSelectedDisease(d.id);
-                    handleReset();
-                  }}
-                >
-                  <div className="disease-icon" />
-                  <div className="disease-info">
-                    <div className="disease-name">{d.name}</div>
-                    <div className="disease-stats">
-                      R₀: {d.r0.typical} | CFR: {(d.cfr * 100).toFixed(1)}% | {d.transmissionMode}
-                    </div>
+          <DiseaseSelector>
+            {Object.values(DISEASE_PROFILES).map(d => (
+              <DiseaseButton
+                key={d.id}
+                $color={d.color}
+                $selected={d.id === selectedDisease}
+                onClick={() => {
+                  setSelectedDisease(d.id);
+                  handleReset();
+                }}
+              >
+                <div className="disease-icon" />
+                <div className="disease-info">
+                  <div className="disease-name">{d.name}</div>
+                  <div className="disease-stats">
+                    R₀: {d.r0.typical} | CFR: {(d.cfr * 100).toFixed(1)}% | {d.transmissionMode}
                   </div>
-                </DiseaseButton>
-              ))}
-            </DiseaseSelector>
-          </ControlsSection>
+                </div>
+              </DiseaseButton>
+            ))}
+          </DiseaseSelector>
+        </ControlsSection>
 
-          <ControlsSection>
-            <TabContainer>
-              <Tab $active={activeTab === 'parameters'} onClick={() => setActiveTab('parameters')}>
-                <Settings size={16} />
-                Parameters
-              </Tab>
-              <Tab $active={activeTab === 'interventions'} onClick={() => setActiveTab('interventions')}>
-                <Shield size={16} />
-                Interventions
-              </Tab>
-              <Tab $active={activeTab === 'statistics'} onClick={() => setActiveTab('statistics')}>
-                <BarChart3 size={16} />
-                Statistics
-              </Tab>
-            </TabContainer>
+        <ControlsSection>
+          <TabContainer>
+            <Tab $active={activeTab === 'parameters'} onClick={() => setActiveTab('parameters')}>
+              <Settings size={16} />
+              Parameters
+            </Tab>
+            <Tab $active={activeTab === 'interventions'} onClick={() => setActiveTab('interventions')}>
+              <Shield size={16} />
+              Interventions
+            </Tab>
+            <Tab $active={activeTab === 'statistics'} onClick={() => setActiveTab('statistics')}>
+              <BarChart3 size={16} />
+              Statistics
+            </Tab>
+          </TabContainer>
 
-            <TabContent>
-              {activeTab === 'parameters' && (
-                <Grid $columns={3}>
-                  <ParameterControl>
-                    <div className="header">
-                      <span className="label">Population Size</span>
-                      <span className="value">{population}</span>
-                    </div>
-                    <input type="range" min={100} max={2000} step={50} value={population} onChange={(e) => setPopulation(Number(e.target.value))} disabled={isRunning} />
-                  </ParameterControl>
+          <TabContent>
+            {activeTab === 'parameters' && (
+              <Grid $columns={3}>
+                <ParameterControl>
+                  <div className="header">
+                    <span className="label">Population Size</span>
+                    <span className="value">{population}</span>
+                  </div>
+                  <input type="range" min={100} max={2000} step={50} value={population} onChange={(e) => setPopulation(Number(e.target.value))} disabled={isRunning} />
+                </ParameterControl>
 
-                  <ParameterControl>
-                    <div className="header">
-                      <span className="label">Initial Cases</span>
-                      <span className="value">{initialInfected}</span>
-                    </div>
-                    <input type="range" min={1} max={20} value={initialInfected} onChange={(e) => setInitialInfected(Number(e.target.value))} disabled={isRunning} />
-                  </ParameterControl>
+                <ParameterControl>
+                  <div className="header">
+                    <span className="label">Initial Cases</span>
+                    <span className="value">{initialInfected}</span>
+                  </div>
+                  <input type="range" min={1} max={20} value={initialInfected} onChange={(e) => setInitialInfected(Number(e.target.value))} disabled={isRunning} />
+                </ParameterControl>
 
-                  <ParameterControl>
-                    <div className="header">
-                      <span className="label">Network Model</span>
-                      <span className="value" style={{ textTransform: 'capitalize' }}>{simulationMode.replace('-', ' ')}</span>
-                    </div>
-                    <select value={simulationMode} onChange={(e) => setSimulationMode(e.target.value as SimulationMode)} disabled={isRunning}>
-                      <option value="well-mixed">Well-Mixed (Random)</option>
-                      <option value="spatial-network">Spatial Network</option>
-                      <option value="age-structured">Age-Structured</option>
-                      <option value="small-world">Small-World Network</option>
-                      <option value="scale-free">Scale-Free Network</option>
-                      <option value="mobility-network">Mobility Network</option>
-                    </select>
-                  </ParameterControl>
+                <ParameterControl>
+                  <div className="header">
+                    <span className="label">Network Model</span>
+                  </div>
+                  <select value={simulationMode} onChange={(e) => setSimulationMode(e.target.value as SimulationMode)} disabled={isRunning}>
+                    <option value="homogeneous">Homogeneous</option>
+                    <option value="regions">Regional Clusters</option>
+                    <option value="households">Household Structure</option>
+                  </select>
+                </ParameterControl>
+              </Grid>
+            )}
 
-                  <ParameterControl>
-                    <div className="header">
-                      <span className="label">Contact Rate</span>
-                      <span className="value">{contactRate}/day</span>
-                    </div>
-                    <input type="range" min={1} max={30} value={contactRate} onChange={(e) => setContactRate(Number(e.target.value))} />
-                  </ParameterControl>
-
-                  <ParameterControl>
-                    <div className="header">
-                      <span className="label">Testing Rate</span>
-                      <span className="value">{(testingRate * 100).toFixed(0)}%/day</span>
-                    </div>
-                    <input type="range" min={0} max={0.2} step={0.01} value={testingRate} onChange={(e) => setTestingRate(Number(e.target.value))} />
-                  </ParameterControl>
-
-                  <ParameterControl>
-                    <div className="header">
-                      <span className="label">Travel Rate</span>
-                      <span className="value">{(travelRate * 100).toFixed(1)}%</span>
-                    </div>
-                    <input type="range" min={0} max={0.05} step={0.001} value={travelRate} onChange={(e) => setTravelRate(Number(e.target.value))} />
-                  </ParameterControl>
-                </Grid>
-              )}
-
-              {activeTab === 'interventions' && (
-                <div>
-                  <InterventionGrid>
-                    {[
-                      { key: 'masks', state: maskWearing, setState: setMaskWearing, icon: Shield, label: 'Mask Mandate', color: '#10b981' },
-                      { key: 'distancing', state: socialDistancing, setState: setSocialDistancing, icon: Users, label: 'Social Distancing', color: '#3b82f6' },
-                      { key: 'quarantine', state: quarantine, setState: setQuarantine, icon: Home, label: 'Quarantine', color: '#f59e0b' },
-                      { key: 'vaccination', state: vaccination, setState: setVaccination, icon: Heart, label: 'Vaccination', color: '#8b5cf6' },
-                      { key: 'lockdown', state: lockdown, setState: setLockdown, icon: Building2, label: 'Lockdown', color: '#ef4444' },
-                      { key: 'testing', state: contactTracing, setState: setContactTracing, icon: Activity, label: 'Contact Tracing', color: '#06b6d4' }
-                    ].map(intervention => (
+            {activeTab === 'interventions' && (
+              <div>
+                <InterventionGrid>
+                  {[
+                    { key: 'masks', state: maskWearing, setState: setMaskWearing, icon: Shield, label: 'Mask Mandate', color: '#10b981' },
+                    { key: 'distancing', state: socialDistancing, setState: setSocialDistancing, icon: Users, label: 'Social Distancing', color: '#3b82f6' },
+                    { key: 'quarantine', state: quarantine, setState: setQuarantine, icon: Home, label: 'Quarantine', color: '#f59e0b' },
+                    { key: 'vaccination', state: vaccination, setState: setVaccination, icon: Heart, label: 'Vaccination', color: '#8b5cf6' }
+                  ].map(intervention => {
+                    const efficacy = disease.interventions[intervention.key as keyof typeof disease.interventions]?.efficacy;
+                    return (
                       <InterventionCard
                         key={intervention.key}
                         $active={intervention.state}
@@ -1402,129 +1373,133 @@ export default function DiseaseSimulation({
                           <intervention.icon size={24} />
                         </div>
                         <div className="name">{intervention.label}</div>
-                        <div className="efficacy">
-                          {Math.round((disease.interventions[intervention.key as keyof typeof disease.interventions]?.efficacy || 0) * 100)}% effective
-                        </div>
+                        {efficacy && (
+                          <div className="efficacy">
+                            {Math.round(efficacy * 100)}% effective
+                          </div>
+                        )}
                       </InterventionCard>
-                    ))}
-                  </InterventionGrid>
+                    );
+                  })}
+                </InterventionGrid>
 
-                  {vaccination && (
-                    <div style={{ marginTop: '1.5rem' }}>
-                      <ParameterControl>
-                        <div className="header">
-                          <span className="label">Vaccination Coverage</span>
-                          <span className="value">{Math.round(vaccinationRate * 100)}%</span>
-                        </div>
-                        <input type="range" min={0} max={1} step={0.05} value={vaccinationRate} onChange={(e) => setVaccinationRate(Number(e.target.value))} disabled={isRunning} />
-                      </ParameterControl>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === 'statistics' && (
-                <div>
-                  <Grid $columns={4}>
-                    <StatCard $color="#3b82f6">
-                      <div className="label">Attack Rate</div>
-                      <div className="value">{((stats.totalCases / population) * 100).toFixed(1)}%</div>
-                      <div className="change">Total cases: {stats.totalCases}</div>
-                    </StatCard>
-
-                    <StatCard $color={stats.rt > 1 ? '#ef4444' : '#22c55e'}>
-                      <div className="label">R(t)</div>
-                      <div className="value">{stats.rt.toFixed(2)}</div>
-                      <div className="change">{stats.rt > 1 ? 'Outbreak growing' : 'Outbreak declining'}</div>
-                    </StatCard>
-
-                    <StatCard $color="#fbbf24">
-                      <div className="label">Peak Infected</div>
-                      <div className="value">{stats.peakInfected}</div>
-                      <div className="change">{((stats.peakInfected / population) * 100).toFixed(1)}% of population</div>
-                    </StatCard>
-
-                    <StatCard $color="#dc2626">
-                      <div className="label">Case Fatality</div>
-                      <div className="value">{stats.D > 0 ? ((stats.D / stats.totalCases) * 100).toFixed(1) : '0'}%</div>
-                      <div className="change">Deaths: {stats.D}</div>
-                    </StatCard>
-                  </Grid>
-
-                  <div style={{ height: '250px', background: 'rgba(0, 0, 0, 0.5)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '1rem' }}>
-                    <Line data={chartData} options={chartOptions} />
+                {vaccination && (
+                  <div style={{ marginTop: '1.5rem' }}>
+                    <ParameterControl>
+                      <div className="header">
+                        <span className="label">Vaccination Coverage</span>
+                        <span className="value">{Math.round(vaccinationRate * 100)}%</span>
+                      </div>
+                      <input type="range" min={0} max={1} step={0.05} value={vaccinationRate} onChange={(e) => setVaccinationRate(Number(e.target.value))} disabled={isRunning} />
+                    </ParameterControl>
                   </div>
-                </div>
-              )}
-            </TabContent>
-          </ControlsSection>
-        </MaxWidthWrapper>
-      </Container>
-
-      <FullscreenOverlay $show={isFullscreen}>
-        <FullscreenCanvas
-          ref={fullscreenCanvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        />
-
-        <HUD>
-          <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Day {stats.day}</div>
-          <div style={{ display: 'grid', gap: '0.4rem', fontSize: '0.8rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>S:</span>
-              <span style={{ fontWeight: 600, color: '#3b82f6' }}>{stats.S}</span>
-            </div>
-            {stats.E > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ opacity: 0.7 }}>E:</span>
-                <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.E}</span>
+                )}
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>I:</span>
-              <span style={{ fontWeight: 600, color: disease.color }}>{stats.I}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>R:</span>
-              <span style={{ fontWeight: 600, color: '#22c55e' }}>{stats.R}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ opacity: 0.7 }}>R(t):</span>
-              <span style={{ fontWeight: 700, color: stats.rt > 1 ? '#ef4444' : '#22c55e' }}>{stats.rt.toFixed(2)}</span>
-            </div>
+
+            {activeTab === 'statistics' && (
+              <div>
+                <Grid $columns={4}>
+                  <StatCard $color="#3b82f6">
+                    <div className="label">Attack Rate</div>
+                    <div className="value">{((stats.totalCases / population) * 100).toFixed(1)}%</div>
+                    <div className="change">Total cases: {stats.totalCases}</div>
+                  </StatCard>
+
+                  <StatCard $color={stats.rt > 1 ? '#ef4444' : '#22c55e'}>
+                    <div className="label">R(t)</div>
+                    <div className="value">{stats.rt.toFixed(2)}</div>
+                    <div className="change">{stats.rt > 1 ? 'Outbreak growing' : 'Outbreak declining'}</div>
+                  </StatCard>
+
+                  <StatCard $color="#fbbf24">
+                    <div className="label">Peak Infected</div>
+                    <div className="value">{stats.peakInfected}</div>
+                    <div className="change">{((stats.peakInfected / population) * 100).toFixed(1)}% of population</div>
+                  </StatCard>
+
+                  <StatCard $color="#dc2626">
+                    <div className="label">Case Fatality</div>
+                    <div className="value">{stats.D > 0 ? ((stats.D / stats.totalCases) * 100).toFixed(1) : '0'}%</div>
+                    <div className="change">Deaths: {stats.D}</div>
+                  </StatCard>
+                </Grid>
+
+                <div style={{ height: '250px', background: 'rgba(0, 0, 0, 0.5)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '1rem' }}>
+                  <Line data={chartData} options={chartOptions} />
+                </div>
+              </div>
+            )}
+          </TabContent>
+        </ControlsSection>
+      </MaxWidthWrapper>
+    </Container>
+
+    {/* Mobile Fullscreen Overlay */}
+    <FullscreenOverlay $show={isMobileFullscreen}>
+      <FullscreenCanvas
+        ref={theaterCanvasRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      />
+
+      <HUD $theater>
+        <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Day {stats.day}</div>
+        <div style={{ display: 'grid', gap: '0.4rem', fontSize: '0.8rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ opacity: 0.7 }}>S:</span>
+            <span style={{ fontWeight: 600, color: '#3b82f6' }}>{stats.S}</span>
           </div>
-        </HUD>
-
-        <div style={{ position: 'absolute', bottom: 'calc(1rem + env(safe-area-inset-bottom))', right: '1rem', background: 'rgba(0,0,0,0.9)', padding: '0.5rem 0.8rem', borderRadius: '18px', border: '1px solid rgba(59,130,246,0.5)', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>
-          {(zoomLevel * 100).toFixed(0)}%
+          {stats.E > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.7 }}>E:</span>
+              <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.E}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ opacity: 0.7 }}>I:</span>
+            <span style={{ fontWeight: 600, color: disease.color }}>{stats.I}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ opacity: 0.7 }}>R:</span>
+            <span style={{ fontWeight: 600, color: '#22c55e' }}>{stats.R}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <span style={{ opacity: 0.7 }}>R(t):</span>
+            <span style={{ fontWeight: 700, color: stats.rt > 1 ? '#ef4444' : '#22c55e' }}>{stats.rt.toFixed(2)}</span>
+          </div>
         </div>
+      </HUD>
 
-        <div style={{ position: 'absolute', bottom: 'calc(6rem + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', textAlign: 'center' }}>
-          Pinch to zoom • Drag to pan
-        </div>
+      <div style={{ position: 'absolute', bottom: 'calc(1rem + env(safe-area-inset-bottom))', right: '1rem', background: 'rgba(0,0,0,0.9)', padding: '0.5rem 0.8rem', borderRadius: '18px', border: '1px solid rgba(59,130,246,0.5)', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace', zIndex: 50 }}>
+        {(zoomLevel * 100).toFixed(0)}%
+      </div>
 
-        <FullscreenControls>
-          <FullscreenButton $primary onClick={() => setIsRunning(!isRunning)}>
-            {isRunning ? <PauseCircle size={20} /> : <PlayCircle size={20} />}
-          </FullscreenButton>
-          <FullscreenButton onClick={handleReset}>
-            <RefreshCw size={20} />
-          </FullscreenButton>
-          <FullscreenButton onClick={resetView}>
-            <Maximize size={20} />
-          </FullscreenButton>
-        </FullscreenControls>
+      <div style={{ position: 'absolute', bottom: 'calc(6rem + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', textAlign: 'center', zIndex: 50 }}>
+        Pinch to zoom • Drag to pan
+      </div>
 
-        <ExitButton onClick={exitFullscreen}>
-          <X size={20} />
-        </ExitButton>
-      </FullscreenOverlay>
-    </>
+      <FullscreenControls>
+        <FullscreenButton $primary onClick={() => setIsRunning(!isRunning)}>
+          {isRunning ? <PauseCircle size={20} /> : <PlayCircle size={20} />}
+        </FullscreenButton>
+        <FullscreenButton onClick={handleReset}>
+          <RefreshCw size={20} />
+        </FullscreenButton>
+        <FullscreenButton onClick={resetView}>
+          <Activity size={20} />
+        </FullscreenButton>
+      </FullscreenControls>
+
+      <ExitButton onClick={exitMobileFullscreen}>
+        <X size={20} />
+      </ExitButton>
+    </FullscreenOverlay>
+  </>
   );
 }
