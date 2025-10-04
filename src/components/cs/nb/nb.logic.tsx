@@ -1,6 +1,5 @@
 // src/components/cs/nb/nb.logic.tsx
-// N-Body Simulation - Fixed Core Logic Engine
-// Eliminates maximum update depth exceeded errors
+// N-Body Simulation with Patched Conics (Sphere of Influence Method)
 
 import { useCallback, useRef, useEffect, useState } from 'react';
 import {
@@ -14,6 +13,17 @@ import {
 } from './nb.config';
 
 // ===== INTERFACES =====
+
+export interface KeplerOrbit {
+  semiMajorAxis: number;           // a (meters)
+  eccentricity: number;            // e (0-1)
+  inclination: number;             // i (radians)
+  longitudeAscNode: number;        // Ω (radians)
+  argPeriapsis: number;            // ω (radians)
+  meanAnomalyAtEpoch: number;      // M0 at t0 (radians)
+  epoch: number;                   // t0 (seconds)
+  period: number;                  // T (seconds)
+}
 
 export interface SimulationBody extends CelestialBodyDefinition {
   // Runtime physics state
@@ -35,6 +45,13 @@ export interface SimulationBody extends CelestialBodyDefinition {
   potentialEnergy: number;
   orbitalSpeed?: number;
   distanceFromPrimary?: number;
+
+  // Sphere of Influence (Patched Conics)
+  sphereOfInfluence?: number;      // SOI radius in meters
+  dominantBody?: string;            // ID of body whose SOI we're in
+  distanceFromDominant?: number;    // current distance to dominant body
+  keplerOrbit?: KeplerOrbit;        // Orbital elements when in SOI
+  useKeplerOrbit?: boolean;         // Flag to use analytical orbit this step
 }
 
 export type ViewMode = 'heliocentric' | 'barycentric' | 'relative';
@@ -162,7 +179,7 @@ class SpatialHashGrid {
   private cellSize: number;
   private grid: Map<string, string[]> = new Map();
 
-  constructor(cellSize: number = 1e10) { // 10 million km cells
+  constructor(cellSize: number = 1e10) {
     this.cellSize = cellSize;
   }
 
@@ -208,30 +225,328 @@ class SpatialHashGrid {
   }
 }
 
+// ===== KEPLER ORBIT SOLVER =====
+
+class KeplerSolver {
+  private config: PhysicsConfig;
+
+  constructor(config: PhysicsConfig) {
+    this.config = config;
+  }
+
+  // Solve Kepler's equation: M = E - e*sin(E)
+  private solveKeplerEquation(M: number, e: number, tolerance: number = 1e-8): number {
+    let E = M; // Initial guess
+    
+    // Newton-Raphson iteration
+    for (let i = 0; i < 15; i++) {
+      const f = E - e * Math.sin(E) - M;
+      const fp = 1 - e * Math.cos(E);
+      const delta = f / fp;
+      E -= delta;
+      
+      if (Math.abs(delta) < tolerance) break;
+    }
+    
+    return E;
+  }
+
+  // Convert state vectors to orbital elements
+  stateToElements(
+    position: Vector3,
+    velocity: Vector3,
+    mu: number, // G * M_primary
+    currentTime: number
+  ): KeplerOrbit {
+    const r = position.magnitude();
+    const v = velocity.magnitude();
+
+    // Specific orbital energy
+    const energy = v * v / 2 - mu / r;
+    
+    // Semi-major axis: a = -mu / (2 * E)
+    const a = -mu / (2 * energy);
+    
+    // Angular momentum vector: h = r × v
+    const h = position.cross(velocity);
+    const hMag = h.magnitude();
+    
+    // Eccentricity vector: e = (v × h) / mu - r_hat
+    const eVec = velocity.cross(h).divide(mu).subtract(position.normalize());
+    const e = eVec.magnitude();
+    
+    // Inclination: i = acos(h_z / |h|)
+    const i = Math.acos(h.z / hMag);
+    
+    // Node vector: n = k × h (where k is [0,0,1])
+    const n = new Vector3(-h.y, h.x, 0);
+    const nMag = n.magnitude();
+    
+    // Longitude of ascending node: Ω
+    let Omega = 0;
+    if (nMag > 1e-10) {
+      Omega = Math.acos(n.x / nMag);
+      if (n.y < 0) Omega = 2 * Math.PI - Omega;
+    }
+    
+    // Argument of periapsis: ω
+    let omega = 0;
+    if (nMag > 1e-10 && e > 1e-10) {
+      omega = Math.acos(n.dot(eVec) / (nMag * e));
+      if (eVec.z < 0) omega = 2 * Math.PI - omega;
+    }
+    
+    // True anomaly: ν
+    let nu = 0;
+    if (e > 1e-10) {
+      nu = Math.acos(eVec.dot(position) / (e * r));
+      if (position.dot(velocity) < 0) nu = 2 * Math.PI - nu;
+    } else {
+      // Circular orbit - use argument of latitude
+      nu = Math.acos(n.dot(position) / (nMag * r));
+      if (position.z < 0) nu = 2 * Math.PI - nu;
+    }
+    
+    // Eccentric anomaly: E
+    const E = 2 * Math.atan2(
+      Math.sqrt(1 - e) * Math.sin(nu / 2),
+      Math.sqrt(1 + e) * Math.cos(nu / 2)
+    );
+    
+    // Mean anomaly: M = E - e * sin(E)
+    const M = E - e * Math.sin(E);
+    
+    // Orbital period: T = 2π * sqrt(a³ / μ)
+    const T = 2 * Math.PI * Math.sqrt(Math.abs(a * a * a) / mu);
+    
+    return {
+      semiMajorAxis: a,
+      eccentricity: e,
+      inclination: i,
+      longitudeAscNode: Omega,
+      argPeriapsis: omega,
+      meanAnomalyAtEpoch: M,
+      epoch: currentTime,
+      period: T
+    };
+  }
+
+  // Convert orbital elements to state vectors
+  elementsToState(
+    orbit: KeplerOrbit,
+    primaryPos: Vector3,
+    primaryVel: Vector3,
+    mu: number,
+    currentTime: number
+  ): { position: Vector3Data; velocity: Vector3Data } {
+    const { semiMajorAxis: a, eccentricity: e, inclination: i,
+            longitudeAscNode: Omega, argPeriapsis: omega,
+            meanAnomalyAtEpoch: M0, epoch: t0, period: T } = orbit;
+    
+    // Mean motion: n = 2π / T
+    const n = 2 * Math.PI / T;
+    
+    // Time since epoch
+    const dt = currentTime - t0;
+    
+    // Current mean anomaly: M = M0 + n * dt
+    const M = (M0 + n * dt) % (2 * Math.PI);
+    
+    // Solve for eccentric anomaly
+    const E = this.solveKeplerEquation(M, e);
+    
+    // True anomaly
+    const nu = 2 * Math.atan2(
+      Math.sqrt(1 + e) * Math.sin(E / 2),
+      Math.sqrt(1 - e) * Math.cos(E / 2)
+    );
+    
+    // Distance from primary
+    const r = a * (1 - e * Math.cos(E));
+    
+    // Position in orbital plane
+    const x_orb = r * Math.cos(nu);
+    const y_orb = r * Math.sin(nu);
+    
+    // Velocity in orbital plane
+    const v_factor = Math.sqrt(mu / (a * (1 - e * e)));
+    const vx_orb = -v_factor * Math.sin(nu);
+    const vy_orb = v_factor * (e + Math.cos(nu));
+    
+    // Rotation matrices
+    const cos_Omega = Math.cos(Omega);
+    const sin_Omega = Math.sin(Omega);
+    const cos_omega = Math.cos(omega);
+    const sin_omega = Math.sin(omega);
+    const cos_i = Math.cos(i);
+    const sin_i = Math.sin(i);
+    
+    // Transform to 3D space (perifocal to inertial frame)
+    const P_x = cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i;
+    const P_y = sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i;
+    const P_z = sin_omega * sin_i;
+    
+    const Q_x = -cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i;
+    const Q_y = -sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i;
+    const Q_z = cos_omega * sin_i;
+    
+    // Position relative to primary
+    const x_rel = P_x * x_orb + Q_x * y_orb;
+    const y_rel = P_y * x_orb + Q_y * y_orb;
+    const z_rel = P_z * x_orb + Q_z * y_orb;
+    
+    // Velocity relative to primary
+    const vx_rel = P_x * vx_orb + Q_x * vy_orb;
+    const vy_rel = P_y * vx_orb + Q_y * vy_orb;
+    const vz_rel = P_z * vx_orb + Q_z * vy_orb;
+    
+    // Transform to world coordinates
+    return {
+      position: {
+        x: primaryPos.x + x_rel,
+        y: primaryPos.y + y_rel,
+        z: primaryPos.z + z_rel
+      },
+      velocity: {
+        x: primaryVel.x + vx_rel,
+        y: primaryVel.y + vy_rel,
+        z: primaryVel.z + vz_rel
+      }
+    };
+  }
+}
+
 // ===== PHYSICS ENGINE =====
 
 class PhysicsEngine {
   private config: PhysicsConfig;
   private spatialGrid: SpatialHashGrid;
+  private keplerSolver: KeplerSolver;
   private barycenter: Vector3 = new Vector3();
   private totalSystemMass: number = 0;
+  private bodiesMapRef: Map<string, SimulationBody> = new Map();
 
   constructor(config: PhysicsConfig = DEFAULT_PHYSICS) {
     this.config = config;
     this.spatialGrid = new SpatialHashGrid();
+    this.keplerSolver = new KeplerSolver(config);
   }
 
   updateConfiguration(newConfig: Partial<PhysicsConfig>): void {
     this.config = { ...this.config, ...newConfig };
   }
 
-  // Calculate system center of mass
+  // Calculate sphere of influence using Laplace formula
+  private calculateSOI(body: SimulationBody, primaryBody: SimulationBody): number {
+    const bodyPos = Vector3.from(body.position);
+    const primaryPos = Vector3.from(primaryBody.position);
+    const a = bodyPos.distanceTo(primaryPos); // semi-major axis approximation
+    
+    const massRatio = body.mass / primaryBody.mass;
+    
+    // Laplace SOI: r_SOI = a * (m_sat / m_primary)^(2/5)
+    return a * Math.pow(massRatio, 0.4);
+  }
+
+  // Find which body's SOI this body is currently in (hierarchical check)
+  private findDominantBody(body: SimulationBody, bodies: Map<string, SimulationBody>): string | undefined {
+    // Only check the body's designated parent from the hierarchy
+    // This prevents moons from being captured by the Sun
+    if (!body.parentId) {
+      return undefined; // Top-level bodies (like the Sun) have no dominant body
+    }
+    
+    const parent = bodies.get(body.parentId);
+    if (!parent) {
+      return undefined;
+    }
+    
+    const bodyPos = Vector3.from(body.position);
+    const parentPos = Vector3.from(parent.position);
+    const distance = bodyPos.distanceTo(parentPos);
+    
+    // Calculate parent's SOI if not already cached
+    if (!parent.sphereOfInfluence) {
+      // Find the parent's parent (grandparent) to calculate SOI
+      const grandparent = parent.parentId ? bodies.get(parent.parentId) : null;
+      
+      if (grandparent) {
+        // Normal case: planet orbiting star, moon orbiting planet
+        parent.sphereOfInfluence = this.calculateSOI(parent, grandparent);
+      } else {
+        // Parent has no parent (it's a top-level body like the Sun)
+        // Give it a very large SOI
+        parent.sphereOfInfluence = 1e15; // ~6700 AU
+      }
+    }
+    
+    // Check if we're inside parent's SOI
+    if (distance < parent.sphereOfInfluence) {
+      return parent.id;
+    }
+    
+    // Outside parent's SOI - body is now in N-body regime
+    return undefined;
+  }
+
+  // Update SOI status for all bodies
+  private updateSOIStatus(bodies: Map<string, SimulationBody>, currentTime: number): void {
+    this.bodiesMapRef = bodies;
+    
+    for (const body of bodies.values()) {
+      // Skip fixed bodies (they don't orbit anything)
+      if (body.isFixed) {
+        body.dominantBody = undefined;
+        body.useKeplerOrbit = false;
+        continue;
+      }
+      
+      const previousDominant = body.dominantBody;
+      const newDominant = this.findDominantBody(body, bodies);
+      
+      body.dominantBody = newDominant;
+      
+      if (newDominant) {
+        const dominant = bodies.get(newDominant)!;
+        const bodyPos = Vector3.from(body.position);
+        const domPos = Vector3.from(dominant.position);
+        body.distanceFromDominant = bodyPos.distanceTo(domPos);
+        
+        // If entering new SOI or don't have orbit yet, calculate orbital elements
+        if (newDominant !== previousDominant || !body.keplerOrbit) {
+          const mu = this.config.gravitationalConstant * dominant.mass;
+          const relPos = bodyPos.subtract(domPos);
+          const relVel = Vector3.from(body.velocity).subtract(Vector3.from(dominant.velocity));
+          
+          body.keplerOrbit = this.keplerSolver.stateToElements(
+            relPos,
+            relVel,
+            mu,
+            currentTime
+          );
+          
+          console.log(`${body.name} entered ${dominant.name}'s SOI - orbital period: ${(body.keplerOrbit.period / 86400).toFixed(1)} days`);
+        }
+        
+        // Use Kepler orbit if we have valid elements
+        body.useKeplerOrbit = !!body.keplerOrbit;
+      } else {
+        // Outside all SOIs - use N-body physics
+        body.useKeplerOrbit = false;
+        body.distanceFromDominant = undefined;
+        
+        if (previousDominant) {
+          console.log(`${body.name} left SOI - using N-body physics`);
+        }
+      }
+    }
+  }
+
   calculateBarycenter(bodies: Map<string, SimulationBody>): Vector3Data {
     let totalMass = 0;
     let centerX = 0, centerY = 0, centerZ = 0;
 
     for (const body of bodies.values()) {
-      // Include ALL bodies in barycenter, regardless of isFixed
       totalMass += body.mass;
       centerX += body.position.x * body.mass;
       centerY += body.position.y * body.mass;
@@ -250,7 +565,6 @@ class PhysicsEngine {
     return this.barycenter.toData();
   }
 
-  // Calculate total system energy for conservation monitoring
   calculateSystemEnergy(bodies: Map<string, SimulationBody>): {
     totalKinetic: number;
     totalPotential: number;
@@ -263,9 +577,8 @@ class PhysicsEngine {
 
     const bodyArray = Array.from(bodies.values());
 
-    // Kinetic energy and momentum
     for (const body of bodyArray) {
-      if (body.isFixed) continue; // Fixed bodies don't contribute
+      if (body.isFixed) continue;
 
       const vel = Vector3.from(body.velocity);
       const speed = vel.magnitude();
@@ -276,7 +589,6 @@ class PhysicsEngine {
       totalMomentum.z += body.mass * body.velocity.z;
     }
 
-    // Potential energy (pairwise)
     for (let i = 0; i < bodyArray.length; i++) {
       for (let j = i + 1; j < bodyArray.length; j++) {
         const b1 = bodyArray[i];
@@ -300,10 +612,13 @@ class PhysicsEngine {
     };
   }
 
-  // Main force computation
-  computeForces(bodies: Map<string, SimulationBody>): PhysicsUpdate[] {
+  // Main force computation with patched conics
+  computeForces(bodies: Map<string, SimulationBody>, currentTime: number): PhysicsUpdate[] {
     const updates: PhysicsUpdate[] = [];
     const bodyArray = Array.from(bodies.values());
+
+    // Update SOI status
+    this.updateSOIStatus(bodies, currentTime);
 
     // Update spatial grid
     this.spatialGrid.clear();
@@ -311,8 +626,22 @@ class PhysicsEngine {
       this.spatialGrid.addBody(body.id, Vector3.from(body.position));
     }
 
-    // Calculate forces for all bodies
+    // Calculate forces for bodies NOT using Kepler orbits
     for (const body of bodyArray) {
+      // Bodies using Kepler orbits skip force calculation
+      if (body.useKeplerOrbit) {
+        // Position/velocity will be calculated in integration step
+        updates.push({
+          bodyId: body.id,
+          position: body.position,
+          velocity: body.velocity,
+          acceleration: { x: 0, y: 0, z: 0 },
+          kineticEnergy: 0,
+          potentialEnergy: 0
+        });
+        continue;
+      }
+
       const force = new Vector3();
       let potentialEnergy = 0;
 
@@ -327,11 +656,9 @@ class PhysicsEngine {
         const r = otherPos.subtract(bodyPos);
         const distanceSquared = r.magnitudeSquared();
 
-        // Apply softening to prevent singularities
         const softenedDistanceSquared = distanceSquared + this.config.softening * this.config.softening;
         const distance = Math.sqrt(softenedDistanceSquared);
 
-        // F = G * m1 * m2 / r^2 * r_hat
         const forceMagnitude = this.config.gravitationalConstant * body.mass * otherBody.mass / softenedDistanceSquared;
         const forceDirection = r.normalize();
 
@@ -339,23 +666,18 @@ class PhysicsEngine {
         force.y += forceMagnitude * forceDirection.y;
         force.z += forceMagnitude * forceDirection.z;
 
-        // Potential energy contribution
         potentialEnergy -= this.config.gravitationalConstant * body.mass * otherBody.mass / distance;
       }
 
-      // Calculate acceleration (F = ma, so a = F/m)
       const acceleration = body.isFixed
         ? new Vector3(0, 0, 0)
         : force.divide(body.mass);
 
-      // Calculate kinetic energy
       const speed = bodyVel.magnitude();
       const kineticEnergy = 0.5 * body.mass * speed * speed;
 
-      // Store orbital information
       body.orbitalSpeed = speed;
 
-      // Find distance to primary (usually the star)
       const primaryBody = bodyArray.find(b => b.type === 'star');
       if (primaryBody && primaryBody.id !== body.id) {
         body.distanceFromPrimary = Vector3.from(body.position).distanceTo(Vector3.from(primaryBody.position));
@@ -367,10 +689,9 @@ class PhysicsEngine {
         velocity: body.velocity,
         acceleration: acceleration.toData(),
         kineticEnergy,
-        potentialEnergy: potentialEnergy / 2 // Avoid double counting in pairwise calculation
+        potentialEnergy: potentialEnergy / 2
       });
 
-      // Update body's acceleration for integration
       body.acceleration = acceleration.toData();
       body.kineticEnergy = kineticEnergy;
       body.potentialEnergy = potentialEnergy / 2;
@@ -379,22 +700,37 @@ class PhysicsEngine {
     return updates;
   }
 
-  // Integration step using selected method
-  integrateStep(body: SimulationBody, timeStep: number): void {
-    // Fixed bodies don't move
+  // Integration with Kepler orbit support
+  integrateStep(body: SimulationBody, timeStep: number, currentTime: number): void {
     if (body.isFixed) return;
-
-    const dt = timeStep;
 
     // Store previous state
     body.previousPosition = { ...body.position };
     body.previousVelocity = { ...body.velocity };
 
-    if (this.config.integrator === 'leapfrog') {
-      // Leapfrog integration (symplectic, energy-conserving)
-      // v(t+dt) = v(t) + a(t) * dt
-      // x(t+dt) = x(t) + v(t+dt) * dt
+    // Use Kepler orbit if in SOI
+    if (body.useKeplerOrbit && body.keplerOrbit && body.dominantBody) {
+      const dominant = this.bodiesMapRef.get(body.dominantBody);
+      if (dominant) {
+        const mu = this.config.gravitationalConstant * dominant.mass;
+        const state = this.keplerSolver.elementsToState(
+          body.keplerOrbit,
+          Vector3.from(dominant.position),
+          Vector3.from(dominant.velocity),
+          mu,
+          currentTime
+        );
+        
+        body.position = state.position;
+        body.velocity = state.velocity;
+        return;
+      }
+    }
 
+    // Otherwise use N-body integration
+    const dt = timeStep;
+
+    if (this.config.integrator === 'leapfrog') {
       body.velocity.x += body.acceleration.x * dt;
       body.velocity.y += body.acceleration.y * dt;
       body.velocity.z += body.acceleration.z * dt;
@@ -404,24 +740,18 @@ class PhysicsEngine {
       body.position.z += body.velocity.z * dt;
 
     } else if (this.config.integrator === 'verlet') {
-      // Velocity Verlet
       const halfDtSquared = 0.5 * dt * dt;
 
       body.position.x += body.velocity.x * dt + body.acceleration.x * halfDtSquared;
       body.position.y += body.velocity.y * dt + body.acceleration.y * halfDtSquared;
       body.position.z += body.velocity.z * dt + body.acceleration.z * halfDtSquared;
 
-      // Note: Full Verlet would need new acceleration here
       body.velocity.x += body.acceleration.x * dt;
       body.velocity.y += body.acceleration.y * dt;
       body.velocity.z += body.acceleration.z * dt;
 
-    } else if (this.config.integrator === 'runge-kutta-4') {
-      // RK4 (most accurate but expensive)
-      this.integrateRK4(body, dt);
-
     } else {
-      // Simple Euler (least accurate but fast)
+      // Euler
       body.position.x += body.velocity.x * dt;
       body.position.y += body.velocity.y * dt;
       body.position.z += body.velocity.z * dt;
@@ -432,83 +762,30 @@ class PhysicsEngine {
     }
   }
 
-  private integrateRK4(body: SimulationBody, dt: number): void {
-    // Simplified RK4 - in practice would need multiple force evaluations
-    const k1v = Vector3.from(body.acceleration);
-    const k1x = Vector3.from(body.velocity);
-
-    const k2v = k1v; // Would need force at t + dt/2
-    const k2x = Vector3.from(body.velocity).add(k1v.multiply(dt * 0.5));
-
-    const k3v = k2v; // Would need force at t + dt/2
-    const k3x = Vector3.from(body.velocity).add(k2v.multiply(dt * 0.5));
-
-    const k4v = k3v; // Would need force at t + dt
-    const k4x = Vector3.from(body.velocity).add(k3v.multiply(dt));
-
-    // Weighted average
-    const dv = k1v.add(k2v.multiply(2)).add(k3v.multiply(2)).add(k4v).divide(6);
-    const dx = k1x.add(k2x.multiply(2)).add(k3x.multiply(2)).add(k4x).divide(6);
-
-    body.velocity.x += dv.x * dt;
-    body.velocity.y += dv.y * dt;
-    body.velocity.z += dv.z * dt;
-
-    body.position.x += dx.x * dt;
-    body.position.y += dx.y * dt;
-    body.position.z += dx.z * dt;
-  }
-
-  // Calculate adaptive timestep based on system dynamics
   calculateAdaptiveTimeStep(bodies: Map<string, SimulationBody>, currentTimeStep: number): number {
     if (!this.config.adaptiveTimeStep) return currentTimeStep;
 
     let minOrbitalPeriod = Infinity;
-    let minDistance = Infinity;
-    let maxVelocity = 0;
-
-    const bodyArray = Array.from(bodies.values());
-
-    // Find critical parameters
-    for (let i = 0; i < bodyArray.length; i++) {
-      const vel = Vector3.from(bodyArray[i].velocity);
-      maxVelocity = Math.max(maxVelocity, vel.magnitude());
-
-      for (let j = i + 1; j < bodyArray.length; j++) {
-        const pos1 = Vector3.from(bodyArray[i].position);
-        const pos2 = Vector3.from(bodyArray[j].position);
-        const distance = pos1.distanceTo(pos2);
-
-        minDistance = Math.min(minDistance, distance);
-
-        // Estimate orbital period using Kepler's third law
-        const totalMass = bodyArray[i].mass + bodyArray[j].mass;
-        const orbitalPeriod = 2 * Math.PI * Math.sqrt(
-          Math.pow(distance, 3) / (this.config.gravitationalConstant * totalMass)
-        );
-
-        minOrbitalPeriod = Math.min(minOrbitalPeriod, orbitalPeriod);
+    
+    // Find shortest period from bodies using Kepler orbits
+    for (const body of bodies.values()) {
+      if (body.keplerOrbit) {
+        minOrbitalPeriod = Math.min(minOrbitalPeriod, body.keplerOrbit.period);
       }
     }
-
-    // Time step should be small fraction of shortest orbital period
-    const suggestedTimeStep = Math.min(
-      minOrbitalPeriod / 200,  // 1/200th of shortest orbit
-      minDistance / (maxVelocity * 10)  // Ensure we don't skip through close encounters
-    );
-
-    // Apply limits and smoothing
+    
+    // Time step should be ~1/100th of shortest orbital period
+    const suggestedTimeStep = minOrbitalPeriod / 100;
+    
     const targetTimeStep = Math.max(
       this.config.minTimeStep,
       Math.min(this.config.maxTimeStep, suggestedTimeStep)
     );
 
-    // Smooth transition to avoid sudden jumps
     return currentTimeStep + (targetTimeStep - currentTimeStep) * 0.1;
   }
 
   destroy(): void {
-    // Cleanup
     this.spatialGrid.clear();
   }
 }
@@ -531,7 +808,6 @@ export const useNBodySimulation = ({
   onPerformanceUpdate
 }: UseNBodySimulationProps = {}) => {
 
-  // Core state
   const [simulationState, setSimulationState] = useState<SimulationState>({
     bodies: new Map(),
     selectedBodyIds: new Set(),
@@ -554,27 +830,22 @@ export const useNBodySimulation = ({
     scenarioProgress: 0
   });
 
-  // CRITICAL FIX: Use refs to track simulation state without causing re-renders
   const isRunningRef = useRef(false);
   const isPausedRef = useRef(false);
   const simulationStateRef = useRef(simulationState);
 
-  // Update refs when state changes
   useEffect(() => {
     isRunningRef.current = simulationState.isRunning;
     isPausedRef.current = simulationState.isPaused;
     simulationStateRef.current = simulationState;
   }, [simulationState]);
 
-  // Refs for stable references
   const physicsEngineRef = useRef<PhysicsEngine | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const lastUpdateTimeRef = useRef<number>(performance.now());
   const initialEnergyRef = useRef<number | null>(null);
   const fpsCounterRef = useRef<number>(0);
   const fpsUpdateTimeRef = useRef<number>(performance.now());
 
-  // Initialize physics engine
   useEffect(() => {
     const physicsConfig = { ...DEFAULT_PHYSICS, ...config };
     physicsEngineRef.current = new PhysicsEngine(physicsConfig);
@@ -584,14 +855,6 @@ export const useNBodySimulation = ({
     };
   }, []);
 
-  // Load initial scenario
-  useEffect(() => {
-    if (initialScenario) {
-      loadScenario(initialScenario);
-    }
-  }, []);
-
-  // Store callbacks in refs to ensure stability
   const onBodyUpdateRef = useRef(onBodyUpdate);
   const onPerformanceUpdateRef = useRef(onPerformanceUpdate);
 
@@ -612,25 +875,20 @@ export const useNBodySimulation = ({
       }
 
       const barycenter = engine.calculateBarycenter(prev.bodies);
-      const updates = engine.computeForces(prev.bodies);
+      const updates = engine.computeForces(prev.bodies, prev.currentTime);
 
-      // CRITICAL FIX: Don't multiply timeStep by speed in the physics integration
-      // The timeStep is the actual physics step size (e.g., 3600 seconds = 1 hour)
-      // Speed only affects how often we advance, not the step size itself
-      const physicsTimeStep = prev.timeStep; // Use base timestep for physics accuracy
+      const physicsTimeStep = prev.timeStep;
 
-      // Apply integration with the actual physics timestep
       for (const update of updates) {
         const body = prev.bodies.get(update.bodyId);
         if (body) {
           body.acceleration = update.acceleration;
-          engine.integrateStep(body, physicsTimeStep);
+          engine.integrateStep(body, physicsTimeStep, prev.currentTime + physicsTimeStep);
           body.kineticEnergy = update.kineticEnergy;
           body.potentialEnergy = update.potentialEnergy;
         }
       }
 
-      // Calculate energy conservation
       const energyInfo = engine.calculateSystemEnergy(prev.bodies);
 
       if (initialEnergyRef.current === null && energyInfo.totalEnergy !== 0) {
@@ -641,13 +899,10 @@ export const useNBodySimulation = ({
         ? Math.abs((energyInfo.totalEnergy - initialEnergyRef.current) / initialEnergyRef.current)
         : 0;
 
-      // Update simulation time - this is the actual simulation time advancement
       const newCurrentTime = prev.currentTime + physicsTimeStep;
-
       const newTimeStep = engine.calculateAdaptiveTimeStep(prev.bodies, prev.timeStep);
       const physicsTime = performance.now() - startTime;
 
-      // FPS tracking
       fpsCounterRef.current++;
       const currentRealTime = performance.now();
       const fpsElapsed = currentRealTime - fpsUpdateTimeRef.current;
@@ -659,7 +914,6 @@ export const useNBodySimulation = ({
         fpsUpdateTimeRef.current = currentRealTime;
       }
 
-      // Notify callbacks
       if (onBodyUpdateRef.current && updates.length > 0) {
         setTimeout(() => onBodyUpdateRef.current?.(updates), 0);
       }
@@ -698,11 +952,9 @@ export const useNBodySimulation = ({
     });
   }, []);
 
-  // Extract just the control flags to avoid unnecessary re-renders
   const isRunning = simulationState.isRunning;
   const isPaused = simulationState.isPaused;
 
-  // Animation loop - responds to control state changes
   useEffect(() => {
     if (!isRunning || isPaused) {
       if (animationFrameRef.current !== null) {
@@ -724,9 +976,6 @@ export const useNBodySimulation = ({
       const currentTime = performance.now();
       const deltaTime = currentTime - lastTime;
 
-      // CRITICAL FIX: Speed affects how often we call simulationStep, not the timestep itself
-      // At 1x speed, run physics at 60 FPS
-      // At higher speeds, run physics more frequently (but with same timestep)
       const targetInterval = 1000 / (60 * simulationStateRef.current.speed);
 
       if (deltaTime >= targetInterval) {
@@ -752,22 +1001,15 @@ export const useNBodySimulation = ({
     };
   }, [isRunning, isPaused, simulationStep]);
 
-  // ===== PUBLIC API =====
-
-  // Key fixes to add to your nb.logic.tsx
-
-  // 1. Fix the loadScenario dependency issue
   const loadScenario = useCallback((scenario: Scenario) => {
     const bodies = new Map<string, SimulationBody>();
 
-    // Find primary star for view mode decisions
     const primaryStar = scenario.bodies.find(b => b.type === 'star');
     const currentViewMode = simulationStateRef.current.viewMode;
     const currentReferenceBodyId = simulationStateRef.current.referenceBodyId;
 
     console.log(`Loading scenario: ${scenario.name} with ${scenario.bodies.length} bodies`);
 
-    // Convert scenario bodies to simulation bodies
     for (const bodyDef of scenario.bodies) {
       const simBody: SimulationBody = {
         ...bodyDef,
@@ -780,7 +1022,6 @@ export const useNBodySimulation = ({
         potentialEnergy: 0
       };
 
-      // Apply view mode logic
       if (currentViewMode === 'heliocentric' && primaryStar) {
         if (simBody.id === primaryStar.id) {
           simBody.isFixed = true;
@@ -798,7 +1039,6 @@ export const useNBodySimulation = ({
       bodies.set(bodyDef.id, simBody);
     }
 
-    // Build hierarchy relationships
     for (const [id, body] of bodies) {
       if (body.parentId) {
         body.parentBody = bodies.get(body.parentId);
@@ -808,7 +1048,6 @@ export const useNBodySimulation = ({
         .filter(Boolean) as SimulationBody[];
     }
 
-    // Reset energy tracking
     initialEnergyRef.current = null;
     fpsCounterRef.current = 0;
     fpsUpdateTimeRef.current = performance.now();
@@ -827,36 +1066,29 @@ export const useNBodySimulation = ({
       energyDrift: 0
     }));
 
-    // Apply scenario physics config
     if (scenario.physicsConfig && physicsEngineRef.current) {
       physicsEngineRef.current.updateConfiguration(scenario.physicsConfig);
     }
-  }, []); // Remove dependencies to prevent infinite loops
+  }, []);
 
-  // 2. Fix the initial scenario loading
   useEffect(() => {
     if (initialScenario) {
       console.log('Loading initial scenario:', initialScenario.name);
       loadScenario(initialScenario);
     }
-  }, [initialScenario, loadScenario]); // Add loadScenario as dependency
+  }, [initialScenario, loadScenario]);
 
   const setViewMode = useCallback((mode: ViewMode, referenceBodyId?: string) => {
     setSimulationState(prev => {
       const newState = { ...prev, viewMode: mode, referenceBodyId };
-
-      // Update body fixed states based on new view mode
       const primaryStar = Array.from(prev.bodies.values()).find(b => b.type === 'star');
 
       for (const body of prev.bodies.values()) {
         if (mode === 'heliocentric' && primaryStar) {
-          // Only fix the star in heliocentric mode
           body.isFixed = (body.id === primaryStar.id);
         } else if (mode === 'barycentric') {
-          // Free all bodies in barycentric mode
           body.isFixed = false;
         } else if (mode === 'relative' && referenceBodyId) {
-          // Fix reference body in relative mode
           body.isFixed = (body.id === referenceBodyId);
         }
       }
@@ -944,10 +1176,9 @@ export const useNBodySimulation = ({
   const start = useCallback(() => {
     console.log('Start button clicked');
     setSimulationState(prev => {
-      // Check if there are bodies to simulate
       if (prev.bodies.size === 0) {
-        console.error('Cannot start simulation: no bodies loaded. Please load a scenario first.');
-        return prev; // Don't change state
+        console.error('Cannot start simulation: no bodies loaded');
+        return prev;
       }
 
       console.log('Starting simulation with', prev.bodies.size, 'bodies');
@@ -975,7 +1206,6 @@ export const useNBodySimulation = ({
   }, []);
 
   const reset = useCallback(() => {
-    // Reset to initial state
     if (simulationStateRef.current.currentScenario) {
       loadScenario(simulationStateRef.current.currentScenario);
     }
@@ -1014,34 +1244,21 @@ export const useNBodySimulation = ({
     }
   }, []);
 
-  // ===== RETURN API =====
-
   return {
-    // State
     simulationState,
-
-    // Scenario management
     loadScenario,
-
-    // View mode control
     setViewMode,
-
-    // Body management
     addBody,
     removeBody,
     updateBody,
     selectBody,
     clearSelection,
-
-    // Simulation control
     start,
     pause,
     stop,
     reset,
     setSpeed,
     setTimeStep,
-
-    // Getters for rendering system
     getBodies: () => Array.from(simulationState.bodies.values()),
     getSelectedBodies: () => {
       return Array.from(simulationState.selectedBodyIds)
@@ -1049,12 +1266,8 @@ export const useNBodySimulation = ({
         .filter(Boolean) as SimulationBody[];
     },
     getBody: (id: string) => simulationState.bodies.get(id),
-
-    // Physics info
     getBarycenter: () => simulationState.barycenter,
     getEnergyDrift: () => simulationState.energyDrift,
-
-    // Direct engine access for advanced usage
     physicsEngine: physicsEngineRef.current
   };
 };

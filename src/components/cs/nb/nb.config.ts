@@ -273,21 +273,56 @@ function makePlanet(id: keyof typeof PLANETARY_CONSTANTS, overrides: Partial<Cel
   } as CelestialBodyDefinition;
 }
 
-function makeMoon(id: string, parentId: keyof typeof PLANETARY_CONSTANTS, overrides: Partial<CelestialBodyDefinition> = {}): CelestialBodyDefinition {
+function makeMoon(
+  id: string, 
+  parentId: keyof typeof PLANETARY_CONSTANTS, 
+  overrides: Partial<CelestialBodyDefinition> = {}
+): CelestialBodyDefinition {
   const m = MOON_CONSTANTS[id];
   const parent = PLANETARY_CONSTANTS[parentId];
+  const sun = PLANETARY_CONSTANTS.sun;
+  
   const parentSemi = parent?.semiMajorAxis ?? 0;
   const semiFromParent = m?.semiMajorAxisFromParent ?? 0;
-  const worldX = parentSemi + semiFromParent;
   const parentOrbitalV = parent?.orbitalVelocity ?? 0;
-  const moonOrbV = m?.orbitalVelocity ?? 0;
-
+  
+  // CRITICAL FIX: Vary the initial orbital phase for each moon
+  // Instead of placing all moons at 0°, distribute them around parent
+  const phaseMap: Record<string, number> = {
+    'moon': Math.PI / 2,        // 90° ahead of Earth
+    'phobos': 0,                // 0° (on X-axis)
+    'deimos': Math.PI,          // 180° opposite
+    'io': 0,
+    'europa': Math.PI / 2,
+    'ganymede': Math.PI,
+    'callisto': 3 * Math.PI / 2,
+    'titan': Math.PI / 4,
+    'enceladus': 3 * Math.PI / 4
+  };
+  
+  const phase = phaseMap[id] || 0;
+  
+  // Calculate circular orbital velocity around parent
+  const G = 6.67430e-11;
+  const circularVelocity = Math.sqrt(G * parent.mass / semiFromParent);
+  
+  // Position: moon at 'phase' angle from parent's position
+  // Parent is at (parentSemi, 0, 0)
+  // Moon orbits in XZ plane (same as planets orbit sun in XY)
+  const moonX = parentSemi + semiFromParent * Math.cos(phase);
+  const moonZ = semiFromParent * Math.sin(phase);
+  
+  // Velocity: parent's velocity + moon's perpendicular velocity
+  // Moon velocity direction is tangent to its orbit around parent
+  const moonVelX = -circularVelocity * Math.sin(phase);
+  const moonVelZ = circularVelocity * Math.cos(phase);
+  
   return {
     id,
     name: capitalizeId(id),
     type: 'moon',
-    position: { x: worldX, y: 0, z: 0 },
-    velocity: { x: 0, y: parentOrbitalV + moonOrbV, z: 0 },
+    position: { x: moonX, y: 0, z: moonZ },
+    velocity: { x: moonVelX, y: parentOrbitalV, z: moonVelZ },
     mass: m?.mass ?? 1e16,
     radius: m?.radius ?? 1e3,
     color: DEFAULT_BODY_COLORS['moon'] ?? '#C0C0C0',
@@ -295,7 +330,7 @@ function makeMoon(id: string, parentId: keyof typeof PLANETARY_CONSTANTS, overri
     parentId,
     childIds: [],
     isFixed: false,
-    useAnalyticalOrbit: true,
+    useAnalyticalOrbit: false, // Patched conics handles this dynamically
     rotationPeriod: m?.rotationPeriod,
     ...overrides
   } as CelestialBodyDefinition;

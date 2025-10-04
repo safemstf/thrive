@@ -48,7 +48,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
   speed: externalSpeed = 1,
   isDark = true
 }) => {
-  
+
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const previouslyRunningRef = useRef<boolean>(false);
 
@@ -79,8 +79,8 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
   const simulation = useNBodySimulation({
     config: physicsConfig,
     initialScenario: PREDEFINED_SCENARIOS[uiState.selectedScenario || 'solar-system'],
-    onBodyUpdate: useCallback((updates: PhysicsUpdate[]) => {}, []),
-    onPerformanceUpdate: useCallback((metrics: PerformanceMetrics) => {}, [])
+    onBodyUpdate: useCallback((updates: PhysicsUpdate[]) => { }, []),
+    onPerformanceUpdate: useCallback((metrics: PerformanceMetrics) => { }, [])
   });
 
   const rendering = useNBodyRendering({
@@ -89,7 +89,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     selectedBodies: simulation.getSelectedBodies(),
     visualConfig,
     cameraConfig,
-    onCameraUpdate: useCallback((position: Vector3Data, target: Vector3Data) => {}, []),
+    onCameraUpdate: useCallback((position: Vector3Data, target: Vector3Data) => { }, []),
     onBodyClick: useCallback((bodyId: string, event: MouseEvent) => {
       simulation.selectBody(bodyId, event.ctrlKey);
       setUIState(prev => ({ ...prev, selectedBodyId: bodyId }));
@@ -293,7 +293,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
 
   const exitMobileView = useCallback(async () => {
     setUIState(prev => ({ ...prev, mobileViewing: false }));
-    
+
     try {
       const doc = window.document as any;
       if (doc && doc.fullscreenElement) {
@@ -568,7 +568,7 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
             <p className="nb-subtitle">Simulate celestial mechanics in real-time</p>
           </header>
 
-          <button 
+          <button
             className="nb-view-btn"
             onClick={() => setUIState(prev => ({ ...prev, mobileViewing: true }))}
           >
