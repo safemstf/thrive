@@ -376,8 +376,8 @@ const StatsSection = styled.section`
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(248, 250, 252, 0.97) 100%
+      rgba(255, 255, 255, 0.05) 70%,
+      rgba(248, 250, 252, 0.77) 100%
     );
   }
   & > * { position: relative; z-index: 1; }
@@ -425,8 +425,10 @@ const PortfoliosSection = styled.section`
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg,
-      rgba(248, 250, 252, 0.96) 0%,
-      rgba(241, 245, 249, 0.97) 100%
+      rgba(248, 250, 252, 0.97) 0%,
+      rgba(241, 245, 249, 0.07) 80%,
+      rgba(248, 250, 252, 0.97) 100%
+
     );
   }
   & > * { position: relative; z-index: 1; }
@@ -515,7 +517,7 @@ const QuickActionsSection = styled.section`
   background-size: cover;
   background-position: center;
   margin: 0;
-  &::before { content: ''; position:absolute; inset:0; background: linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(241,245,249,0.97) 100%); }
+  &::before { content: ''; position:absolute; inset:0; background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(241,245,249,0.97) 100%); }
   & > * { position: relative; z-index:1; }
 `;
 
