@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import styled, { keyframes, css } from 'styled-components';
 import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
-  Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen, 
+  Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen,
   Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
@@ -464,7 +464,7 @@ const SpeedControl = styled.div<{ $theater?: boolean }>`
   }
 `;
 
-const TheaterControls = styled(ControlsContainer)<{ $theater: boolean }>`
+const TheaterControls = styled(ControlsContainer) <{ $theater: boolean }>`
   ${({ $theater }) => $theater && css`
     position: fixed;
     top: 50%;
@@ -1018,8 +1018,13 @@ export default function SimulationsPage() {
       case 'maze':
         return <MazeSolverDemo />;
       case 'disease':
-        return <DiseaseSimulation isRunning={isRunning} speed={speed} isDark={false} />;
-      case 'life':
+      case 'disease':
+        return <DiseaseSimulation
+          isRunning={isRunning}
+          speed={speed}
+          isDark={false}
+          isTheaterMode={theaterMode}  // Add this if you want external theater control
+        />; case 'life':
         return <LifeSimulation isDark={false} isRunning={isRunning} speed={speed} />;
       case 'bacteria-phage':
         return <AdvancedBacteremiaSimulator initialRunning={isRunning} initialSpeed={speed} isDark={false} />;

@@ -564,8 +564,12 @@ export default function DiseaseSimulation({
     peakInfected: 0
   });
 
-  const canvasWidth = useRef(1200);
-  const canvasHeight = useRef(675);
+  // FIXED PHYSICS WORLD - Add these two lines:
+  const PHYSICS_WIDTH = 1200;
+  const PHYSICS_HEIGHT = 1000;
+
+  const canvasWidth = PHYSICS_WIDTH;
+  const canvasHeight = PHYSICS_HEIGHT;
 
   // Generate spatial network
   const generateSpatialNetwork = (agents: Agent[], width: number, height: number) => {
@@ -604,8 +608,8 @@ export default function DiseaseSimulation({
 
   // Initialize agents
   const initAgents = useCallback(() => {
-    const width = canvasWidth.current;
-    const height = canvasHeight.current;
+    const width = PHYSICS_WIDTH;
+    const height = PHYSICS_HEIGHT;
     const newAgents: Agent[] = [];
 
     for (let i = 0; i < population; i++) {
@@ -682,8 +686,9 @@ export default function DiseaseSimulation({
   const update = useCallback(() => {
     if (!isRunning) return;
 
-    const width = canvasWidth.current;
-    const height = canvasHeight.current;
+    // Use FIXED physics boundaries
+    const width = PHYSICS_WIDTH;
+    const height = PHYSICS_HEIGHT;
 
     const maskEffect = maskWearing ? (1 - (disease.interventions.masks?.efficacy || 0)) : 1;
     const distanceEffect = socialDistancing ? (1 - (disease.interventions.distancing?.efficacy || 0)) : 1;
@@ -781,15 +786,25 @@ export default function DiseaseSimulation({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.save();
+    // Clear entire canvas
     ctx.fillStyle = "#0a0e1a";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Save state and apply transforms
+    ctx.save();
     ctx.translate(panOffset.x, panOffset.y);
     ctx.scale(zoomLevel, zoomLevel);
 
-    if (simulationMode === 'regions' && networkConnections.current.size > 0) {
+
+    // Clear entire canvas
+    ctx.fillStyle = "#0a0e1a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+    // Draw network connections
+    if ((simulationMode === 'regions' || simulationMode === 'households') && networkConnections.current.size > 0) {
       ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1 / zoomLevel;
       networkConnections.current.forEach((connections, fromId) => {
         const fromAgent = agents.current[fromId];
         if (!fromAgent) return;
@@ -806,8 +821,10 @@ export default function DiseaseSimulation({
       });
     }
 
+    // Draw agents
     for (const a of agents.current) {
       if (a.state === 'D') continue;
+
       let size = 3;
       let color = '#3b82f6';
 
@@ -911,21 +928,14 @@ export default function DiseaseSimulation({
   useEffect(() => {
     const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
     if (!canvas) return;
-
     const updateSize = () => {
-      if (isTheaterMode) {
-        canvasWidth.current = window.innerWidth;
-        canvasHeight.current = window.innerHeight;
-      } else {
-        const container = canvas.parentElement;
-        if (!container) return;
-        const rect = container.getBoundingClientRect();
-        canvasWidth.current = rect.width;
-        canvasHeight.current = rect.height;
-      }
+      const container = canvas.parentElement;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = canvasWidth.current * dpr;
-      canvas.height = canvasHeight.current * dpr;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
       const ctx = canvas.getContext('2d');
       if (ctx) ctx.scale(dpr, dpr);
     };
@@ -1276,231 +1286,231 @@ export default function DiseaseSimulation({
             </CanvasContainer>
           </VideoSection>
 
-        <ControlsSection>
-          <SectionTitle>
-            <Bug size={20} />
-            Disease Selection
-          </SectionTitle>
+          <ControlsSection>
+            <SectionTitle>
+              <Bug size={20} />
+              Disease Selection
+            </SectionTitle>
 
-          <DiseaseSelector>
-            {Object.values(DISEASE_PROFILES).map(d => (
-              <DiseaseButton
-                key={d.id}
-                $color={d.color}
-                $selected={d.id === selectedDisease}
-                onClick={() => {
-                  setSelectedDisease(d.id);
-                  handleReset();
-                }}
-              >
-                <div className="disease-icon" />
-                <div className="disease-info">
-                  <div className="disease-name">{d.name}</div>
-                  <div className="disease-stats">
-                    R₀: {d.r0.typical} | CFR: {(d.cfr * 100).toFixed(1)}% | {d.transmissionMode}
+            <DiseaseSelector>
+              {Object.values(DISEASE_PROFILES).map(d => (
+                <DiseaseButton
+                  key={d.id}
+                  $color={d.color}
+                  $selected={d.id === selectedDisease}
+                  onClick={() => {
+                    setSelectedDisease(d.id);
+                    handleReset();
+                  }}
+                >
+                  <div className="disease-icon" />
+                  <div className="disease-info">
+                    <div className="disease-name">{d.name}</div>
+                    <div className="disease-stats">
+                      R₀: {d.r0.typical} | CFR: {(d.cfr * 100).toFixed(1)}% | {d.transmissionMode}
+                    </div>
                   </div>
-                </div>
-              </DiseaseButton>
-            ))}
-          </DiseaseSelector>
-        </ControlsSection>
+                </DiseaseButton>
+              ))}
+            </DiseaseSelector>
+          </ControlsSection>
 
-        <ControlsSection>
-          <TabContainer>
-            <Tab $active={activeTab === 'parameters'} onClick={() => setActiveTab('parameters')}>
-              <Settings size={16} />
-              Parameters
-            </Tab>
-            <Tab $active={activeTab === 'interventions'} onClick={() => setActiveTab('interventions')}>
-              <Shield size={16} />
-              Interventions
-            </Tab>
-            <Tab $active={activeTab === 'statistics'} onClick={() => setActiveTab('statistics')}>
-              <BarChart3 size={16} />
-              Statistics
-            </Tab>
-          </TabContainer>
+          <ControlsSection>
+            <TabContainer>
+              <Tab $active={activeTab === 'parameters'} onClick={() => setActiveTab('parameters')}>
+                <Settings size={16} />
+                Parameters
+              </Tab>
+              <Tab $active={activeTab === 'interventions'} onClick={() => setActiveTab('interventions')}>
+                <Shield size={16} />
+                Interventions
+              </Tab>
+              <Tab $active={activeTab === 'statistics'} onClick={() => setActiveTab('statistics')}>
+                <BarChart3 size={16} />
+                Statistics
+              </Tab>
+            </TabContainer>
 
-          <TabContent>
-            {activeTab === 'parameters' && (
-              <Grid $columns={3}>
-                <ParameterControl>
-                  <div className="header">
-                    <span className="label">Population Size</span>
-                    <span className="value">{population}</span>
-                  </div>
-                  <input type="range" min={100} max={2000} step={50} value={population} onChange={(e) => setPopulation(Number(e.target.value))} disabled={isRunning} />
-                </ParameterControl>
+            <TabContent>
+              {activeTab === 'parameters' && (
+                <Grid $columns={3}>
+                  <ParameterControl>
+                    <div className="header">
+                      <span className="label">Population Size</span>
+                      <span className="value">{population}</span>
+                    </div>
+                    <input type="range" min={100} max={2000} step={50} value={population} onChange={(e) => setPopulation(Number(e.target.value))} disabled={isRunning} />
+                  </ParameterControl>
 
-                <ParameterControl>
-                  <div className="header">
-                    <span className="label">Initial Cases</span>
-                    <span className="value">{initialInfected}</span>
-                  </div>
-                  <input type="range" min={1} max={20} value={initialInfected} onChange={(e) => setInitialInfected(Number(e.target.value))} disabled={isRunning} />
-                </ParameterControl>
+                  <ParameterControl>
+                    <div className="header">
+                      <span className="label">Initial Cases</span>
+                      <span className="value">{initialInfected}</span>
+                    </div>
+                    <input type="range" min={1} max={20} value={initialInfected} onChange={(e) => setInitialInfected(Number(e.target.value))} disabled={isRunning} />
+                  </ParameterControl>
 
-                <ParameterControl>
-                  <div className="header">
-                    <span className="label">Network Model</span>
-                  </div>
-                  <select value={simulationMode} onChange={(e) => setSimulationMode(e.target.value as SimulationMode)} disabled={isRunning}>
-                    <option value="homogeneous">Homogeneous</option>
-                    <option value="regions">Regional Clusters</option>
-                    <option value="households">Household Structure</option>
-                  </select>
-                </ParameterControl>
-              </Grid>
-            )}
-
-            {activeTab === 'interventions' && (
-              <div>
-                <InterventionGrid>
-                  {[
-                    { key: 'masks', state: maskWearing, setState: setMaskWearing, icon: Shield, label: 'Mask Mandate', color: '#10b981' },
-                    { key: 'distancing', state: socialDistancing, setState: setSocialDistancing, icon: Users, label: 'Social Distancing', color: '#3b82f6' },
-                    { key: 'quarantine', state: quarantine, setState: setQuarantine, icon: Home, label: 'Quarantine', color: '#f59e0b' },
-                    { key: 'vaccination', state: vaccination, setState: setVaccination, icon: Heart, label: 'Vaccination', color: '#8b5cf6' }
-                  ].map(intervention => {
-                    const efficacy = disease.interventions[intervention.key as keyof typeof disease.interventions]?.efficacy;
-                    return (
-                      <InterventionCard
-                        key={intervention.key}
-                        $active={intervention.state}
-                        $color={intervention.color}
-                        onClick={() => intervention.setState(!intervention.state)}
-                      >
-                        <div className="icon">
-                          <intervention.icon size={24} />
-                        </div>
-                        <div className="name">{intervention.label}</div>
-                        {efficacy && (
-                          <div className="efficacy">
-                            {Math.round(efficacy * 100)}% effective
-                          </div>
-                        )}
-                      </InterventionCard>
-                    );
-                  })}
-                </InterventionGrid>
-
-                {vaccination && (
-                  <div style={{ marginTop: '1.5rem' }}>
-                    <ParameterControl>
-                      <div className="header">
-                        <span className="label">Vaccination Coverage</span>
-                        <span className="value">{Math.round(vaccinationRate * 100)}%</span>
-                      </div>
-                      <input type="range" min={0} max={1} step={0.05} value={vaccinationRate} onChange={(e) => setVaccinationRate(Number(e.target.value))} disabled={isRunning} />
-                    </ParameterControl>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'statistics' && (
-              <div>
-                <Grid $columns={4}>
-                  <StatCard $color="#3b82f6">
-                    <div className="label">Attack Rate</div>
-                    <div className="value">{((stats.totalCases / population) * 100).toFixed(1)}%</div>
-                    <div className="change">Total cases: {stats.totalCases}</div>
-                  </StatCard>
-
-                  <StatCard $color={stats.rt > 1 ? '#ef4444' : '#22c55e'}>
-                    <div className="label">R(t)</div>
-                    <div className="value">{stats.rt.toFixed(2)}</div>
-                    <div className="change">{stats.rt > 1 ? 'Outbreak growing' : 'Outbreak declining'}</div>
-                  </StatCard>
-
-                  <StatCard $color="#fbbf24">
-                    <div className="label">Peak Infected</div>
-                    <div className="value">{stats.peakInfected}</div>
-                    <div className="change">{((stats.peakInfected / population) * 100).toFixed(1)}% of population</div>
-                  </StatCard>
-
-                  <StatCard $color="#dc2626">
-                    <div className="label">Case Fatality</div>
-                    <div className="value">{stats.D > 0 ? ((stats.D / stats.totalCases) * 100).toFixed(1) : '0'}%</div>
-                    <div className="change">Deaths: {stats.D}</div>
-                  </StatCard>
+                  <ParameterControl>
+                    <div className="header">
+                      <span className="label">Network Model</span>
+                    </div>
+                    <select value={simulationMode} onChange={(e) => setSimulationMode(e.target.value as SimulationMode)} disabled={isRunning}>
+                      <option value="homogeneous">Homogeneous</option>
+                      <option value="regions">Regional Clusters</option>
+                      <option value="households">Household Structure</option>
+                    </select>
+                  </ParameterControl>
                 </Grid>
+              )}
 
-                <div style={{ height: '250px', background: 'rgba(0, 0, 0, 0.5)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '1rem' }}>
-                  <Line data={chartData} options={chartOptions} />
+              {activeTab === 'interventions' && (
+                <div>
+                  <InterventionGrid>
+                    {[
+                      { key: 'masks', state: maskWearing, setState: setMaskWearing, icon: Shield, label: 'Mask Mandate', color: '#10b981' },
+                      { key: 'distancing', state: socialDistancing, setState: setSocialDistancing, icon: Users, label: 'Social Distancing', color: '#3b82f6' },
+                      { key: 'quarantine', state: quarantine, setState: setQuarantine, icon: Home, label: 'Quarantine', color: '#f59e0b' },
+                      { key: 'vaccination', state: vaccination, setState: setVaccination, icon: Heart, label: 'Vaccination', color: '#8b5cf6' }
+                    ].map(intervention => {
+                      const efficacy = disease.interventions[intervention.key as keyof typeof disease.interventions]?.efficacy;
+                      return (
+                        <InterventionCard
+                          key={intervention.key}
+                          $active={intervention.state}
+                          $color={intervention.color}
+                          onClick={() => intervention.setState(!intervention.state)}
+                        >
+                          <div className="icon">
+                            <intervention.icon size={24} />
+                          </div>
+                          <div className="name">{intervention.label}</div>
+                          {efficacy && (
+                            <div className="efficacy">
+                              {Math.round(efficacy * 100)}% effective
+                            </div>
+                          )}
+                        </InterventionCard>
+                      );
+                    })}
+                  </InterventionGrid>
+
+                  {vaccination && (
+                    <div style={{ marginTop: '1.5rem' }}>
+                      <ParameterControl>
+                        <div className="header">
+                          <span className="label">Vaccination Coverage</span>
+                          <span className="value">{Math.round(vaccinationRate * 100)}%</span>
+                        </div>
+                        <input type="range" min={0} max={1} step={0.05} value={vaccinationRate} onChange={(e) => setVaccinationRate(Number(e.target.value))} disabled={isRunning} />
+                      </ParameterControl>
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {activeTab === 'statistics' && (
+                <div>
+                  <Grid $columns={4}>
+                    <StatCard $color="#3b82f6">
+                      <div className="label">Attack Rate</div>
+                      <div className="value">{((stats.totalCases / population) * 100).toFixed(1)}%</div>
+                      <div className="change">Total cases: {stats.totalCases}</div>
+                    </StatCard>
+
+                    <StatCard $color={stats.rt > 1 ? '#ef4444' : '#22c55e'}>
+                      <div className="label">R(t)</div>
+                      <div className="value">{stats.rt.toFixed(2)}</div>
+                      <div className="change">{stats.rt > 1 ? 'Outbreak growing' : 'Outbreak declining'}</div>
+                    </StatCard>
+
+                    <StatCard $color="#fbbf24">
+                      <div className="label">Peak Infected</div>
+                      <div className="value">{stats.peakInfected}</div>
+                      <div className="change">{((stats.peakInfected / population) * 100).toFixed(1)}% of population</div>
+                    </StatCard>
+
+                    <StatCard $color="#dc2626">
+                      <div className="label">Case Fatality</div>
+                      <div className="value">{stats.D > 0 ? ((stats.D / stats.totalCases) * 100).toFixed(1) : '0'}%</div>
+                      <div className="change">Deaths: {stats.D}</div>
+                    </StatCard>
+                  </Grid>
+
+                  <div style={{ height: '250px', background: 'rgba(0, 0, 0, 0.5)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '1rem' }}>
+                    <Line data={chartData} options={chartOptions} />
+                  </div>
+                </div>
+              )}
+            </TabContent>
+          </ControlsSection>
+        </MaxWidthWrapper>
+      </Container>
+
+      {/* Mobile Fullscreen Overlay */}
+      <FullscreenOverlay $show={isMobileFullscreen}>
+        <FullscreenCanvas
+          ref={theaterCanvasRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        />
+
+        <HUD $theater>
+          <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Day {stats.day}</div>
+          <div style={{ display: 'grid', gap: '0.4rem', fontSize: '0.8rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.7 }}>S:</span>
+              <span style={{ fontWeight: 600, color: '#3b82f6' }}>{stats.S}</span>
+            </div>
+            {stats.E > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ opacity: 0.7 }}>E:</span>
+                <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.E}</span>
               </div>
             )}
-          </TabContent>
-        </ControlsSection>
-      </MaxWidthWrapper>
-    </Container>
-
-    {/* Mobile Fullscreen Overlay */}
-    <FullscreenOverlay $show={isMobileFullscreen}>
-      <FullscreenCanvas
-        ref={theaterCanvasRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      />
-
-      <HUD $theater>
-        <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Day {stats.day}</div>
-        <div style={{ display: 'grid', gap: '0.4rem', fontSize: '0.8rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ opacity: 0.7 }}>S:</span>
-            <span style={{ fontWeight: 600, color: '#3b82f6' }}>{stats.S}</span>
-          </div>
-          {stats.E > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>E:</span>
-              <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.E}</span>
+              <span style={{ opacity: 0.7 }}>I:</span>
+              <span style={{ fontWeight: 600, color: disease.color }}>{stats.I}</span>
             </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ opacity: 0.7 }}>I:</span>
-            <span style={{ fontWeight: 600, color: disease.color }}>{stats.I}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ opacity: 0.7 }}>R:</span>
+              <span style={{ fontWeight: 600, color: '#22c55e' }}>{stats.R}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <span style={{ opacity: 0.7 }}>R(t):</span>
+              <span style={{ fontWeight: 700, color: stats.rt > 1 ? '#ef4444' : '#22c55e' }}>{stats.rt.toFixed(2)}</span>
+            </div>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ opacity: 0.7 }}>R:</span>
-            <span style={{ fontWeight: 600, color: '#22c55e' }}>{stats.R}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            <span style={{ opacity: 0.7 }}>R(t):</span>
-            <span style={{ fontWeight: 700, color: stats.rt > 1 ? '#ef4444' : '#22c55e' }}>{stats.rt.toFixed(2)}</span>
-          </div>
+        </HUD>
+
+        <div style={{ position: 'absolute', bottom: 'calc(1rem + env(safe-area-inset-bottom))', right: '1rem', background: 'rgba(0,0,0,0.9)', padding: '0.5rem 0.8rem', borderRadius: '18px', border: '1px solid rgba(59,130,246,0.5)', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace', zIndex: 50 }}>
+          {(zoomLevel * 100).toFixed(0)}%
         </div>
-      </HUD>
 
-      <div style={{ position: 'absolute', bottom: 'calc(1rem + env(safe-area-inset-bottom))', right: '1rem', background: 'rgba(0,0,0,0.9)', padding: '0.5rem 0.8rem', borderRadius: '18px', border: '1px solid rgba(59,130,246,0.5)', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace', zIndex: 50 }}>
-        {(zoomLevel * 100).toFixed(0)}%
-      </div>
+        <div style={{ position: 'absolute', bottom: 'calc(6rem + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', textAlign: 'center', zIndex: 50 }}>
+          Pinch to zoom • Drag to pan
+        </div>
 
-      <div style={{ position: 'absolute', bottom: 'calc(6rem + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', textAlign: 'center', zIndex: 50 }}>
-        Pinch to zoom • Drag to pan
-      </div>
+        <FullscreenControls>
+          <FullscreenButton $primary onClick={() => setIsRunning(!isRunning)}>
+            {isRunning ? <PauseCircle size={20} /> : <PlayCircle size={20} />}
+          </FullscreenButton>
+          <FullscreenButton onClick={handleReset}>
+            <RefreshCw size={20} />
+          </FullscreenButton>
+          <FullscreenButton onClick={resetView}>
+            <Activity size={20} />
+          </FullscreenButton>
+        </FullscreenControls>
 
-      <FullscreenControls>
-        <FullscreenButton $primary onClick={() => setIsRunning(!isRunning)}>
-          {isRunning ? <PauseCircle size={20} /> : <PlayCircle size={20} />}
-        </FullscreenButton>
-        <FullscreenButton onClick={handleReset}>
-          <RefreshCw size={20} />
-        </FullscreenButton>
-        <FullscreenButton onClick={resetView}>
-          <Activity size={20} />
-        </FullscreenButton>
-      </FullscreenControls>
-
-      <ExitButton onClick={exitMobileFullscreen}>
-        <X size={20} />
-      </ExitButton>
-    </FullscreenOverlay>
-  </>
+        <ExitButton onClick={exitMobileFullscreen}>
+          <X size={20} />
+        </ExitButton>
+      </FullscreenOverlay>
+    </>
   );
 }
