@@ -488,7 +488,7 @@ const ControlButton = styled.button`
   }
 `;
 
-const SlowMoButton = styled(ControlButton)<{ $active: boolean }>`
+const SlowMoButton = styled(ControlButton) <{ $active: boolean }>`
   ${({ $active }) => $active && css`
     background: rgba(34, 197, 94, 0.06);
     border-color: rgba(34, 197, 94, 0.12);
@@ -698,6 +698,9 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
     const perms: number[][] = [];
     let stepId = 0;
 
+    // Sort array for permuteUnique to enable duplicate detection
+    const sortedNums = algoType === 'permuteUnique' ? [...nums].sort((a, b) => a - b) : nums;
+
     const backtrack = (path: number[], usedArray: boolean[], depth: number): void => {
       steps.push({
         id: stepId++,
@@ -708,7 +711,7 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
         message: `Depth ${depth}: [${path.join(', ') || 'empty'}]`
       });
 
-      if (depth === nums.length) {
+      if (depth === sortedNums.length) {
         const permIndex = perms.length;
         perms.push([...path]);
         steps.push({
@@ -723,29 +726,31 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
         return;
       }
 
-      for (let i = 0; i < nums.length; i++) {
+      for (let i = 0; i < sortedNums.length; i++) {
         let canUse = false;
         let skipReason = '';
 
+        // Check all skip conditions first
         if (usedArray[i]) {
           skipReason = 'used';
-        } else if (algoType === 'permuteUnique' && i > 0 && nums[i] === nums[i - 1] && !usedArray[i - 1]) {
+          canUse = false;
+        } else if (algoType === 'permuteUnique' && i > 0 && sortedNums[i] === sortedNums[i - 1] && !usedArray[i - 1]) {
           skipReason = 'duplicate';
+          canUse = false;
         } else if (algoType === 'specialPerm') {
           if (depth === 0) {
             canUse = true;
           } else {
             const lastNum = path[depth - 1];
-            canUse = nums[i] % lastNum === 0 || lastNum % nums[i] === 0;
+            canUse = sortedNums[i] % lastNum === 0 || lastNum % sortedNums[i] === 0;
             if (!canUse) {
               skipReason = 'not divisible';
             }
           }
         } else {
+          // Default case: element is available
           canUse = true;
         }
-
-        if (!canUse && algoType !== 'specialPerm') canUse = !usedArray[i];
 
         steps.push({
           id: stepId++,
@@ -755,12 +760,12 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
           depth,
           currentIndex: i,
           message: canUse ?
-            `→ Choose ${nums[i]}` :
-            `✗ Skip ${nums[i]} (${skipReason})`
+            `→ Choose ${sortedNums[i]}` :
+            `✗ Skip ${sortedNums[i]} (${skipReason})`
         });
 
         if (canUse) {
-          const newPath = [...path, nums[i]];
+          const newPath = [...path, sortedNums[i]];
           const newUsed = [...usedArray];
           newUsed[i] = true;
 
@@ -772,14 +777,13 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
             path: [...path],
             used: [...usedArray],
             depth,
-            message: `← Backtrack from ${nums[i]}`
+            message: `← Backtrack from ${sortedNums[i]}`
           });
         }
       }
     };
 
-    const sortedNums = algoType === 'permuteUnique' ? [...nums].sort((a, b) => a - b) : nums;
-    backtrack([], new Array(nums.length).fill(false), 0);
+    backtrack([], new Array(sortedNums.length).fill(false), 0);
 
     return { steps, permutations: perms };
   }, []);
@@ -1033,7 +1037,7 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
               <Turtle className="w-4 h-4" />
             </SlowMoButton>
           </div>
-          
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <SpeedSlider
               type="range"
@@ -1100,7 +1104,7 @@ const PermutationSimulation: React.FC<PermutationSimulationProps> = ({
               </ModeButton>
             ))}
           </ModeSelector>
-          
+
           <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.75rem', color: COLORS.textMuted }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
               <Timer className="w-3 h-3" style={{ color: COLORS.accentSoft }} />
