@@ -1,210 +1,465 @@
-// np.tsx - Complete OFDM simulation with OOP state management (revised)
-// 'use client'
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-  lazy,
-  Suspense
-} from 'react';
-import {
-  PlayCircle,
-  PauseCircle,
-  RefreshCw,
-  Train,
-  Wifi,
-  Loader2
-} from 'lucide-react';
+// Train Station OFDM WiFi Simulation
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { PlayCircle, PauseCircle, RefreshCw, Train, Wifi, Radio } from 'lucide-react';
 
-// Import components
-import TabNavigationSystem from './np.tabs';
+// Types
+interface Position { x: number; y: number; }
+interface Velocity { x: number; y: number; }
 
-// Import styled components
-import {
-  SimulationContainer,
-  TrainStationContainer,
-  VisualizationGrid,
-  VisualizationPanel,
-  PanelHeader,
-  SimCanvas,
-  PlaybackControls,
-  TabContent
-} from './np.styles';
+interface Agent {
+  id: string;
+  type: 'access_point' | 'passenger';
+  position: Position;
+  velocity: Velocity;
+  state: 'on_platform' | 'boarding' | 'on_train' | 'exiting' | 'walking';
+  isTransmitting: boolean;
+  connectedToRouter: string | null;
+  snr: number;
+  throughput: number;
+  color: string;
+  targetPosition?: Position;
+  boardingProgress?: number;
+}
 
-// Import types
-import {
-  Agent,
-  Train as TrainType,
-  Channel,
-  SimulationState,
-  OFDMParameters,
-  TransmissionMetrics,
-  VisualizationSettings,
-  TabType,
-  OFDMSymbol,
-  ConnectionLink,
-  WIRELESS_STANDARDS
-} from './np.types';
+interface TrainType {
+  id: string;
+  position: Position;
+  velocity: Velocity;
+  length: number;
+  width: number;
+  isAtStation: boolean;
+  direction: 'approaching' | 'stopped' | 'departing';
+  passengerIds: string[];
+}
 
-// Lazy load heavy components
-const TrainStationSignalProcessor = lazy(() => import('./np.signal-processor'));
-const AdvancedVisualizations = lazy(() => import('./np.advanced-viz'));
+interface ConnectionLink {
+  fromAgent: string;
+  toAgent: string;
+  color: string;
+  snr: number;
+}
 
-// Loading component
-const TabLoader: React.FC = () => (
-  <div style={{
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '400px',
-    color: '#94a3b8',
-    gap: '16px'
-  }}>
-    <Loader2 size={32} style={{ animation: 'spin 1s linear infinite' }} />
-    <span>Loading component...</span>
-    <style>{`
-      @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-    `}</style>
-  </div>
-);
+// Layout helper
+const getLayout = (w: number, h: number) => ({
+  platform: {
+    x: w * 0.15,
+    y: h * 0.15,
+    width: w * 0.7,
+    height: h * 0.22
+  },
+  track: {
+    y: h * 0.48,
+    height: h * 0.08
+  },
+  apZone: {
+    y: h * 0.41 // Between platform and track for better coverage
+  },
+  stationZone: {
+    x: w * 0.35,
+    width: w * 0.15
+  }
+});
 
-// ==================== OOP STATE MANAGEMENT ====================
-class SimulationStateManager {
+// ==================== STATE MANAGEMENT ====================
+class SimulationEngine {
+  private animationFrame: number | null = null;
+  private lastUpdateTime = 0;
+  private stationStopTime = 0;
   private subscribers = new Set<() => void>();
 
-  public simulationState: SimulationState;
+  public isRunning = false;
+  public currentTime = 0;
+  public speed = 1.0;
   public train: TrainType;
   public agents: Agent[];
-  public channel: Channel;
   public connectionLinks: ConnectionLink[];
-  public currentSymbol: OFDMSymbol | null = null;
-  public ofdmParams: OFDMParameters;
-  public metrics: TransmissionMetrics;
-  public selectedAgent: Agent | null = null;
-  public visualizationSettings: VisualizationSettings;
-  public activeTab: TabType = 'simulation';
-
-  private cache = new Map<string, { value: any; timestamp: number }>();
-  private readonly CACHE_TTL = 100; // ms
+  public canvasSize = { width: 1400, height: 600 };
 
   constructor() {
-    this.simulationState = {
-      isRunning: false,
-      currentTime: 0,
-      timeStep: 0.1,
-      speed: 1.0,
-      totalSymbols: 0,
-      processedSymbols: 0,
-      mode: 'ofdm',
-      visualizationMode: 'network',
-      trainPosition: 0,
-      trainState: 'approaching',
-      activeCommunications: [],
-      interferenceLevel: 0
-    };
-
     this.train = {
       id: 'express_101',
-      position: { x: -100, y: 250 },
-      velocity: { x: 0, y: 0, magnitude: 0, direction: 0 },
-      length: 120,
-      width: 30,
-      passengers: [],
+      position: { x: -150, y: 0 },
+      velocity: { x: 0, y: 0 },
+      length: 140,
+      width: 32,
       isAtStation: false,
       direction: 'approaching',
-      metalShielding: 15,
-      interiorSignalStrength: -75
+      passengerIds: []
     };
-
     this.agents = [];
-    this.channel = {
-      type: 'multipath',
-      snr: 25,
-      dopplerShift: 0,
-      multipath: [
-        { delay: 0.5, amplitude: 0.8, phase: 0, dopplerShift: 0 },
-        { delay: 1.2, amplitude: 0.3, phase: Math.PI / 4, dopplerShift: 5 }
-      ],
-      fadingRate: 0.1,
-      mobility: 0.2,
-      interferenceLevel: 0.15,
-      pathLoss: 15
-    };
-
     this.connectionLinks = [];
-    this.ofdmParams = WIRELESS_STANDARDS.wifi6.ofdmParams;
-    this.metrics = {
-      throughput: 0,
-      spectralEfficiency: 4.5,
-      symbolErrorRate: 0.001,
-      bitErrorRate: 0.0005,
-      frameErrorRate: 0.01,
-      latency: 15,
-      jitter: 2,
-      packetLossRate: 0.5,
-      signalToNoiseRatio: 25,
-      signalToInterferenceRatio: 20,
-      peakToAverageRatio: 8.2,
-      channelCapacity: 100,
-      linkMargin: 10
-    };
-
-    this.visualizationSettings = {
-      showConnections: true,
-      showInterference: true,
-      showDopplerEffects: true,
-      showSignalStrength: true,
-      showMovementTrails: false,
-      animationSpeed: 1,
-      colorScheme: 'default',
-      updateRate: 30
-    };
   }
 
-  findOptimalRoute(from: Agent, to: Agent): Agent[] {
-    const cache = this.cache.get(`route_${from.id}_${to.id}`);
-    if (cache && Date.now() - cache.timestamp < this.CACHE_TTL) {
-      return cache.value;
-    }
+  initializeAgents(w: number, h: number) {
+    const layout = getLayout(w, h);
+    const agents: Agent[] = [];
 
-    const accessPoints = this.agents.filter(a => a.type === 'access_point');
-    const route = [from, ...accessPoints.slice(0, 1), to];
+    // 4 Access Points - positioned BETWEEN platform and track for optimal coverage
+    const apY = layout.apZone.y;
+    const apPositions = [
+      { x: w * 0.22, y: apY },
+      { x: w * 0.38, y: apY },
+      { x: w * 0.62, y: apY },
+      { x: w * 0.78, y: apY }
+    ];
 
-    this.cache.set(`route_${from.id}_${to.id}`, {
-      value: route,
-      timestamp: Date.now()
+    apPositions.forEach((pos, i) => {
+      agents.push({
+        id: `ap_${i + 1}`,
+        type: 'access_point',
+        position: pos,
+        velocity: { x: 0, y: 0 },
+        state: 'on_platform',
+        isTransmitting: true,
+        connectedToRouter: null,
+        snr: 35,
+        throughput: 150,
+        color: '#10b981'
+      });
     });
 
-    return route;
+    // Platform passengers waiting
+    const platformY = layout.platform.y;
+    const platformH = layout.platform.height;
+    for (let i = 0; i < 8; i++) {
+      const walkSpeed = Math.random() > 2.5;
+      agents.push({
+        id: `platform_${i + 1}`,
+        type: 'passenger',
+        position: {
+          x: layout.platform.x + 40 + (i * (layout.platform.width - 80) / 7),
+          y: platformY + 50 + Math.random() * (platformH - 100)
+        },
+        velocity: walkSpeed
+          ? { x: (Math.random() - 0.5) * 1.2, y: (Math.random() - 0.5) * 0.6 }
+          : { x: 0, y: 0 },
+        state: walkSpeed ? 'walking' : 'on_platform',
+        isTransmitting: Math.random() > 0.2,
+        connectedToRouter: this.findNearestAPId(agents, { x: layout.platform.x + w * 0.4, y: platformY + platformH / 2 }),
+        snr: 22 + Math.random() * 8,
+        throughput: 30 + Math.random() * 60,
+        color: '#3b82f6'
+      });
+    }
+
+    // Initial train passengers (will be on the train when it arrives)
+    const trainCenterY = layout.track.y + layout.track.height / 2;
+    for (let i = 0; i < 5; i++) {
+      agents.push({
+        id: `train_${i + 1}`,
+        type: 'passenger',
+        position: { x: -100 + i * 25, y: trainCenterY },
+        velocity: { x: 0, y: 0 },
+        state: 'on_train',
+        isTransmitting: false,
+        connectedToRouter: null,
+        snr: 12,
+        throughput: 0,
+        color: '#f59e0b'
+      });
+    }
+
+    this.train.passengerIds = agents.filter(a => a.state === 'on_train').map(a => a.id);
+    this.agents = agents;
   }
 
-  mitigateInterference(): void {
-    const highInterference = this.agents.filter(a => (a as any).interferenceLevel > 0.5);
+  private findNearestAPId(agents: Agent[], pos: Position): string {
+    const aps = agents.filter(a => a.type === 'access_point');
+    if (aps.length === 0) return 'ap_1';
 
-    for (const agent of highInterference) {
-      const originalChannel = (agent as any).connectedToRouter;
-      const alternativeAPs = this.agents
-        .filter(a => a.type === 'access_point' && a.id !== originalChannel)
-        .sort((a, b) => (a as any).interferenceLevel - (b as any).interferenceLevel);
+    let nearest = aps[0].id;
+    let minDist = Infinity;
+    for (const ap of aps) {
+      const dist = Math.hypot(ap.position.x - pos.x, ap.position.y - pos.y);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = ap.id;
+      }
+    }
+    return nearest;
+  }
 
-      if (alternativeAPs.length > 0) {
-        (agent as any).connectedToRouter = alternativeAPs[0].id;
-        (agent as any).interferenceLevel *= 0.7;
+  private updateSimulation(deltaTime: number) {
+    const { train, agents, canvasSize } = this;
+    const w = canvasSize.width;
+    const h = canvasSize.height;
+    const layout = getLayout(w, h);
+    const stationX = layout.stationZone.x;
+
+    // Update train
+    switch (train.direction) {
+      case 'approaching':
+        train.velocity.x = 22 * this.speed;
+        train.position.x += train.velocity.x * deltaTime;
+        if (train.position.x >= stationX) {
+          train.direction = 'stopped';
+          train.velocity.x = 0;
+          train.isAtStation = true;
+          this.stationStopTime = this.currentTime;
+          this.handleTrainArrival();
+        }
+        break;
+
+      case 'stopped':
+        if ((this.currentTime - this.stationStopTime) > 6) {
+          train.direction = 'departing';
+          train.isAtStation = false;
+        }
+        break;
+
+      case 'departing':
+        train.velocity.x = 28 * this.speed;
+        train.position.x += train.velocity.x * deltaTime;
+        if (train.position.x >= w + 100) {
+          train.position.x = -train.length - 50;
+          train.direction = 'approaching';
+          train.velocity.x = 0;
+          // Reset passengers for next cycle
+          this.resetForNextCycle(layout);
+        }
+        break;
+    }
+
+    const trainCenterY = layout.track.y + layout.track.height / 2;
+    const platformY = layout.platform.y;
+    const platformH = layout.platform.height;
+
+    // Update all agents
+    for (const agent of agents) {
+      if (agent.type === 'access_point') continue;
+
+      switch (agent.state) {
+        case 'on_train':
+          // Move with train
+          const trainPassengerIndex = train.passengerIds.indexOf(agent.id);
+          if (trainPassengerIndex >= 0) {
+            const spacing = train.length / (train.passengerIds.length + 1);
+            agent.position.x = train.position.x + spacing * (trainPassengerIndex + 1);
+            agent.position.y = trainCenterY;
+            agent.velocity.x = train.velocity.x;
+
+            // Connect to WiFi when train is at station
+            if (train.isAtStation && !agent.isTransmitting) {
+              agent.isTransmitting = true;
+              agent.connectedToRouter = this.findNearestAPId(agents, agent.position);
+              agent.snr = 18 + Math.random() * 10;
+              agent.throughput = 20 + Math.random() * 50;
+            } else if (!train.isAtStation) {
+              agent.isTransmitting = false;
+              agent.throughput = 0;
+            }
+          }
+          break;
+
+        case 'exiting':
+          // Move from train to platform
+          if (agent.targetPosition) {
+            const dx = agent.targetPosition.x - agent.position.x;
+            const dy = agent.targetPosition.y - agent.position.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > 3) {
+              const speed = 40;
+              agent.position.x += (dx / dist) * speed * deltaTime;
+              agent.position.y += (dy / dist) * speed * deltaTime;
+            } else {
+              agent.state = 'walking';
+              agent.velocity = { x: (Math.random() - 0.5) * 1.2, y: (Math.random() - 0.5) * 0.6 };
+              agent.color = '#3b82f6';
+              agent.isTransmitting = true;
+              agent.connectedToRouter = this.findNearestAPId(agents, agent.position);
+            }
+          }
+          break;
+
+        case 'boarding':
+          // Move from platform to train
+          if (agent.targetPosition) {
+            const dx = agent.targetPosition.x - agent.position.x;
+            const dy = agent.targetPosition.y - agent.position.y;
+            const dist = Math.hypot(dx, dy);
+
+            if (dist > 3) {
+              const speed = 40;
+              agent.position.x += (dx / dist) * speed * deltaTime;
+              agent.position.y += (dy / dist) * speed * deltaTime;
+            } else {
+              agent.state = 'on_train';
+              agent.color = '#f59e0b';
+              train.passengerIds.push(agent.id);
+            }
+          }
+          break;
+
+        case 'walking':
+        case 'on_platform':
+          // Move on platform
+          if (agent.state === 'walking') {
+            agent.position.x += agent.velocity.x * deltaTime * 10;
+            agent.position.y += agent.velocity.y * deltaTime * 10;
+          }
+
+          // Strict platform boundaries
+          const minX = layout.platform.x + 20;
+          const maxX = layout.platform.x + layout.platform.width - 20;
+          const minY = platformY + 35;
+          const maxY = platformY + platformH - 20;
+
+          if (agent.position.x <= minX || agent.position.x >= maxX) {
+            agent.velocity.x *= -1;
+            agent.position.x = Math.max(minX, Math.min(maxX, agent.position.x));
+          }
+          if (agent.position.y <= minY || agent.position.y >= maxY) {
+            agent.velocity.y *= -1;
+            agent.position.y = Math.max(minY, Math.min(maxY, agent.position.y));
+          }
+
+          // Update connection
+          if (agent.isTransmitting) {
+            agent.connectedToRouter = this.findNearestAPId(agents, agent.position);
+          }
+          break;
+      }
+    }
+
+    this.updateConnectionLinks();
+    this.notify();
+  }
+
+  private handleTrainArrival() {
+    const layout = getLayout(this.canvasSize.width, this.canvasSize.height);
+    const platformY = layout.platform.y;
+    const platformH = layout.platform.height;
+
+    // Some train passengers exit
+    const trainPassengers = this.agents.filter(a => a.state === 'on_train');
+    const exitCount = Math.min(3, Math.floor(trainPassengers.length * 0.6));
+
+    for (let i = 0; i < exitCount; i++) {
+      const passenger = trainPassengers[i];
+      if (passenger) {
+        passenger.state = 'exiting';
+        passenger.targetPosition = {
+          x: layout.platform.x + 50 + Math.random() * (layout.platform.width - 100),
+          y: platformY + 60 + Math.random() * (platformH - 120)
+        };
+        const idx = this.train.passengerIds.indexOf(passenger.id);
+        if (idx >= 0) this.train.passengerIds.splice(idx, 1);
+      }
+    }
+
+    // Some platform passengers board
+    const platformPassengers = this.agents.filter(a =>
+      (a.state === 'on_platform' || a.state === 'walking') &&
+      a.type === 'passenger'
+    );
+    const boardCount = Math.min(3, platformPassengers.length);
+
+    for (let i = 0; i < boardCount; i++) {
+      const passenger = platformPassengers[Math.floor(Math.random() * platformPassengers.length)];
+      if (passenger && passenger.state !== 'boarding') {
+        passenger.state = 'boarding';
+        const trainCenterY = layout.track.y + layout.track.height / 2;
+        passenger.targetPosition = {
+          x: this.train.position.x + this.train.length / 2 + (Math.random() - 0.5) * 40,
+          y: trainCenterY
+        };
+        passenger.isTransmitting = false;
       }
     }
   }
 
-  updateMetrics(): void {
-    const activeAgents = this.agents.filter(a => a.isTransmitting);
-    this.metrics.throughput = activeAgents.reduce((sum, a) => sum + (a.throughput ?? 0), 0);
-    this.metrics.signalToNoiseRatio = this.channel.snr;
-    this.metrics.packetLossRate = activeAgents.length > 0 ? activeAgents.reduce((sum, a) => sum + (a.packetLoss ?? 0), 0) / activeAgents.length : 0;
+  private resetForNextCycle(layout: any) {
+    // Reset all passengers for next train cycle
+    const platformPassengers = this.agents.filter(a =>
+      a.type === 'passenger' &&
+      (a.state === 'on_platform' || a.state === 'walking' || a.state === 'exiting')
+    );
+
+    // Keep some on platform, put some on next train
+    this.train.passengerIds = [];
+
+    this.agents.forEach(agent => {
+      if (agent.type === 'passenger') {
+        if (Math.random() < 0.4) {
+          // On next train
+          agent.state = 'on_train';
+          agent.color = '#f59e0b';
+          agent.isTransmitting = false;
+          this.train.passengerIds.push(agent.id);
+        } else {
+          // On platform
+          agent.state = Math.random() > 0.5 ? 'walking' : 'on_platform';
+          agent.color = '#3b82f6';
+          agent.velocity = agent.state === 'walking'
+            ? { x: (Math.random() - 0.5) * 1.2, y: (Math.random() - 0.5) * 0.6 }
+            : { x: 0, y: 0 };
+        }
+      }
+    });
+  }
+
+  private updateConnectionLinks() {
+    const links: ConnectionLink[] = [];
+    for (const agent of this.agents) {
+      if (agent.connectedToRouter && agent.isTransmitting) {
+        const router = this.agents.find(a => a.id === agent.connectedToRouter);
+        if (router) {
+          links.push({
+            fromAgent: agent.id,
+            toAgent: router.id,
+            color: agent.snr > 22 ? '#10b981' : agent.snr > 16 ? '#f59e0b' : '#ef4444',
+            snr: agent.snr
+          });
+        }
+      }
+    }
+    this.connectionLinks = links;
+  }
+
+  private simulationLoop = (timestamp: number) => {
+    if (!this.isRunning) return;
+    const deltaTime = Math.min((timestamp - this.lastUpdateTime) / 1000, 0.1) * this.speed;
+    this.lastUpdateTime = timestamp;
+    if (deltaTime > 0) {
+      this.currentTime += deltaTime;
+      this.updateSimulation(deltaTime);
+    }
+    this.animationFrame = requestAnimationFrame(this.simulationLoop);
+  };
+
+  start() {
+    if (this.isRunning) return;
+    this.isRunning = true;
+    this.lastUpdateTime = performance.now();
+    this.animationFrame = requestAnimationFrame(this.simulationLoop);
+  }
+
+  stop() {
+    this.isRunning = false;
+    if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+  }
+
+  reset(w: number, h: number) {
+    this.stop();
+    this.currentTime = 0;
+    this.stationStopTime = 0;
+    this.canvasSize = { width: w, height: h };
+    this.train.position.x = -150;
+    this.train.direction = 'approaching';
+    this.train.isAtStation = false;
+    this.train.passengerIds = [];
+    this.initializeAgents(w, h);
+    this.notify();
+  }
+
+  setSpeed(speed: number) {
+    this.speed = Math.max(0.5, Math.min(3, speed));
+  }
+
+  getStationProgress(): number {
+    if (!this.train.isAtStation) return 0;
+    return Math.min(1, (this.currentTime - this.stationStopTime) / 6);
   }
 
   subscribe(callback: () => void): () => void {
@@ -215,639 +470,475 @@ class SimulationStateManager {
   notify(): void {
     this.subscribers.forEach(cb => cb());
   }
-}
-
-// ==================== SIMULATION ENGINE ====================
-class SimulationEngine {
-  public isRunning = false;
-  private animationFrame: number | null = null;
-  private lastUpdateTime = 0;
-  private stationStopTime = 0;
-  public stateManager: SimulationStateManager;
-
-  constructor(private width: number, private height: number) {
-    this.stateManager = new SimulationStateManager();
-    this.initializeAgents();
-  }
-
-  private initializeAgents() {
-    const agents: Agent[] = [];
-
-    // 3 Access Points
-    const apPositions = [
-      { x: 300, y: 50 },
-      { x: 700, y: 50 },
-      { x: 1100, y: 50 }
-    ];
-
-    apPositions.forEach((pos, i) => {
-      agents.push({
-        id: `ap_${i + 1}`,
-        type: 'access_point',
-        position: pos,
-        velocity: { x: 0, y: 0, magnitude: 0, direction: 0 },
-        movementState: 'stationary',
-        connectionState: 'idle',
-        transmitPower: 23,
-        signalStrength: -30,
-        interferenceLevel: 0.1,
-        snr: 30,
-        isTransmitting: true,
-        connectedToRouter: null,
-        dopplerShift: 0,
-        pathLoss: 0,
-        throughput: 0,
-        latency: 5,
-        packetLoss: 0.1,
-        handoffCount: 0,
-        trail: [],
-        color: '#10b981'
-      } as Agent);
-    });
-
-    // Platform & Train passengers
-    for (let i = 0; i < 7; i++) {
-      const isWalking = Math.random() > 0.6;
-      agents.push({
-        id: `platform_${i + 1}`,
-        type: 'platform_passenger',
-        position: {
-          x: 250 + (i * 100) + (Math.random() - 0.5) * 80,
-          y: 350 + (Math.random() - 0.5) * 100
-        },
-        velocity: isWalking
-          ? { x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5), magnitude: 0, direction: 0 }
-          : { x: 0, y: 0, magnitude: 0, direction: 0 },
-        movementState: isWalking ? 'walking' : 'sitting',
-        connectionState: Math.random() > 0.3 ? 'transmitting' : 'idle',
-        transmitPower: 15,
-        signalStrength: -50 - Math.random() * 20,
-        interferenceLevel: 0.05 + Math.random() * 0.1,
-        snr: 20 + Math.random() * 10,
-        isTransmitting: Math.random() > 0.4,
-        connectedToRouter: `ap_${Math.floor(Math.random() * 3) + 1}`,
-        dopplerShift: (Math.random() - 0.5) * 10,
-        pathLoss: 10 + Math.random() * 15,
-        platformArea: Math.random() > 0.5 ? 'waiting' : 'walking',
-        throughput: 10 + Math.random() * 40,
-        latency: 10 + Math.random() * 20,
-        packetLoss: Math.random() * 2,
-        handoffCount: 0,
-        trail: [],
-        color: '#3b82f6'
-      } as Agent);
-    }
-
-    for (let i = 0; i < 3; i++) {
-      agents.push({
-        id: `train_${i + 1}`,
-        type: 'train_passenger',
-        position: { x: -80 + i * 25, y: 240 + (Math.random() - 0.5) * 20 },
-        velocity: { x: 0, y: 0, magnitude: 0, direction: 0 },
-        movementState: 'moving_with_train',
-        connectionState: 'idle',
-        transmitPower: 12,
-        signalStrength: -70,
-        interferenceLevel: 0.3,
-        snr: 15,
-        isTransmitting: false,
-        connectedToRouter: null,
-        dopplerShift: 0,
-        pathLoss: 25,
-        trainId: 'express_101',
-        throughput: 0,
-        latency: 50,
-        packetLoss: 5,
-        handoffCount: 0,
-        trail: [],
-        color: '#f59e0b'
-      } as Agent);
-    }
-
-    this.stateManager.agents = agents;
-  }
-
-  private updateSimulation(deltaTime: number) {
-    // Update train
-    const train = this.stateManager.train;
-    const stationStart = 400;
-
-    switch (train.direction) {
-      case 'approaching':
-        train.velocity.x = 15 * this.stateManager.simulationState.speed;
-        train.position.x += train.velocity.x * deltaTime;
-
-        if (train.position.x >= stationStart) {
-          train.direction = 'stopped';
-          train.velocity.x = 0;
-          train.isAtStation = true;
-          this.stationStopTime = this.stateManager.simulationState.currentTime;
-        }
-        break;
-
-      case 'stopped':
-        if ((this.stateManager.simulationState.currentTime - this.stationStopTime) > 5) {
-          train.direction = 'departing';
-          train.isAtStation = false;
-        }
-        break;
-
-      case 'departing':
-        train.velocity.x = 20 * this.stateManager.simulationState.speed;
-        train.position.x += train.velocity.x * deltaTime;
-
-        if (train.position.x >= this.width + 100) {
-          train.position.x = -150;
-          train.direction = 'approaching';
-          train.velocity.x = 0;
-        }
-        break;
-    }
-
-    train.velocity.magnitude = Math.abs(train.velocity.x);
-
-    // Update agents (train passengers follow the train)
-    for (const agent of this.stateManager.agents) {
-      if (agent.type === 'train_passenger') {
-        const idNum = parseInt(agent.id.split('_')[1] || '1', 10);
-        const offset = idNum * 25 - 25;
-        agent.position.x = train.position.x + offset;
-        agent.position.y = train.position.y + (Math.random() - 0.5) * 10;
-        agent.velocity = { ...train.velocity };
-      }
-    }
-
-    // Update connections
-    this.updateConnectionLinks();
-
-    // Periodic optimizations
-    if (Math.floor(this.stateManager.simulationState.currentTime) % 1 === 0) {
-      this.stateManager.mitigateInterference();
-    }
-
-    this.stateManager.updateMetrics();
-    this.stateManager.notify();
-  }
-
-  private updateConnectionLinks() {
-    const links: ConnectionLink[] = [];
-    const { agents } = this.stateManager;
-
-    for (const agent of agents) {
-      if ((agent as any).connectedToRouter && agent.isTransmitting) {
-        const router = agents.find(a => a.id === (agent as any).connectedToRouter);
-        if (router) {
-          links.push({
-            id: `${agent.id}_${router.id}`,
-            fromAgent: agent.id,
-            toAgent: router.id,
-            signalStrength: agent.signalStrength,
-            snr: agent.snr,
-            interferenceLevel: agent.interferenceLevel,
-            pathLoss: agent.pathLoss,
-            opacity: Math.max(0.2, Math.min(1, (agent.signalStrength + 90) / 40)),
-            color: agent.snr > 20 ? '#10b981' : agent.snr > 15 ? '#f59e0b' : '#ef4444',
-            thickness: Math.max(1, Math.min(3, (agent.throughput ?? 0) / 25)),
-            animationSpeed: 1.0,
-            instantaneousThroughput: agent.throughput ?? 0,
-            latency: agent.latency ?? 0,
-            jitter: 0,
-            packetLoss: agent.packetLoss ?? 0,
-            interferencePattern: [],
-            dopplerEffect: {
-              isActive: false,
-              frequencyShift: 0,
-              direction: 'stationary',
-              intensity: 0,
-              waveCompressionFactor: 1,
-              colorShift: '#3b82f6'
-            }
-          } as ConnectionLink);
-        }
-      }
-    }
-
-    this.stateManager.connectionLinks = links;
-  }
-
-  private simulationLoop = (timestamp: number) => {
-    if (!this.isRunning) return;
-
-    const deltaTime = Math.min((timestamp - this.lastUpdateTime) / 1000, 0.1) * this.stateManager.simulationState.speed;
-    this.lastUpdateTime = timestamp;
-
-    if (deltaTime > 0) {
-      this.stateManager.simulationState.currentTime += deltaTime;
-      this.updateSimulation(deltaTime);
-    }
-
-    this.animationFrame = requestAnimationFrame(this.simulationLoop);
-  };
-
-  start() {
-    if (this.isRunning) return;
-    this.isRunning = true;
-    this.stateManager.simulationState.isRunning = true;
-    this.lastUpdateTime = performance.now();
-    this.animationFrame = requestAnimationFrame(this.simulationLoop);
-  }
-
-  stop() {
-    this.isRunning = false;
-    this.stateManager.simulationState.isRunning = false;
-    if (this.animationFrame !== null) {
-      cancelAnimationFrame(this.animationFrame);
-      this.animationFrame = null;
-    }
-  }
-
-  reset() {
-    this.stop();
-    this.stateManager = new SimulationStateManager();
-    this.initializeAgents();
-    this.stationStopTime = 0;
-    this.stateManager.notify();
-  }
-
-  setSpeed(speed: number) {
-    this.stateManager.simulationState.speed = Math.max(0.1, Math.min(5, speed));
-  }
 
   destroy() {
     this.stop();
   }
 }
 
-// ==================== VIEWPORT COMPONENTS ====================
-const SimulationViewport: React.FC<{
-  engine: SimulationEngine;
-  settings: VisualizationSettings;
-  onAgentSelect: (agent: Agent | null) => void;
-}> = React.memo(({ engine, settings, onAgentSelect }) => {
+// ==================== VIEWPORT COMPONENT ====================
+const SimulationViewport: React.FC<{ engine: SimulationEngine }> = React.memo(({ engine }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
-  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
-  // perform a pixel-perfect draw using devicePixelRatio
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const w = Math.max(1, Math.floor(container.clientWidth));
-    const h = Math.max(1, Math.floor(container.clientHeight));
+    const w = Math.max(1, container.clientWidth);
+    const h = Math.max(1, container.clientHeight);
 
     if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
+      engine.canvasSize = { width: w, height: h };
     }
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Snapshot of state (avoid referencing reactive data in mid-draw)
-    const { train, agents, connectionLinks } = engine.stateManager;
+    const { train, agents, connectionLinks } = engine;
+    const layout = getLayout(w, h);
 
     // Background
-    ctx.fillStyle = '#0f172a';
+    ctx.fillStyle = '#0a0f1e';
     ctx.fillRect(0, 0, w, h);
 
-    // Platform (example)
-    ctx.fillStyle = 'rgba(59, 130, 246, 0.08)';
-    ctx.fillRect(200, 100, Math.min(800, w - 400), 150);
+    // Grid
+    ctx.strokeStyle = 'rgba(100, 116, 139, 0.06)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= w; x += 50) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= h; y += 50) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
 
-    // Tracks
-    ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
-    ctx.fillRect(0, 250, w, 50);
+    // Platform
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.12)';
+    ctx.fillRect(layout.platform.x, layout.platform.y, layout.platform.width, layout.platform.height);
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(layout.platform.x, layout.platform.y, layout.platform.width, layout.platform.height);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = 'bold 16px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('PLATFORM', w / 2, layout.platform.y + 24);
+
+    // Yellow safety line
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([12, 8]);
+    ctx.beginPath();
+    ctx.moveTo(layout.platform.x, layout.platform.y + layout.platform.height);
+    ctx.lineTo(layout.platform.x + layout.platform.width, layout.platform.y + layout.platform.height);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Track
+    ctx.fillStyle = 'rgba(71, 85, 105, 0.6)';
+    ctx.fillRect(0, layout.track.y, w, layout.track.height);
+
+    // Station zone
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.15)';
+    ctx.fillRect(layout.stationZone.x, layout.track.y, layout.stationZone.width, layout.track.height);
+
+    // Rails
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.8)';
+    ctx.lineWidth = 4;
+    [0.28, 0.72].forEach(ratio => {
+      ctx.beginPath();
+      ctx.moveTo(0, layout.track.y + layout.track.height * ratio);
+      ctx.lineTo(w, layout.track.y + layout.track.height * ratio);
+      ctx.stroke();
+    });
 
     // Train
-    if (train.position.x > -200 && train.position.x < w + 200) {
-      ctx.fillStyle = '#374151';
-      ctx.fillRect(train.position.x, train.position.y - 15, train.length, train.width);
+    if (train.position.x > -train.length - 50 && train.position.x < w + 50) {
+      const trainY = layout.track.y + (layout.track.height - train.width) / 2;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fillRect(train.position.x + 4, trainY + 4, train.length, train.width);
+
+      const grad = ctx.createLinearGradient(0, trainY, 0, trainY + train.width);
+      grad.addColorStop(0, '#64748b');
+      grad.addColorStop(0.5, '#475569');
+      grad.addColorStop(1, '#334155');
+      ctx.fillStyle = grad;
+      ctx.fillRect(train.position.x, trainY, train.length, train.width);
+
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(train.position.x, trainY, train.length, train.width);
+
+      // Windows
+      ctx.fillStyle = 'rgba(147, 197, 253, 0.5)';
+      for (let i = 0; i < 6; i++) {
+        ctx.fillRect(
+          train.position.x + 8 + i * (train.length / 6),
+          trainY + 5,
+          train.length / 6 - 10,
+          train.width - 10
+        );
+      }
+
+      // Status
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold 12px system-ui';
+      ctx.textAlign = 'center';
+      const status = train.isAtStation ? '⬛ BOARDING' : train.direction === 'approaching' ? '→ ARRIVING' : '→→ DEPARTING';
+      ctx.fillText(status, train.position.x + train.length / 2, trainY - 10);
+
+      if (train.velocity.x > 0) {
+        ctx.fillStyle = '#22c55e';
+        ctx.font = '10px monospace';
+        ctx.fillText(`${Math.round(train.velocity.x * 3)} km/h`, train.position.x + train.length / 2, trainY + train.width + 14);
+      }
+
+      // Boarding timer
+      if (train.isAtStation) {
+        const progress = engine.getStationProgress();
+        const barW = train.length - 24;
+        const barH = 4;
+        const barX = train.position.x + 12;
+        const barY = trainY + train.width + 20;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(barX, barY, barW, barH);
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect(barX, barY, barW * progress, barH);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(barX, barY, barW, barH);
+      }
     }
 
     // Connections
-    if (settings.showConnections) {
-      for (const link of connectionLinks) {
-        const from = agents.find(a => a.id === link.fromAgent);
-        const to = agents.find(a => a.id === link.toAgent);
-        if (from && to) {
-          ctx.strokeStyle = link.color + '88';
-          ctx.lineWidth = Math.max(1, Math.min(4, link.thickness));
-          ctx.beginPath();
-          ctx.moveTo(from.position.x, from.position.y);
-          ctx.lineTo(to.position.x, to.position.y);
-          ctx.stroke();
-        }
+    for (const link of connectionLinks) {
+      const from = agents.find(a => a.id === link.fromAgent);
+      const to = agents.find(a => a.id === link.toAgent);
+      if (from && to) {
+        ctx.setLineDash([6, 6]);
+        ctx.lineDashOffset = -(Date.now() / 30) % 12;
+
+        ctx.strokeStyle = link.color + '50';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(from.position.x, from.position.y);
+        ctx.lineTo(to.position.x, to.position.y);
+        ctx.stroke();
+
+        ctx.strokeStyle = link.color + 'dd';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
     }
 
     // Agents
     for (const agent of agents) {
-      ctx.fillStyle = (agent.color || '#3b82f6');
-      ctx.beginPath();
-      ctx.arc(agent.position.x, agent.position.y, 8, 0, Math.PI * 2);
-      ctx.fill();
-      // optionally draw signal strength rings
-      if (settings.showSignalStrength && agent.isTransmitting) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-        ctx.lineWidth = 1;
+      if (agent.type === 'access_point') {
+        // Access Point - larger, more visible
+        const grad = ctx.createRadialGradient(agent.position.x, agent.position.y, 0, agent.position.x, agent.position.y, 30);
+        grad.addColorStop(0, agent.color + '66');
+        grad.addColorStop(1, agent.color + '00');
+        ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(agent.position.x, agent.position.y, 16, 0, Math.PI * 2);
+        ctx.arc(agent.position.x, agent.position.y, 30, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = agent.color;
+        ctx.beginPath();
+        ctx.arc(agent.position.x, agent.position.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
         ctx.stroke();
+
+        // AP icon
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 11px system-ui';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 4;
+        ctx.fillText('AP', agent.position.x, agent.position.y - 18);
+        ctx.shadowBlur = 0;
+
+        // Connection count
+        const conns = connectionLinks.filter(l => l.toAgent === agent.id).length;
+        if (conns > 0) {
+          ctx.fillStyle = '#10b981';
+          ctx.font = 'bold 10px system-ui';
+          ctx.fillText(`${conns}`, agent.position.x, agent.position.y + 26);
+        }
+      } else {
+        // Passenger
+        const grad = ctx.createRadialGradient(agent.position.x, agent.position.y, 0, agent.position.x, agent.position.y, 18);
+        grad.addColorStop(0, agent.color + '55');
+        grad.addColorStop(1, agent.color + '00');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(agent.position.x, agent.position.y, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = agent.color;
+        ctx.beginPath();
+        ctx.arc(agent.position.x, agent.position.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Signal rings
+        if (agent.isTransmitting) {
+          const pulse = (Date.now() / 1000) % 1;
+          for (let i = 1; i <= 2; i++) {
+            ctx.globalAlpha = Math.max(0, 0.7 - pulse - (i - 1) * 0.3);
+            ctx.strokeStyle = agent.color;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(agent.position.x, agent.position.y, 12 * i + pulse * 8, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        // State indicators
+        if (agent.state === 'on_train') {
+          ctx.fillStyle = 'rgba(251, 191, 36, 0.9)';
+          ctx.font = '10px system-ui';
+          ctx.textAlign = 'center';
+          ctx.fillText('🚂', agent.position.x, agent.position.y - 12);
+        } else if (agent.state === 'boarding') {
+          ctx.fillStyle = '#22c55e';
+          ctx.font = '12px system-ui';
+          ctx.fillText('↓', agent.position.x, agent.position.y - 12);
+        } else if (agent.state === 'exiting') {
+          ctx.fillStyle = '#3b82f6';
+          ctx.font = '12px system-ui';
+          ctx.fillText('↑', agent.position.x, agent.position.y - 12);
+        } else if (agent.state === 'walking') {
+          const angle = Math.atan2(agent.velocity.y, agent.velocity.x);
+          ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(agent.position.x, agent.position.y);
+          ctx.lineTo(agent.position.x + Math.cos(angle) * 10, agent.position.y + Math.sin(angle) * 10);
+          ctx.stroke();
+        }
       }
     }
-  }, [engine, settings]);
 
-  // subscribe to state changes and schedule redraw via rAF
+    // Stats
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(15, 15, 330, 85);
+
+    ctx.fillStyle = 'white';
+    ctx.font = 'bold 11px system-ui';
+    ctx.textAlign = 'left';
+
+    const onTrain = agents.filter(a => a.state === 'on_train').length;
+    const onPlatform = agents.filter(a => a.state === 'on_platform' || a.state === 'walking').length;
+    const boarding = agents.filter(a => a.state === 'boarding').length;
+    const exiting = agents.filter(a => a.state === 'exiting').length;
+
+    ctx.fillText(`Train: ${train.direction.toUpperCase()} | Position: ${Math.round(train.position.x)}`, 25, 33);
+    ctx.fillText(`On Train: ${onTrain} | On Platform: ${onPlatform}`, 25, 51);
+    ctx.fillText(`Boarding: ${boarding} | Exiting: ${exiting} | Connections: ${connectionLinks.length}`, 25, 69);
+    ctx.fillText(`Speed: ${engine.speed}x`, 25, 87);
+
+    // Legend
+    const legendY = h - 42;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(15, legendY, w - 30, 32);
+
+    ctx.font = 'bold 10px system-ui';
+    const items = [
+      { color: '#10b981', label: 'Access Point', x: 30 },
+      { color: '#3b82f6', label: 'Platform User', x: 150 },
+      { color: '#f59e0b', label: 'Train User', x: 280 },
+      { label: '↑ Exiting', x: 390, isText: true },
+      { label: '↓ Boarding', x: 460, isText: true }
+    ];
+
+    items.forEach(item => {
+      if (item.isText) {
+        ctx.fillStyle = 'white';
+        ctx.fillText(item.label, item.x, legendY + 20);
+      } else {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.beginPath();
+        ctx.arc(item.x, legendY + 16, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'white';
+        ctx.fillText(item.label, item.x + 12, legendY + 20);
+      }
+    });
+  }, [engine]);
+
   useEffect(() => {
     const scheduleDraw = () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => draw());
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(draw);
     };
-
-    // initial draw
     scheduleDraw();
-
-    const unsubscribe = engine.stateManager.subscribe(() => {
-      scheduleDraw();
-    });
-
+    const unsub = engine.subscribe(scheduleDraw);
     return () => {
-      unsubscribe();
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
+      unsub();
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [engine, draw]);
 
-  // ResizeObserver to resize canvas when container changes
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const obs = new ResizeObserver(() => {
-      // schedule immediate draw on resize
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => draw());
-    });
-    obs.observe(container);
-    resizeObserverRef.current = obs;
-
-    return () => {
-      if (resizeObserverRef.current) resizeObserverRef.current.disconnect();
-      resizeObserverRef.current = null;
-    };
-  }, [draw]);
-
-  // click handler for selecting agents
-  const handleClick = (e: React.MouseEvent) => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const x = ((e.clientX - rect.left) / rect.width) * canvas.width / dpr;
-    const y = ((e.clientY - rect.top) / rect.height) * canvas.height / dpr;
-
-    const clicked = engine.stateManager.agents.find(a => {
-      const dx = x - a.position.x;
-      const dy = y - a.position.y;
-      return Math.sqrt(dx * dx + dy * dy) < 18;
-    });
-
-    onAgentSelect(clicked || null);
-  };
-
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <SimCanvas
-        ref={canvasRef}
-        onClick={handleClick}
-        style={{ width: '100%', height: '100%', display: 'block', cursor: 'pointer' }}
-      />
+    <div ref={containerRef} style={{ width: '100%', height: '100%' }}>
+      <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
     </div>
   );
 });
 
-// ==================== MAIN COMPONENT WITH EXPORT PROPS ====================
-export interface NetworkProtocolSimulationProps {
-  isRunning?: boolean;
-  speed?: number;
-  isDark?: boolean;
-  width?: number;
-  height?: number;
-  autoStart?: boolean;
-}
-
-const TrainStationOFDMSimulation: React.FC<NetworkProtocolSimulationProps> = ({
-  isRunning: externalIsRunning,
-  speed: externalSpeed = 1,
-  isDark = true,
-  width = 1400,
-  height = 600,
-  autoStart = true
-}) => {
+// ==================== MAIN COMPONENT ====================
+const TrainStationOFDMSimulation: React.FC = () => {
   const engineRef = useRef<SimulationEngine | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('simulation');
   const [, forceUpdate] = useState({});
 
-  // Initialize engine
   useEffect(() => {
-    if (!engineRef.current) {
-      engineRef.current = new SimulationEngine(width, height);
-      engineRef.current.stateManager.simulationState.speed = externalSpeed;
-
-      if (autoStart || externalIsRunning) {
-        engineRef.current.start();
-      }
-    }
-
-    const unsub = engineRef.current.stateManager.subscribe(() => forceUpdate({}));
-
+    const engine = new SimulationEngine();
+    engineRef.current = engine;
+    setTimeout(() => {
+      engine.initializeAgents(1400, 600);
+      engine.start();
+    }, 100);
+    const unsub = engine.subscribe(() => forceUpdate({}));
     return () => {
       unsub();
-      if (engineRef.current) {
-        engineRef.current.destroy();
-        engineRef.current = null;
-      }
+      engine.destroy();
     };
-    // NOTE: we intentionally don't include externalIsRunning in dependencies to avoid restarting the engine here
-    // width/height changes will recreate on unmount -> mount (you can tweak if desired)
-  }, [width, height, autoStart]);
-
-  // Sync external props
-  useEffect(() => {
-    if (!engineRef.current) return;
-    if (externalIsRunning === undefined) return;
-    if (externalIsRunning && !engineRef.current.isRunning) engineRef.current.start();
-    if (!externalIsRunning && engineRef.current.isRunning) engineRef.current.stop();
-  }, [externalIsRunning]);
-
-  useEffect(() => {
-    if (engineRef.current && externalSpeed !== undefined) engineRef.current.setSpeed(externalSpeed);
-  }, [externalSpeed]);
+  }, []);
 
   const engine = engineRef.current;
-  if (!engine) return <TabLoader />;
+  if (!engine) return null;
 
-  const handleSimulationControl = (action: 'play' | 'pause' | 'reset' | 'step') => {
-    switch (action) {
-      case 'play':
-        engine.start();
-        break;
-      case 'pause':
-        engine.stop();
-        break;
-      case 'reset':
-        engine.reset();
-        break;
-    }
-  };
-
-  // Map train direction for SimulationState (correct mapping)
-  const getTrainState = (): 'approaching' | 'boarding' | 'departing' => {
-    const dir = engine.stateManager.train.direction;
-    if (dir === 'stopped') return 'boarding';
-    if (dir === 'departing') return 'departing';
-    return 'approaching';
-  };
-
-  engine.stateManager.simulationState.trainState = getTrainState();
-  engine.stateManager.activeTab = activeTab;
-
-  // full-height layout so visualization fills available viewport space
   return (
-    <SimulationContainer $isDark={isDark} style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{
+      width: '100%',
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      background: '#0a0f1e',
+      fontFamily: 'system-ui'
+    }}>
       <div style={{
-        padding: '20px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+        padding: '18px 28px',
+        background: 'rgba(0, 0, 0, 0.7)',
+        borderBottom: '1px solid rgba(59, 130, 246, 0.25)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', color: 'white', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Train size={24} />
-          Train Station OFDM WiFi
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Radio size={26} color="#10b981" />
+          <h1 style={{ margin: 0, fontSize: '1.4rem', color: 'white' }}>
+            Train Station WiFi Network
+          </h1>
+        </div>
 
-        <PlaybackControls>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'rgba(255, 255, 255, 0.8)' }}>
+            <span style={{ fontSize: '0.85rem' }}>Speed:</span>
+            <input
+              type="range"
+              min="0.5"
+              max="3"
+              step="0.5"
+              value={engine.speed}
+              onChange={(e) => {
+                engine.setSpeed(parseFloat(e.target.value));
+                forceUpdate({});
+              }}
+              style={{ width: '100px', accentColor: '#10b981' }}
+            />
+            <span style={{ minWidth: '32px', fontSize: '0.85rem' }}>{engine.speed}x</span>
+          </div>
+
           <button
-            onClick={() => handleSimulationControl(engine.isRunning ? 'pause' : 'play')}
-            className="control-button"
-            aria-label={engine.isRunning ? 'Pause simulation' : 'Play simulation'}
-            title={engine.isRunning ? 'Pause' : 'Play'}
+            onClick={() => engine.isRunning ? engine.stop() : engine.start()}
+            style={{
+              padding: '9px 18px',
+              background: engine.isRunning ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'linear-gradient(135deg, #10b981, #059669)',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '7px',
+              fontSize: '0.85rem',
+              fontWeight: '600'
+            }}
           >
-            {engine.isRunning ? <PauseCircle size={20} /> : <PlayCircle size={20} />}
+            {engine.isRunning ? <PauseCircle size={17} /> : <PlayCircle size={17} />}
+            {engine.isRunning ? 'Pause' : 'Play'}
           </button>
 
           <button
-            onClick={() => handleSimulationControl('reset')}
-            className="control-button"
-            aria-label="Reset simulation"
-            title="Reset"
+            onClick={() => {
+              const canvas = document.querySelector('canvas');
+              const container = canvas?.parentElement;
+              if (container) {
+                engine.reset(container.clientWidth, container.clientHeight);
+                engine.start();
+              }
+            }}
+            style={{
+              padding: '9px 18px',
+              background: 'rgba(59, 130, 246, 0.15)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              borderRadius: '8px',
+              color: '#60a5fa',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '7px',
+              fontSize: '0.85rem',
+              fontWeight: '600'
+            }}
           >
-            <RefreshCw size={20} />
+            <RefreshCw size={17} />
+            Reset
           </button>
-        </PlaybackControls>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <TabNavigationSystem
-          agents={engine.stateManager.agents}
-          train={engine.stateManager.train}
-          channel={engine.stateManager.channel}
-          simulationState={engine.stateManager.simulationState}
-          ofdmParams={engine.stateManager.ofdmParams}
-          metrics={engine.stateManager.metrics}
-          visualizationSettings={engine.stateManager.visualizationSettings}
-          onTabChange={(t) => setActiveTab(t)}
-          onParameterChange={(param, value) => {
-            // you can implement param changes here (kept intentionally minimal)
-            if (param === 'modulation') {
-              // mutate ofdmParams safely and notify
-              (engine.stateManager.ofdmParams as any).modulation = value;
-              engine.stateManager.notify();
-            }
-          }}
-          onVisualizationChange={(settings) => {
-            Object.assign(engine.stateManager.visualizationSettings, settings);
-            engine.stateManager.notify();
-          }}
-          onSimulationControl={(action) => handleSimulationControl(action)}
-          selectedAgent={engine.stateManager.selectedAgent}
-          onAgentSelect={(agent) => {
-            engine.stateManager.selectedAgent = agent;
-            engine.stateManager.notify();
-          }}
-        />
+      <div style={{ flex: 1, padding: '20px', minHeight: 0 }}>
+        <div style={{
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0, 0, 0, 0.3)',
+          borderRadius: '12px',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6)'
+        }}>
+          <SimulationViewport engine={engine} />
+        </div>
       </div>
-
-      {/* main content area - flex:1 so visualization fills remaining viewport */}
-      <div style={{ padding: '20px', flex: 1, minHeight: 0 }}>
-        {activeTab === 'simulation' && (
-          <TrainStationContainer style={{ height: '100%' }}>
-            <VisualizationGrid style={{ height: '100%' }}>
-              <VisualizationPanel $gridArea="main-sim" $priority="primary" style={{ display: 'flex', flexDirection: 'column' }}>
-                <PanelHeader $variant="enhanced">
-                  <div className="title">
-                    <Wifi size={16} />
-                    Train Station Network
-                  </div>
-                </PanelHeader>
-
-                {/* make the panel content fill available space */}
-                <div style={{ flex: 1, paddingTop: '56px', minHeight: 0 }}>
-                  <SimulationViewport
-                    engine={engine}
-                    settings={engine.stateManager.visualizationSettings}
-                    onAgentSelect={(agent) => {
-                      engine.stateManager.selectedAgent = agent;
-                      engine.stateManager.notify();
-                    }}
-                  />
-                </div>
-              </VisualizationPanel>
-            </VisualizationGrid>
-          </TrainStationContainer>
-        )}
-
-        {activeTab === 'signal-analysis' && (
-          <Suspense fallback={<TabLoader />}>
-            <TrainStationSignalProcessor
-              ofdmParams={engine.stateManager.ofdmParams}
-              channel={engine.stateManager.channel}
-              agents={engine.stateManager.agents}
-              train={engine.stateManager.train}
-              inputData={{ bits: [], message: "Test" }}
-              onProcessingComplete={() => { }}
-              onProgressUpdate={() => { }}
-              onChannelAnalysis={() => { }}
-            />
-          </Suspense>
-        )}
-
-        {activeTab === 'metrics' && (
-          <Suspense fallback={<TabLoader />}>
-            <AdvancedVisualizations
-              currentSymbol={engine.stateManager.currentSymbol}
-              channel={engine.stateManager.channel}
-              agents={engine.stateManager.agents}
-              isActive={true}
-              width={width}
-              height={Math.round(height * 0.8)}
-            />
-          </Suspense>
-        )}
-      </div>
-    </SimulationContainer>
+    </div>
   );
 };
 
 export default TrainStationOFDMSimulation;
-export { TrainStationOFDMSimulation as NetworkProtocolSimulation };
