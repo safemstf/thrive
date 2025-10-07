@@ -1,16 +1,28 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, Zap, Sparkles, Map as MapIcon, TrendingUp, Award, Brain, Circle, Grid3x3, Shuffle, Eye, EyeOff, Volume2, VolumeX, Trophy, Flame, Target, Cpu, BarChart3, Timer, Activity, ChevronDown, ChevronUp, Info, X, Maximize2 } from 'lucide-react';
+import { Play, Pause, Zap, Sparkles, Map as MapIcon, TrendingUp, Award, Brain, Circle, Grid3x3, Shuffle, Eye, EyeOff, Trophy, Target, Cpu, BarChart3, Timer, Activity, ChevronDown, ChevronUp, X, Maximize2 } from 'lucide-react';
+import styled, { keyframes, css } from 'styled-components';
 
-// Constants
-const CANVAS_BASE_WIDTH = 800;
-const CANVAS_BASE_HEIGHT = 800;
+// Color palette matching Permutations
+const COLORS = {
+  bg1: '#0a0e1a',
+  bg2: '#1a1a2e',
+  surface: 'rgba(0,0,0,0.5)',
+  textPrimary: '#e6eef8',
+  textMuted: '#dee5efff',
+  accent: '#3b82f6',
+  accentSoft: '#60a5fa',
+  purple: '#d5c7f5ff',
+  success: '#22c55e',
+  warn: '#fbbf24',
+  danger: '#ef4444',
+  borderAccent: 'rgba(59, 130, 246, 0.15)'
+};
 
 // Types
 type AlgorithmType = 'greedy' | 'twoOpt' | 'annealing' | 'genetic' | 'antColony';
 type CityMode = 'random' | 'circle' | 'grid' | 'clusters' | 'spiral';
-type ThemeMode = 'cyber' | 'neon' | 'matrix' | 'sunset';
 
 interface City {
   x: number;
@@ -49,48 +61,599 @@ interface Particle {
 }
 
 interface TSPAlgorithmRaceProps {
-  isRunning: boolean;
-  speed: number;
+  isRunning?: boolean;
+  speed?: number;
 }
 
-const themes: Record<ThemeMode, any> = {
-  matrix: {
-    bg: 'rgba(0, 0, 0, 0.85)',
-    grid: 'rgba(59, 130, 246, 0.02)',
-    city: '#3b82f6',
-    glow: 'rgba(59, 130, 246, 0.6)',
-    text: '#3b82f6',
-    panel: 'rgba(0, 10, 20, 0.9)',
-    border: 'rgba(59, 130, 246, 0.3)'
-  },
-  cyber: {
-    bg: '#0a0f1b',
-    grid: 'rgba(0, 255, 255, 0.03)',
-    city: '#00ffff',
-    glow: 'rgba(0, 255, 255, 0.4)',
-    text: '#00ffff',
-    panel: 'rgba(10, 15, 27, 0.95)',
-    border: 'rgba(0, 255, 255, 0.3)'
-  },
-  neon: {
-    bg: '#0a0a0a',
-    grid: 'rgba(255, 0, 255, 0.03)',
-    city: '#ff00ff',
-    glow: 'rgba(255, 0, 255, 0.4)',
-    text: '#ff00ff',
-    panel: 'rgba(10, 10, 10, 0.95)',
-    border: 'rgba(255, 0, 255, 0.3)'
-  },
-  sunset: {
-    bg: '#1a0f1f',
-    grid: 'rgba(255, 100, 50, 0.03)',
-    city: '#ff6432',
-    glow: 'rgba(255, 100, 50, 0.4)',
-    text: '#ff6432',
-    panel: 'rgba(26, 15, 31, 0.95)',
-    border: 'rgba(255, 100, 50, 0.3)'
+// Animations
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+`;
+
+const gentlePulse = keyframes`
+  0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(59,130,246,0.12); }
+  50% { transform: scale(1.02); box-shadow: 0 0 25px rgba(59,130,246,0.16); }
+`;
+
+const shimmer = keyframes`
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+`;
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+`;
+
+// Styled Components
+const MainContainer = styled.div`
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(135deg, ${COLORS.bg1} 0%, ${COLORS.bg2} 50%, ${COLORS.bg1} 100%);
+  color: ${COLORS.textPrimary};
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
+    pointer-events: none;
   }
-};
+`;
+
+const Header = styled.div`
+  padding: 1.5rem 2rem;
+  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid ${COLORS.borderAccent};
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  animation: ${fadeIn} 0.6s ease-out;
+  position: relative;
+  z-index: 10;
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+    flex-wrap: wrap;
+  }
+`;
+
+const Title = styled.h1`
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: ${COLORS.textPrimary};
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  
+  @media (max-width: 768px) {
+    font-size: 1.25rem;
+  }
+`;
+
+const Badge = styled.div`
+  padding: 0.5rem 1rem;
+  background: rgba(59, 130, 246, 0.12);
+  border-radius: 24px;
+  font-size: 0.875rem;
+  border: 1px solid ${COLORS.borderAccent};
+  font-weight: 500;
+  white-space: nowrap;
+`;
+
+const ThemeButtons = styled.div`
+  margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+`;
+
+const ThemeButton = styled.button<{ $active: boolean }>`
+  padding: 0.5rem 1rem;
+  background: ${({ $active }) => $active ? COLORS.accent : 'transparent'};
+  border: 2px solid ${({ $active }) => $active ? COLORS.accent : COLORS.borderAccent};
+  border-radius: 8px;
+  color: ${({ $active }) => $active ? '#000' : COLORS.textPrimary};
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: capitalize;
+  transition: all 0.3s ease;
+  flex: 1;
+  
+  &:hover {
+    background: ${({ $active }) => $active ? COLORS.accent : 'rgba(59, 130, 246, 0.06)'};
+    transform: scale(1.05);
+  }
+`;
+
+const MainContent = styled.div`
+  flex: 1;
+  display: flex;
+  padding: 1.5rem;
+  gap: 1.5rem;
+  overflow: hidden;
+  animation: ${fadeIn} 0.8s ease-out;
+  position: relative;
+  z-index: 1;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    padding: 1rem;
+    overflow-y: auto;
+  }
+`;
+
+const CanvasArea = styled.div<{ $mobileViewing?: boolean }>`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid ${COLORS.borderAccent};
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+      transparent,
+      rgba(59, 130, 246, 0.35),
+      transparent
+    );
+    background-size: 200% 100%;
+    animation: ${shimmer} 3s linear infinite;
+  }
+  
+  @media (max-width: 768px) {
+    display: none;
+    min-height: 400px;
+  }
+  
+  ${({ $mobileViewing }) => $mobileViewing && css`
+    @media (max-width: 768px) {
+      display: flex !important;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      padding: 0 !important;
+      z-index: 10000 !important;
+    }
+  `}
+`;
+
+const Sidebar = styled.div`
+  width: 400px;
+  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid ${COLORS.borderAccent};
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow-y: auto;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.2);
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.22);
+    border-radius: 3px;
+  }
+  
+  @media (max-width: 768px) {
+    width: 100%;
+    padding: 1rem;
+  }
+`;
+
+const MobileViewButton = styled.button`
+  display: none;
+  
+  @media (max-width: 768px) {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    border-radius: 1rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 1rem;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    
+    &:active {
+      transform: scale(0.98);
+    }
+  }
+`;
+
+const ControlsSection = styled.div`
+  display: flex;
+  gap: 0.75rem;
+`;
+
+const PlayButton = styled.button<{ $playing?: boolean }>`
+  flex: 1;
+  padding: 0.875rem;
+  background: ${({ $playing }) => $playing
+    ? `linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.06))`
+    : `linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.06))`};
+  border: 1px solid ${({ $playing }) => $playing ? COLORS.danger : COLORS.accent};
+  border-radius: 12px;
+  color: ${({ $playing }) => $playing ? COLORS.danger : COLORS.accentSoft};
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px ${({ $playing }) => $playing
+    ? 'rgba(239, 68, 68, 0.18)'
+    : 'rgba(59, 130, 246, 0.18)'};
+  }
+`;
+
+const ControlButton = styled.button<{ $active?: boolean }>`
+  padding: 0.875rem;
+  background: ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.12)' : 'rgba(0,0,0,0.28)'};
+  border: 1px solid ${({ $active }) => $active ? COLORS.accent : COLORS.borderAccent};
+  border-radius: 12px;
+  color: ${({ $active }) => $active ? COLORS.accentSoft : COLORS.textMuted};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    transform: scale(1.05);
+    background: rgba(59, 130, 246, 0.06);
+    color: ${COLORS.accentSoft};
+  }
+`;
+
+const Section = styled.div``;
+
+const SectionTitle = styled.h3`
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+  color: ${COLORS.textPrimary};
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const Label = styled.label`
+  fontSize: 0.875rem;
+  color: ${COLORS.textMuted};
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+`;
+
+const Slider = styled.input`
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(59, 130, 246, 0.14);
+  outline: none;
+  
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: ${COLORS.accentSoft};
+    cursor: pointer;
+  }
+  
+  &::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: ${COLORS.accentSoft};
+    cursor: pointer;
+    border: none;
+  }
+`;
+
+const ButtonGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.625rem;
+  margin-top: 0.75rem;
+`;
+
+const ModeButton = styled.button<{ $active: boolean }>`
+  padding: 0.75rem;
+  background: ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255,255,255,0.05)'};
+  border: 2px solid ${({ $active }) => $active ? COLORS.accent : 'transparent'};
+  border-radius: 10px;
+  color: ${COLORS.textPrimary};
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.08);
+    transform: scale(1.05);
+  }
+`;
+
+const AlgoCheckbox = styled.label<{ $active: boolean; $color: string }>`
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem;
+  margin-bottom: 0.625rem;
+  background: ${({ $active, $color }) => $active ? `${$color}15` : 'rgba(255,255,255,0.05)'};
+  border: 2px solid ${({ $active, $color }) => $active ? $color : 'transparent'};
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: ${({ $color }) => `${$color}10`};
+    transform: translateY(-2px);
+  }
+  
+  input {
+    display: none;
+  }
+`;
+
+const AlgoEmoji = styled.span`
+  font-size: 1.5rem;
+  min-width: 30px;
+  text-align: center;
+`;
+
+const AlgoDetails = styled.div`
+  flex: 1;
+`;
+
+const AlgoName = styled.div<{ $color: string; $active: boolean }>`
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: ${({ $active, $color }) => $active ? $color : COLORS.textPrimary};
+`;
+
+const AlgoDescription = styled.div`
+  font-size: 0.8125rem;
+  color: ${COLORS.textMuted};
+  margin-top: 0.125rem;
+`;
+
+const Leaderboard = styled.div<{ $expanded: boolean }>`
+  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: ${({ $expanded }) => $expanded ? '1.25rem' : '1rem'};
+  border: 1px solid ${COLORS.borderAccent};
+`;
+
+const LeaderboardHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+`;
+
+const LeaderboardTitle = styled.h3`
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: ${COLORS.textPrimary};
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const ExpandButton = styled.button`
+  background: transparent;
+  border: none;
+  color: ${COLORS.textPrimary};
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  
+  &:hover {
+    color: ${COLORS.accentSoft};
+  }
+`;
+
+const LeaderboardItem = styled.div<{ $rank: number; $isWinner: boolean; $color: string }>`
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  background: ${({ $rank, $isWinner, $color }) => 
+    $rank === 0 && $isWinner ? `${$color}15` : 'rgba(255,255,255,0.03)'};
+  border-radius: 8px;
+  border: 1px solid ${({ $rank, $isWinner, $color }) =>
+    $rank === 0 && $isWinner ? $color : 'transparent'};
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.06);
+    transform: translateX(4px);
+  }
+`;
+
+const Rank = styled.div`
+  font-size: 1.25rem;
+  min-width: 30px;
+  text-align: center;
+`;
+
+const AlgoInfo = styled.div`
+  flex: 1;
+`;
+
+const AlgoHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+`;
+
+const AlgoStatus = styled.div<{ $color: string }>`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${({ $color }) => $color};
+  animation: ${pulse} 1s infinite;
+`;
+
+const AlgoNameInBoard = styled.span<{ $color: string }>`
+  font-weight: 600;
+  font-size: 1rem;
+  color: ${({ $color }) => $color};
+`;
+
+const Stats = styled.div`
+  font-size: 0.875rem;
+  color: ${COLORS.textMuted};
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+`;
+
+const StatValue = styled.strong`
+  color: ${COLORS.textPrimary};
+`;
+
+const WinnerOverlay = styled.div`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(0,10,30,0.95) 100%);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 2rem;
+  border: 2px solid;
+  text-align: center;
+  box-shadow: 0 0 60px;
+  max-width: 90%;
+  animation: ${gentlePulse} 2s ease-in-out infinite;
+`;
+
+const WinnerTitle = styled.h2`
+  font-size: 2.25rem;
+  margin: 0 0 1rem 0;
+`;
+
+const WinnerAlgo = styled.p`
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem 0;
+`;
+
+const WinnerDistance = styled.p`
+  font-size: 1rem;
+  color: ${COLORS.textMuted};
+  margin: 0;
+`;
+
+const MobileControls = styled.div`
+  position: absolute;
+  top: calc(1rem + env(safe-area-inset-top));
+  right: 1rem;
+  z-index: 10001;
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(0,0,0,0.95);
+  backdrop-filter: blur(10px);
+  padding: 0.6rem;
+  border-radius: 999px;
+  border: 1px solid ${COLORS.borderAccent};
+`;
+
+const MobileControlButton = styled.button<{ $variant?: 'primary' | 'danger' | 'default' }>`
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: ${({ $variant }) => {
+    switch ($variant) {
+      case 'primary': return '#6366f1';
+      case 'danger': return '#ef4444';
+      default: return 'rgba(51,65,85,0.8)';
+    }
+  }};
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+// Constants
+const CANVAS_BASE_WIDTH = 800;
+const CANVAS_BASE_HEIGHT = 800;
 
 const algorithmConfigs = {
   greedy: {
@@ -429,7 +992,10 @@ const generateCities = (count: number, mode: CityMode, canvasWidth: number, canv
   return cities;
 };
 
-export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceProps) {
+// Store reference to built-in Map before any potential naming conflicts
+type TrailMap = Map<string, Array<{x: number, y: number, alpha: number}>>;
+
+export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAlgorithmRaceProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPlaying, setIsPlaying] = useState(isRunning);
   const [localSpeed, setLocalSpeed] = useState(speed);
@@ -438,7 +1004,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
   const [selectedAlgos, setSelectedAlgos] = useState<AlgorithmType[]>(['greedy', 'twoOpt', 'annealing']);
   const [cityCount, setCityCount] = useState(12);
   const [cityMode, setCityMode] = useState<CityMode>('random');
-  const [theme, setTheme] = useState<ThemeMode>('matrix');
   const [showTrails, setShowTrails] = useState(true);
   const [winner, setWinner] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(true);
@@ -450,7 +1015,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
   const populationRef = useRef<Record<string, number[][]>>({});
   const pheromonesRef = useRef<number[][]>([]);
   const timeRef = useRef(0);
-  const trailsRef = useRef<Map<string, Array<{x: number, y: number, alpha: number}>>>(new Map());
+  const trailsRef = useRef<TrailMap>(new Map());
   const previouslyRunningRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -468,7 +1033,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     const enterMobileView = async () => {
       previouslyRunningRef.current = isPlaying;
       
-      // Start algorithms and simulation
       if (!isPlaying) {
         setAlgorithms(prev => prev.map(a => ({ ...a, status: 'running' })));
         setIsPlaying(true);
@@ -532,7 +1096,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
 
       const dpr = window.devicePixelRatio || 1;
       
-      // For mobile fullscreen, use full viewport
       if (mobileViewing) {
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -541,7 +1104,6 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
         canvas.style.width = `${width}px`;
         canvas.style.height = `${height}px`;
       } else {
-        // For desktop, maintain aspect ratio
         canvas.width = CANVAS_BASE_WIDTH * dpr;
         canvas.height = CANVAS_BASE_HEIGHT * dpr;
         canvas.style.width = `${CANVAS_BASE_WIDTH}px`;
@@ -731,59 +1293,33 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    const currentTheme = themes[theme];
     const width = canvas.width / (window.devicePixelRatio || 1);
     const height = canvas.height / (window.devicePixelRatio || 1);
     
-    ctx.fillStyle = currentTheme.bg;
+    // Background
+    ctx.fillStyle = COLORS.bg1;
     ctx.fillRect(0, 0, width, height);
     
-    if (theme === 'matrix') {
-      const gridSize = 30;
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)';
-      ctx.lineWidth = 0.5;
-      
-      for (let x = 0; x <= width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = 0; y <= height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
-      
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
-      ctx.font = '12px monospace';
-      const matrixChars = '01░▒▓█الم';
-      for (let i = 0; i < 20; i++) {
-        const x = Math.random() * width;
-        const y = Math.random() * height;
-        const char = matrixChars[Math.floor(Math.random() * matrixChars.length)];
-        ctx.fillText(char, x, y);
-      }
-    } else {
-      const gridOffset = (timeRef.current * 0.05) % 50;
-      ctx.strokeStyle = currentTheme.grid;
-      ctx.lineWidth = 1;
-      
-      for (let x = -gridOffset; x <= width + 50; x += 50) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = -gridOffset; y <= height + 50; y += 50) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
+    // Grid
+    const gridSize = 30;
+    const gridOffset = (timeRef.current * 0.05) % gridSize;
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)';
+    ctx.lineWidth = 0.5;
+    
+    for (let x = -gridOffset; x <= width + gridSize; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+    for (let y = -gridOffset; y <= height + gridSize; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
     }
     
+    // Pheromone trails for ant colony
     const antAlgo = algorithms.find(a => a.id === 'antColony');
     if (antAlgo && pheromonesRef.current.length > 0 && showTrails) {
       const maxPheromone = Math.max(...pheromonesRef.current.flat());
@@ -791,10 +1327,8 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
         for (let j = i + 1; j < cities.length; j++) {
           const intensity = pheromonesRef.current[i]?.[j] / maxPheromone || 0;
           if (intensity > 0.1) {
-            ctx.strokeStyle = theme === 'matrix' ? 
-              `rgba(59, 130, 246, ${intensity * 0.4})` :
-              `${antAlgo.glow}${Math.floor(intensity * 40).toString(16).padStart(2, '0')}`;
-            ctx.lineWidth = intensity * 4;
+            ctx.strokeStyle = `rgba(16, 185, 129, ${intensity * 0.3})`;
+            ctx.lineWidth = intensity * 3;
             ctx.beginPath();
             ctx.moveTo(cities[i].x, cities[i].y);
             ctx.lineTo(cities[j].x, cities[j].y);
@@ -804,12 +1338,14 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
       }
     }
     
+    // Algorithm paths
     algorithms.forEach((algo) => {
       if (algo.tour.length === 0) return;
       
+      // Trails
       if (showTrails) {
         const trail = trailsRef.current.get(algo.id) || [];
-        trail.forEach((point, i) => {
+        trail.forEach((point) => {
           ctx.fillStyle = `${algo.color}${Math.floor(point.alpha * 255).toString(16).padStart(2, '0')}`;
           ctx.beginPath();
           ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
@@ -820,6 +1356,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
         if (trail.length > 100) trail.shift();
       }
       
+      // Main path
       ctx.strokeStyle = algo.color;
       ctx.lineWidth = algo.status === 'winner' ? 4 : 2;
       ctx.shadowColor = algo.glow;
@@ -847,6 +1384,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
       ctx.stroke();
       ctx.shadowBlur = 0;
       
+      // Particles
       algo.particles?.forEach(p => {
         ctx.fillStyle = `${p.color}${Math.floor(p.life * 255).toString(16).padStart(2, '0')}`;
         ctx.beginPath();
@@ -855,17 +1393,20 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
       });
     });
     
-    cities.forEach((city, idx) => {
+    // Cities
+    cities.forEach((city) => {
+      // Glow
       const gradient = ctx.createRadialGradient(city.x, city.y, 0, city.x, city.y, 25);
-      gradient.addColorStop(0, currentTheme.glow);
+      gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
       gradient.addColorStop(1, 'transparent');
       ctx.fillStyle = gradient;
       ctx.fillRect(city.x - 25, city.y - 25, 50, 50);
       
-      ctx.fillStyle = currentTheme.city;
-      ctx.strokeStyle = theme === 'matrix' ? '#001122' : '#000';
+      // City dot
+      ctx.fillStyle = COLORS.accent;
+      ctx.strokeStyle = COLORS.bg1;
       ctx.lineWidth = 2;
-      ctx.shadowColor = currentTheme.glow;
+      ctx.shadowColor = COLORS.accentSoft;
       ctx.shadowBlur = 15;
       ctx.beginPath();
       ctx.arc(city.x, city.y, 12, 0, Math.PI * 2);
@@ -873,7 +1414,8 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
       ctx.stroke();
       ctx.shadowBlur = 0;
       
-      ctx.fillStyle = theme === 'matrix' ? '#fff' : '#000';
+      // City ID
+      ctx.fillStyle = '#fff';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -881,7 +1423,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     });
     
     timeRef.current++;
-  }, [cities, algorithms, theme, showTrails]);
+  }, [cities, algorithms, showTrails]);
 
   useEffect(() => {
     const animate = () => {
@@ -939,7 +1481,7 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     }
   };
 
-  const cityModeIcons = {
+  const cityModeIcons: Record<CityMode, React.ReactElement> = {
     random: <Sparkles size={18} />,
     circle: <Circle size={18} />,
     grid: <Grid3x3 size={18} />,
@@ -947,649 +1489,234 @@ export default function TSPAlgorithmRace({ isRunning, speed }: TSPAlgorithmRaceP
     spiral: <TrendingUp size={18} />
   };
 
-  const currentTheme = themes[theme];
+  const winnerAlgo = algorithms.find(a => a.id === winner);
 
   return (
-    <>
-      <style>{`
-        .tsp-container {
-          display: flex;
-          flex-direction: column;
-          height: 100vh;
-          background: ${theme === 'matrix' ? 'transparent' : 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)'};
-          color: #fff;
-          font-family: system-ui, -apple-system, sans-serif;
-          overflow: hidden;
-        }
+    <MainContainer>
+      <Header>
+        <Title>
+          <Cpu size={32} />
+          TSP Algorithm Battle Arena
+        </Title>
+        
+        <Badge>
+          {cities.length} Cities • {algorithms.length} Algorithms
+        </Badge>
+        
+        <ThemeButtons>
+          <ThemeButton $active={true}>
+            Matrix
+          </ThemeButton>
+        </ThemeButtons>
+      </Header>
 
-        .tsp-header {
-          padding: 16px 32px;
-          background: ${currentTheme.panel};
-          backdrop-filter: blur(10px);
-          border-bottom: 1px solid ${currentTheme.border};
-          display: flex;
-          align-items: center;
-          gap: 24px;
-        }
-
-        .tsp-main {
-          flex: 1;
-          display: flex;
-          padding: 24px;
-          gap: 24px;
-          overflow: hidden;
-        }
-
-        .tsp-canvas-area {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justifyContent: center;
-          background: ${currentTheme.panel};
-          border-radius: 16px;
-          border: 1px solid ${currentTheme.border};
-          position: relative;
-        }
-
-        .tsp-sidebar {
-          width: 400px;
-          background: ${currentTheme.panel};
-          backdrop-filter: blur(10px);
-          border-radius: 16px;
-          border: 1px solid ${currentTheme.border};
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 24px;
-          overflow-y: auto;
-        }
-
-        .tsp-view-btn {
-          display: none;
-        }
-
-        @media (max-width: 768px) {
-          .tsp-container {
-            display: block;
-            height: auto;
-            min-height: 100vh;
-            padding: 1rem;
-          }
-
-          .tsp-header {
-            padding: 12px 16px;
-            margin-bottom: 1rem;
-            border-radius: 12px;
-          }
-
-          .tsp-main {
-            display: block;
-            padding: 0;
-          }
-
-          .tsp-canvas-area {
-            display: none;
-          }
-
-          .tsp-sidebar {
-            width: 100%;
-            padding: 16px;
-            margin-bottom: 1rem;
-          }
-
-          .tsp-view-btn {
-            display: flex !important;
-            width: 100%;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            padding: 1.25rem;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            color: white;
-            border: none;
-            border-radius: 1rem;
-            font-size: 1.125rem;
-            font-weight: 600;
-            cursor: pointer;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-          }
-
-          .tsp-view-btn:active {
-            transform: scale(0.98);
-          }
-
-          .tsp-canvas-area.mobile-viewing {
-            display: block !important;
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            margin: 0 !important;
-            border-radius: 0 !important;
-            padding: 0 !important;
-            z-index: 10000 !important;
-          }
-        }
-
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.5; }
-          100% { opacity: 1; }
-        }
-      `}</style>
-
-      <div className="tsp-container">
-        <div className="tsp-header">
-          <h1 style={{ 
-            margin: 0, 
-            fontSize: '28px', 
-            fontWeight: 700,
-            color: currentTheme.text,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            textShadow: theme === 'matrix' ? '0 0 10px rgba(59, 130, 246, 0.5)' : 'none'
-          }}>
-            <Cpu size={32} />
-            TSP Algorithm Battle Arena
-          </h1>
-          
-          <div style={{ 
-            padding: '8px 16px',
-            background: `${currentTheme.city}22`,
-            borderRadius: '24px',
-            fontSize: '14px',
-            border: `1px solid ${currentTheme.border}`,
-            fontWeight: 500
-          }}>
-            {cities.length} Cities • {algorithms.length} Algorithms
-          </div>
-          
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px' }}>
-            {Object.keys(themes).map(t => (
-              <button
-                key={t}
-                onClick={() => setTheme(t as ThemeMode)}
-                style={{
-                  padding: '8px 16px',
-                  background: theme === t ? themes[t as ThemeMode].city : 'transparent',
-                  border: `2px solid ${theme === t ? themes[t as ThemeMode].city : currentTheme.border}`,
-                  borderRadius: '8px',
-                  color: theme === t ? '#000' : currentTheme.text,
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  textTransform: 'capitalize'
-                }}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <button 
-          className="tsp-view-btn"
-          onClick={() => setMobileViewing(true)}
-        >
+      <MainContent>
+        <MobileViewButton onClick={() => setMobileViewing(true)}>
           <Maximize2 size={24} />
           View Simulation
-        </button>
+        </MobileViewButton>
 
-        <div className="tsp-main">
-          <div className={`tsp-canvas-area ${mobileViewing ? 'mobile-viewing' : ''}`}>
-            <canvas
-              ref={canvasRef}
-              style={{ 
-                maxWidth: '100%',
-                maxHeight: '100%',
-                borderRadius: '12px'
-              }}
+        <CanvasArea $mobileViewing={mobileViewing}>
+          <canvas
+            ref={canvasRef}
+            style={{ 
+              maxWidth: '100%',
+              maxHeight: '100%',
+              borderRadius: '12px'
+            }}
+          />
+
+          {winner && winnerAlgo && !mobileViewing && (
+            <WinnerOverlay style={{
+              borderColor: winnerAlgo.color,
+              boxShadow: `0 0 60px ${winnerAlgo.glow}`
+            }}>
+              <WinnerTitle style={{ color: winnerAlgo.color }}>
+                🎉 Victory! 🎉
+              </WinnerTitle>
+              <WinnerAlgo>
+                {winnerAlgo.emoji} {winnerAlgo.name} Algorithm Wins!
+              </WinnerAlgo>
+              <WinnerDistance>
+                Final Distance: {winnerAlgo.bestDistance.toFixed(1)}
+              </WinnerDistance>
+            </WinnerOverlay>
+          )}
+
+          {mobileViewing && (
+            <MobileControls>
+              <MobileControlButton $variant="primary" onClick={handlePlay}>
+                {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+              </MobileControlButton>
+              <MobileControlButton onClick={handleReset}>
+                <Shuffle size={20} />
+              </MobileControlButton>
+              <MobileControlButton $variant="danger" onClick={exitMobileView}>
+                <X size={20} />
+              </MobileControlButton>
+            </MobileControls>
+          )}
+        </CanvasArea>
+
+        <Sidebar>
+          <ControlsSection>
+            <PlayButton $playing={isPlaying} onClick={handlePlay}>
+              {isPlaying ? <><Pause size={22} />Pause</> : <><Play size={22} />Start Race</>}
+            </PlayButton>
+            
+            <ControlButton onClick={handleReset}>
+              <Shuffle size={22} />
+            </ControlButton>
+            
+            <ControlButton $active={showTrails} onClick={() => setShowTrails(!showTrails)}>
+              {showTrails ? <Eye size={22} /> : <EyeOff size={22} />}
+            </ControlButton>
+            
+            <ControlButton $active={showStats} onClick={() => setShowStats(!showStats)}>
+              <BarChart3 size={22} />
+            </ControlButton>
+          </ControlsSection>
+
+          {showStats && (
+            <Leaderboard $expanded={expandedStats}>
+              <LeaderboardHeader>
+                <LeaderboardTitle>
+                  <Trophy size={20} />
+                  Live Leaderboard
+                </LeaderboardTitle>
+                <ExpandButton onClick={() => setExpandedStats(!expandedStats)}>
+                  {expandedStats ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </ExpandButton>
+              </LeaderboardHeader>
+              
+              {[...algorithms]
+                .sort((a, b) => a.bestDistance - b.bestDistance)
+                .map((algo, idx) => (
+                  <LeaderboardItem
+                    key={algo.id}
+                    $rank={idx}
+                    $isWinner={algo.status === 'winner'}
+                    $color={algo.color}
+                  >
+                    <Rank>
+                      {idx === 0 && algo.status === 'winner' ? '🏆' : 
+                       idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
+                    </Rank>
+                    
+                    <AlgoInfo>
+                      <AlgoHeader>
+                        <span style={{ fontSize: '1.5rem' }}>{algo.emoji}</span>
+                        <AlgoNameInBoard $color={algo.color}>
+                          {algo.name}
+                        </AlgoNameInBoard>
+                        {algo.status === 'running' && (
+                          <AlgoStatus $color={algo.color} />
+                        )}
+                      </AlgoHeader>
+                      
+                      <Stats>
+                        <span>Distance: <StatValue>
+                          {algo.bestDistance.toFixed(0)}
+                        </StatValue></span>
+                        <span>Improvements: <StatValue>
+                          {algo.improvements}
+                        </StatValue></span>
+                      </Stats>
+                    </AlgoInfo>
+                  </LeaderboardItem>
+                ))}
+            </Leaderboard>
+          )}
+
+          <Section>
+            <Label>
+              <Zap size={16} />
+              Simulation Speed: {localSpeed}x
+            </Label>
+            <Slider
+              type="range"
+              min="0.5"
+              max="5"
+              step="0.5"
+              value={localSpeed}
+              onChange={(e) => setLocalSpeed(Number(e.target.value))}
+            />
+          </Section>
+
+          <Section>
+            <SectionTitle>
+              <MapIcon size={18} />
+              City Configuration
+            </SectionTitle>
+            
+            <Label>
+              Number of Cities: {cityCount}
+            </Label>
+            <Slider
+              type="range"
+              min="5"
+              max="25"
+              value={cityCount}
+              onChange={(e) => setCityCount(Number(e.target.value))}
             />
             
-            {showStats && !mobileViewing && (
-              <div style={{
-                position: 'absolute',
-                top: '20px',
-                left: '20px',
-                background: currentTheme.panel,
-                borderRadius: '12px',
-                padding: expandedStats ? '20px' : '16px',
-                border: `1px solid ${currentTheme.border}`,
-                minWidth: expandedStats ? '400px' : '360px',
-                maxWidth: '90%'
-              }}>
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginBottom: expandedStats ? '16px' : '12px'
-                }}>
-                  <h3 style={{ 
-                    margin: 0, 
-                    fontSize: '18px', 
-                    fontWeight: 600,
-                    color: currentTheme.text,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <Trophy size={20} />
-                    Live Leaderboard
-                  </h3>
-                  <button
-                    onClick={() => setExpandedStats(!expandedStats)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: currentTheme.text,
-                      cursor: 'pointer',
-                      padding: '4px'
-                    }}
-                  >
-                    {expandedStats ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                  </button>
-                </div>
-                
-                {[...algorithms]
-                  .sort((a, b) => a.bestDistance - b.bestDistance)
-                  .map((algo, idx) => (
-                    <div key={algo.id} style={{
-                      padding: '12px',
-                      marginBottom: '8px',
-                      background: idx === 0 && algo.status === 'winner' ? 
-                        `${algo.color}15` : 'rgba(255,255,255,0.03)',
-                      borderRadius: '8px',
-                      border: `1px solid ${idx === 0 && algo.status === 'winner' ? 
-                        algo.color : 'transparent'}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px'
-                    }}>
-                      <div style={{
-                        fontSize: '20px',
-                        minWidth: '30px',
-                        textAlign: 'center'
-                      }}>
-                        {idx === 0 && algo.status === 'winner' ? '🏆' : 
-                         idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
-                      </div>
-                      
-                      <div style={{ flex: 1 }}>
-                        <div style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '8px',
-                          marginBottom: '4px'
-                        }}>
-                          <span style={{ fontSize: '24px' }}>{algo.emoji}</span>
-                          <span style={{ 
-                            fontWeight: 600, 
-                            fontSize: '16px',
-                            color: algo.color
-                          }}>
-                            {algo.name}
-                          </span>
-                          {algo.status === 'running' && (
-                            <div style={{
-                              width: '8px',
-                              height: '8px',
-                              borderRadius: '50%',
-                              background: algo.color,
-                              animation: 'pulse 1s infinite'
-                            }}/>
-                          )}
-                        </div>
-                        
-                        <div style={{ 
-                          fontSize: '14px', 
-                          color: '#94a3b8',
-                          display: 'flex',
-                          gap: '16px',
-                          flexWrap: 'wrap'
-                        }}>
-                          <span>Distance: <strong style={{ color: currentTheme.text }}>
-                            {algo.bestDistance.toFixed(0)}
-                          </strong></span>
-                          <span>Improvements: <strong style={{ color: currentTheme.text }}>
-                            {algo.improvements}
-                          </strong></span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-
-            {winner && !mobileViewing && (
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                background: currentTheme.panel,
-                borderRadius: '16px',
-                padding: '32px',
-                border: `2px solid ${algorithms.find(a => a.id === winner)?.color}`,
-                textAlign: 'center',
-                boxShadow: `0 0 40px ${algorithms.find(a => a.id === winner)?.glow}`,
-                maxWidth: '90%'
-              }}>
-                <h2 style={{ 
-                  fontSize: '36px', 
-                  margin: '0 0 16px 0',
-                  color: algorithms.find(a => a.id === winner)?.color
-                }}>
-                  🎉 Victory! 🎉
-                </h2>
-                <p style={{ fontSize: '20px', margin: '0 0 8px 0' }}>
-                  {algorithms.find(a => a.id === winner)?.emoji} {algorithms.find(a => a.id === winner)?.name} Algorithm Wins!
-                </p>
-                <p style={{ fontSize: '16px', color: '#94a3b8' }}>
-                  Final Distance: {algorithms.find(a => a.id === winner)?.bestDistance.toFixed(1)}
-                </p>
-              </div>
-            )}
-
-            {mobileViewing && (
-              <div style={{
-                position: 'absolute',
-                top: 'calc(1rem + env(safe-area-inset-top))',
-                right: '1rem',
-                zIndex: 10001,
-                display: 'flex',
-                gap: '0.5rem',
-                background: 'rgba(0,0,0,0.95)',
-                padding: '0.6rem',
-                borderRadius: '999px',
-                border: `1px solid ${currentTheme.border}`
-              }}>
-                <button 
-                  onClick={handlePlay}
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: '#6366f1',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
+            <ButtonGrid>
+              {Object.entries(cityModeIcons).map(([mode, icon]) => (
+                <ModeButton
+                  key={mode}
+                  $active={cityMode === mode}
+                  onClick={() => {
+                    setCityMode(mode as CityMode);
+                    setTimeout(initializeSimulation, 0);
                   }}
                 >
-                  {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-                </button>
-                <button 
-                  onClick={handleReset}
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: 'rgba(51,65,85,0.8)',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Shuffle size={20} />
-                </button>
-                <button 
-                  onClick={exitMobileView}
-                  style={{
-                    width: '44px',
-                    height: '44px',
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: '#ef4444',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="tsp-sidebar">
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={handlePlay}
-                style={{
-                  flex: 1,
-                  padding: '14px',
-                  background: isPlaying ? '#ef4444' : currentTheme.city,
-                  border: 'none',
-                  borderRadius: '10px',
-                  color: 'white',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px'
-                }}
-              >
-                {isPlaying ? <><Pause size={22} />Pause</> : <><Play size={22} />Start Race</>}
-              </button>
-              
-              <button
-                onClick={handleReset}
-                style={{
-                  padding: '14px',
-                  background: 'rgba(255,255,255,0.1)',
-                  border: `2px solid ${currentTheme.border}`,
-                  borderRadius: '10px',
-                  color: currentTheme.text,
-                  cursor: 'pointer'
-                }}
-              >
-                <Shuffle size={22} />
-              </button>
-              
-              <button
-                onClick={() => setShowTrails(!showTrails)}
-                style={{
-                  padding: '14px',
-                  background: showTrails ? `${currentTheme.city}22` : 'rgba(255,255,255,0.1)',
-                  border: `2px solid ${showTrails ? currentTheme.city : currentTheme.border}`,
-                  borderRadius: '10px',
-                  color: currentTheme.text,
-                  cursor: 'pointer'
-                }}
-              >
-                {showTrails ? <Eye size={22} /> : <EyeOff size={22} />}
-              </button>
-              
-              <button
-                onClick={() => setShowStats(!showStats)}
-                style={{
-                  padding: '14px',
-                  background: showStats ? `${currentTheme.city}22` : 'rgba(255,255,255,0.1)',
-                  border: `2px solid ${showStats ? currentTheme.city : currentTheme.border}`,
-                  borderRadius: '10px',
-                  color: currentTheme.text,
-                  cursor: 'pointer'
-                }}
-              >
-                <BarChart3 size={22} />
-              </button>
-            </div>
-
-            <div>
-              <label style={{ 
-                fontSize: '14px', 
-                color: '#94a3b8', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px', 
-                marginBottom: '12px',
-                fontWeight: 500
-              }}>
-                <Zap size={16} />
-                Simulation Speed: {localSpeed}x
-              </label>
-              <input
-                type="range"
-                min="0.5"
-                max="5"
-                step="0.5"
-                value={localSpeed}
-                onChange={(e) => setLocalSpeed(Number(e.target.value))}
-                style={{ 
-                  width: '100%',
-                  accentColor: currentTheme.city
-                }}
-              />
-            </div>
-
-            <div>
-              <h3 style={{ 
-                fontSize: '16px', 
-                marginBottom: '12px', 
-                color: currentTheme.text,
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <MapIcon size={18} />
-                City Configuration
-              </h3>
-              
-              <label style={{ 
-                fontSize: '14px', 
-                color: '#94a3b8', 
-                marginBottom: '8px', 
-                display: 'block',
-                fontWeight: 500
-              }}>
-                Number of Cities: {cityCount}
-              </label>
-              <input
-                type="range"
-                min="5"
-                max="25"
-                value={cityCount}
-                onChange={(e) => setCityCount(Number(e.target.value))}
-                style={{ 
-                  width: '100%', 
-                  marginBottom: '16px',
-                  accentColor: currentTheme.city
-                }}
-              />
-              
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                {Object.entries(cityModeIcons).map(([mode, icon]) => (
-                  <button
-                    key={mode}
-                    onClick={() => {
-                      setCityMode(mode as CityMode);
-                      setTimeout(initializeSimulation, 0);
-                    }}
-                    style={{
-                      padding: '12px',
-                      background: cityMode === mode ? `${currentTheme.city}22` : 'rgba(255,255,255,0.05)',
-                      border: `2px solid ${cityMode === mode ? currentTheme.city : currentTheme.border}`,
-                      borderRadius: '10px',
-                      color: currentTheme.text,
-                      fontSize: '13px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    {icon}
-                    <span style={{ textTransform: 'capitalize' }}>{mode}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 style={{ 
-                fontSize: '16px', 
-                marginBottom: '12px', 
-                color: currentTheme.text,
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <Brain size={18} />
-                Select Algorithms
-              </h3>
-              
-              {Object.entries(algorithmConfigs).map(([id, config]) => (
-                <label
-                  key={id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '14px',
-                    padding: '14px',
-                    marginBottom: '10px',
-                    background: selectedAlgos.includes(id as AlgorithmType) ? 
-                      `${config.color}15` : 
-                      'rgba(255,255,255,0.05)',
-                    border: `2px solid ${selectedAlgos.includes(id as AlgorithmType) ? 
-                      config.color : 'transparent'}`,
-                    borderRadius: '10px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedAlgos.includes(id as AlgorithmType)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedAlgos([...selectedAlgos, id as AlgorithmType]);
-                      } else {
-                        setSelectedAlgos(selectedAlgos.filter(a => a !== id));
-                      }
-                    }}
-                    style={{ display: 'none' }}
-                  />
-                  <span style={{ fontSize: '24px' }}>{config.emoji}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ 
-                      fontSize: '15px', 
-                      fontWeight: 600,
-                      color: selectedAlgos.includes(id as AlgorithmType) ? 
-                        config.color : currentTheme.text
-                    }}>
-                      {config.name}
-                    </div>
-                    <div style={{ 
-                      fontSize: '13px', 
-                      color: '#94a3b8',
-                      marginTop: '2px'
-                    }}>
-                      {config.funFact}
-                    </div>
-                  </div>
-                </label>
+                  {icon}
+                  <span style={{ textTransform: 'capitalize' }}>{mode}</span>
+                </ModeButton>
               ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+            </ButtonGrid>
+          </Section>
+
+          <Section>
+            <SectionTitle>
+              <Brain size={18} />
+              Select Algorithms
+            </SectionTitle>
+            
+            {Object.entries(algorithmConfigs).map(([id, config]) => (
+              <AlgoCheckbox
+                key={id}
+                $active={selectedAlgos.includes(id as AlgorithmType)}
+                $color={config.color}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedAlgos.includes(id as AlgorithmType)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedAlgos([...selectedAlgos, id as AlgorithmType]);
+                    } else {
+                      setSelectedAlgos(selectedAlgos.filter(a => a !== id));
+                    }
+                  }}
+                />
+                <AlgoEmoji>{config.emoji}</AlgoEmoji>
+                <AlgoDetails>
+                  <AlgoName
+                    $color={config.color}
+                    $active={selectedAlgos.includes(id as AlgorithmType)}
+                  >
+                    {config.name}
+                  </AlgoName>
+                  <AlgoDescription>
+                    {config.funFact}
+                  </AlgoDescription>
+                </AlgoDetails>
+              </AlgoCheckbox>
+            ))}
+          </Section>
+        </Sidebar>
+      </MainContent>
+    </MainContainer>
   );
 }
