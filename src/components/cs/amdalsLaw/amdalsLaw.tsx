@@ -25,8 +25,13 @@ interface Drop {
 const W = 500;
 const H = 600;
 
-export default function AmdahlRain() {
-  const leftCanvasRef = useRef<HTMLCanvasElement>(null);
+interface AmdahlRainProps {
+  isRunning?: boolean;
+  speed?: number;
+  isDark?: boolean;
+}
+
+export default function AmdahlsLawSimulator({ isRunning: externalIsRunning, speed: externalSpeed = 1, isDark = true }: AmdahlRainProps = {}) {  const leftCanvasRef = useRef<HTMLCanvasElement>(null);
   const rightCanvasRef = useRef<HTMLCanvasElement>(null);
   const leftDrops = useRef<Drop[]>([]);
   const rightDrops = useRef<Drop[]>([]);

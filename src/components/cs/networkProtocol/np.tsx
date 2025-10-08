@@ -812,7 +812,18 @@ const SimulationViewport: React.FC<{ engine: SimulationEngine }> = React.memo(({
 });
 
 // ==================== MAIN COMPONENT ====================
-const TrainStationOFDMSimulation: React.FC = () => {
+interface TrainStationOFDMProps {
+  isRunning?: boolean;
+  speed?: number;
+  isDark?: boolean;
+}
+
+// ==================== MAIN COMPONENT ====================
+const TrainStationOFDMSimulation: React.FC<TrainStationOFDMProps> = ({ 
+  isRunning: externalIsRunning, 
+  speed: externalSpeed,
+  isDark = true 
+}) => {  
   const engineRef = useRef<SimulationEngine | null>(null);
   const [, forceUpdate] = useState({});
 
