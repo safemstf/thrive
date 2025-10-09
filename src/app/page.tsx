@@ -608,7 +608,9 @@ const useNetworkStatus = () => {
 };
 
 const usePortfolios = () => {
-  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>(() =>
+    Object.values(MOCK_PORTFOLIOS).slice(0, 6) // always show at least fallback
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<'online' | 'offline' | 'error'>('online');
@@ -617,28 +619,40 @@ const usePortfolios = () => {
   const fetchPortfolios = useCallback(async () => {
     if (!isOnline) {
       setConnectionState('offline');
-      setPortfolios(Object.values(MOCK_PORTFOLIOS).slice(0, 6));
       setLoading(false);
-      return;
+      return; // keep mock portfolios
     }
     try {
       setLoading(true);
       setError(null);
       const apiClient = getApiClient();
       const portfolioData = await apiClient.portfolio?.discover?.({}, 1, 6);
+
+      let serverPortfolios: Portfolio[] = [];
       if (Array.isArray(portfolioData)) {
-        setPortfolios(portfolioData.map(normalizePortfolio));
+        serverPortfolios = portfolioData.map(normalizePortfolio);
       } else if ((portfolioData as any)?.portfolios) {
-        setPortfolios((portfolioData as any).portfolios.map(normalizePortfolio));
-      } else {
-        setPortfolios(Object.values(MOCK_PORTFOLIOS).slice(0, 6));
+        serverPortfolios = (portfolioData as any).portfolios.map(normalizePortfolio);
       }
+
+      // Merge: server portfolios first, then fallback (avoid duplicates)
+      const merged = [
+        ...serverPortfolios,
+        ...Object.values(MOCK_PORTFOLIOS)
+          .slice(0, 6)
+          .filter(
+            (mock) => !serverPortfolios.some((p) => p.username === mock.username)
+          ),
+      ];
+
+      setPortfolios(merged);
       setConnectionState('online');
     } catch (err) {
       console.error('Failed to fetch portfolios:', err);
       setError('Failed to load portfolios');
       setConnectionState('error');
-      setPortfolios(Object.values(MOCK_PORTFOLIOS).slice(0, 6));
+      // keep fallback
+      setPortfolios((prev) => [...prev]); // just keep current mock
     } finally {
       setLoading(false);
     }
