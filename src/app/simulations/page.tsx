@@ -1,6 +1,6 @@
 // src/app/simulations/page.tsx - Enhanced Professional Simulation Platform
 'use client';
-
+// cladogram simulation with longest subsequences and phylogenetic trees
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import dynamic from "next/dynamic";
 import styled, { keyframes, css } from 'styled-components';
@@ -49,8 +49,13 @@ const NBodySandbox = dynamic(() => import("@/components/cs/nb/nb"), {
   loading: () => <SimulationLoader>Loading N-Body Sandbox...</SimulationLoader>
 });
 
+const PhylogeneticTreeBuilder = dynamic(() => import('@/components/cs/phylogeny/phylogeny'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Phylogenetic Tree Builder...</SimulationLoader>
+});
+
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'parallel-model' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection';
 type TabType = 'simulations' | 'algorithms';
 
 interface SimulationItem {
@@ -813,14 +818,14 @@ const allItems: SimulationItem[] = [
     category: 'algorithms'
   },
   {
-    key: 'parallel-model',
-    label: 'Parallel Computing',
+    key: 'phylogeny',
+    label: 'Phylogenetic Trees',
     icon: <Cpu size={24} />,
     color: '#f59e0b',
-    description: 'Task scheduling visualizer',
+    description: 'Evolutionary tree construction',
     optimized: true,
     featured: false,
-    comingSoon: true,
+    comingSoon: false,
     category: 'algorithms'
   },
   {
@@ -1036,6 +1041,9 @@ export default function SimulationsPage() {
         return <PermutationSimulation isRunning={isRunning} speed={speed} isDark={false} />;
       case 'nbody':
         return <NBodySandbox isRunning={isRunning} speed={speed} isDark={false} />;
+
+      case 'phylogeny':
+        return <PhylogeneticTreeBuilder isRunning={isRunning} speed={speed} />;
       default:
         return (
           <PlaceholderContent>
