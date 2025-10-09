@@ -81,30 +81,6 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                 color: '#3b82f6',
                 href: '/projects'
               },
-              {
-                id: 'design',
-                title: 'Design',
-                description: 'Creative work',
-                icon: <Brush size={20} />,
-                color: '#8b5cf6',
-                href: '/design'
-              },
-              {
-                id: 'blog',
-                title: 'Blog',
-                description: 'Read articles',
-                icon: <BookOpen size={20} />,
-                color: '#10b981',
-                href: '/blog'
-              },
-              {
-                id: 'contact',
-                title: 'Contact',
-                description: 'Get in touch',
-                icon: <Mail size={20} />,
-                color: '#f59e0b',
-                href: '/contact'
-              }
             ],
             portfolio: {
               kind: 'hybrid',
