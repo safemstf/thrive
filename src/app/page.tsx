@@ -18,17 +18,6 @@ import styled, { keyframes } from 'styled-components';
 import { MOCK_PORTFOLIOS } from '@/data/mockData';
 
 /* =========================
-   Tunables
-   ========================= */
-// NOTE: multipliers are used by useParallaxCSS per-section to compute the px offset:
-// final movement is "clampedNormalized * multiplier" in px. Tune per-section when calling hook.
-const HERO_MULTIPLIER = 160;      // large, dramatic background on hero
-const SECTION1_MULTIPLIER = 110;
-const SECTION2_MULTIPLIER = 110;
-const FG_SCALE = 0.16;            // foreground content reacts only a little (multiplier fraction)
-const MID_SCALE = 0.7;            // middle decorative layers
-
-/* =========================
    Animations
    ========================= */
 const fadeInUp = keyframes`
@@ -70,7 +59,6 @@ const PageWrapper = styled.div`
 const MainContainer = styled.main`
   width: 100%;
   position: relative;
-  overflow: hidden;
 `;
 
 /* HERO */
@@ -81,26 +69,15 @@ const HeroSection = styled.section`
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  /* default var so nested calc() doesn't blow up */
-  --parallax-base: 0px;
-  @media (max-width: 768px) { min-height: 90vh; }
-`;
-
-/* Background layer reads the --parallax-base computed by useParallaxCSS */
-const HeroParallaxBg = styled.div`
-  position: absolute;
-  inset: 0;
+  
+  /* Fixed parallax background */
   background-image: url('https://picsum.photos/1920/1080?random=10');
   background-size: cover;
   background-position: center;
-
-  /* translate using the computed px value. Multiply by -1 so background moves opposite to scroll */
-  transform: translate3d(0, calc(var(--parallax-base, 0px) * -1), 0) scale(1.15);
-  will-change: transform;
-  pointer-events: none;
-  z-index: 0;
-
-  &::after {
+  background-attachment: fixed;
+  
+  /* Gradient overlay */
+  &::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -110,6 +87,12 @@ const HeroParallaxBg = styled.div`
       rgba(59, 130, 246, 0.28) 100%
     );
     pointer-events: none;
+    z-index: 1;
+  }
+  
+  @media (max-width: 768px) { 
+    min-height: 90vh;
+    background-attachment: scroll; /* Fixed doesn't work well on mobile */
   }
 `;
 
@@ -138,7 +121,7 @@ const FloatingShape = styled.div<{ $delay: number; $duration: number; $top: stri
   }
 `;
 
-/* Foreground content reads the same var but at smaller scale (FG_SCALE) */
+/* Foreground content */
 const HeroContent = styled.div`
   position: relative;
   z-index: 10;
@@ -147,9 +130,6 @@ const HeroContent = styled.div`
   padding: 2rem 1.5rem;
   text-align: center;
   animation: ${fadeInUp} 1s ease-out;
-  /* foreground uses a small fraction of the base px movement */
-  transform: translate3d(0, calc(var(--parallax-base, 0px) * ${FG_SCALE}), 0);
-  will-change: transform;
 `;
 
 const HeroTitle = styled.h1`
@@ -295,23 +275,15 @@ const ParallaxSection1 = styled.section`
   justify-content: center;
   overflow: hidden;
   margin: 0;
-  --parallax-base: 0px;
-  @media (max-width: 768px) { min-height: 60vh; }
-`;
-
-/* use var for section background transform; the child content will use small FG_SCALE fraction */
-const ParallaxBg1 = styled.div`
-  position: absolute;
-  inset: -10%;
+  
+  /* Fixed parallax background */
   background-image: url('https://picsum.photos/1920/1080?random=20');
   background-size: cover;
   background-position: center;
-  transform: translate3d(0, calc(var(--parallax-base, 0px) * -${MID_SCALE}), 0) scale(1.08);
-  will-change: transform;
-  pointer-events: none;
-  z-index: 0;
-
-  &::after {
+  background-attachment: fixed;
+  
+  /* Gradient overlay */
+  &::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -320,18 +292,24 @@ const ParallaxBg1 = styled.div`
       rgba(236, 72, 153, 0.6) 100%
     );
     pointer-events: none;
+    z-index: 1;
+  }
+  
+  @media (max-width: 768px) { 
+    min-height: 60vh;
+    background-attachment: scroll;
   }
 `;
 
+/* Remove the separate background div */
+
 const ParallaxContent = styled.div`
   position: relative;
-  z-index: 1;
+  z-index: 10;
   max-width: 900px;
   margin: 0 auto;
   padding: 3rem 2rem;
   text-align: center;
-  transform: translate3d(0, calc(var(--parallax-base, 0px) * ${FG_SCALE * 0.9}), 0);
-  will-change: transform;
   @media (max-width: 768px) { padding: 2rem 1.5rem; }
 `;
 
@@ -375,7 +353,9 @@ const StatsSection = styled.section`
   background-image: url('https://picsum.photos/1920/1080?random=40');
   background-size: cover;
   background-position: center;
+  background-attachment: fixed;
   margin: 0;
+  overflow: hidden;
   &::before {
     content: '';
     position: absolute;
@@ -394,8 +374,6 @@ const StatsGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 2rem;
-  transform: translate3d(0, calc(var(--parallax-base, 0px) * ${FG_SCALE * 0.8}), 0);
-  will-change: transform;
 `;
 
 /* stat cards etc (unchanged) */
@@ -424,7 +402,9 @@ const PortfoliosSection = styled.section`
   background-image: url('https://picsum.photos/1920/1080?random=50');
   background-size: cover;
   background-position: center;
+  background-attachment: fixed;
   margin: 0;
+  overflow: hidden;
   &::before {
     content: '';
     position: absolute;
@@ -447,8 +427,6 @@ const SectionHeader = styled.div`
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
-  transform: translate3d(0, calc(var(--parallax-base, 0px) * ${FG_SCALE * 0.7}), 0);
-  will-change: transform;
 `;
 const SectionTitle = styled.h2` font-size: 2.5rem; font-weight: 800; color: #1e293b; display:flex; align-items:center; gap:0.75rem; svg { color: #3b82f6; } @media (max-width:768px) { font-size:2rem; } `;
 const ViewAllLink = styled(Link)` display:flex; align-items:center; gap:0.5rem; color:#3b82f6; text-decoration:none; font-weight:700; font-size:1.0625rem; padding:0.5rem 1rem; border-radius:8px; &:hover { background:#f0f9ff; gap:0.75rem; } `;
@@ -459,8 +437,6 @@ const PortfolioGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 2rem;
-  transform: translate3d(0, calc(var(--parallax-base, 0px) * ${FG_SCALE * 0.8}), 0);
-  will-change: transform;
   @media (max-width: 768px) { grid-template-columns: 1fr; }
 `;
 
@@ -534,38 +510,39 @@ const SkeletonStats = styled.div`
 const ParallaxSection2 = styled.section`
   position: relative;
   min-height: 70vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  overflow:hidden;
-  margin:0;
-  --parallax-base: 0px;
-  @media (max-width:768px) { min-height:60vh; }
-`;
-
-const ParallaxBg2 = styled.div`
-  position:absolute;
-  inset:-10%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin: 0;
+  
+  /* Fixed parallax background */
   background-image: url('https://picsum.photos/1920/1080?random=30');
   background-size: cover;
   background-position: center;
-  transform: translate3d(0, calc(var(--parallax-base, 0px) * -${MID_SCALE}), 0) scale(1.08);
-  will-change: transform;
-  pointer-events: none;
-  z-index: 0;
-
-  &::after {
+  background-attachment: fixed;
+  
+  /* Gradient overlay */
+  &::before {
     content: '';
-    position:absolute;
-    inset:0;
+    position: absolute;
+    inset: 0;
     background: linear-gradient(135deg,
       rgba(5, 46, 22, 0.72) 0%,
       rgba(6,95,70,0.7) 50%,
       rgba(4,120,87,0.72) 100%
     );
-    pointer-events:none;
+    pointer-events: none;
+    z-index: 1;
+  }
+  
+  @media (max-width: 768px) {
+    min-height: 60vh;
+    background-attachment: scroll;
   }
 `;
+
+/* Remove the separate background div */
 
 /* QUICK ACTIONS */
 const QuickActionsSection = styled.section`
@@ -574,19 +551,19 @@ const QuickActionsSection = styled.section`
   background-image: url('https://picsum.photos/1920/1080?random=60');
   background-size: cover;
   background-position: center;
+  background-attachment: fixed;
   margin: 0;
+  overflow: hidden;
   &::before { content: ''; position:absolute; inset:0; background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(241,245,249,0.97) 100%); }
   & > * { position: relative; z-index:1; }
 `;
 
 const QuickActionsGrid = styled.div`
   max-width: 1200px;
-  margin:0 auto;
-  display:grid;
+  margin: 0 auto;
+  display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap:2rem;
-  transform: translate3d(0, calc(var(--parallax-base, 0px) * ${FG_SCALE * 0.8}), 0);
-  will-change: transform;
+  gap: 2rem;
 `;
 
 /* Small cards */
@@ -673,93 +650,6 @@ const usePortfolios = () => {
 };
 
 /* =========================
-   New: useParallaxCSS hook
-   - writes a per-section pixel offset into --parallax-base
-   - respects prefers-reduced-motion
-   - runs only when section is visible via IntersectionObserver
-   - uses requestAnimationFrame (no React state per frame)
-   ========================= */
-function useParallaxCSS(
-  ref: React.RefObject<HTMLElement | null>,
-  {
-    multiplier = 120,
-    sensitivity = 0.9,
-    reduceOnMobile = true,
-  }: { multiplier?: number; sensitivity?: number; reduceOnMobile?: boolean } = {}
-) {
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    // honor reduced motion
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    if (media.matches) {
-      el.style.setProperty('--parallax-base', '0px');
-      return;
-    }
-
-    const computeMultiplier = () => (reduceOnMobile && window.innerWidth < 768 ? multiplier * 0.5 : multiplier);
-
-    let rafId: number | null = null;
-    let active = true;
-    let isIntersecting = false;
-
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        isIntersecting = e.isIntersecting;
-        if (isIntersecting && rafId == null) {
-          rafId = requestAnimationFrame(tick);
-        } else if (!isIntersecting) {
-          // snap to zero when offscreen to avoid odd transforms
-          el.style.setProperty('--parallax-base', '0px');
-          if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
-        }
-      });
-    }, { threshold: 0 });
-
-    io.observe(el);
-
-    function tick() {
-      rafId = null;
-      if (!active || !isIntersecting || !el) return;
-
-      const rect = el.getBoundingClientRect();
-      const elemCenter = rect.top + rect.height / 2;
-      const viewportCenter = window.innerHeight / 2;
-
-      const denom = Math.max(1, viewportCenter + rect.height / 2);
-      let raw = (elemCenter - viewportCenter) / denom;
-      raw = -raw * sensitivity; // invert so positive -> background moves up
-      const clamped = Math.max(-1, Math.min(1, raw));
-      const px = clamped * computeMultiplier();
-
-      // write pixel value
-      el.style.setProperty('--parallax-base', `${px}px`);
-
-      rafId = requestAnimationFrame(tick);
-    }
-
-    // initial tick to set var
-    rafId = requestAnimationFrame(tick);
-
-    const onResize = () => {
-      if (rafId != null) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => { rafId = requestAnimationFrame(tick); });
-    };
-
-    window.addEventListener('resize', onResize);
-
-    return () => {
-      active = false;
-      io.disconnect();
-      if (rafId != null) cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', onResize);
-      if (el) el.style.removeProperty('--parallax-base');
-    };
-  }, [ref, multiplier, sensitivity, reduceOnMobile]);
-}
-
-/* =========================
    MAIN PAGE Component
    ========================= */
 export default function HomePage() {
@@ -767,22 +657,6 @@ export default function HomePage() {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const { portfolios, loading, connectionState, refetch } = usePortfolios();
-
-  // refs for sections
-  const heroRef = useRef<HTMLElement | null>(null);
-  const section1Ref = useRef<HTMLElement | null>(null);
-  const statsRef = useRef<HTMLElement | null>(null);
-  const portfoliosRef = useRef<HTMLElement | null>(null);
-  const section2Ref = useRef<HTMLElement | null>(null);
-  const actionsRef = useRef<HTMLElement | null>(null);
-
-  // wire up per-section parallax CSS loops
-  useParallaxCSS(heroRef, { multiplier: HERO_MULTIPLIER, sensitivity: 0.95, reduceOnMobile: true });
-  useParallaxCSS(section1Ref, { multiplier: SECTION1_MULTIPLIER, sensitivity: 0.8, reduceOnMobile: true });
-  useParallaxCSS(statsRef, { multiplier: 60, sensitivity: 0.6, reduceOnMobile: true });
-  useParallaxCSS(portfoliosRef, { multiplier: 55, sensitivity: 0.6, reduceOnMobile: true });
-  useParallaxCSS(section2Ref, { multiplier: SECTION2_MULTIPLIER, sensitivity: 0.8, reduceOnMobile: true });
-  useParallaxCSS(actionsRef, { multiplier: 45, sensitivity: 0.7, reduceOnMobile: true });
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -813,9 +687,7 @@ export default function HomePage() {
         )}
 
         {/* HERO */}
-        <HeroSection ref={heroRef}>
-          <HeroParallaxBg />
-
+        <HeroSection>
           <HeroFloatingElements aria-hidden>
             <FloatingShape $delay={0} $duration={20} $top="10%" $left="10%" />
             <FloatingShape $delay={2} $duration={15} $top="60%" $left="80%" />
@@ -854,8 +726,7 @@ export default function HomePage() {
         </HeroSection>
 
         {/* PARALLAX SECTION 1 */}
-        <ParallaxSection1 ref={section1Ref}>
-          <ParallaxBg1 />
+        <ParallaxSection1>
           <ParallaxContent>
             <ParallaxTitle>Build Your Creative Brand</ParallaxTitle>
             <ParallaxText>
@@ -869,7 +740,7 @@ export default function HomePage() {
         </ParallaxSection1>
 
         {/* STATS */}
-        <StatsSection ref={statsRef}>
+        <StatsSection>
           <StatsGrid>
             <StatCard><StatIcon><Users size={32} /></StatIcon><StatNumber>1,247</StatNumber><StatLabel>Active Creators</StatLabel></StatCard>
             <StatCard><StatIcon><Grid3X3 size={32} /></StatIcon><StatNumber>120</StatNumber><StatLabel>Portfolios</StatLabel></StatCard>
@@ -879,7 +750,7 @@ export default function HomePage() {
         </StatsSection>
 
         {/* FEATURED PORTFOLIOS */}
-        <PortfoliosSection ref={portfoliosRef}>
+        <PortfoliosSection>
           <SectionHeader>
             <SectionTitle><Star size={32} /> Featured Creators</SectionTitle>
             <ViewAllLink href="/explore">View All <ChevronRight size={20} /></ViewAllLink>
@@ -956,8 +827,7 @@ export default function HomePage() {
         </PortfoliosSection>
 
         {/* PARALLAX SECTION 2 */}
-        <ParallaxSection2 ref={section2Ref}>
-          <ParallaxBg2 />
+        <ParallaxSection2>
           <ParallaxContent>
             <ParallaxTitle>Level Up Your Skills</ParallaxTitle>
             <ParallaxText>
@@ -969,7 +839,7 @@ export default function HomePage() {
         </ParallaxSection2>
 
         {/* QUICK ACTIONS */}
-        <QuickActionsSection ref={actionsRef}>
+        <QuickActionsSection>
           <SectionHeader><SectionTitle><Zap size={32} /> Quick Actions</SectionTitle></SectionHeader>
 
           <QuickActionsGrid>
