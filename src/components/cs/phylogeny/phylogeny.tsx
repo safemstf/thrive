@@ -125,14 +125,14 @@ const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 700;
 
 const INITIAL_COUNTS = {
-    water: 100,
-    carbon: 40,
-    nitrogen: 30,
-    oxygen: 30,
-    amino_acid: 20,
-    nucleotide: 25,
-    lipid: 30,
-    sugar: 15,
+    water: 600,
+    carbon: 240,
+    nitrogen: 180,
+    oxygen: 180,
+    amino_acid: 120,
+    nucleotide: 150,
+    lipid: 180,
+    sugar: 90,
 };
 
 const MOLECULE_SPEED = 0.35;

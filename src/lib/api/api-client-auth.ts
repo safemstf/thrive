@@ -1,9 +1,9 @@
 // lib/api/api-client-auth.ts
 import { BaseApiClient, APIError } from './base-api-client';
-import { 
-  LoginCredentials, 
-  AuthResponse, 
-  User 
+import {
+  LoginCredentials,
+  AuthResponse,
+  User
 } from '@/types/auth.types';
 
 // Updated signup credentials to match backend
@@ -32,60 +32,64 @@ export class AuthApiClient extends BaseApiClient implements AuthAPI {
     super(baseURL);
   }
 
+  // LOGIN
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    const payload = {
+      // prefer an explicit usernameOrEmail if provided, fallback to email or username
+      usernameOrEmail: (credentials as any).usernameOrEmail ?? credentials.email ?? (credentials as any).username,
+      password: credentials.password
+    };
+
     const response = await this.requestWithRetry<AuthResponse>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({
-        usernameOrEmail: credentials.email,
-        password: credentials.password
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
 
-    // Store token in localStorage for API calls
-    if (response.token && typeof window !== 'undefined') {
-      localStorage.setItem('auth-token', response.token);
-      console.log('[Auth] Token stored after login');
+    // Persist token via BaseApiClient helper (keeps discovery consistent)
+    if (response.token) {
+      // use static helper on BaseApiClient so existing discovery/logging remains consistent
+      BaseApiClient.setAuthToken(response.token);
+      // DO NOT console.log the token or token value
     }
 
     return response;
   }
 
+  // SIGNUP
   async signup(credentials: SignupCredentials): Promise<AuthResponse> {
     const response = await this.requestWithRetry<AuthResponse>('/auth/register', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials),
     });
 
-    // Store token in localStorage for API calls
-    if (response.token && typeof window !== 'undefined') {
-      localStorage.setItem('auth-token', response.token);
-      console.log('[Auth] Token stored after signup');
+    if (response.token) {
+      BaseApiClient.setAuthToken(response.token);
     }
 
     return response;
   }
 
+  // LOGOUT
   async logout(): Promise<void> {
     try {
       await this.requestWithRetry<void>('/auth/logout', {
         method: 'POST',
       });
     } finally {
-      // Always clear local storage, even if server request fails
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth-token');
-        console.log('[Auth] Token cleared after logout');
-      }
+      // Use BaseApiClient helper to clear token
+      BaseApiClient.clearAuthToken();
     }
   }
 
   async getCurrentUser(): Promise<User> {
-    const response = await this.requestWithRetry<{user: User}>('/auth/me');
+    const response = await this.requestWithRetry<{ user: User }>('/auth/me');
     return response.user;
   }
 
   async updateProfile(updates: Partial<User>): Promise<User> {
-    const response = await this.requestWithRetry<{user: User}>('/auth/me', {
+    const response = await this.requestWithRetry<{ user: User }>('/auth/me', {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
@@ -99,39 +103,33 @@ export class AuthApiClient extends BaseApiClient implements AuthAPI {
     if (!token) {
       throw new APIError('No token to refresh', 401, 'NO_TOKEN');
     }
-    
+
     // Verify token is still valid by getting current user
     const user = await this.getCurrentUser();
     return { token, user, message: 'Token refreshed' };
   }
 
   async verifyToken(token: string): Promise<User | null> {
+    // Save original token via base discovery
+    const originalToken = super.getAuthToken() ?? null;
     try {
-      // Temporarily store token for this request
-      const originalToken = this.getAuthToken();
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('auth-token', token);
-      }
-      
+      // Use base helper to set the test token
+      BaseApiClient.setAuthToken(token);
       const user = await this.getCurrentUser();
-      
-      // Restore original token
-      if (typeof window !== 'undefined') {
-        if (originalToken) {
-          localStorage.setItem('auth-token', originalToken);
-        } else {
-          localStorage.removeItem('auth-token');
-        }
-      }
-      
       return user;
     } catch (error) {
-      if (error instanceof APIError && error.status === 401) {
-        return null;
-      }
+      if (error instanceof APIError && error.status === 401) return null;
       throw error;
+    } finally {
+      // restore previous token (or clear)
+      if (originalToken) {
+        BaseApiClient.setAuthToken(originalToken);
+      } else {
+        BaseApiClient.clearAuthToken();
+      }
     }
   }
+
 }
 
 // Singleton for auth API
