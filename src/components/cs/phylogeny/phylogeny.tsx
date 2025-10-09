@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Droplets, Sparkles } from 'lucide-react';
+import { Play, Pause, RotateCcw, Droplets, Sparkles, Dna, Zap } from 'lucide-react';
 
 // ==================== TYPES ====================
 
@@ -49,6 +49,13 @@ interface ProtoLifeEntity extends BaseEntity {
     age: number;
 }
 
+interface OrganismTraits {
+    metabolicEfficiency: number;
+    speed: number;
+    size: number;
+    color: string;
+}
+
 interface LivingEntity extends PhysicalEntity {
     generation: number;
     genome: string;
@@ -57,6 +64,7 @@ interface LivingEntity extends PhysicalEntity {
     canMove: boolean;
     parent: number | null;
     children: number[];
+    traits: OrganismTraits;
 }
 
 interface Bond {
@@ -75,7 +83,8 @@ type SimulationPhase =
     | 'self_assembly'
     | 'proto_life'
     | 'luca_emergence'
-    | 'early_life';
+    | 'early_life'
+    | 'diversification';
 
 interface PhylogenySimProps {
     isRunning?: boolean;
@@ -89,23 +98,23 @@ const COLORS = {
     surface: '#111827',
     text: '#f8fafc',
     textMuted: '#64748b',
-    water: 'rgba(96, 165, 250, 0.4)',
-    carbon: 'rgba(120, 113, 108, 0.6)',
-    nitrogen: 'rgba(147, 197, 253, 0.5)',
-    oxygen: 'rgba(239, 68, 68, 0.5)',
-    amino_acid: 'rgba(236, 72, 153, 0.7)',
-    nucleotide: 'rgba(139, 92, 246, 0.8)',
-    lipid: 'rgba(250, 204, 21, 0.7)',
-    sugar: 'rgba(134, 239, 172, 0.6)',
-    peptide: 'rgba(219, 39, 119, 0.8)',
-    rna_fragment: 'rgba(124, 58, 237, 0.9)',
-    membrane_vesicle: 'rgba(245, 158, 11, 0.6)',
-    proto: 'rgba(236, 72, 153, 0.7)',
+    water: 'rgba(96, 165, 250, 0.5)',
+    carbon: 'rgba(120, 113, 108, 0.7)',
+    nitrogen: 'rgba(147, 197, 253, 0.6)',
+    oxygen: 'rgba(239, 68, 68, 0.6)',
+    amino_acid: 'rgba(236, 72, 153, 0.85)',
+    nucleotide: 'rgba(139, 92, 246, 0.9)',
+    lipid: 'rgba(250, 204, 21, 0.85)',
+    sugar: 'rgba(134, 239, 172, 0.7)',
+    peptide: 'rgba(219, 39, 119, 0.9)',
+    rna_fragment: 'rgba(124, 58, 237, 1)',
+    membrane_vesicle: 'rgba(245, 158, 11, 0.8)',
+    proto: 'rgba(236, 72, 153, 0.85)',
     luca: 'rgba(251, 191, 36, 1)',
-    organism: 'rgba(59, 130, 246, 0.8)',
-    bond_covalent: 'rgba(139, 92, 246, 0.4)',
-    bond_hydrogen: 'rgba(96, 165, 250, 0.3)',
-    bond_hydrophobic: 'rgba(250, 204, 21, 0.2)',
+    organism: 'rgba(59, 130, 246, 0.9)',
+    bond_covalent: 'rgba(139, 92, 246, 0.5)',
+    bond_hydrogen: 'rgba(96, 165, 250, 0.4)',
+    bond_hydrophobic: 'rgba(250, 204, 21, 0.3)',
     energy: 'rgba(20, 184, 166, 0.12)',
 };
 
@@ -161,6 +170,33 @@ function mutateRNA(rna: string, rate: number) {
         })
         .join('');
     return { newRNA };
+}
+
+function hashGenome(genome: string): number {
+    let hash = 0;
+    for (let i = 0; i < genome.length; i++) {
+        hash = ((hash << 5) - hash) + genome.charCodeAt(i);
+        hash = hash & hash;
+    }
+    return Math.abs(hash);
+}
+
+function genomeToTraits(genome: string): OrganismTraits {
+    const hash = hashGenome(genome);
+    const h1 = (hash & 0xFF) / 255;
+    const h2 = ((hash >> 8) & 0xFF) / 255;
+    const h3 = ((hash >> 16) & 0xFF) / 255;
+
+    const hue = h1 * 360;
+    const saturation = 60 + h2 * 30;
+    const lightness = 45 + h3 * 20;
+
+    return {
+        metabolicEfficiency: 0.7 + h1 * 0.6,
+        speed: 0.15 + h2 * 0.15,
+        size: 12 + h3 * 8,
+        color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+    };
 }
 
 function randomPosition(width: number, height: number, padding: number = 40) {
@@ -270,7 +306,6 @@ class PrimordialWorld {
 
     createVentTopology() {
         for (const vent of this.vents) {
-            // Create chimney structure around each vent
             const chimneyRings = 3;
             for (let ring = 0; ring < chimneyRings; ring++) {
                 const ringRadius = 20 + ring * 15;
@@ -292,7 +327,6 @@ class PrimordialWorld {
                 }
             }
 
-            // Create channel/ridge structures radiating from vents
             const channels = 3;
             for (let i = 0; i < channels; i++) {
                 const angle = (i / channels) * Math.PI * 2 + Math.random() * 0.5;
@@ -315,7 +349,6 @@ class PrimordialWorld {
                 }
             }
 
-            // Scatter some boulders in the general area
             const boulders = 4 + Math.floor(Math.random() * 4);
             for (let i = 0; i < boulders; i++) {
                 const angle = Math.random() * Math.PI * 2;
@@ -404,7 +437,6 @@ class PrimordialWorld {
         let fx = 0;
         let fy = 0;
 
-        // Global rotation
         const cx = this.width / 2;
         const cy = this.height / 2;
         const dxC = wrapDelta(x - cx, this.width);
@@ -414,7 +446,6 @@ class PrimordialWorld {
         fx += -rotStrength * dyC;
         fy += rotStrength * dxC;
 
-        // Hydrothermal convection - strong upward flow from vents
         for (const vent of this.vents) {
             const dx = wrapDelta(x - vent.x, this.width);
             const dy = wrapDelta(y - vent.y, this.height);
@@ -427,41 +458,33 @@ class PrimordialWorld {
 
             const pulse = Math.sin(this.time * 0.05 + vent.phase) * 0.25 + 0.75;
 
-            // Strong radial outward flow from vent (convection plume)
             const radialStrength = (1 - dist / maxRadius) * vent.strength * pulse * 0.8;
             const angle = Math.atan2(dy, dx);
             fx += Math.cos(angle) * radialStrength;
             fy += Math.sin(angle) * radialStrength;
 
-            // Circular flow around vent
             const circularStrength = Math.sin((dist / maxRadius) * Math.PI) * vent.strength * 0.15;
             fx += -Math.sin(angle) * circularStrength;
             fy += Math.cos(angle) * circularStrength;
         }
 
-        // Rocks create blocking, deflection and eddies
         for (const rock of this.rocks) {
             const dxR = wrapDelta(x - rock.x, this.width);
             const dyR = wrapDelta(y - rock.y, this.height);
             const r = Math.sqrt(dxR * dxR + dyR * dyR);
 
-            // Strong repulsion from rock surface
             if (r < rock.radius + 5) {
                 const push = 1.2 * (1 - (r - rock.radius) / 5);
                 const ang = Math.atan2(dyR, dxR);
                 fx += Math.cos(ang) * push;
                 fy += Math.sin(ang) * push;
-            }
-            // Deflection and eddies around rocks
-            else if (r < rock.radius + 40) {
+            } else if (r < rock.radius + 40) {
                 const eddyStrength = 0.5 * rock.roughness * (1 - (r - rock.radius) / 40);
                 const ang = Math.atan2(dyR, dxR);
 
-                // Tangential flow around obstacle
                 fx += -Math.sin(ang) * eddyStrength;
                 fy += Math.cos(ang) * eddyStrength;
 
-                // Slight attraction to create trapped pockets
                 const attraction = eddyStrength * 0.2;
                 fx -= Math.cos(ang) * attraction;
                 fy -= Math.sin(ang) * attraction;
@@ -537,7 +560,6 @@ class Molecule implements MolecularEntity {
             this.symbol = type.charAt(0).toUpperCase();
         }
 
-        // Try to spawn molecules away from rocks
         let attempts = 0;
         let pos;
         this.radius = 2 + this.complexity;
@@ -564,7 +586,6 @@ class Molecule implements MolecularEntity {
         this.vx += flow.fx * 0.1;
         this.vy += flow.fy * 0.1;
 
-        // Complex molecules attracted to rock surfaces (adsorption)
         if (this.complexity >= 2) {
             const rockCheck = world.isNearRock(this.x, this.y, 35);
             if (rockCheck.near && rockCheck.rock) {
@@ -580,15 +601,12 @@ class Molecule implements MolecularEntity {
             }
         }
 
-        // Calculate new position
         const newX = this.x + this.vx * (1 - movementReduction);
         const newY = this.y + this.vy * (1 - movementReduction);
 
-        // Check for rock collision
         const collision = world.checkRockCollision(newX, newY, this.radius);
 
         if (collision) {
-            // Bounce off rock with energy loss
             const dx = wrapDelta(this.x - collision.x, world.width);
             const dy = wrapDelta(this.y - collision.y, world.height);
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -597,16 +615,13 @@ class Molecule implements MolecularEntity {
                 const nx = dx / dist;
                 const ny = dy / dist;
 
-                // Reflect velocity
                 const dot = this.vx * nx + this.vy * ny;
                 this.vx = this.vx - 2 * dot * nx;
                 this.vy = this.vy - 2 * dot * ny;
 
-                // Energy loss on collision
                 this.vx *= 0.6;
                 this.vy *= 0.6;
 
-                // Push away from rock surface
                 const pushDist = collision.radius + this.radius + 1;
                 this.x = collision.x + nx * pushDist;
                 this.y = collision.y + ny * pushDist;
@@ -616,7 +631,6 @@ class Molecule implements MolecularEntity {
             this.y = newY;
         }
 
-        // Wrap position to toroidal space
         const wrapped = wrapPosition(this.x, this.y, world.width, world.height);
         this.x = wrapped.x;
         this.y = wrapped.y;
@@ -625,22 +639,34 @@ class Molecule implements MolecularEntity {
         this.vy *= 0.995;
     }
 
-    draw(ctx: CanvasRenderingContext2D) {
+    draw(ctx: CanvasRenderingContext2D, time: number) {
+        // Glow effect for complex molecules
         if (this.complexity >= 2 && this.bondedTo.size > 0) {
-            ctx.fillStyle = `${this.color}30`;
+            const glowPulse = Math.sin(time * 0.03 + this.id * 0.5) * 0.2 + 0.8;
+            ctx.fillStyle = `${this.color}40`;
             ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius * 1.8, 0, Math.PI * 2);
+            ctx.arc(this.x, this.y, this.radius * 2.2 * glowPulse, 0, Math.PI * 2);
             ctx.fill();
         }
 
+        // Main molecule body
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
 
+        // Highlight for 3D effect
+        if (this.complexity >= 2) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(this.x - this.radius * 0.3, this.y - this.radius * 0.3, this.radius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Symbol for complex molecules
         if (this.complexity === 3) {
             ctx.fillStyle = COLORS.text;
-            ctx.font = '7px monospace';
+            ctx.font = 'bold 8px monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(this.symbol, this.x, this.y);
@@ -660,7 +686,7 @@ class ProtoCell implements ProtoLifeEntity {
     x: number;
     y: number;
     energy: number;
-    radius = 25;
+    radius = 28;
     stability: number = 0;
     age = 0;
     peptideCount = 0;
@@ -725,18 +751,32 @@ class ProtoCell implements ProtoLifeEntity {
     draw(ctx: CanvasRenderingContext2D) {
         const pulse = Math.sin(this.age * 0.04) * 0.15 + 0.85;
 
+        // Outer glow
+        ctx.fillStyle = `${COLORS.proto}20`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 1.5 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+
         if (this.hasMembrane) {
+            // Solid membrane
             ctx.strokeStyle = COLORS.membrane_vesicle;
-            ctx.lineWidth = 3;
-            ctx.globalAlpha = 0.8;
+            ctx.lineWidth = 4;
+            ctx.globalAlpha = 0.9;
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
             ctx.stroke();
             ctx.globalAlpha = 1;
+
+            // Inner fill
+            ctx.fillStyle = 'rgba(236, 72, 153, 0.15)';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius - 2, 0, Math.PI * 2);
+            ctx.fill();
         } else {
+            // Dashed membrane (incomplete)
             ctx.strokeStyle = COLORS.proto;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 3;
+            ctx.setLineDash([6, 6]);
             ctx.globalAlpha = pulse;
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
@@ -745,33 +785,35 @@ class ProtoCell implements ProtoLifeEntity {
             ctx.globalAlpha = 1;
         }
 
-        ctx.font = '8px monospace';
+        // Labels
+        ctx.font = '9px monospace';
         ctx.textAlign = 'center';
-        let y = this.y - this.radius - 15;
+        let y = this.y - this.radius - 18;
 
         if (this.hasMembrane) {
             ctx.fillStyle = COLORS.membrane_vesicle;
             ctx.fillText('🧫 Membrane', this.x, y);
-            y += 10;
+            y += 11;
         }
         if (this.hasMetabolism) {
             ctx.fillStyle = COLORS.peptide;
             ctx.fillText('⚡ Metabolism', this.x, y);
-            y += 10;
+            y += 11;
         }
         if (this.canReplicate) {
             ctx.fillStyle = COLORS.rna_fragment;
             ctx.fillText('🧬 Replication', this.x, y);
         }
 
+        // Stability bar
         const pct = this.stability / 100;
-        const barW = 36;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.fillRect(this.x - barW / 2, this.y + this.radius + 8, barW, 3);
+        const barW = 40;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(this.x - barW / 2, this.y + this.radius + 10, barW, 4);
 
         const stabilityColor = this.canBecomeLUCA() ? COLORS.luca : COLORS.proto;
         ctx.fillStyle = stabilityColor;
-        ctx.fillRect(this.x - barW / 2, this.y + this.radius + 8, barW * pct, 3);
+        ctx.fillRect(this.x - barW / 2, this.y + this.radius + 10, barW * pct, 4);
     }
 }
 
@@ -783,9 +825,9 @@ class LUCAEntity implements LivingEntity {
     y: number;
     vx = 0;
     vy = 0;
-    energy = 100;
-    mass = 5;
-    radius = 22;
+    energy = 120;
+    mass = 8;
+    radius = 32;
     generation = 0;
     genome: string;
     birthTime: number;
@@ -794,6 +836,7 @@ class LUCAEntity implements LivingEntity {
     children: number[] = [];
     canMove = false;
     lastReproduction = 0;
+    traits: OrganismTraits;
 
     constructor(id: number, x: number, y: number, rna: string, birthTime: number) {
         this.id = id;
@@ -802,19 +845,25 @@ class LUCAEntity implements LivingEntity {
         this.genome = rna;
         this.birthTime = birthTime;
         this.lastReproduction = birthTime;
+        this.traits = {
+            metabolicEfficiency: 1.0,
+            speed: 0.2,
+            size: 32,
+            color: COLORS.luca,
+        };
     }
 
     update(world: PrimordialWorld) {
         if (!this.isAlive) return;
 
-        this.energy += world.consumeEnergyAt(this.x, this.y, 2.5);
-        this.energy -= 0.06;
+        this.energy += world.consumeEnergyAt(this.x, this.y, 3);
+        this.energy -= 0.05;
 
         if (this.energy <= 0) this.isAlive = false;
 
-        if (this.energy > 70 && !this.canMove) {
+        if (this.energy > 80 && !this.canMove) {
             this.canMove = true;
-            const vel = randomVelocity(0.15);
+            const vel = randomVelocity(0.12);
             this.vx = vel.vx;
             this.vy = vel.vy;
         }
@@ -852,13 +901,13 @@ class LUCAEntity implements LivingEntity {
     }
 
     canReproduce(world: PrimordialWorld): boolean {
-        return this.energy >= 70 && world.time - this.lastReproduction >= 400;
+        return this.energy >= 80 && world.time - this.lastReproduction >= 350;
     }
 
     reproduce(childId: number, world: PrimordialWorld): OrganismEntity {
-        const { newRNA } = mutateRNA(this.genome, 0.015);
+        const { newRNA } = mutateRNA(this.genome, 0.02);
         const angle = Math.random() * Math.PI * 2;
-        const dist = 38;
+        const dist = 45;
         const offspring = new OrganismEntity(
             childId,
             this.x + Math.cos(angle) * dist,
@@ -869,33 +918,69 @@ class LUCAEntity implements LivingEntity {
             world.time
         );
         this.children.push(childId);
-        this.energy -= 28;
+        this.energy -= 35;
         this.lastReproduction = world.time;
         return offspring;
     }
 
     draw(ctx: CanvasRenderingContext2D, time: number) {
-        const pulse = Math.sin(time * 0.02) * 0.3 + 0.7;
+        const pulse = Math.sin(time * 0.03) * 0.25 + 0.75;
 
-        const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 2.2);
-        gradient.addColorStop(0, `${COLORS.luca}40`);
-        gradient.addColorStop(1, 'rgba(251, 191, 36, 0)');
-        ctx.fillStyle = gradient;
+        // Massive outer glow
+        const gradient1 = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 3);
+        gradient1.addColorStop(0, `${COLORS.luca}30`);
+        gradient1.addColorStop(0.5, `${COLORS.luca}15`);
+        gradient1.addColorStop(1, 'rgba(251, 191, 36, 0)');
+        ctx.fillStyle = gradient1;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius * 2.2 * pulse, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, this.radius * 3 * pulse, 0, Math.PI * 2);
         ctx.fill();
 
+        // Middle glow
+        const gradient2 = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 1.8);
+        gradient2.addColorStop(0, `${COLORS.luca}60`);
+        gradient2.addColorStop(1, 'rgba(251, 191, 36, 0)');
+        ctx.fillStyle = gradient2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 1.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Main body
         ctx.fillStyle = COLORS.luca;
-        ctx.globalAlpha = 0.95;
+        ctx.globalAlpha = 1;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
+
+        // Bright outline
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
         ctx.globalAlpha = 1;
 
+        // Rotating particles
+        for (let i = 0; i < 8; i++) {
+            const angle = (time * 0.02 + i * Math.PI / 4);
+            const px = this.x + Math.cos(angle) * (this.radius + 12);
+            const py = this.y + Math.sin(angle) * (this.radius + 12);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.beginPath();
+            ctx.arc(px, py, 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // LUCA label
         ctx.fillStyle = COLORS.text;
-        ctx.font = 'bold 13px system-ui';
+        ctx.font = 'bold 16px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText('LUCA', this.x, this.y - this.radius - 10);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.lineWidth = 4;
+        ctx.strokeText('LUCA', this.x, this.y - this.radius - 18);
+        ctx.fillText('LUCA', this.x, this.y - this.radius - 18);
+
+        ctx.font = '10px system-ui';
+        ctx.fillStyle = COLORS.textMuted;
+        ctx.fillText('Last Universal Common Ancestor', this.x, this.y - this.radius - 6);
     }
 }
 
@@ -917,6 +1002,7 @@ class OrganismEntity implements LivingEntity {
     children: number[] = [];
     canMove = true;
     lastReproduction: number;
+    traits: OrganismTraits;
 
     constructor(id: number, x: number, y: number, gen: number, parent: number | null, rna: string, birthTime: number) {
         this.id = id;
@@ -928,7 +1014,9 @@ class OrganismEntity implements LivingEntity {
         this.parent = parent;
         this.birthTime = birthTime;
         this.lastReproduction = birthTime;
-        const vel = randomVelocity(0.22);
+        this.traits = genomeToTraits(rna);
+        this.radius = this.traits.size;
+        const vel = randomVelocity(this.traits.speed);
         this.vx = vel.vx;
         this.vy = vel.vy;
     }
@@ -936,7 +1024,7 @@ class OrganismEntity implements LivingEntity {
     update(world: PrimordialWorld) {
         if (!this.isAlive) return;
 
-        this.energy += world.consumeEnergyAt(this.x, this.y, 1.5);
+        this.energy += world.consumeEnergyAt(this.x, this.y, 1.8 * this.traits.metabolicEfficiency);
 
         if (this.canMove) {
             const newX = this.x + this.vx;
@@ -969,7 +1057,7 @@ class OrganismEntity implements LivingEntity {
             this.y = wrapped.y;
         }
 
-        this.energy -= 0.09;
+        this.energy -= 0.1 * (this.traits.size / 15) * (this.traits.speed / 0.2);
         if (this.energy <= 0) {
             this.isAlive = false;
             this.canMove = false;
@@ -977,13 +1065,13 @@ class OrganismEntity implements LivingEntity {
     }
 
     canReproduce(world: PrimordialWorld): boolean {
-        return this.energy >= 65 && world.time - this.lastReproduction >= 400;
+        return this.energy >= 70 && world.time - this.lastReproduction >= 350;
     }
 
     reproduce(childId: number, world: PrimordialWorld): OrganismEntity {
-        const { newRNA } = mutateRNA(this.genome, 0.02);
+        const { newRNA } = mutateRNA(this.genome, 0.025);
         const angle = Math.random() * Math.PI * 2;
-        const dist = 32;
+        const dist = this.radius + 20;
         const offspring = new OrganismEntity(
             childId,
             this.x + Math.cos(angle) * dist,
@@ -994,35 +1082,61 @@ class OrganismEntity implements LivingEntity {
             world.time
         );
         this.children.push(childId);
-        this.energy -= 22;
+        this.energy -= 30;
         this.lastReproduction = world.time;
         return offspring;
     }
 
     draw(ctx: CanvasRenderingContext2D) {
         if (!this.isAlive) {
-            ctx.fillStyle = 'rgba(100, 116, 139, 0.2)';
+            ctx.fillStyle = 'rgba(100, 116, 139, 0.25)';
             ctx.beginPath();
-            ctx.arc(this.x, this.y, this.radius * 0.7, 0, Math.PI * 2);
+            ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
             ctx.fill();
             return;
         }
 
-        ctx.fillStyle = COLORS.organism;
-        ctx.globalAlpha = 0.9;
+        // Glow based on energy
+        const glowAlpha = Math.min(0.4, this.energy / 200);
+        ctx.fillStyle = `${this.traits.color}${Math.floor(glowAlpha * 255).toString(16).padStart(2, '0')}`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Main body
+        ctx.fillStyle = this.traits.color;
+        ctx.globalAlpha = 0.95;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.lineWidth = 1;
+        // Highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.beginPath();
+        ctx.arc(this.x - this.radius * 0.3, this.y - this.radius * 0.3, this.radius * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Outline
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.stroke();
 
+        // Label
         ctx.fillStyle = COLORS.text;
-        ctx.font = '9px system-ui';
+        ctx.font = `${Math.max(9, this.radius * 0.6)}px system-ui`;
         ctx.textAlign = 'center';
-        ctx.fillText(this.name, this.x, this.y - this.radius - 5);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(this.name, this.x, this.y - this.radius - 6);
+        ctx.fillText(this.name, this.x, this.y - this.radius - 6);
+
+        // Generation indicator
+        ctx.font = '7px system-ui';
+        ctx.fillStyle = COLORS.textMuted;
+        ctx.fillText(`Gen ${this.generation}`, this.x, this.y + this.radius + 10);
     }
 }
 
@@ -1040,6 +1154,8 @@ class SimulationEngine {
     moleculeMap: Map<number, Molecule> = new Map();
     bondSpringK: number = 0.02;
     bondBreakProbability: number = 0.012;
+    totalBorn = 0;
+    maxGeneration = 0;
 
     constructor() {
         this.world = new PrimordialWorld(CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -1355,9 +1471,10 @@ class SimulationEngine {
 
         if (this.luca && this.luca.isAlive) {
             this.luca.update(this.world);
-            if (this.luca.canReproduce(this.world) && this.organisms.length < 6) {
+            if (this.luca.canReproduce(this.world) && this.organisms.length < 8) {
                 const offspring = this.luca.reproduce(this.nextId++, this.world);
                 this.organisms.push(offspring);
+                this.totalBorn++;
                 this.world.phase = 'early_life';
             }
         }
@@ -1365,10 +1482,15 @@ class SimulationEngine {
         this.organisms.forEach((o) => o.update(this.world));
 
         const fertile = this.organisms.filter((o) => o.canReproduce(this.world) && o.isAlive);
-        if (fertile.length > 0 && this.organisms.length < 15) {
+        if (fertile.length > 0 && this.organisms.length < 25) {
             const parent = fertile[Math.floor(Math.random() * fertile.length)];
             const child = parent.reproduce(this.nextId++, this.world);
             this.organisms.push(child);
+            this.totalBorn++;
+            this.maxGeneration = Math.max(this.maxGeneration, child.generation);
+            if (this.organisms.length > 12) {
+                this.world.phase = 'diversification';
+            }
         }
     }
 
@@ -1433,7 +1555,7 @@ class SimulationEngine {
             const mol2 = this.moleculeMap.get(bond.mol2);
             if (mol1 && mol2) {
                 ctx.strokeStyle = (COLORS as any)[`bond_${bond.type}`] || COLORS.bond_covalent;
-                ctx.lineWidth = 1;
+                ctx.lineWidth = 1.5;
 
                 const dx = wrapDelta(mol2.x - mol1.x, this.world.width);
                 const dy = wrapDelta(mol2.y - mol1.y, this.world.height);
@@ -1446,7 +1568,7 @@ class SimulationEngine {
         }
 
         if (!this.lucaBorn) {
-            this.molecules.forEach((m) => m.draw(ctx));
+            this.molecules.forEach((m) => m.draw(ctx, this.world.time));
         }
         this.protoCells.forEach((p) => p.draw(ctx));
         if (this.luca) this.luca.draw(ctx, this.world.time);
@@ -1530,9 +1652,13 @@ export default function LUCASimulation({ isRunning: externalIsRunning, speed: ex
         polymerization: 'Polymerization',
         self_assembly: 'Self-Assembly',
         proto_life: 'Protocell Formation',
-        luca_emergence: 'LUCA Emerges',
+        luca_emergence: '⭐ LUCA Has Emerged!',
         early_life: 'Early Life',
+        diversification: 'Diversification & Evolution',
     };
+
+    const aliveOrganisms = engine.organisms.filter((o) => o.isAlive).length;
+    const uniqueColors = new Set(engine.organisms.filter((o) => o.isAlive).map((o) => o.traits.color)).size;
 
     return (
         <div
@@ -1546,11 +1672,42 @@ export default function LUCASimulation({ isRunning: externalIsRunning, speed: ex
             }}
         >
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-                <div style={{ marginBottom: '3rem' }}>
+                <div style={{ marginBottom: '2rem' }}>
                     <h1 style={{ fontSize: '1.5rem', fontWeight: 600, margin: '0 0 0.5rem 0', letterSpacing: '-0.02em' }}>
                         The Origin of Life: Hydrothermal Vent Simulation
                     </h1>
-                    <p style={{ color: COLORS.textMuted, fontSize: '0.9rem', margin: 0 }}>{phaseLabels[engine.world.phase]}</p>
+                    <p style={{ color: COLORS.textMuted, fontSize: '0.9rem', margin: '0 0 1rem 0' }}>
+                        {phaseLabels[engine.world.phase]}
+                    </p>
+
+                    {engine.lucaBorn && (
+                        <div style={{
+                            background: 'rgba(251, 191, 36, 0.1)',
+                            border: '1px solid rgba(251, 191, 36, 0.3)',
+                            borderRadius: '6px',
+                            padding: '0.75rem 1rem',
+                            display: 'flex',
+                            gap: '1rem',
+                            fontSize: '0.85rem',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Dna size={16} style={{ color: COLORS.luca }} />
+                                <span><strong>Total Born:</strong> {engine.totalBorn}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Zap size={16} style={{ color: COLORS.organism }} />
+                                <span><strong>Alive:</strong> {aliveOrganisms}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Sparkles size={16} style={{ color: COLORS.rna_fragment }} />
+                                <span><strong>Max Gen:</strong> {engine.maxGeneration}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span>🎨</span>
+                                <span><strong>Species:</strong> {uniqueColors}</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div
@@ -1610,8 +1767,8 @@ export default function LUCASimulation({ isRunning: externalIsRunning, speed: ex
                             <div style={{ fontSize: '0.75rem', fontWeight: 500, marginBottom: '0.5rem', color: COLORS.textMuted }}>Life Forms</div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                 <LegendItem color={COLORS.proto} label="Protocells" />
-                                <LegendItem color={COLORS.luca} label="LUCA" />
-                                <LegendItem color={COLORS.organism} label="Early Organisms" />
+                                <LegendItem color={COLORS.luca} label="LUCA (huge golden glow!)" />
+                                <LegendItem color="hsl(200, 70%, 55%)" label="Evolved Organisms" />
                             </div>
                         </div>
 
@@ -1621,7 +1778,6 @@ export default function LUCASimulation({ isRunning: externalIsRunning, speed: ex
                                 <LegendItem color={COLORS.energy} label="Energy Field" isSquare />
                                 <LegendItem color="rgba(255, 100, 50, 0.9)" label="Hydrothermal Vents" />
                                 <LegendItem color="rgba(70, 70, 80, 0.25)" label="Mineral Chimneys" />
-                                <LegendItem color="rgba(70, 70, 80, 0.15)" label="Rock Formations" />
                             </div>
                         </div>
                     </div>
