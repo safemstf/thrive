@@ -826,7 +826,7 @@ const allItems: SimulationItem[] = [
     optimized: true,
     featured: false,
     comingSoon: false,
-    category: 'algorithms'
+    category: 'simulations'
   },
   {
     key: 'amdahl',
