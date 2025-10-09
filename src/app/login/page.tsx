@@ -1,7 +1,7 @@
-// app/login/page.tsx - Enhanced UI/UX Design
+// app/login/page.tsx - Enhanced UI/UX with Scroll Effects
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import styled, { keyframes } from 'styled-components';
@@ -18,65 +18,51 @@ import {
   Label,
   MessageContainer,
   TabContainer,
-  TabButton,
-  FlexRow,
-  FlexColumn,
-  Heading1,
-  BodyText
+  TabButton
 } from '@/styles/styled-components';
 
-// API hub (your client)
+// API hub
 import api from '@/lib/api-client';
 
 /* ===== Animations ===== */
 const fadeIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 `;
 
 const slideIn = keyframes`
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
 `;
 
 const pulse = keyframes`
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 `;
 
 const spin = keyframes`
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 `;
 
-/* ===== Layout Components ===== */
+const float = keyframes`
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+`;
+
+const shimmer = keyframes`
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+`;
+
+/* ===== Layout Components with Scroll Effects ===== */
 const LeftPanel = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: var(--spacing-3xl);
+  padding: 3rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   position: relative;
   overflow: hidden;
@@ -91,11 +77,10 @@ const LeftPanel = styled.div`
     background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
     background-size: 50px 50px;
     opacity: 0.3;
+    will-change: transform;
   }
   
-  @media (max-width: 968px) {
-    display: none;
-  }
+  @media (max-width: 968px) { display: none; }
 `;
 
 const RightPanel = styled.div`
@@ -103,8 +88,8 @@ const RightPanel = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-xl);
-  background: var(--color-background-primary, #ffffff);
+  padding: 2rem;
+  background: #ffffff;
   
   @media (max-width: 968px) {
     flex: none;
@@ -115,10 +100,11 @@ const RightPanel = styled.div`
 
 const BrandSection = styled.div`
   text-align: center;
-  margin-bottom: var(--spacing-3xl);
+  margin-bottom: 3rem;
   position: relative;
   z-index: 1;
   animation: ${fadeIn} 0.6s ease-out;
+  will-change: transform;
 `;
 
 const BrandLogo = styled.div`
@@ -126,22 +112,31 @@ const BrandLogo = styled.div`
   height: 80px;
   background: rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(10px);
-  border-radius: var(--radius-lg);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto var(--spacing-lg);
+  margin: 0 auto 1.5rem;
   border: 2px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+  
+  svg {
+    animation: ${float} 3s ease-in-out infinite;
+  }
+  
+  &:hover {
+    transform: scale(1.05) rotate(5deg);
+  }
 `;
 
 const BrandTitle = styled.h1`
   font-size: 3rem;
   font-weight: 700;
   color: white;
-  margin: 0 0 var(--spacing-md);
+  margin: 0 0 1rem;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
-  font-family: var(--font-body);
+  will-change: transform;
 `;
 
 const BrandSubtitle = styled.p`
@@ -151,8 +146,10 @@ const BrandSubtitle = styled.p`
   font-weight: 400;
 `;
 
-const FeatureList = styled(FlexColumn)`
-  gap: var(--spacing-lg);
+const FeatureList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
   max-width: 420px;
   width: 100%;
   position: relative;
@@ -160,17 +157,18 @@ const FeatureList = styled(FlexColumn)`
 `;
 
 const FeatureItem = styled.div`
-  padding: var(--spacing-xl);
+  padding: 1.5rem;
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(10px);
-  border-radius: var(--radius-lg);
+  border-radius: 16px;
   display: flex;
   align-items: flex-start;
-  gap: var(--spacing-lg);
+  gap: 1.5rem;
   border: 1px solid rgba(255, 255, 255, 0.2);
   transition: all 0.3s ease;
   animation: ${slideIn} 0.6s ease-out;
   animation-fill-mode: both;
+  will-change: transform;
   
   &:nth-child(1) { animation-delay: 0.1s; }
   &:nth-child(2) { animation-delay: 0.2s; }
@@ -178,15 +176,15 @@ const FeatureItem = styled.div`
   
   &:hover {
     background: rgba(255, 255, 255, 0.25);
-    transform: translateX(10px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    transform: translateX(10px) scale(1.02);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
   }
 `;
 
 const FeatureIcon = styled.div`
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.25);
   display: flex;
   align-items: center;
@@ -194,6 +192,11 @@ const FeatureIcon = styled.div`
   color: white;
   flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+  
+  ${FeatureItem}:hover & {
+    transform: scale(1.1) rotate(5deg);
+  }
 `;
 
 const FeatureText = styled.div`
@@ -203,9 +206,8 @@ const FeatureText = styled.div`
 const FeatureTitle = styled.h3`
   font-size: 1.1rem;
   font-weight: 600;
-  margin: 0 0 var(--spacing-xs);
+  margin: 0 0 0.5rem;
   color: white;
-  font-family: var(--font-body);
 `;
 
 const FeatureDescription = styled.p`
@@ -215,30 +217,67 @@ const FeatureDescription = styled.p`
   line-height: 1.5;
 `;
 
+const FloatingCircle = styled.div<{ $delay: number; $size: number; $top: string; $left: string }>`
+  position: absolute;
+  width: ${p => p.$size}px;
+  height: ${p => p.$size}px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15), transparent);
+  top: ${p => p.$top};
+  left: ${p => p.$left};
+  animation: ${float} ${p => 3 + p.$delay}s ease-in-out infinite;
+  animation-delay: ${p => p.$delay}s;
+  pointer-events: none;
+  z-index: 0;
+`;
+
 /* ===== Form Components ===== */
 const FormCard = styled(Card)`
   width: 100%;
   max-width: 480px;
   animation: ${fadeIn} 0.5s ease-out;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
-  border: 1px solid var(--color-border-light, #e5e7eb);
+  border: 1px solid #e5e7eb;
+  will-change: transform, box-shadow;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+  }
 `;
 
 const CardHeader = styled.div`
   text-align: center;
-  margin-bottom: var(--spacing-2xl);
+  margin-bottom: 2rem;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: -20px;
+    left: -50%;
+    width: 200%;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(102, 126, 234, 0.5),
+      transparent
+    );
+    animation: ${shimmer} 3s infinite;
+  }
 `;
 
 const Title = styled.h2`
   font-size: 2rem;
   font-weight: 700;
-  color: var(--color-text-primary);
-  margin: 0 0 var(--spacing-sm);
-  font-family: var(--font-body);
+  color: #0f172a;
+  margin: 0 0 0.75rem;
 `;
 
-const Subtitle = styled(BodyText)`
-  color: var(--color-text-secondary);
+const Subtitle = styled.p`
+  color: #64748b;
   font-size: 1rem;
   margin: 0;
 `;
@@ -246,7 +285,7 @@ const Subtitle = styled(BodyText)`
 const Form = styled.form`
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xl);
+  gap: 1.5rem;
 `;
 
 const InputWrapper = styled.div`
@@ -254,19 +293,20 @@ const InputWrapper = styled.div`
   
   &:focus-within {
     .input-icon {
-      color: var(--color-primary-500, #667eea);
+      color: #667eea;
+      transform: translateY(-50%) scale(1.1);
     }
   }
 `;
 
 const InputIcon = styled.div`
   position: absolute;
-  left: var(--spacing-lg);
+  left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--color-text-secondary);
+  color: #64748b;
   z-index: 2;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
   pointer-events: none;
 `;
 
@@ -275,35 +315,37 @@ const StyledInput = styled(Input)`
   height: 52px;
   font-size: 1rem;
   transition: all 0.2s ease;
-  border: 2px solid var(--color-border-light, #e5e7eb);
+  border: 2px solid #e5e7eb;
   
   &:focus {
-    border-color: var(--color-primary-500, #667eea);
+    border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    transform: translateY(-1px);
   }
   
   &::placeholder {
-    color: var(--color-text-tertiary, #9ca3af);
+    color: #9ca3af;
   }
 `;
 
 const PasswordToggle = styled.button`
   position: absolute;
-  right: var(--spacing-lg);
+  right: 1rem;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   cursor: pointer;
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-sm);
+  padding: 0.5rem;
+  border-radius: 8px;
   transition: all 0.2s ease;
-  color: var(--color-text-secondary);
+  color: #64748b;
   z-index: 2;
 
   &:hover {
-    color: var(--color-primary-500, #667eea);
-    background: var(--color-background-tertiary, #f3f4f6);
+    color: #667eea;
+    background: #f3f4f6;
+    transform: translateY(-50%) scale(1.1);
   }
   
   &:active {
@@ -312,22 +354,34 @@ const PasswordToggle = styled.button`
 `;
 
 const StyledTabContainer = styled(TabContainer)`
-  background: var(--color-background-secondary, #f9fafb);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-xs);
-  margin-bottom: var(--spacing-xl);
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 2rem;
+  position: relative;
 `;
 
 const StyledTabButton = styled(TabButton)`
-  border-radius: var(--radius-md);
-  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
   font-weight: 600;
   transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
   
   ${props => props.$active && `
     background: white;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    color: #667eea;
   `}
+  
+  &:hover {
+    transform: scale(1.02);
+  }
+  
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 const SubmitButton = styled(BaseButton)`
@@ -356,6 +410,11 @@ const SubmitButton = styled(BaseButton)`
     height: 300px;
   }
   
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(102, 126, 234, 0.3);
+  }
+  
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -369,43 +428,33 @@ const SubmitButton = styled(BaseButton)`
 const BackLink = styled(Link)`
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  color: var(--color-text-secondary);
+  gap: 0.5rem;
+  color: #64748b;
   text-decoration: none;
   font-size: 0.95rem;
-  font-family: var(--font-body);
-  margin-top: var(--spacing-xl);
+  margin-top: 1.5rem;
   justify-content: center;
   font-weight: 500;
   transition: all 0.2s ease;
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-md);
+  padding: 0.5rem;
+  border-radius: 8px;
 
   &:hover {
-    color: var(--color-primary-500, #667eea);
-    background: var(--color-background-secondary, #f9fafb);
+    color: #667eea;
+    background: #f9fafb;
+    transform: translateX(-4px);
   }
 `;
 
 /* ===== Overlay Components ===== */
 const overlayFadeIn = keyframes`
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 `;
 
 const overlaySlideUp = keyframes`
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 `;
 
 const Overlay = styled.div`
@@ -417,7 +466,7 @@ const Overlay = styled.div`
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  padding: var(--spacing-lg);
+  padding: 1.5rem;
   animation: ${overlayFadeIn} 0.3s ease-out;
 `;
 
@@ -425,12 +474,12 @@ const OverlayCard = styled.div`
   width: 100%;
   max-width: 520px;
   background: white;
-  border-radius: var(--radius-xl);
-  padding: var(--spacing-3xl);
+  border-radius: 20px;
+  padding: 3rem;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xl);
+  gap: 1.5rem;
   animation: ${overlaySlideUp} 0.4s ease-out;
 `;
 
@@ -456,43 +505,59 @@ const OverlayContent = styled.div`
 `;
 
 const OverlayTitle = styled.h3`
-  margin: 0 0 var(--spacing-md);
+  margin: 0 0 1rem;
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--color-text-primary, #0f172a);
+  color: #0f172a;
 `;
 
 const OverlayText = styled.p`
   margin: 0;
-  color: var(--color-text-secondary, #64748b);
+  color: #64748b;
   font-size: 1.05rem;
   line-height: 1.6;
 `;
 
 const OverlayReason = styled.div`
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--color-background-secondary, #f8fafc);
-  border-radius: var(--radius-md);
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
   border-left: 4px solid #f59e0b;
 `;
 
 const OverlayReasonText = styled.p`
   margin: 0;
   font-size: 0.9rem;
-  color: var(--color-text-secondary, #64748b);
+  color: #64748b;
   font-family: monospace;
 `;
 
 const OverlayActions = styled.div`
   display: flex;
-  gap: var(--spacing-md);
-  margin-top: var(--spacing-md);
+  gap: 1rem;
+  margin-top: 1rem;
 `;
 
 const LoadingSpinner = styled(Loader2)`
   animation: ${spin} 1s linear infinite;
 `;
+
+/* ===== Scroll Hook ===== */
+function useScrollEffect() {
+  const [scrollY, setScrollY] = useState(0);
+  
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  return scrollY;
+}
 
 /* ===== Main Component ===== */
 export default function LoginPage() {
@@ -503,8 +568,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  const scrollY = useScrollEffect();
+  const leftPanelRef = useRef<HTMLDivElement>(null);
+  const brandRef = useRef<HTMLDivElement>(null);
 
-  // Backend availability states
   const [loginAvailable, setLoginAvailable] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
   const [offlineReason, setOfflineReason] = useState<string | null>(null);
@@ -517,14 +585,26 @@ export default function LoginPage() {
     confirmPassword: ''
   });
 
-  // Redirect if already logged in
+  // Apply parallax effects
+  useEffect(() => {
+    if (leftPanelRef.current) {
+      const offset = scrollY * 0.5;
+      const bgPattern = leftPanelRef.current.querySelector('::before') as any;
+      leftPanelRef.current.style.transform = `translateY(${offset * 0.1}px)`;
+    }
+    
+    if (brandRef.current) {
+      const offset = scrollY * 0.3;
+      brandRef.current.style.transform = `translateY(${offset}px)`;
+    }
+  }, [scrollY]);
+
   useEffect(() => {
     if (user) {
       router.push('/dashboard');
     }
   }, [user, router]);
 
-  // Check backend health on mount
   const checkConnection = useCallback(async () => {
     setChecking(true);
     setOfflineReason(null);
@@ -605,8 +685,12 @@ export default function LoginPage() {
 
   return (
     <AuthPageWrapper $variant="login">
-      <LeftPanel>
-        <BrandSection>
+      <LeftPanel ref={leftPanelRef}>
+        <FloatingCircle $delay={0} $size={120} $top="10%" $left="15%" />
+        <FloatingCircle $delay={1} $size={80} $top="70%" $left="80%" />
+        <FloatingCircle $delay={0.5} $size={100} $top="40%" $left="85%" />
+        
+        <BrandSection ref={brandRef}>
           <BrandLogo>
             <Sparkles size={40} color="white" />
           </BrandLogo>
@@ -809,39 +893,27 @@ export default function LoginPage() {
         </FormCard>
       </RightPanel>
 
-      {/* Enhanced Overlay for Unavailable Login */}
       {loginAvailable !== true && (
-        <Overlay role="alertdialog" aria-modal="true" aria-label="Login unavailable">
+        <Overlay role="alertdialog" aria-modal="true">
           <OverlayCard>
             <OverlayIconWrapper>
-              {checking ? (
-                <LoadingSpinner size={28} />
-              ) : (
-                <AlertCircle size={28} />
-              )}
+              {checking ? <LoadingSpinner size={28} /> : <AlertCircle size={28} />}
             </OverlayIconWrapper>
 
             <OverlayContent>
               <OverlayTitle>
                 {checking ? 'Checking Server Status' : 'Service Temporarily Unavailable'}
               </OverlayTitle>
-
               <OverlayText>
                 {checking ? (
-                  'Please wait while we verify the connection to our servers...'
+                  'Please wait while we verify the connection...'
                 ) : (
-                  <>
-                    We're experiencing technical difficulties with our authentication service. 
-                    Our team has been notified and is working to resolve this issue.
-                  </>
+                  "We're experiencing technical difficulties. Our team is working to resolve this."
                 )}
               </OverlayText>
-
               {!checking && offlineReason && (
                 <OverlayReason>
-                  <OverlayReasonText>
-                    Error: {offlineReason}
-                  </OverlayReasonText>
+                  <OverlayReasonText>Error: {offlineReason}</OverlayReasonText>
                 </OverlayReason>
               )}
             </OverlayContent>
@@ -855,26 +927,14 @@ export default function LoginPage() {
               >
                 Back to Home
               </BaseButton>
-
               <BaseButton
                 $variant="primary"
                 $size="md"
                 onClick={checkConnection}
                 disabled={checking}
-                title="Retry connecting to API"
                 style={{ flex: 1 }}
               >
-                {checking ? (
-                  <>
-                    <LoadingSpinner size={16} />
-                    Checking...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw size={16} />
-                    Try Again
-                  </>
-                )}
+                {checking ? <><LoadingSpinner size={16} /> Checking...</> : <><RefreshCw size={16} /> Try Again</>}
               </BaseButton>
             </OverlayActions>
           </OverlayCard>

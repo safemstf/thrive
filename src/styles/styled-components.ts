@@ -701,7 +701,6 @@ export const AuthPageWrapper = styled(PageContainer) <{ $variant?: 'login' | 're
     right: 0;
     bottom: 0;
     background: var(--color-background-primary);
-    opacity: 0.8;
     backdrop-filter: blur(0.5px);
     z-index: -1;
     pointer-events: none;

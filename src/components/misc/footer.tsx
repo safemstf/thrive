@@ -44,7 +44,6 @@ const FooterContainer = styled.footer`
   );
   border-top: 1px solid rgba(59, 130, 246, 0.12);
   padding: 3rem 1rem 2rem;
-  margin-top: 4rem;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   position: relative;
