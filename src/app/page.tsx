@@ -51,6 +51,11 @@ const slideInRight = keyframes`
   to { opacity: 1; transform: translateX(0); }
 `;
 
+const shimmer = keyframes`
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+`;
+
 /* =========================
    Styled layout components
    ========================= */
@@ -472,6 +477,59 @@ const PortfolioBio = styled.p` font-size:0.9375rem; color:#475569; line-height:1
 const PortfolioStats = styled.div` display:flex; justify-content:space-between; padding-top:1rem; border-top:1px solid #e2e8f0; font-size:0.875rem; `;
 const PortfolioStat = styled.div` display:flex; align-items:center; gap:0.375rem; color:#64748b; svg { width:16px; height:16px; } span { font-weight:700; color:#1e293b; } `;
 
+/* Skeleton Loading Cards */
+const SkeletonCard = styled.div`
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+`;
+
+const SkeletonCover = styled.div`
+  height: 200px;
+  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%);
+  background-size: 200% 100%;
+  animation: ${shimmer} 1.5s ease-in-out infinite;
+`;
+
+const SkeletonContent = styled.div`
+  padding: 1.5rem;
+`;
+
+const SkeletonHeader = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+`;
+
+const SkeletonAvatar = styled.div`
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%);
+  background-size: 200% 100%;
+  animation: ${shimmer} 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+`;
+
+const SkeletonText = styled.div<{ $width?: string; $height?: string }>`
+  width: ${p => p.$width || '100%'};
+  height: ${p => p.$height || '16px'};
+  background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%);
+  background-size: 200% 100%;
+  animation: ${shimmer} 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+`;
+
+const SkeletonStats = styled.div`
+  display: flex;
+  justify-content: space-between;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+`;
+
 /* PARALLAX SECTION 2 */
 const ParallaxSection2 = styled.section`
   position: relative;
@@ -537,7 +595,7 @@ const QuickActionIcon = styled.div` width:70px; height:70px; margin:0 auto 1.5re
 const QuickActionTitle = styled.h3` font-size:1.375rem; font-weight:700; color:#1e293b; margin:0 0 0.75rem; `;
 const QuickActionDesc = styled.p` font-size:0.9375rem; color:#64748b; margin:0; line-height:1.6; `;
 
-/* Connection banner, loading etc left as-is */
+/* Connection banner */
 const ConnectionBanner = styled.div<{ $type: 'offline' | 'error' }>`
   background: ${props => props.$type === 'offline' ? 'linear-gradient(90deg,#fef2f2,#fee2e2)' : 'linear-gradient(90deg,#fefce8,#fef9c3)'};
   border-bottom: 2px solid ${props => props.$type === 'offline' ? '#ef4444' : '#eab308'};
@@ -552,11 +610,9 @@ const ConnectionBanner = styled.div<{ $type: 'offline' | 'error' }>`
   z-index:50;
 `;
 const RetryButton = styled.button` display:flex; align-items:center; gap:0.375rem; padding:0.5rem 1rem; background:white; border:2px solid currentColor; border-radius:8px; color:inherit; font-weight:700; cursor:pointer; &:hover { background: currentColor; color:white; } `;
-const LoadingContainer = styled.div` min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2rem; background: linear-gradient(135deg,#667eea 0%, #764ba2 100%); color:white; svg { animation: spin 1s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } `;
-const LoadingText = styled.p` font-size:1.25rem; font-weight:600; `;
 
 /* =========================
-   Hooks: network + api (unchanged)
+   Hooks: network + api
    ========================= */
 const useNetworkStatus = () => {
   const [isOnline, setIsOnline] = useState(true);
@@ -745,15 +801,6 @@ export default function HomePage() {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
-  if (loading && portfolios.length === 0) {
-    return (
-      <LoadingContainer>
-        <Loader2 size={64} />
-        <LoadingText>Loading amazing portfolios...</LoadingText>
-      </LoadingContainer>
-    );
-  }
-
   return (
     <PageWrapper>
       <MainContainer>
@@ -839,47 +886,72 @@ export default function HomePage() {
           </SectionHeader>
 
           <PortfolioGrid>
-            {portfolios.map((portfolio) => {
-              const portfolioId = getPortfolioId(portfolio);
-              if (!portfolioId) return null;
-              return (
-                <PortfolioCard key={`${portfolioId}-${portfolio.username}`} onClick={() => handlePortfolioClick(portfolio.username)}>
-                  <PortfolioCover $gradient={!portfolio.coverImage}>
-                    <PortfolioBadge>{portfolio.kind}</PortfolioBadge>
-                    {portfolio.coverImage ? (
-                      <NextImage src={portfolio.coverImage} alt={`${portfolio.title}'s portfolio`} fill style={{ objectFit: 'cover' }} />
-                    ) : (
-                      <User size={52} color="white" opacity={0.5} />
-                    )}
-                  </PortfolioCover>
+            {loading && portfolios.length === 0 ? (
+              // Show skeleton cards while loading
+              Array.from({ length: 6 }).map((_, idx) => (
+                <SkeletonCard key={idx}>
+                  <SkeletonCover />
+                  <SkeletonContent>
+                    <SkeletonHeader>
+                      <SkeletonAvatar />
+                      <div style={{ flex: 1 }}>
+                        <SkeletonText $width="60%" $height="18px" />
+                        <SkeletonText $width="80%" $height="14px" />
+                      </div>
+                    </SkeletonHeader>
+                    <SkeletonText $width="100%" />
+                    <SkeletonText $width="90%" />
+                    <SkeletonStats>
+                      <SkeletonText $width="25%" />
+                      <SkeletonText $width="25%" />
+                      <SkeletonText $width="25%" />
+                    </SkeletonStats>
+                  </SkeletonContent>
+                </SkeletonCard>
+              ))
+            ) : (
+              portfolios.map((portfolio) => {
+                const portfolioId = getPortfolioId(portfolio);
+                if (!portfolioId) return null;
+                return (
+                  <PortfolioCard key={`${portfolioId}-${portfolio.username}`} onClick={() => handlePortfolioClick(portfolio.username)}>
+                    <PortfolioCover $gradient={!portfolio.coverImage}>
+                      <PortfolioBadge>{portfolio.kind}</PortfolioBadge>
+                      {portfolio.coverImage ? (
+                        <NextImage src={portfolio.coverImage} alt={`${portfolio.title}'s portfolio`} fill style={{ objectFit: 'cover' }} />
+                      ) : (
+                        <User size={52} color="white" opacity={0.5} />
+                      )}
+                    </PortfolioCover>
 
-                  <PortfolioContent>
-                    <PortfolioHeader>
-                      <PortfolioAvatar>
-                        {portfolio.profileImage ? (
-                          <NextImage src={portfolio.profileImage} alt={portfolio.title || portfolio.username} width={52} height={52} style={{ borderRadius: '14px' }} />
-                        ) : (
-                          getInitials(portfolio.title || portfolio.username)
-                        )}
-                      </PortfolioAvatar>
+                    <PortfolioContent>
+                      <PortfolioHeader>
+                        <PortfolioAvatar>
+                          {portfolio.profileImage ? (
+                            <NextImage src={portfolio.profileImage} alt={portfolio.title || portfolio.username} width={52} height={52} style={{ borderRadius: '14px' }} />
+                          ) : (
+                            getInitials(portfolio.title || portfolio.username)
+                          )}
+                        </PortfolioAvatar>
 
-                      <PortfolioInfo>
-                        <PortfolioUsername>@{portfolio.username}</PortfolioUsername>
-                        <PortfolioTitle>{portfolio.title}</PortfolioTitle>
-                      </PortfolioInfo>
-                    </PortfolioHeader>
+                        <PortfolioInfo>
+                          <PortfolioUsername>@{portfolio.username}</PortfolioUsername>
+                          <PortfolioTitle>{portfolio.title}</PortfolioTitle>
+                        </PortfolioInfo>
+                      </PortfolioHeader>
 
-                    {portfolio.bio && <PortfolioBio>{portfolio.bio}</PortfolioBio>}
+                      {portfolio.bio && <PortfolioBio>{portfolio.bio}</PortfolioBio>}
 
-                    <PortfolioStats>
-                      <PortfolioStat><Eye /><span>{utils.data.formatNumber(portfolio.stats?.totalViews || 0)}</span></PortfolioStat>
-                      <PortfolioStat><Image /><span>{portfolio.stats?.totalPieces || 0}</span></PortfolioStat>
-                      <PortfolioStat><Star /><span>{portfolio.stats?.averageRating?.toFixed(1) || 'N/A'}</span></PortfolioStat>
-                    </PortfolioStats>
-                  </PortfolioContent>
-                </PortfolioCard>
-              );
-            })}
+                      <PortfolioStats>
+                        <PortfolioStat><Eye /><span>{utils.data.formatNumber(portfolio.stats?.totalViews || 0)}</span></PortfolioStat>
+                        <PortfolioStat><Image /><span>{portfolio.stats?.totalPieces || 0}</span></PortfolioStat>
+                        <PortfolioStat><Star /><span>{portfolio.stats?.averageRating?.toFixed(1) || 'N/A'}</span></PortfolioStat>
+                      </PortfolioStats>
+                    </PortfolioContent>
+                  </PortfolioCard>
+                );
+              })
+            )}
           </PortfolioGrid>
         </PortfoliosSection>
 

@@ -17,19 +17,18 @@ interface PhysicalEntity extends BaseEntity {
   mass: number;
 }
 
-// Rich molecular diversity
 type MoleculeType =
   | 'water'
   | 'carbon'
   | 'nitrogen'
-  | 'oxygen' // Simple
+  | 'oxygen'
   | 'amino_acid'
   | 'nucleotide'
   | 'lipid'
-  | 'sugar' // Building blocks
+  | 'sugar'
   | 'peptide'
   | 'rna_fragment'
-  | 'membrane_vesicle'; // Complex
+  | 'membrane_vesicle';
 
 interface MolecularEntity extends PhysicalEntity {
   type: MoleculeType;
@@ -37,7 +36,7 @@ interface MolecularEntity extends PhysicalEntity {
   color: string;
   bonded: boolean;
   bondedTo: Set<number>;
-  complexity: number; // 1 = simple, 2 = building block, 3 = complex
+  complexity: number;
 }
 
 interface ProtoLifeEntity extends BaseEntity {
@@ -60,14 +59,13 @@ interface LivingEntity extends PhysicalEntity {
   children: number[];
 }
 
-// --- CHANGED ---: Bond now stores mechanical params
 interface Bond {
   mol1: number;
   mol2: number;
   strength: number;
   type: 'covalent' | 'hydrogen' | 'hydrophobic';
-  restLength: number; // desired separation distance
-  k?: number; // optional spring constant override
+  restLength: number;
+  k?: number;
 }
 
 type SimulationPhase =
@@ -82,7 +80,6 @@ type SimulationPhase =
 interface PhylogenySimProps {
   isRunning?: boolean;
   speed?: number;
-  isDark?: boolean;
 }
 
 // ==================== CONSTANTS ====================
@@ -92,56 +89,32 @@ const COLORS = {
   surface: '#111827',
   text: '#f8fafc',
   textMuted: '#64748b',
-
-  // Simple molecules
   water: 'rgba(96, 165, 250, 0.4)',
   carbon: 'rgba(120, 113, 108, 0.6)',
   nitrogen: 'rgba(147, 197, 253, 0.5)',
   oxygen: 'rgba(239, 68, 68, 0.5)',
-
-  // Building blocks
   amino_acid: 'rgba(236, 72, 153, 0.7)',
   nucleotide: 'rgba(139, 92, 246, 0.8)',
   lipid: 'rgba(250, 204, 21, 0.7)',
   sugar: 'rgba(134, 239, 172, 0.6)',
-
-  // Complex molecules
   peptide: 'rgba(219, 39, 119, 0.8)',
   rna_fragment: 'rgba(124, 58, 237, 0.9)',
   membrane_vesicle: 'rgba(245, 158, 11, 0.6)',
-
   proto: 'rgba(236, 72, 153, 0.7)',
   luca: 'rgba(251, 191, 36, 1)',
   organism: 'rgba(59, 130, 246, 0.8)',
-
   bond_covalent: 'rgba(139, 92, 246, 0.4)',
   bond_hydrogen: 'rgba(96, 165, 250, 0.3)',
   bond_hydrophobic: 'rgba(250, 204, 21, 0.2)',
-
   energy: 'rgba(20, 184, 166, 0.12)',
 };
 
 const RNA_BASES = ['A', 'U', 'C', 'G'] as const;
-const AMINO_ACIDS = [
-  'A',
-  'R',
-  'N',
-  'D',
-  'C',
-  'Q',
-  'E',
-  'G',
-  'H',
-  'I',
-  'L',
-  'K',
-  'M',
-];
+const AMINO_ACIDS = ['A', 'R', 'N', 'D', 'C', 'Q', 'E', 'G', 'H', 'I', 'L', 'K', 'M'];
 const RNA_LENGTH = 24;
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 700;
 
-// Many more molecules for interesting chemistry!
 const INITIAL_COUNTS = {
   water: 100,
   carbon: 40,
@@ -153,12 +126,10 @@ const INITIAL_COUNTS = {
   sugar: 15,
 };
 
-// Chemistry parameters
 const MOLECULE_SPEED = 0.35;
 const COLLISION_DISTANCE = 10;
 const UPDATE_INTERVAL = 100;
 
-// Bond probabilities (per collision)
 const BOND_PROBABILITIES = {
   amino_acid_to_peptide: 0.03,
   nucleotide_to_rna: 0.04,
@@ -166,7 +137,6 @@ const BOND_PROBABILITIES = {
   simple_to_building_block: 0.02,
 };
 
-// Emergence thresholds
 const PEPTIDE_SIZE_FOR_METABOLISM = 3;
 const RNA_SIZE_FOR_REPLICATION = 6;
 const LIPID_COUNT_FOR_MEMBRANE = 8;
@@ -179,21 +149,16 @@ function generateRNA(length: number): string {
 }
 
 function mutateRNA(rna: string, rate: number) {
-  const mutations: Array<{ pos: number; from: string; to: string }> = [];
   const newRNA = rna
     .split('')
-    .map((base, i) => {
+    .map((base) => {
       if (Math.random() < rate) {
-        const newBase = RNA_BASES[Math.floor(Math.random() * RNA_BASES.length)];
-        if (newBase !== base) {
-          mutations.push({ pos: i, from: base, to: newBase });
-          return newBase;
-        }
+        return RNA_BASES[Math.floor(Math.random() * RNA_BASES.length)];
       }
       return base;
     })
     .join('');
-  return { newRNA, mutations };
+  return { newRNA };
 }
 
 function randomPosition(width: number, height: number, padding: number = 40) {
@@ -209,10 +174,11 @@ function randomVelocity(maxSpeed: number = MOLECULE_SPEED) {
   return { vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
 }
 
-// --- CHANGED --- Toroidal helpers
 function wrapDelta(delta: number, size: number) {
   const half = size / 2;
-  return ((delta + half) % size) - half;
+  if (delta > half) return delta - size;
+  if (delta < -half) return delta + size;
+  return delta;
 }
 
 function toroidalDistance(x1: number, y1: number, x2: number, y2: number, w: number, h: number) {
@@ -221,47 +187,34 @@ function toroidalDistance(x1: number, y1: number, x2: number, y2: number, w: num
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-// Average positions across edges
-function averageToroidalPosition(reactants: { x: number; y: number }[], w: number, h: number) {
-  if (reactants.length === 0) return { x: 0, y: 0 };
-  const ref = reactants[0];
-  let sumX = ref.x;
-  let sumY = ref.y;
-  for (let i = 1; i < reactants.length; i++) {
-    const rx = reactants[i].x;
-    const ry = reactants[i].y;
-    const dx = wrapDelta(rx - ref.x, w);
-    const dy = wrapDelta(ry - ref.y, h);
-    sumX += ref.x + dx;
-    sumY += ref.y + dy;
+function averageToroidalPosition(positions: { x: number; y: number }[], w: number, h: number) {
+  if (positions.length === 0) return { x: 0, y: 0 };
+  const ref = positions[0];
+  let sumX = 0;
+  let sumY = 0;
+  
+  for (const pos of positions) {
+    const dx = wrapDelta(pos.x - ref.x, w);
+    const dy = wrapDelta(pos.y - ref.y, h);
+    sumX += dx;
+    sumY += dy;
   }
-  const avgX = sumX / reactants.length;
-  const avgY = sumY / reactants.length;
-  const wrapX = ((avgX % w) + w) % w;
-  const wrapY = ((avgY % h) + h) % h;
-  return { x: wrapX, y: wrapY };
+  
+  let avgX = ref.x + sumX / positions.length;
+  let avgY = ref.y + sumY / positions.length;
+  
+  // Wrap to canvas bounds
+  avgX = ((avgX % w) + w) % w;
+  avgY = ((avgY % h) + h) % h;
+  
+  return { x: avgX, y: avgY };
 }
 
-// Simple Euclidean fallback
-function euclideanDistance(x1: number, y1: number, x2: number, y2: number) {
-  const dx = x2 - x1,
-    dy = y2 - y1;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-// --- CHANGED --- toroidal constrainPosition (user-provided logic preserved)
-function constrainPosition(x: number, y: number, vx: number, vy: number, w: number, h: number, pad: number = 40) {
-  // Use toroidal wrapping instead of hard bounce so particles don't pile up in corners.
-  let newX = x + vx;
-  let newY = y + vy;
-  // wrap X
-  if (newX < 0) newX += w;
-  if (newX >= w) newX -= w;
-  // wrap Y
-  if (newY < 0) newY += h;
-  if (newY >= h) newY -= h;
-  // velocities left unchanged except small friction applied elsewhere
-  return { x: newX, y: newY, vx, vy };
+function wrapPosition(x: number, y: number, w: number, h: number) {
+  return {
+    x: ((x % w) + w) % w,
+    y: ((y % h) + h) % h,
+  };
 }
 
 function getComplexity(type: MoleculeType): number {
@@ -276,15 +229,14 @@ interface HydrothermalVent {
   x: number;
   y: number;
   strength: number;
-  phase: number; // For pulsing effect
+  phase: number;
 }
 
-// --- CHANGED ---: Rocks to make flow complex
 interface Rock {
   x: number;
   y: number;
   radius: number;
-  roughness?: number;
+  roughness: number;
 }
 
 class PrimordialWorld {
@@ -293,10 +245,10 @@ class PrimordialWorld {
   time: number = 0;
   phase: SimulationPhase = 'primordial_soup';
   energyField: number[][];
-  temperature: number = 85; // Hot early Earth
+  temperature: number = 85;
   vents: HydrothermalVent[] = [];
-  rocks: Rock[] = []; // --- CHANGED ---
-  rotationSpeed: number = 0.0008; // --- CHANGED ---
+  rocks: Rock[] = [];
+  rotationSpeed: number = 0.0008;
 
   constructor(w: number, h: number) {
     this.width = w;
@@ -305,14 +257,12 @@ class PrimordialWorld {
       .fill(0)
       .map(() => Array(40).fill(70 + Math.random() * 30));
 
-    // Create hydrothermal vents
     this.vents = [
       { x: w * 0.25, y: h * 0.3, strength: 1.2, phase: 0 },
       { x: w * 0.65, y: h * 0.5, strength: 1.0, phase: Math.PI },
       { x: w * 0.45, y: h * 0.75, strength: 1.1, phase: Math.PI * 0.5 },
     ];
 
-    // --- CHANGED --- Create rocks near vents to perturb flow
     for (const vent of this.vents) {
       const count = 2 + Math.floor(Math.random() * 3);
       for (let i = 0; i < count; i++) {
@@ -348,12 +298,11 @@ class PrimordialWorld {
     return 0;
   }
 
-  // --- CHANGED --- getFlowAt uses toroidal deltas, rotation, and rocks
   getFlowAt(x: number, y: number): { fx: number; fy: number } {
-    let fx = 0,
-      fy = 0;
+    let fx = 0;
+    let fy = 0;
 
-    // global rotation (Coriolis-like)
+    // Global rotation (Coriolis-like effect)
     const cx = this.width / 2;
     const cy = this.height / 2;
     const dxC = wrapDelta(x - cx, this.width);
@@ -363,38 +312,45 @@ class PrimordialWorld {
     fx += -rotStrength * dyC;
     fy += rotStrength * dxC;
 
-    // vents (convection)
+    // Hydrothermal vent convection
     for (const vent of this.vents) {
       const dx = wrapDelta(x - vent.x, this.width);
       const dy = wrapDelta(y - vent.y, this.height);
       const dist = Math.sqrt(dx * dx + dy * dy);
+      
       if (dist < 5) continue;
+      
       const maxRadius = 250;
       if (dist > maxRadius) continue;
+      
       const pulse = Math.sin(this.time * 0.05 + vent.phase) * 0.3 + 0.7;
       const radialStrength = (1 - dist / maxRadius) * vent.strength * pulse;
       const angle = Math.atan2(dy, dx);
+      
       const radialFx = Math.cos(angle) * radialStrength * 0.4;
       const radialFy = Math.sin(angle) * radialStrength * 0.4;
+      
       const rotationalStrength = Math.sin((dist / maxRadius) * Math.PI) * vent.strength * 0.2;
       const tangentialFx = -Math.sin(angle) * rotationalStrength;
       const tangentialFy = Math.cos(angle) * rotationalStrength;
+      
       fx += radialFx + tangentialFx;
       fy += radialFy + tangentialFy;
     }
 
-    // rocks create repulsion and eddies
+    // Rocks create repulsion and eddies
     for (const rock of this.rocks) {
       const dxR = wrapDelta(x - rock.x, this.width);
       const dyR = wrapDelta(y - rock.y, this.height);
       const r = Math.sqrt(dxR * dxR + dyR * dyR);
+      
       if (r < rock.radius + 1) {
         const push = 0.6 * (1 - r / (rock.radius + 1));
         const ang = Math.atan2(dyR, dxR);
         fx += Math.cos(ang) * push;
         fy += Math.sin(ang) * push;
       } else if (r < rock.radius * 4) {
-        const eddyStrength = 0.35 * (rock.roughness ?? 0.5) * (1 - (r - rock.radius) / (rock.radius * 3));
+        const eddyStrength = 0.35 * rock.roughness * (1 - (r - rock.radius) / (rock.radius * 3));
         const ang = Math.atan2(dyR, dxR);
         fx += -Math.sin(ang) * eddyStrength;
         fy += Math.cos(ang) * eddyStrength;
@@ -415,6 +371,7 @@ class PrimordialWorld {
       for (let y = 0; y < this.energyField.length; y++) {
         for (let x = 0; x < this.energyField[y].length; x++) {
           let energy = this.energyField[y][x];
+          
           for (const vent of this.vents) {
             const cellX = x * 30 + 15;
             const cellY = y * 30 + 15;
@@ -424,6 +381,7 @@ class PrimordialWorld {
               energy += bonus;
             }
           }
+          
           this.energyField[y][x] = Math.min(100, energy + 3);
         }
       }
@@ -481,32 +439,25 @@ class Molecule implements MolecularEntity {
   }
 
   update(world: PrimordialWorld) {
-    // Movement affected by bonding
     const movementReduction = Math.min(this.bondedTo.size * 0.15, 0.7);
 
-    // Apply convection flow from hydrothermal vents + rotation + rocks
     const flow = world.getFlowAt(this.x, this.y);
     this.vx += flow.fx * 0.08;
     this.vy += flow.fy * 0.08;
 
     this.x += this.vx * (1 - movementReduction);
     this.y += this.vy * (1 - movementReduction);
-    const result = constrainPosition(this.x, this.y, this.vx, this.vy, world.width, world.height);
-    this.x = result.x;
-    this.y = result.y;
-    this.vx = result.vx;
-    this.vy = result.vy;
+    
+    // Wrap position to toroidal space
+    const wrapped = wrapPosition(this.x, this.y, world.width, world.height);
+    this.x = wrapped.x;
+    this.y = wrapped.y;
+    
     this.vx *= 0.996;
     this.vy *= 0.996;
   }
 
-  distanceTo(other: Molecule, world?: PrimordialWorld): number {
-    if (world) return toroidalDistance(this.x, this.y, other.x, other.y, world.width, world.height);
-    return euclideanDistance(this.x, this.y, other.x, other.y);
-  }
-
   draw(ctx: CanvasRenderingContext2D) {
-    // Glow for complex molecules
     if (this.complexity >= 2 && this.bondedTo.size > 0) {
       ctx.fillStyle = `${this.color}30`;
       ctx.beginPath();
@@ -519,7 +470,6 @@ class Molecule implements MolecularEntity {
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Label for complex molecules
     if (this.complexity === 3) {
       ctx.fillStyle = COLORS.text;
       ctx.font = '7px monospace';
@@ -560,7 +510,6 @@ class ProtoCell implements ProtoLifeEntity {
   update(world: PrimordialWorld, moleculeMap: Map<number, Molecule>) {
     this.age++;
 
-    // Update position based on molecules (toroidal average)
     const mols = this.molecules.map((id) => moleculeMap.get(id)).filter((m) => m) as Molecule[];
     if (mols.length > 0) {
       const positions = mols.map((m) => ({ x: m.x, y: m.y }));
@@ -569,32 +518,23 @@ class ProtoCell implements ProtoLifeEntity {
       this.y = avg.y;
     }
 
-    // Count components
     this.peptideCount = mols.filter((m) => m.type === 'peptide').length;
     this.rnaCount = mols.filter((m) => m.type === 'rna_fragment').length;
     this.lipidCount = mols.filter((m) => m.type === 'lipid' || m.type === 'membrane_vesicle').length;
 
-    // Check for membrane
     this.hasMembrane = this.lipidCount >= LIPID_COUNT_FOR_MEMBRANE;
-
-    // Check for metabolism (peptides can catalyze)
     this.hasMetabolism = this.peptideCount >= PEPTIDE_SIZE_FOR_METABOLISM;
-
-    // Check for replication capability
     this.canReplicate = this.rnaCount >= RNA_SIZE_FOR_REPLICATION;
 
-    // Build RNA sequence
     const rnaMols = mols.filter((m) => m.type === 'nucleotide' || m.type === 'rna_fragment');
     this.rnaSequence = rnaMols.map((m) => m.symbol).join('');
 
-    // Calculate stability
     let baseStability = 20;
     if (this.hasMembrane) baseStability += 30;
     if (this.hasMetabolism) baseStability += 25;
     if (this.canReplicate) baseStability += 25;
 
     this.stability = Math.min(100, baseStability + this.age * 0.1);
-
     this.energy += world.consumeEnergyAt(this.x, this.y, this.hasMetabolism ? 2 : 1);
   }
 
@@ -617,7 +557,6 @@ class ProtoCell implements ProtoLifeEntity {
   draw(ctx: CanvasRenderingContext2D) {
     const pulse = Math.sin(this.age * 0.04) * 0.15 + 0.85;
 
-    // Membrane
     if (this.hasMembrane) {
       ctx.strokeStyle = COLORS.membrane_vesicle;
       ctx.lineWidth = 3;
@@ -638,7 +577,6 @@ class ProtoCell implements ProtoLifeEntity {
       ctx.globalAlpha = 1;
     }
 
-    // Components indicators
     ctx.font = '8px monospace';
     ctx.textAlign = 'center';
     let y = this.y - this.radius - 15;
@@ -658,7 +596,6 @@ class ProtoCell implements ProtoLifeEntity {
       ctx.fillText('🧬 Replication', this.x, y);
     }
 
-    // Stability bar
     const pct = this.stability / 100;
     const barW = 36;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
@@ -719,11 +656,10 @@ class LUCAEntity implements LivingEntity {
       this.y += this.vy;
       this.vx *= 0.98;
       this.vy *= 0.98;
-      const result = constrainPosition(this.x, this.y, this.vx, this.vy, world.width, world.height);
-      this.x = result.x;
-      this.y = result.y;
-      this.vx = result.vx;
-      this.vy = result.vy;
+      
+      const wrapped = wrapPosition(this.x, this.y, world.width, world.height);
+      this.x = wrapped.x;
+      this.y = wrapped.y;
     }
   }
 
@@ -811,18 +747,20 @@ class OrganismEntity implements LivingEntity {
 
   update(world: PrimordialWorld) {
     if (!this.isAlive) return;
+    
     this.energy += world.consumeEnergyAt(this.x, this.y, 1.5);
+    
     if (this.canMove) {
       this.x += this.vx;
       this.y += this.vy;
       this.vx *= 0.98;
       this.vy *= 0.98;
-      const result = constrainPosition(this.x, this.y, this.vx, this.vy, world.width, world.height);
-      this.x = result.x;
-      this.y = result.y;
-      this.vx = result.vx;
-      this.vy = result.vy;
+      
+      const wrapped = wrapPosition(this.x, this.y, world.width, world.height);
+      this.x = wrapped.x;
+      this.y = wrapped.y;
     }
+    
     this.energy -= 0.09;
     if (this.energy <= 0) {
       this.isAlive = false;
@@ -861,15 +799,18 @@ class OrganismEntity implements LivingEntity {
       ctx.fill();
       return;
     }
+    
     ctx.fillStyle = COLORS.organism;
     ctx.globalAlpha = 0.9;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
+    
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
     ctx.lineWidth = 1;
     ctx.stroke();
+    
     ctx.fillStyle = COLORS.text;
     ctx.font = '9px system-ui';
     ctx.textAlign = 'center';
@@ -889,8 +830,6 @@ class SimulationEngine {
   nextId = 0;
   lucaBorn = false;
   moleculeMap: Map<number, Molecule> = new Map();
-
-  // --- CHANGED --- runtime-configurable parameters
   bondSpringK: number = 0.02;
   bondBreakProbability: number = 0.012;
 
@@ -900,7 +839,6 @@ class SimulationEngine {
   }
 
   initMolecules() {
-    // Create diverse primordial soup
     for (const [type, count] of Object.entries(INITIAL_COUNTS)) {
       for (let i = 0; i < count; i++) {
         const mol = new Molecule(this.nextId++, type as MoleculeType, this.world);
@@ -910,12 +848,11 @@ class SimulationEngine {
     }
   }
 
-  // --- CHANGED --- bond forces (spring-like) and breakage
   applyBondForces() {
     if (this.bonds.length === 0) return;
+    
     const maxForce = 0.6;
     const breakThreshold = 3.0;
-    const breakProbabilityPerTick = this.bondBreakProbability; // --- CHANGED ---
 
     for (let i = this.bonds.length - 1; i >= 0; i--) {
       const b = this.bonds[i];
@@ -923,22 +860,19 @@ class SimulationEngine {
       const m2 = this.moleculeMap.get(b.mol2);
       if (!m1 || !m2) continue;
 
-      // shortest toroidal delta
       const dx = wrapDelta(m2.x - m1.x, this.world.width);
       const dy = wrapDelta(m2.y - m1.y, this.world.height);
       const dist = Math.sqrt(dx * dx + dy * dy) + 1e-6;
       const rest = b.restLength || Math.max(4, dist);
-      const k = b.k ?? this.bondSpringK; // --- CHANGED ---
+      const k = b.k ?? this.bondSpringK;
 
-      // break logic
       if (dist > rest * breakThreshold) {
-        if (Math.random() < breakProbabilityPerTick) {
+        if (Math.random() < this.bondBreakProbability) {
           this.breakBond(b);
           continue;
         }
       }
 
-      // spring force
       const fs = -k * (dist - rest);
       const fclamped = Math.max(-maxForce, Math.min(maxForce, fs));
       const ux = dx / dist;
@@ -963,16 +897,16 @@ class SimulationEngine {
   }
 
   breakBond(bond: Bond) {
-    this.bonds = this.bonds.filter((bb) => bb !== bond);
+    this.bonds = this.bonds.filter((b) => b !== bond);
 
-    // rebuild bondedTo
-    for (const [, mol] of this.moleculeMap) {
+    for (const mol of this.moleculeMap.values()) {
       mol.bondedTo.clear();
       mol.bonded = false;
     }
-    for (const bb of this.bonds) {
-      const m1 = this.moleculeMap.get(bb.mol1);
-      const m2 = this.moleculeMap.get(bb.mol2);
+    
+    for (const b of this.bonds) {
+      const m1 = this.moleculeMap.get(b.mol1);
+      const m2 = this.moleculeMap.get(b.mol2);
       if (m1 && m2) {
         m1.bondedTo.add(m2.id);
         m2.bondedTo.add(m1.id);
@@ -982,18 +916,14 @@ class SimulationEngine {
     }
   }
 
-  // Check collisions and create bonds/new molecules
   checkChemistry() {
-    const molecules = this.molecules;
-
-    for (let i = 0; i < molecules.length; i++) {
-      for (let j = i + 1; j < molecules.length; j++) {
-        const mol1 = molecules[i];
-        const mol2 = molecules[j];
+    for (let i = 0; i < this.molecules.length; i++) {
+      for (let j = i + 1; j < this.molecules.length; j++) {
+        const mol1 = this.molecules[i];
+        const mol2 = this.molecules[j];
 
         if (mol1.bondedTo.has(mol2.id)) continue;
 
-        // --- CHANGED --- use toroidal-aware distance
         const dist = toroidalDistance(mol1.x, mol1.y, mol2.x, mol2.y, this.world.width, this.world.height);
 
         if (dist < COLLISION_DISTANCE) {
@@ -1004,33 +934,22 @@ class SimulationEngine {
   }
 
   tryReaction(mol1: Molecule, mol2: Molecule) {
-    // Amino acids → Peptide
     if (mol1.type === 'amino_acid' && mol2.type === 'amino_acid') {
       if (Math.random() < BOND_PROBABILITIES.amino_acid_to_peptide) {
         this.createComplexMolecule('peptide', [mol1, mol2]);
         if (this.world.phase === 'primordial_soup') this.world.phase = 'synthesis';
       }
-    }
-
-    // Nucleotides → RNA fragment
-    else if (mol1.type === 'nucleotide' && mol2.type === 'nucleotide') {
+    } else if (mol1.type === 'nucleotide' && mol2.type === 'nucleotide') {
       if (Math.random() < BOND_PROBABILITIES.nucleotide_to_rna) {
         this.createComplexMolecule('rna_fragment', [mol1, mol2]);
         if (this.world.phase === 'synthesis') this.world.phase = 'polymerization';
       }
-    }
-
-    // Lipids → Membrane vesicle
-    else if (mol1.type === 'lipid' && mol2.type === 'lipid') {
+    } else if (mol1.type === 'lipid' && mol2.type === 'lipid') {
       if (Math.random() < BOND_PROBABILITIES.lipid_to_membrane) {
         this.createBond(mol1, mol2, 'hydrophobic');
       }
-    }
-
-    // Simple molecules can form building blocks
-    else if (mol1.complexity === 1 && mol2.complexity === 1) {
+    } else if (mol1.complexity === 1 && mol2.complexity === 1) {
       if (Math.random() < BOND_PROBABILITIES.simple_to_building_block * 0.5) {
-        // Randomly create a building block
         const buildingBlocks: MoleculeType[] = ['amino_acid', 'nucleotide', 'sugar'];
         const newType = buildingBlocks[Math.floor(Math.random() * buildingBlocks.length)];
         this.createComplexMolecule(newType, [mol1, mol2]);
@@ -1038,7 +957,6 @@ class SimulationEngine {
     }
   }
 
-  // --- CHANGED --- createBond sets restLength
   createBond(mol1: Molecule, mol2: Molecule, type: Bond['type']) {
     const rest = toroidalDistance(mol1.x, mol1.y, mol2.x, mol2.y, this.world.width, this.world.height);
     const bond: Bond = {
@@ -1047,7 +965,6 @@ class SimulationEngine {
       strength: 0.6 + Math.random() * 0.4,
       type,
       restLength: Math.max(4, rest),
-      k: undefined,
     };
     this.bonds.push(bond);
     mol1.bondedTo.add(mol2.id);
@@ -1056,26 +973,19 @@ class SimulationEngine {
     mol2.bonded = true;
   }
 
-  // --- CHANGED --- preserve external bonds by rewiring them to the new molecule
   createComplexMolecule(type: MoleculeType, reactants: Molecule[]) {
-    // Average position on torus
     const positions = reactants.map((r) => ({ x: r.x, y: r.y }));
     const avg = averageToroidalPosition(positions, this.world.width, this.world.height);
-    const x = avg.x;
-    const y = avg.y;
 
-    // Create new complex molecule
     const newMol = new Molecule(this.nextId++, type, this.world);
-    newMol.x = x;
-    newMol.y = y;
+    newMol.x = avg.x;
+    newMol.y = avg.y;
     newMol.vx = reactants[0].vx * 0.5;
     newMol.vy = reactants[0].vy * 0.5;
 
-    // Add the new molecule
     this.molecules.push(newMol);
     this.moleculeMap.set(newMol.id, newMol);
 
-    // Rewire bonds: compute new bond list mapping reactants -> newMol
     const reactantIds = new Set(reactants.map((r) => r.id));
     const seenKeys = new Set<string>();
     const newBonds: Bond[] = [];
@@ -1084,10 +994,7 @@ class SimulationEngine {
       const aIsReact = reactantIds.has(b.mol1);
       const bIsReact = reactantIds.has(b.mol2);
 
-      if (aIsReact && bIsReact) {
-        // consumed internal bond, drop it
-        continue;
-      }
+      if (aIsReact && bIsReact) continue;
 
       let nm1 = b.mol1;
       let nm2 = b.mol2;
@@ -1095,12 +1002,10 @@ class SimulationEngine {
       if (bIsReact) nm2 = newMol.id;
       if (nm1 === nm2) continue;
 
-      // avoid duplicate bonds
       const key = nm1 < nm2 ? `${nm1}-${nm2}` : `${nm2}-${nm1}`;
       if (seenKeys.has(key)) continue;
       seenKeys.add(key);
 
-      // compute restLength for rewired bond:
       let rest = b.restLength ?? 6;
       if (nm1 === newMol.id && this.moleculeMap.has(nm2)) {
         const other = this.moleculeMap.get(nm2)!;
@@ -1122,17 +1027,16 @@ class SimulationEngine {
 
     this.bonds = newBonds;
 
-    // Remove reactants
     for (const mol of reactants) {
       this.molecules = this.molecules.filter((m) => m.id !== mol.id);
       this.moleculeMap.delete(mol.id);
     }
 
-    // Recompute bondedTo sets from bonds
-    for (const [, mol] of this.moleculeMap) {
+    for (const mol of this.moleculeMap.values()) {
       mol.bondedTo.clear();
       mol.bonded = false;
     }
+    
     for (const b of this.bonds) {
       const m1 = this.moleculeMap.get(b.mol1);
       const m2 = this.moleculeMap.get(b.mol2);
@@ -1143,16 +1047,11 @@ class SimulationEngine {
         m2.bonded = true;
       }
     }
-
-    // newMol may have external bonds now
-    newMol.bonded = this.bonds.some((b) => b.mol1 === newMol.id || b.mol2 === newMol.id);
   }
 
-  // Find clusters for protocell formation
   tryFormProtoCells() {
     if (this.lucaBorn || this.protoCells.length > 0) return;
 
-    // Look for clusters with diverse components
     const complexMols = this.molecules.filter((m) => m.complexity >= 2 && m.bonded);
     if (complexMols.length < 10) return;
 
@@ -1201,10 +1100,7 @@ class SimulationEngine {
 
   update() {
     this.world.update();
-
     this.molecules.forEach((m) => m.update(this.world));
-
-    // apply bond forces after molecules moved this tick
     this.applyBondForces();
 
     if (!this.lucaBorn) {
@@ -1259,11 +1155,10 @@ class SimulationEngine {
       }
     }
 
-    // Draw hydrothermal vents
+    // Hydrothermal vents
     for (const vent of this.world.vents) {
       const pulse = Math.sin(this.world.time * 0.05 + vent.phase) * 0.3 + 0.7;
 
-      // Outer glow
       const gradient = ctx.createRadialGradient(vent.x, vent.y, 0, vent.x, vent.y, 60);
       gradient.addColorStop(0, 'rgba(239, 68, 68, 0.3)');
       gradient.addColorStop(0.5, 'rgba(251, 146, 60, 0.15)');
@@ -1273,13 +1168,11 @@ class SimulationEngine {
       ctx.arc(vent.x, vent.y, 60 * pulse, 0, Math.PI * 2);
       ctx.fill();
 
-      // Vent core
       ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
       ctx.beginPath();
       ctx.arc(vent.x, vent.y, 8, 0, Math.PI * 2);
       ctx.fill();
 
-      // Heat shimmer effect
       ctx.strokeStyle = `rgba(251, 146, 60, ${0.4 * pulse})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -1287,20 +1180,18 @@ class SimulationEngine {
       ctx.stroke();
     }
 
-    // Draw rocks (subtle)
+    // Rocks
     for (const rock of this.world.rocks) {
-      ctx.fillStyle = 'rgba(100,100,110,0.08)';
+      ctx.fillStyle = 'rgba(100, 100, 110, 0.08)';
       ctx.beginPath();
       ctx.arc(rock.x, rock.y, rock.radius, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(100,100,110,0.12)';
+      ctx.strokeStyle = 'rgba(100, 100, 110, 0.12)';
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(rock.x, rock.y, rock.radius + 1, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    // Bonds (draw shortest wrapped segment) --- CHANGED ---
+    // Bonds
     for (const bond of this.bonds) {
       const mol1 = this.moleculeMap.get(bond.mol1);
       const mol2 = this.moleculeMap.get(bond.mol2);
@@ -1308,15 +1199,12 @@ class SimulationEngine {
         ctx.strokeStyle = (COLORS as any)[`bond_${bond.type}`] || COLORS.bond_covalent;
         ctx.lineWidth = 1;
 
-        // compute shortest toroidal delta and draw from mol1 to mol1 + delta
         const dx = wrapDelta(mol2.x - mol1.x, this.world.width);
         const dy = wrapDelta(mol2.y - mol1.y, this.world.height);
-        const tx = mol1.x + dx;
-        const ty = mol1.y + dy;
 
         ctx.beginPath();
         ctx.moveTo(mol1.x, mol1.y);
-        ctx.lineTo(tx, ty);
+        ctx.lineTo(mol1.x + dx, mol1.y + dy);
         ctx.stroke();
       }
     }
@@ -1350,36 +1238,29 @@ function LegendItem({ color, label, isSquare = false }: { color: string; label: 
   );
 }
 
-export default function LUCASimulation({
-  isRunning: externalIsRunning,
-  speed: externalSpeed = 1,
-}: PhylogenySimProps = {}) {
+export default function LUCASimulation({ isRunning: externalIsRunning, speed: externalSpeed = 1 }: PhylogenySimProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<SimulationEngine | null>(null);
 
   const [internalIsRunning, setInternalIsRunning] = useState(true);
   const [, forceUpdate] = useState({});
 
-  // --- CHANGED --- UI-controlled parameters (defaults)
-  const [rotation, setRotation] = useState(0.0008); // world.rotationSpeed
-  const [bondK, setBondK] = useState(0.02); // bond spring constant (k)
-  const [breakProb, setBreakProb] = useState(0.012); // bond break probability per tick
+  const [rotation, setRotation] = useState(0.0008);
+  const [bondK, setBondK] = useState(0.02);
+  const [breakProb, setBreakProb] = useState(0.012);
 
   const isRunning = externalIsRunning !== undefined ? externalIsRunning : internalIsRunning;
 
   useEffect(() => {
     engineRef.current = new SimulationEngine();
-    // apply UI defaults to engine
     if (engineRef.current) {
       engineRef.current.world.rotationSpeed = rotation;
       engineRef.current.bondSpringK = bondK;
       engineRef.current.bondBreakProbability = breakProb;
     }
     forceUpdate({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync engine params when sliders change
   useEffect(() => {
     if (!engineRef.current) return;
     engineRef.current.world.rotationSpeed = rotation;
@@ -1430,14 +1311,7 @@ export default function LUCASimulation({
     >
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ marginBottom: '3rem' }}>
-          <h1
-            style={{
-              fontSize: '1.5rem',
-              fontWeight: 600,
-              margin: '0 0 0.5rem 0',
-              letterSpacing: '-0.02em',
-            }}
-          >
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 600, margin: '0 0 0.5rem 0', letterSpacing: '-0.02em' }}>
             The Origin of Life
           </h1>
           <p style={{ color: COLORS.textMuted, fontSize: '0.9rem', margin: 0 }}>{phaseLabels[engine.world.phase]}</p>
@@ -1455,7 +1329,6 @@ export default function LUCASimulation({
           <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} style={{ width: '100%', height: 'auto', display: 'block' }} />
         </div>
 
-        {/* Legend */}
         <div
           style={{
             background: COLORS.surface,
@@ -1468,7 +1341,6 @@ export default function LUCASimulation({
           <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '1rem', color: COLORS.text }}>Legend</h3>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            {/* Simple Molecules */}
             <div>
               <div style={{ fontSize: '0.75rem', fontWeight: 500, marginBottom: '0.5rem', color: COLORS.textMuted }}>Simple Molecules</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -1479,7 +1351,6 @@ export default function LUCASimulation({
               </div>
             </div>
 
-            {/* Building Blocks */}
             <div>
               <div style={{ fontSize: '0.75rem', fontWeight: 500, marginBottom: '0.5rem', color: COLORS.textMuted }}>Building Blocks</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -1490,7 +1361,6 @@ export default function LUCASimulation({
               </div>
             </div>
 
-            {/* Complex Molecules */}
             <div>
               <div style={{ fontSize: '0.75rem', fontWeight: 500, marginBottom: '0.5rem', color: COLORS.textMuted }}>Complex Structures</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -1500,7 +1370,6 @@ export default function LUCASimulation({
               </div>
             </div>
 
-            {/* Life Forms */}
             <div>
               <div style={{ fontSize: '0.75rem', fontWeight: 500, marginBottom: '0.5rem', color: COLORS.textMuted }}>Life Forms</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -1510,20 +1379,18 @@ export default function LUCASimulation({
               </div>
             </div>
 
-            {/* Environment */}
             <div>
               <div style={{ fontSize: '0.75rem', fontWeight: 500, marginBottom: '0.5rem', color: COLORS.textMuted }}>Environment</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <LegendItem color={COLORS.energy} label="Energy Field" isSquare />
                 <LegendItem color="rgba(239, 68, 68, 0.8)" label="Hydrothermal Vents" />
-                <LegendItem color="rgba(100,100,110,0.08)" label="Rocks / Obstacles" />
+                <LegendItem color="rgba(100, 100, 110, 0.08)" label="Rocks / Obstacles" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Controls */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button
               onClick={() => setInternalIsRunning(!internalIsRunning)}
@@ -1548,7 +1415,6 @@ export default function LUCASimulation({
             <button
               onClick={() => {
                 engineRef.current = new SimulationEngine();
-                // apply current UI settings to new engine
                 if (engineRef.current) {
                   engineRef.current.world.rotationSpeed = rotation;
                   engineRef.current.bondSpringK = bondK;
@@ -1582,7 +1448,6 @@ export default function LUCASimulation({
                 fontVariantNumeric: 'tabular-nums',
                 display: 'flex',
                 gap: '1rem',
-                alignItems: 'center',
               }}
             >
               <span>
@@ -1596,10 +1461,11 @@ export default function LUCASimulation({
             </div>
           </div>
 
-          {/* Sliders row */}
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ color: COLORS.textMuted, fontSize: '0.85rem', minWidth: 220 }}>
-              Rotation (global) <strong style={{ color: COLORS.text }}> {rotation.toFixed(4)}</strong>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+            <label style={{ color: COLORS.textMuted, fontSize: '0.85rem' }}>
+              <div style={{ marginBottom: '0.5rem' }}>
+                Global Rotation: <strong style={{ color: COLORS.text }}>{rotation.toFixed(4)}</strong>
+              </div>
               <input
                 type="range"
                 min={0}
@@ -1607,12 +1473,14 @@ export default function LUCASimulation({
                 step={0.0001}
                 value={rotation}
                 onChange={(e) => setRotation(Number(e.target.value))}
-                style={{ width: 220, display: 'block', marginTop: 6 }}
+                style={{ width: '100%' }}
               />
             </label>
 
-            <label style={{ color: COLORS.textMuted, fontSize: '0.85rem', minWidth: 220 }}>
-              Bond stiffness (k) <strong style={{ color: COLORS.text }}> {bondK.toFixed(3)}</strong>
+            <label style={{ color: COLORS.textMuted, fontSize: '0.85rem' }}>
+              <div style={{ marginBottom: '0.5rem' }}>
+                Bond Stiffness: <strong style={{ color: COLORS.text }}>{bondK.toFixed(3)}</strong>
+              </div>
               <input
                 type="range"
                 min={0.001}
@@ -1620,12 +1488,14 @@ export default function LUCASimulation({
                 step={0.001}
                 value={bondK}
                 onChange={(e) => setBondK(Number(e.target.value))}
-                style={{ width: 220, display: 'block', marginTop: 6 }}
+                style={{ width: '100%' }}
               />
             </label>
 
-            <label style={{ color: COLORS.textMuted, fontSize: '0.85rem', minWidth: 220 }}>
-              Bond break prob <strong style={{ color: COLORS.text }}> {breakProb.toFixed(3)}</strong>
+            <label style={{ color: COLORS.textMuted, fontSize: '0.85rem' }}>
+              <div style={{ marginBottom: '0.5rem' }}>
+                Bond Break Probability: <strong style={{ color: COLORS.text }}>{breakProb.toFixed(3)}</strong>
+              </div>
               <input
                 type="range"
                 min={0}
@@ -1633,12 +1503,11 @@ export default function LUCASimulation({
                 step={0.001}
                 value={breakProb}
                 onChange={(e) => setBreakProb(Number(e.target.value))}
-                style={{ width: 220, display: 'block', marginTop: 6 }}
+                style={{ width: '100%' }}
               />
             </label>
           </div>
         </div>
-
       </div>
     </div>
   );
