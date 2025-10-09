@@ -14,11 +14,11 @@ import {
   portfolioToBackend
 } from '@/types/portfolio.types';
 import type {
-  GalleryPieceCreateData, 
-  GalleryPieceResponse, 
+  GalleryPieceCreateData,
+  GalleryPieceResponse,
 } from '@/types/gallery.types';
 
-import type {   BackendGalleryPiece } from '@/types/base.types'
+import type { BackendGalleryPiece } from '@/types/base.types'
 
 // ==================== ENHANCED TYPE DEFINITIONS ====================
 
@@ -386,11 +386,11 @@ export class PortfolioApiClient extends BaseApiClient {
       // normalize portfolio shape if present, but don't run expensive transforms
       const portfolio = result.portfolio
         ? {
-            id: result.portfolio.id,
-            kind: result.portfolio.kind,
-            title: result.portfolio.title,
-            username: result.portfolio.username
-          }
+          id: result.portfolio.id,
+          kind: result.portfolio.kind,
+          title: result.portfolio.title,
+          username: result.portfolio.username
+        }
         : undefined;
 
       return { hasPortfolio: Boolean(result.hasPortfolio), portfolio };
@@ -398,12 +398,14 @@ export class PortfolioApiClient extends BaseApiClient {
       // Fallback: ask for portfolio directly (cheap request)
       try {
         const portfolio = await this.getMyPortfolio();
-        return { hasPortfolio: !!portfolio, portfolio: portfolio ? {
-          id: (portfolio as any).id,
-          kind: (portfolio as any).kind,
-          title: (portfolio as any).title,
-          username: (portfolio as any).username
-        } : undefined };
+        return {
+          hasPortfolio: !!portfolio, portfolio: portfolio ? {
+            id: (portfolio as any).id,
+            kind: (portfolio as any).kind,
+            title: (portfolio as any).title,
+            username: (portfolio as any).username
+          } : undefined
+        };
       } catch {
         return { hasPortfolio: false };
       }
@@ -462,69 +464,69 @@ export class PortfolioApiClient extends BaseApiClient {
   }
 
   async addGalleryPiece(data: GalleryPieceCreateData): Promise<GalleryPieceResponse> {
-  console.log('Adding gallery piece with data:', data);
-  try {
-    const response = await this.requestWithRetry<unknown>('/api/portfolios/me/gallery', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    console.log('Adding gallery piece with data:', data);
+    try {
+      const response = await this.requestWithRetry<unknown>('/api/portfolios/me/gallery', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
 
-    // Log the raw response for debugging
-    console.log('Raw gallery piece response:', response);
+      // Log the raw response for debugging
+      console.log('Raw gallery piece response:', response);
 
-    // Type assertion for the response
-    const typedResponse = response as any;
+      // Type assertion for the response
+      const typedResponse = response as any;
 
-    // Handle different response formats
-    if (typedResponse?.success !== undefined) {
-      // New format: { success: true, galleryPiece: {...}, portfolioId: "...", message: "..." }
-      if (!typedResponse.success) {
-        throw new APIError(
-          typedResponse.error || typedResponse.message || 'Gallery piece creation failed',
-          400,
-          typedResponse.code || 'CREATION_FAILED'
-        );
+      // Handle different response formats
+      if (typedResponse?.success !== undefined) {
+        // New format: { success: true, galleryPiece: {...}, portfolioId: "...", message: "..." }
+        if (!typedResponse.success) {
+          throw new APIError(
+            typedResponse.error || typedResponse.message || 'Gallery piece creation failed',
+            400,
+            typedResponse.code || 'CREATION_FAILED'
+          );
+        }
+        return {
+          success: typedResponse.success,
+          galleryPiece: typedResponse.galleryPiece,
+          portfolioId: typedResponse.portfolioId,
+          message: typedResponse.message,
+          code: typedResponse.code
+        };
+      } else {
+        // Legacy format - wrap in new format for consistency
+        return {
+          success: true,
+          galleryPiece: typedResponse.galleryPiece || typedResponse,
+          message: 'Gallery piece created successfully'
+        };
       }
-      return {
-        success: typedResponse.success,
-        galleryPiece: typedResponse.galleryPiece,
-        portfolioId: typedResponse.portfolioId,
-        message: typedResponse.message,
-        code: typedResponse.code
-      };
-    } else {
-      // Legacy format - wrap in new format for consistency
-      return {
-        success: true,
-        galleryPiece: typedResponse.galleryPiece || typedResponse,
-        message: 'Gallery piece created successfully'
-      };
-    }
 
-  } catch (error) {
-    if (error instanceof APIError) {
-      const errorMappings: { [key: string]: string } = {
-        'MISSING_TITLE': 'Title is required for gallery pieces.',
-        'MISSING_IMAGE_URL': 'Image URL is required for gallery pieces.',
-        'PORTFOLIO_NOT_FOUND': 'Portfolio not found. Please create a portfolio first.',
-        'VALIDATION_ERROR': 'Please check your input data and try again.',
-        'DUPLICATE_ENTRY': 'A gallery piece with this information already exists.'
-      };
-      
-      const mapped = error.code && errorMappings[error.code];
-      if (mapped) {
-        throw new APIError(mapped, error.status, error.code);
+    } catch (error) {
+      if (error instanceof APIError) {
+        const errorMappings: { [key: string]: string } = {
+          'MISSING_TITLE': 'Title is required for gallery pieces.',
+          'MISSING_IMAGE_URL': 'Image URL is required for gallery pieces.',
+          'PORTFOLIO_NOT_FOUND': 'Portfolio not found. Please create a portfolio first.',
+          'VALIDATION_ERROR': 'Please check your input data and try again.',
+          'DUPLICATE_ENTRY': 'A gallery piece with this information already exists.'
+        };
+
+        const mapped = error.code && errorMappings[error.code];
+        if (mapped) {
+          throw new APIError(mapped, error.status, error.code);
+        }
+        throw error;
       }
-      throw error;
+
+      console.error('Unexpected error in addGalleryPiece:', error);
+      throw new APIError(
+        'Failed to add gallery piece. Please try again.',
+        500,
+        'GALLERY_ADD_FAILED'
+      );
     }
-    
-    console.error('Unexpected error in addGalleryPiece:', error);
-    throw new APIError(
-      'Failed to add gallery piece. Please try again.',
-      500,
-      'GALLERY_ADD_FAILED'
-    );
-  }
   }
 
   async updateGalleryPiece(pieceId: string, data: Partial<BackendGalleryPiece>): Promise<{ success: boolean; galleryPiece: BackendGalleryPiece; message: string; }> {
@@ -735,26 +737,44 @@ export class PortfolioApiClient extends BaseApiClient {
   }
 
   async discover(
-    filters?: { kind?: string; search?: string; featured?: boolean; sortBy?: string; sortOrder?: 'asc' | 'desc'; },
+    filters?: { kind?: string; search?: string; featured?: boolean; sortBy?: string; sortOrder?: 'asc' | 'desc' },
     page: number = 1,
     limit: number = 20
-  ): Promise<{ success: boolean; portfolios: Portfolio[]; pagination: PaginationResponse; filters: any; }> {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...Object.fromEntries(Object.entries(filters || {}).filter(([_, v]) => v !== undefined))
-    });
+  ): Promise<{ success: boolean; portfolios: Portfolio[]; pagination: PaginationResponse; filters: any }> {
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        ...Object.fromEntries(Object.entries(filters || {}).filter(([_, v]) => v !== undefined))
+      });
 
-    const response = await this.requestWithRetry<{ success: boolean; portfolios: any[]; pagination: any; filters: any }>(`/api/portfolios/discover?${params}`);
-    const data = ResponseHandler.extractData(response);
-    const portfolios = Array.isArray(data?.portfolios) ? data.portfolios.map(portfolioFromBackend) : [];
-    const pagination = ResponseHandler.normalizePagination(data?.pagination ?? data);
-    return {
-      success: (response as any).success ?? true,
-      portfolios,
-      pagination: pagination ?? { page, limit, total: 0, pages: 0 },
-      filters: data?.filters
-    };
+      const response = await this.requestWithRetry<{ success: boolean; portfolios: any[]; pagination: any; filters: any }>(
+        `/api/portfolios/discover?${params}`
+      );
+
+      const data = ResponseHandler.extractData(response);
+      const portfolios = Array.isArray(data?.portfolios) ? data.portfolios.map(portfolioFromBackend) : [];
+      const pagination = ResponseHandler.normalizePagination(data?.pagination ?? data);
+
+      return {
+        success: (response as any).success ?? true,
+        portfolios,
+        pagination: pagination ?? { page, limit, total: 0, pages: 0 },
+        filters: data?.filters
+      };
+    } catch (err) {
+      // Handle permanent "not implemented" without retry
+      if (err instanceof APIError && err.status === 501) {
+        console.warn('[Portfolio] Discovery endpoint not implemented. Returning empty result.');
+        return {
+          success: true,
+          portfolios: [],
+          pagination: { page, limit, total: 0, pages: 0 },
+          filters: {}
+        };
+      }
+      throw err;
+    }
   }
 
   async getStats(): Promise<{ success: boolean; stats: { totalPortfolios: number; publicPortfolios: number; totalGalleryPieces: number; kinds: Record<string, number>; recentPortfolios: number; topPortfolios: Portfolio[]; }; }> {

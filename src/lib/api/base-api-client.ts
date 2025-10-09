@@ -36,8 +36,8 @@ export function transformDates<T>(obj: any): T {
     for (const [key, value] of Object.entries(obj)) {
       // Check if the key suggests it's a date field
       if ((key === 'createdAt' || key === 'updatedAt' || key === 'lastAccessed' ||
-           key === 'lastUpdated' || key === 'startDate' || key === 'endDate' ||
-           key === 'lastLogin') && typeof value === 'string') {
+        key === 'lastUpdated' || key === 'startDate' || key === 'endDate' ||
+        key === 'lastLogin') && typeof value === 'string') {
         transformed[key] = new Date(value);
       } else {
         transformed[key] = transformDates(value);
@@ -192,7 +192,7 @@ export class BaseApiClient {
     }
   }
 
-  // Helper method for making requests with retry logic
+  // lib/api/base-api-client.ts (replace retry condition)
   protected async requestWithRetry<T>(
     endpoint: string,
     config?: RequestConfig,
@@ -201,11 +201,15 @@ export class BaseApiClient {
     try {
       return await this.request<T>(endpoint, config);
     } catch (error) {
-      if (error instanceof APIError &&
-          error.status &&
-          error.status >= 500 &&
-          retryCount < this.maxRetries) {
-        // Wait before retrying (exponential backoff)
+      // Only retry on transient server errors
+      const RETRYABLE_STATUS_CODES = new Set([500, 502, 503, 504]);
+
+      if (
+        error instanceof APIError &&
+        typeof error.status === 'number' &&
+        RETRYABLE_STATUS_CODES.has(error.status) &&
+        retryCount < this.maxRetries
+      ) {
         await new Promise(resolve =>
           setTimeout(resolve, this.retryDelay * Math.pow(2, retryCount))
         );
@@ -217,6 +221,7 @@ export class BaseApiClient {
       throw error;
     }
   }
+
 
   protected async request<T>(
     endpoint: string,
