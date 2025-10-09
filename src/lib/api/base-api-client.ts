@@ -35,8 +35,8 @@ export function transformDates<T>(obj: any): T {
     const transformed: any = {};
     for (const [key, value] of Object.entries(obj)) {
       // Check if the key suggests it's a date field
-      if ((key === 'createdAt' || key === 'updatedAt' || key === 'lastAccessed' || 
-           key === 'lastUpdated' || key === 'startDate' || key === 'endDate' || 
+      if ((key === 'createdAt' || key === 'updatedAt' || key === 'lastAccessed' ||
+           key === 'lastUpdated' || key === 'startDate' || key === 'endDate' ||
            key === 'lastLogin') && typeof value === 'string') {
         transformed[key] = new Date(value);
       } else {
@@ -54,107 +54,141 @@ export class BaseApiClient {
   protected defaultHeaders: HeadersInit;
   protected maxRetries: number;
   protected retryDelay: number;
+  protected isProd: boolean;
+  protected enableHealthCheck: boolean;
 
   constructor(baseURL?: string) {
     const base = baseURL || config.api.baseUrl;
-    // Don't automatically append /api - let individual services decide
     this.baseURL = base;
+
+    // Detect production mode from config in a robust way
+    // Accept either config.app.env === 'production' or config.app.isProduction boolean
+    this.isProd =
+      (config && (config.app.env === 'production' || config.app?.isProduction === true)) || false;
+
+    // Enable or disable health checks client-side via config.app.enableHealthCheck (defaults true in dev, false in prod)
+    this.enableHealthCheck = typeof config.client?.enableHealthCheck === 'boolean'
+      ? config.client!.enableHealthCheck
+      : !this.isProd;
+
+    // Default headers: omit the ngrok header for production
     this.defaultHeaders = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
+      ...(this.isProd ? {} : { 'ngrok-skip-browser-warning': 'true' }),
     };
-    this.maxRetries = config.client.maxRetries;
-    this.retryDelay = config.client.retryDelay;
+
+    this.maxRetries = config.client?.maxRetries ?? 2;
+    this.retryDelay = config.client?.retryDelay ?? 500; // ms
   }
 
   // Get auth token from localStorage with better discovery
+  // NOTE: In production we avoid mutating localStorage (don't copy tokens into a "standard" key)
   protected getAuthToken(): string | null {
     if (typeof window === 'undefined') {
       return null;
     }
 
-    // First check if we have a token in our standard location
-    const standardToken = localStorage.getItem('auth-token');
-    if (standardToken && standardToken.trim()) {
-      return standardToken;
-    }
-
-    // Check common token storage keys in order of preference
     const tokenKeys = [
-      'authToken', 
+      'auth-token', // standard primary key we prefer
+      'authToken',
       'accessToken',
       'token',
       'jwt',
       'bearer',
       'access_token'
     ];
-    
-    // Try direct token keys
+
+    // 1) Try obvious primary key first
+    const primary = localStorage.getItem('auth-token');
+    if (primary && primary.trim()) {
+      return primary;
+    }
+
+    // 2) Search other keys; in development we will copy to 'auth-token' for convenience,
+    //    but in production we will NOT mutate localStorage — only return whatever we find.
     for (const key of tokenKeys) {
       const token = localStorage.getItem(key);
       if (token && token.trim()) {
-        // Store it in our standard location for next time
-        localStorage.setItem('auth-token', token);
-        console.log(`[Auth] Found token under '${key}', copied to 'auth-token'`);
+        if (!this.isProd && key !== 'auth-token') {
+          // help developer experience: persist to canonical key so future reads are easier
+          try {
+            localStorage.setItem('auth-token', token);
+            console.debug(`[Auth] Found token under '${key}', copied to 'auth-token'`);
+          } catch {
+            // ignore quota/security issues
+          }
+        }
         return token;
       }
     }
-    
-    // Check for tokens in JSON objects
+
+    // 3) Search JSON stores (auth, user, session, etc.)
     const jsonKeys = ['auth', 'user', 'session', 'authentication', 'login', 'auth-storage'];
     for (const key of jsonKeys) {
-      const value = localStorage.getItem(key);
-      if (value) {
-        try {
-          const parsed = JSON.parse(value);
-          
-          // Check if it's a direct token object
-          if (parsed.token || parsed.accessToken || parsed.authToken) {
-            const token = parsed.token || parsed.accessToken || parsed.authToken;
-            localStorage.setItem('auth-token', token);
-            console.log(`[Auth] Found token in '${key}', copied to 'auth-token'`);
-            return token;
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        const found =
+          parsed?.token || parsed?.accessToken || parsed?.authToken ||
+          parsed?.state?.token || parsed?.state?.accessToken || parsed?.state?.authToken ||
+          parsed?.user?.token || parsed?.user?.accessToken;
+        if (found) {
+          if (!this.isProd) {
+            try {
+              localStorage.setItem('auth-token', found);
+              console.debug(`[Auth] Found token in '${key}', copied to 'auth-token'`);
+            } catch {
+              // ignore
+            }
+          } else {
+            // In production: do not mutate storage; do not log token keys (minimize info leaked to console)
+            if (!this.isProd) { /* noop */ }
           }
-          
-          // Check nested structures (like auth-storage might have state.token)
-          if (parsed.state?.token || parsed.state?.accessToken || parsed.state?.authToken) {
-            const token = parsed.state.token || parsed.state.accessToken || parsed.state.authToken;
-            localStorage.setItem('auth-token', token);
-            console.log(`[Auth] Found token in '${key}.state', copied to 'auth-token'`);
-            return token;
-          }
-          
-          // Check for user object with token
-          if (parsed.user?.token || parsed.user?.accessToken) {
-            const token = parsed.user.token || parsed.user.accessToken;
-            localStorage.setItem('auth-token', token);
-            console.log(`[Auth] Found token in '${key}.user', copied to 'auth-token'`);
-            return token;
-          }
-        } catch {
-          // Not JSON or parsing failed, continue
+          return found;
         }
+      } catch {
+        // not JSON, continue
       }
     }
-    
-    console.warn('[Auth] No authentication token found in localStorage');
+
+    // only log a gentle debug/warn in dev — silence in production
+    if (!this.isProd) {
+      console.warn('[Auth] No authentication token found in localStorage');
+    }
     return null;
   }
 
-  // Store auth token in a consistent location
+  // Store auth token in a consistent location (explicit API)
+  // In production we still allow setting but keep logs minimal
   static setAuthToken(token: string): void {
     if (typeof window !== 'undefined' && token) {
-      localStorage.setItem('auth-token', token);
-      console.log('[Auth] Token stored in auth-token');
+      try {
+        localStorage.setItem('auth-token', token);
+        // Only log in non-production
+        if (typeof config !== 'undefined' && !(config.app.env === 'production' || config.app?.isProduction)) {
+          // eslint-disable-next-line no-console
+          console.debug('[Auth] Token stored in auth-token');
+        }
+      } catch {
+        // ignore storage errors silently
+      }
     }
   }
 
   // Clear auth token
   static clearAuthToken(): void {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('auth-token');
-      console.log('[Auth] Token cleared from auth-token');
+      try {
+        localStorage.removeItem('auth-token');
+        if (typeof config !== 'undefined' && !(config.app.env === 'production' || config.app?.isProduction)) {
+          // eslint-disable-next-line no-console
+          console.debug('[Auth] Token cleared from auth-token');
+        }
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -167,15 +201,17 @@ export class BaseApiClient {
     try {
       return await this.request<T>(endpoint, config);
     } catch (error) {
-      if (error instanceof APIError && 
-          error.status && 
-          error.status >= 500 && 
+      if (error instanceof APIError &&
+          error.status &&
+          error.status >= 500 &&
           retryCount < this.maxRetries) {
         // Wait before retrying (exponential backoff)
-        await new Promise(resolve => 
+        await new Promise(resolve =>
           setTimeout(resolve, this.retryDelay * Math.pow(2, retryCount))
         );
-        console.log(`[API] Retrying request (${retryCount + 1}/${this.maxRetries}): ${endpoint}`);
+        if (!this.isProd) {
+          console.debug(`[API] Retrying request (${retryCount + 1}/${this.maxRetries}): ${endpoint}`);
+        }
         return this.requestWithRetry<T>(endpoint, config, retryCount + 1);
       }
       throw error;
@@ -187,21 +223,19 @@ export class BaseApiClient {
     options?: RequestConfig
   ): Promise<T> {
     const { params, timeout = config?.api?.timeout || 30000, ...fetchConfig } = options || {};
-    
+
     // Build URL - ensure endpoint starts with /api unless it's a full URL
     let fullUrl: string;
     if (endpoint.startsWith('http')) {
-      // Full URL provided
       fullUrl = endpoint;
     } else {
-      // Relative endpoint - ensure it has /api prefix
       const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
       const apiPrefix = cleanEndpoint.startsWith('/api') ? '' : '/api';
       fullUrl = `${this.baseURL}${apiPrefix}${cleanEndpoint}`;
     }
-    
+
     const url = new URL(fullUrl);
-    
+
     // Add query params
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -213,38 +247,40 @@ export class BaseApiClient {
 
     // Get auth token and add to headers if available
     const token = this.getAuthToken();
-    
+
     // IMPORTANT: Check if body is FormData
     const isFormData = fetchConfig.body instanceof FormData;
-    
+
     // Build headers - but exclude Content-Type for FormData
     const headers: Record<string, string> = {};
-    
-    // Only add default headers if not FormData
+
     if (!isFormData) {
-      Object.assign(headers, this.defaultHeaders);
+      Object.assign(headers, this.defaultHeaders as Record<string, string>);
     } else {
-      // For FormData, only copy non-Content-Type headers
       const { 'Content-Type': _, ...otherDefaultHeaders } = this.defaultHeaders as Record<string, string>;
       Object.assign(headers, otherDefaultHeaders);
     }
-    
+
     // Add any custom headers from fetchConfig
     if (fetchConfig.headers) {
-      Object.assign(headers, fetchConfig.headers);
+      Object.assign(headers, fetchConfig.headers as Record<string, string>);
     }
-    
+
     // Add auth token if available
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
-      console.log(`[API] Request with auth token: ${url.pathname}`);
+      if (!this.isProd) {
+        console.debug(`[API] Request with auth token: ${url.pathname}`);
+      }
     } else {
-      console.warn(`[API] Request without auth token: ${url.pathname}`);
+      if (!this.isProd) {
+        console.warn(`[API] Request without auth token: ${url.pathname}`);
+      }
     }
 
-    // Log FormData requests
-    if (isFormData) {
-      console.log(`[API] FormData request detected, Content-Type header omitted`);
+    // Log FormData requests in dev only
+    if (isFormData && !this.isProd) {
+      console.debug(`[API] FormData request detected, Content-Type header omitted`);
     }
 
     // Setup timeout
@@ -252,8 +288,13 @@ export class BaseApiClient {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      console.log(`[API] ${fetchConfig.method || 'GET'} ${url.toString()}`);
-      
+      // In production, avoid printing full URLs (could leak ngrok or internal host). Print path only.
+      if (!this.isProd) {
+        console.debug(`[API] ${fetchConfig.method || 'GET'} ${url.toString()}`);
+      } else {
+        console.debug(`[API] ${fetchConfig.method || 'GET'} ${url.pathname}`);
+      }
+
       const response = await fetch(url.toString(), {
         ...fetchConfig,
         headers,
@@ -264,9 +305,11 @@ export class BaseApiClient {
 
       clearTimeout(timeoutId);
 
-      console.log(`[API] Response ${response.status}: ${url.pathname}`);
+      if (!this.isProd) {
+        console.debug(`[API] Response ${response.status}: ${url.pathname}`);
+      }
 
-      // Handle response
+      // Handle response non-ok
       if (!response.ok) {
         let errorData;
         try {
@@ -274,45 +317,50 @@ export class BaseApiClient {
         } catch {
           errorData = { message: response.statusText };
         }
-        
+
         const error = new APIError(
           errorData.message || `HTTP ${response.status}: ${response.statusText}`,
           response.status,
           errorData.code,
           errorData.details
         );
-        
-        console.error(`[API] Error ${response.status}:`, error.message);
+
+        if (!this.isProd) {
+          console.error(`[API] Error ${response.status}:`, error.message);
+        }
         throw error;
       }
 
-      // Handle empty responses
+      // Handle empty/non-json responses
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        console.log(`[API] Non-JSON response: ${contentType}`);
+        if (!this.isProd) {
+          console.debug(`[API] Non-JSON response: ${contentType}`);
+        }
         return {} as T;
       }
 
       const data = await response.json();
-      console.log(`[API] Success: ${url.pathname}`, { dataKeys: Object.keys(data || {}) });
-      
-      // Transform dates in the response
+
+      if (!this.isProd) {
+        console.debug(`[API] Success: ${url.pathname}`, { dataKeys: Object.keys(data || {}) });
+      }
+
       return transformDates<T>(data);
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
       if (error instanceof APIError) {
         throw error;
       }
-      
+
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
           const timeoutError = new APIError('Request timeout', 408, 'TIMEOUT');
-          console.error('[API] Timeout:', timeoutError.message);
+          if (!this.isProd) console.error('[API] Timeout:', timeoutError.message);
           throw timeoutError;
         }
-        
-        // Better error messages for common issues
+
         if (error.message === 'Failed to fetch') {
           const networkError = new APIError(
             'Cannot connect to server. This might be a CORS issue or the server is not reachable. ' +
@@ -320,27 +368,34 @@ export class BaseApiClient {
             undefined,
             'CORS_OR_NETWORK_ERROR'
           );
-          console.error('[API] Network error:', networkError.message);
+          if (!this.isProd) console.error('[API] Network error:', networkError.message);
           throw networkError;
         }
-        
+
         const networkError = new APIError(error.message, undefined, 'NETWORK_ERROR');
-        console.error('[API] Network error:', networkError.message);
+        if (!this.isProd) console.error('[API] Network error:', networkError.message);
         throw networkError;
       }
-      
+
       const unknownError = new APIError('Unknown error occurred', undefined, 'UNKNOWN');
-      console.error('[API] Unknown error:', unknownError.message);
+      if (!this.isProd) console.error('[API] Unknown error:', unknownError.message);
       throw unknownError;
     }
   }
 
   // Common utilities
   async healthCheck(): Promise<{ status: string; version: string }> {
+    // Respect enableHealthCheck flag (configured per environment)
+    if (!this.enableHealthCheck) {
+      if (!this.isProd) console.debug('[API] Health checks are disabled in this environment.');
+      return { status: 'unknown', version: 'unknown' };
+    }
+
     try {
       return await this.request<{ status: string; version: string }>('/health');
     } catch (error) {
-      console.error('[API] Health check failed:', error);
+      if (!this.isProd) console.error('[API] Health check failed:', error);
+      // Return an informative fallback; do not throw (caller can decide)
       return { status: 'offline', version: 'unknown' };
     }
   }
@@ -349,7 +404,7 @@ export class BaseApiClient {
     try {
       const health = await this.healthCheck();
       return {
-        connected: health.status !== 'offline',
+        connected: health.status !== 'offline' && health.status !== 'unknown',
         baseUrl: this.baseURL,
       };
     } catch (error) {

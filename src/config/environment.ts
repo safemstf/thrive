@@ -33,6 +33,8 @@ export const config = {
   client: {
     maxRetries: parseInt(process.env.NEXT_PUBLIC_MAX_RETRIES || '3', 10),
     retryDelay: parseInt(process.env.NEXT_PUBLIC_RETRY_DELAY || '1000', 10),
+    enableHealthCheck: process.env.NEXT_PUBLIC_ENABLE_HEALTH_CHECK !== 'false',
+
   },
 } as const;
 

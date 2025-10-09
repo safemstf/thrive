@@ -72,16 +72,6 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               type: 'dev',
               label: 'Development'
             },
-            quickActions: [
-              {
-                id: 'code',
-                title: 'Code',
-                description: 'View projects',
-                icon: <Code size={20} />,
-                color: '#3b82f6',
-                href: '/projects'
-              },
-            ],
             portfolio: {
               kind: 'hybrid',
               title: 'Portfolio'
