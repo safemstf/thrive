@@ -2,7 +2,7 @@
 
 ![GitHub Repo stars](https://img.shields.io/github/stars/safemstf/thrive?style=for-the-badge)
 ![GitHub issues](https://img.shields.io/github/issues/safemstf/thrive?style=for-the-badge)
-![License](https://img.shields.io/github/license/safemstf/thrive?style=for-the-badge)
+![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)
 
 
 **Tagline:** *Brag Responsibly*
