@@ -1,8 +1,8 @@
 # LearnMorra
 
-![GitHub Repo stars](https://img.shields.io/github/stars/yourusername/learnmorra?style=for-the-badge)
-![GitHub issues](https://img.shields.io/github/issues/yourusername/learnmorra?style=for-the-badge)
-![License](https://img.shields.io/github/license/yourusername/learnmorra?style=for-the-badge)
+![GitHub Repo stars](https://img.shields.io/github/stars/Mustafa/learnmorra?style=for-the-badge)
+![GitHub issues](https://img.shields.io/github/issues/Mustafa/learnmorra?style=for-the-badge)
+![License](https://img.shields.io/github/license/Mustafa/learnmorra?style=for-the-badge)
 
 **Tagline:** *Brag Responsibly*
 
