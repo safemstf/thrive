@@ -1,14 +1,12 @@
 'use client'
 
-import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import styled, { css, keyframes } from 'styled-components';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import styled from 'styled-components';
 import { 
   Play, Pause, RotateCcw, Trophy, Zap, Activity, 
   Radio, Users, DollarSign, TrendingUp, Flag,
-  Volume2, VolumeX, Gauge, Navigation, MapPin,
-  Timer, Award, Eye, Layers3, Sparkles, ChevronUp,
-  ChevronDown, Info, Settings, Maximize2, Target,
-  CheckCircle2, Circle, Gamepad2,
+  Volume2, VolumeX, Gauge, Target,
+  CheckCircle2, Circle, Gamepad2, Eye, Sparkles, Settings
 } from 'lucide-react';
 
 // Import the actual pathfinding algorithms
@@ -17,19 +15,30 @@ import {
   depthFirstSearch, 
   aStarSearch, 
   dijkstraSearch,
-  AlgorithmResult,
-  AlgorithmConfig,
   greedyBestFirstSearch,
-  bidirectionalSearch
+  bidirectionalSearch,
+  bmsspSearch,
+  AlgorithmResult,
+  AlgorithmConfig
 } from './algorithms';
 
-import { BroadcastBadge, Button, Card, CardContent, CardHeader, Commentary, ControlsBar,   FlagIcon,
-FlagCounter, GridLayout, Header, HeaderContent, LeaderboardItem, MainContainer, ModeButton, ModeSelector, OddsItem, OddsValue, PageContainer, Panel, RoundBadge, TeamBadge, TeamSelector, TelemetryBar, TelemetryFill, TimeDisplay, Title, ToggleSwitch, TrackCanvas } from './mazeStyles';
-import { AlgorithmClass, RacingTeam, Racer, RaceStatus, RaceMode, RaceCommentary, BettingOdds, RaceTrack } from './mazeTypes';
+import { 
+  BroadcastBadge, Button, Card, CardContent, CardHeader, Commentary, 
+  ControlsBar, FlagIcon, FlagCounter, GridLayout, Header, HeaderContent, 
+  LeaderboardItem, MainContainer, ModeButton, ModeSelector, OddsItem, 
+  OddsValue, PageContainer, Panel, RoundBadge, TeamBadge, TeamSelector, 
+  TimeDisplay, Title, ToggleSwitch, TrackCanvas 
+} from './mazeStyles';
+
+import { 
+  AlgorithmClass, RacingTeam, Racer, RaceStatus, RaceMode, 
+  RaceCommentary, BettingOdds, RaceTrack 
+} from './mazeTypes';
+
 import { RACING_TEAMS } from './agent';
 
 // ============================================================================
-// TYPES AND CONFIGURATION
+// CONFIGURATION
 // ============================================================================
 
 const TRACK_WIDTH = 41;
@@ -51,7 +60,7 @@ export default function ProfessionalAlgorithmDerby() {
   const [racers, setRacers] = useState<Racer[]>([]);
   const [raceStatus, setRaceStatus] = useState<RaceStatus>('preparing');
   const [raceTime, setRaceTime] = useState(0);
-  const [selectedTeams, setSelectedTeams] = useState<AlgorithmClass[]>(['BFS', 'AStar', 'Dijkstra']);
+  const [selectedTeams, setSelectedTeams] = useState<AlgorithmClass[]>(['BFS', 'AStar', 'BMSSP']);
   const [raceMode, setRaceMode] = useState<RaceMode>('flags');
   
   const [showMetrics, setShowMetrics] = useState(true);
@@ -62,7 +71,12 @@ export default function ProfessionalAlgorithmDerby() {
   const [bettingOdds, setBettingOdds] = useState<BettingOdds[]>([]);
   
   // Calculate flag collection order based on algorithm strategy
-  const calculateFlagOrder = useCallback((start: [number, number], flags: [number, number][], teamId: AlgorithmClass, finishPos: [number, number]): number[] => {
+  const calculateFlagOrder = useCallback((
+    start: [number, number], 
+    flags: [number, number][], 
+    teamId: AlgorithmClass, 
+    finishPos: [number, number]
+  ): number[] => {
     const order: number[] = [];
     const remaining = new Set(flags.map((_, i) => i));
     let current = start;
@@ -90,8 +104,8 @@ export default function ProfessionalAlgorithmDerby() {
           break;
         }
       }
-    } else if (teamId === 'AStar' || teamId === 'Dijkstra') {
-      // A* and Dijkstra: Consider distance to finish as well
+    } else if (teamId === 'AStar' || teamId === 'Dijkstra' || teamId === 'BMSSP') {
+      // A*, Dijkstra, and BMSSP: Consider distance to finish as well
       while (remaining.size > 0) {
         let best = -1;
         let bestScore = Infinity;
@@ -142,6 +156,57 @@ export default function ProfessionalAlgorithmDerby() {
     return order;
   }, []);
   
+  // Run algorithm based on team ID
+  const runAlgorithm = useCallback((
+    teamId: AlgorithmClass,
+    maze: number[][],
+    start: [number, number],
+    goal: [number, number],
+    config: AlgorithmConfig
+  ): AlgorithmResult => {
+    switch (teamId) {
+      case 'BFS':
+        return breadthFirstSearch(maze, start, goal, config);
+      case 'DFS':
+        return depthFirstSearch(maze, start, goal, config);
+      case 'AStar':
+        return aStarSearch(maze, start, goal, config);
+      case 'Dijkstra':
+        return dijkstraSearch(maze, start, goal, config);
+      case 'Greedy':
+        return greedyBestFirstSearch(maze, start, goal, config);
+      case 'Bidirectional':
+        return bidirectionalSearch(maze, start, goal, config);
+      case 'BMSSP':
+        return bmsspSearch(maze, start, goal, config);
+      default:
+        return breadthFirstSearch(maze, start, goal, config);
+    }
+  }, []);
+  
+  const calculateOdds = useCallback((racer: Racer): string => {
+    // Odds based on algorithm type and path efficiency
+    const baseOdds: Record<AlgorithmClass, number> = {
+      'AStar': 2.5,      // Usually finds optimal path
+      'BMSSP': 2.3,      // New algorithm - theoretically fastest
+      'Dijkstra': 2.8,   // Optimal but explores more
+      'BFS': 3.2,        // Optimal but explores everything
+      'Bidirectional': 4.0, // Good but depends on maze
+      'Greedy': 5.5,     // Fast but often suboptimal
+      'DFS': 7.0         // Can take very long paths
+    };
+    
+    const base = baseOdds[racer.team.id] || 5.0;
+    
+    // Adjust based on actual path length if available
+    if (racer.path.length > 0) {
+      const pathPenalty = racer.path.length / 100;
+      return `${Math.max(1.5, base + pathPenalty).toFixed(1)}:1`;
+    }
+    
+    return `${base.toFixed(1)}:1`;
+  }, []);
+  
   const initializeRace = useCallback(() => {
     const flagCount = raceMode === 'flags' ? 7 : 0;
     const newTrack = new RaceTrack(TRACK_WIDTH, TRACK_HEIGHT, flagCount);
@@ -172,30 +237,7 @@ export default function ProfessionalAlgorithmDerby() {
         
         for (const flagIdx of flagOrder) {
           const flagPos = newTrack.flags[flagIdx];
-          
-          // Use the actual algorithm for this team
-          switch (teamId) {
-            case 'BFS':
-              algorithmResult = breadthFirstSearch(maze, currentPos, flagPos, config);
-              break;
-            case 'DFS':
-              algorithmResult = depthFirstSearch(maze, currentPos, flagPos, config);
-              break;
-            case 'AStar':
-              algorithmResult = aStarSearch(maze, currentPos, flagPos, config);
-              break;
-            case 'Dijkstra':
-              algorithmResult = dijkstraSearch(maze, currentPos, flagPos, config);
-              break;
-            case 'Greedy':
-              algorithmResult = greedyBestFirstSearch(maze, currentPos, flagPos, config);
-              break;
-            case 'Bidirectional':
-              algorithmResult = bidirectionalSearch(maze, currentPos, flagPos, config);
-              break;
-            default:
-              algorithmResult = breadthFirstSearch(maze, currentPos, flagPos, config);
-          }
+          algorithmResult = runAlgorithm(teamId, maze, currentPos, flagPos, config);
           
           if (algorithmResult.success && algorithmResult.path.length > 0) {
             fullPath = fullPath.concat(algorithmResult.path.slice(fullPath.length > 0 ? 1 : 0));
@@ -205,28 +247,7 @@ export default function ProfessionalAlgorithmDerby() {
         }
         
         // Path from last flag to finish
-        switch (teamId) {
-          case 'BFS':
-            algorithmResult = breadthFirstSearch(maze, currentPos, newTrack.finish, config);
-            break;
-          case 'DFS':
-            algorithmResult = depthFirstSearch(maze, currentPos, newTrack.finish, config);
-            break;
-          case 'AStar':
-            algorithmResult = aStarSearch(maze, currentPos, newTrack.finish, config);
-            break;
-          case 'Dijkstra':
-            algorithmResult = dijkstraSearch(maze, currentPos, newTrack.finish, config);
-            break;
-          case 'Greedy':
-            algorithmResult = greedyBestFirstSearch(maze, currentPos, newTrack.finish, config);
-            break;
-          case 'Bidirectional':
-            algorithmResult = bidirectionalSearch(maze, currentPos, newTrack.finish, config);
-            break;
-          default:
-            algorithmResult = breadthFirstSearch(maze, currentPos, newTrack.finish, config);
-        }
+        algorithmResult = runAlgorithm(teamId, maze, currentPos, newTrack.finish, config);
         
         if (algorithmResult.success && algorithmResult.path.length > 0) {
           fullPath = fullPath.concat(algorithmResult.path.slice(1));
@@ -234,31 +255,14 @@ export default function ProfessionalAlgorithmDerby() {
         }
       } else {
         // Sprint mode - direct path to finish
-        switch (teamId) {
-          case 'BFS':
-            algorithmResult = breadthFirstSearch(maze, newTrack.start, newTrack.finish, config);
-            break;
-          case 'DFS':
-            algorithmResult = depthFirstSearch(maze, newTrack.start, newTrack.finish, config);
-            break;
-          case 'AStar':
-            algorithmResult = aStarSearch(maze, newTrack.start, newTrack.finish, config);
-            break;
-          case 'Dijkstra':
-            algorithmResult = dijkstraSearch(maze, newTrack.start, newTrack.finish, config);
-            break;
-          case 'Greedy':
-            algorithmResult = greedyBestFirstSearch(maze, newTrack.start, newTrack.finish, config);
-            break;
-          case 'Bidirectional':
-            algorithmResult = bidirectionalSearch(maze, newTrack.start, newTrack.finish, config);
-            break;
-          default:
-            algorithmResult = breadthFirstSearch(maze, newTrack.start, newTrack.finish, config);
-        }
-        
+        algorithmResult = runAlgorithm(teamId, maze, newTrack.start, newTrack.finish, config);
         fullPath = algorithmResult.path;
         algorithmResult.explored.forEach(e => totalExplored.add(`${e[0]},${e[1]}`));
+      }
+      
+      // Check if algorithm found a valid path
+      if (!algorithmResult.success || fullPath.length === 0) {
+        console.warn(`${team.name} failed to find a path!`);
       }
       
       newRacers.push({
@@ -273,8 +277,8 @@ export default function ProfessionalAlgorithmDerby() {
         bestLap: Infinity,
         totalDistance: 0,
         currentSpeed: 0,
-        tire: 100, // Kept for compatibility but not used
-        fuel: 100, // Kept for compatibility but not used
+        tire: 100,
+        fuel: 100,
         finished: false,
         finishTime: 0,
         trail: [],
@@ -310,29 +314,7 @@ export default function ProfessionalAlgorithmDerby() {
       movement: 'stable' as const
     }));
     setBettingOdds(odds);
-  }, [selectedTeams, raceMode, calculateFlagOrder]);
-  
-  const calculateOdds = (racer: Racer): string => {
-    // Odds based on algorithm type and path efficiency
-    const baseOdds: Record<AlgorithmClass, number> = {
-      'AStar': 2.5,      // Usually finds optimal path
-      'Dijkstra': 2.8,   // Optimal but explores more
-      'BFS': 3.2,        // Optimal but explores everything
-      'Bidirectional': 4.0, // Good but depends on maze
-      'Greedy': 5.5,     // Fast but often suboptimal
-      'DFS': 7.0         // Can take very long paths
-    };
-    
-    const base = baseOdds[racer.team.id] || 5.0;
-    
-    // Adjust based on actual path length if available
-    if (racer.path.length > 0) {
-      const pathPenalty = racer.path.length / 100;
-      return `${Math.max(1.5, base + pathPenalty).toFixed(1)}:1`;
-    }
-    
-    return `${base.toFixed(1)}:1`;
-  };
+  }, [selectedTeams, raceMode, calculateFlagOrder, runAlgorithm, calculateOdds]);
   
   const startRace = () => {
     setRaceStatus('starting');
@@ -348,27 +330,49 @@ export default function ProfessionalAlgorithmDerby() {
     
     setTimeout(() => {
       setRaceStatus('racing');
-      setCommentary(prev => [...prev, {
+      
+      const failedRacers = racers.filter(r => !r.path || r.path.length === 0);
+      const initialCommentary: RaceCommentary[] = [{
         time: raceTime,
         message: "AND THEY'RE OFF! The algorithms are racing through the maze!",
         type: 'exciting'
-      }, {
+      }];
+      
+      if (failedRacers.length > 0) {
+        initialCommentary.push({
+          time: raceTime,
+          message: `Warning: ${failedRacers.map(r => r.team.name).join(', ')} failed to find a path!`,
+          type: 'critical'
+        });
+      }
+      
+      initialCommentary.push({
         time: raceTime,
         message: `Watch how each algorithm takes a different path - shorter paths win!`,
         type: 'normal'
-      }]);
+      });
+      
+      setCommentary(prev => [...prev, ...initialCommentary]);
     }, 2000);
   };
   
   const animate = useCallback(() => {
     if (raceStatus !== 'racing') return;
     
-    // Clear the commentary queue for this frame
     commentaryQueueRef.current = [];
     
     setRacers(prevRacers => {
       const updated = prevRacers.map(racer => {
         if (racer.finished) return racer;
+        
+        // CRITICAL: Skip racers with no path (algorithm failed)
+        if (!racer.path || racer.path.length === 0) {
+          return {
+            ...racer,
+            finished: true,
+            finishTime: Infinity // Mark as DNF
+          };
+        }
         
         let updatedRacer = { ...racer };
         
@@ -383,7 +387,6 @@ export default function ProfessionalAlgorithmDerby() {
               newCollectedFlags.add(idx);
               flagsUpdated = true;
               
-              // Queue commentary instead of setting it directly
               commentaryQueueRef.current.push({
                 time: raceTime,
                 message: `${racer.team.name} collects flag #${idx + 1}! (${newCollectedFlags.size}/7)`,
@@ -440,7 +443,7 @@ export default function ProfessionalAlgorithmDerby() {
         }
         
         // All racers move at the same base speed - only path efficiency matters
-        const BASE_SPEED = 0.2; // Uniform speed for all algorithms
+        const BASE_SPEED = 0.2;
         const nextTarget = Math.min(
           updatedRacer.currentTarget + BASE_SPEED,
           updatedRacer.path.length - 1
@@ -449,8 +452,26 @@ export default function ProfessionalAlgorithmDerby() {
         const targetIndex = Math.floor(nextTarget);
         const t = nextTarget - targetIndex;
         
+        // CRITICAL: Bounds check for path access
+        if (targetIndex >= updatedRacer.path.length) {
+          return {
+            ...updatedRacer,
+            finished: true,
+            finishTime: raceTime
+          };
+        }
+        
         const current = updatedRacer.path[targetIndex];
         const next = updatedRacer.path[Math.min(targetIndex + 1, updatedRacer.path.length - 1)];
+        
+        // CRITICAL: Validate current and next positions
+        if (!current || !next) {
+          return {
+            ...updatedRacer,
+            finished: true,
+            finishTime: raceTime
+          };
+        }
         
         const newX = current[0] + (next[0] - current[0]) * t;
         const newY = current[1] + (next[1] - current[1]) * t;
@@ -482,23 +503,31 @@ export default function ProfessionalAlgorithmDerby() {
       
       if (updated.every(r => r.finished)) {
         setRaceStatus('finished');
-        // Find the winner
         if (updated.length > 0) {
-          const winner = updated.reduce((prev, current) => 
-            current.finishTime < prev.finishTime ? current : prev
-          );
-          commentaryQueueRef.current.push({
-            time: raceTime,
-            message: `Race complete! ${winner.team.name} wins with the most efficient path (${winner.path.length} steps)!`,
-            type: 'exciting'
-          });
+          // Find winner (excluding DNF racers)
+          const finishers = updated.filter(r => r.finishTime !== Infinity);
+          if (finishers.length > 0) {
+            const winner = finishers.reduce((prev, current) => 
+              current.finishTime < prev.finishTime ? current : prev
+            );
+            commentaryQueueRef.current.push({
+              time: raceTime,
+              message: `Race complete! ${winner.team.name} wins with the most efficient path (${winner.path.length} steps)!`,
+              type: 'exciting'
+            });
+          } else {
+            commentaryQueueRef.current.push({
+              time: raceTime,
+              message: `Race complete! All algorithms failed to find valid paths.`,
+              type: 'critical'
+            });
+          }
         }
       }
       
       return updated;
     });
     
-    // Process commentary queue after state update
     if (commentaryQueueRef.current.length > 0) {
       setCommentary(prev => [...prev, ...commentaryQueueRef.current]);
     }
@@ -516,6 +545,7 @@ export default function ProfessionalAlgorithmDerby() {
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, VIEWPORT_W, VIEWPORT_H);
     
+    // Draw track
     for (let y = 0; y < TRACK_HEIGHT; y++) {
       for (let x = 0; x < TRACK_WIDTH; x++) {
         const cell = track.getCell(x, y);
@@ -544,6 +574,7 @@ export default function ProfessionalAlgorithmDerby() {
       }
     }
     
+    // Draw exploration
     if (showExploration) {
       racers.forEach(racer => {
         ctx.fillStyle = `${racer.team.color}15`;
@@ -554,20 +585,18 @@ export default function ProfessionalAlgorithmDerby() {
       });
     }
     
-    // Draw flags if in flag mode
+    // Draw flags
     if (raceMode === 'flags') {
       track.flags.forEach((flag, idx) => {
         const x = flag[0] * CELL_SIZE + CELL_SIZE/2;
         const y = flag[1] * CELL_SIZE + CELL_SIZE/2;
         
-        // Flag glow
         const glow = ctx.createRadialGradient(x, y, 0, x, y, CELL_SIZE);
         glow.addColorStop(0, 'rgba(251, 191, 36, 0.3)');
         glow.addColorStop(1, 'transparent');
         ctx.fillStyle = glow;
         ctx.fillRect(x - CELL_SIZE, y - CELL_SIZE, CELL_SIZE * 2, CELL_SIZE * 2);
         
-        // Flag pole
         ctx.strokeStyle = '#94a3b8';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -575,7 +604,6 @@ export default function ProfessionalAlgorithmDerby() {
         ctx.lineTo(x, y - CELL_SIZE * 0.4);
         ctx.stroke();
         
-        // Flag
         ctx.fillStyle = '#fbbf24';
         ctx.beginPath();
         ctx.moveTo(x, y - CELL_SIZE * 0.4);
@@ -585,14 +613,12 @@ export default function ProfessionalAlgorithmDerby() {
         ctx.closePath();
         ctx.fill();
         
-        // Flag number
         ctx.fillStyle = '#713f12';
         ctx.font = 'bold 8px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText((idx + 1).toString(), x + CELL_SIZE * 0.2, y - CELL_SIZE * 0.2);
         
-        // Check if collected by any racer
         const isCollected = racers.some(r => r.collectedFlags.has(idx));
         if (isCollected) {
           ctx.fillStyle = 'rgba(16, 185, 129, 0.6)';
@@ -601,6 +627,7 @@ export default function ProfessionalAlgorithmDerby() {
       });
     }
     
+    // Draw start
     ctx.fillStyle = '#10b981';
     ctx.fillRect(track.start[0] * CELL_SIZE, track.start[1] * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     ctx.fillStyle = 'white';
@@ -609,6 +636,7 @@ export default function ProfessionalAlgorithmDerby() {
     ctx.textBaseline = 'middle';
     ctx.fillText('START', track.start[0] * CELL_SIZE + CELL_SIZE/2, track.start[1] * CELL_SIZE + CELL_SIZE/2);
     
+    // Draw finish
     const fx = track.finish[0] * CELL_SIZE;
     const fy = track.finish[1] * CELL_SIZE;
     for (let i = 0; i < 2; i++) {
@@ -618,6 +646,7 @@ export default function ProfessionalAlgorithmDerby() {
       }
     }
     
+    // Draw trails
     if (showTrails) {
       racers.forEach(racer => {
         racer.trail.forEach(point => {
@@ -635,6 +664,7 @@ export default function ProfessionalAlgorithmDerby() {
       });
     }
     
+    // Draw racers
     racers.forEach(racer => {
       const x = racer.position.x * CELL_SIZE + CELL_SIZE/2;
       const y = racer.position.y * CELL_SIZE + CELL_SIZE/2;
@@ -673,7 +703,6 @@ export default function ProfessionalAlgorithmDerby() {
         ctx.fillText('🏁', x, y - CELL_SIZE);
       }
       
-      // Show flag count in flag mode
       if (raceMode === 'flags' && racer.collectedFlags.size > 0) {
         ctx.fillStyle = '#fbbf24';
         ctx.font = 'bold 10px sans-serif';
@@ -681,6 +710,7 @@ export default function ProfessionalAlgorithmDerby() {
       }
     });
     
+    // Draw starting lights
     if (raceStatus === 'starting') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(0, 0, VIEWPORT_W, VIEWPORT_H);
@@ -715,9 +745,11 @@ export default function ProfessionalAlgorithmDerby() {
     };
   }, [raceStatus, animate, render]);
   
+  // FIXED: Only initialize race on mount, not on every initializeRace change
   useEffect(() => {
     initializeRace();
-  }, [initializeRace]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty array = only on mount
   
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
@@ -726,14 +758,16 @@ export default function ProfessionalAlgorithmDerby() {
   };
   
   return (
-    <PageContainer>
-      <Header>
-        <HeaderContent>
-          <BroadcastBadge>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%)', color: 'white', padding: '1rem' }}>
+      <div style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <Radio size={24} />
-            <Title>Algorithm Racing Derby</Title>
-            <RoundBadge>Pathfinding Challenge • Round 1</RoundBadge>
-          </BroadcastBadge>
+            <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Algorithm Racing Derby</h1>
+            <span style={{ background: 'rgba(0,0,0,0.3)', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.875rem' }}>
+              Pathfinding Challenge • Round 1
+            </span>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
@@ -751,326 +785,414 @@ export default function ProfessionalAlgorithmDerby() {
             >
               {audioEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
             </button>
-            <TimeDisplay>{formatTime(raceTime)}</TimeDisplay>
+            <div style={{ fontFamily: 'monospace', fontSize: '1.5rem', fontWeight: 'bold' }}>
+              {formatTime(raceTime)}
+            </div>
           </div>
-        </HeaderContent>
-      </Header>
+        </div>
+      </div>
       
-      <MainContainer>
-        <GridLayout>
-          <Panel $variant="left">
-            <Card>
-              <CardHeader $color="linear-gradient(90deg, #475569 0%, #334155 100%)">
-                <Users size={16} />
-                Select Algorithms
-              </CardHeader>
-              <CardContent>
-                {Object.values(RACING_TEAMS).map(team => (
-                  <TeamSelector
-                    key={team.id}
-                    $selected={selectedTeams.includes(team.id)}
-                    $teamColor={team.color}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedTeams.includes(team.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedTeams([...selectedTeams, team.id]);
-                        } else {
-                          setSelectedTeams(selectedTeams.filter(t => t !== team.id));
-                        }
-                        setTimeout(initializeRace, 0);
-                      }}
-                    />
-                    <TeamBadge $color={team.color}>{team.number}</TeamBadge>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{team.name}</div>
-                      <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '2px' }}>
-                        {team.strategy}
-                      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr 300px', gap: '1rem' }}>
+        {/* Left Panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
+            <div style={{ background: 'linear-gradient(90deg, #475569 0%, #334155 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Users size={16} />
+              <span style={{ fontWeight: 600 }}>Select Algorithms</span>
+            </div>
+            <div>
+              {Object.values(RACING_TEAMS).map(team => (
+                <label
+                  key={team.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    padding: '0.75rem',
+                    marginBottom: '0.5rem',
+                    background: selectedTeams.includes(team.id) ? `${team.color}20` : '#0f172a',
+                    border: `2px solid ${selectedTeams.includes(team.id) ? team.color : 'transparent'}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedTeams.includes(team.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedTeams([...selectedTeams, team.id]);
+                      } else {
+                        setSelectedTeams(selectedTeams.filter(t => t !== team.id));
+                      }
+                      // FIXED: Removed setTimeout, will be called by state change effect below
+                    }}
+                  />
+                  <div style={{ 
+                    width: '24px', 
+                    height: '24px', 
+                    borderRadius: '50%', 
+                    background: team.color,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}>
+                    {team.number}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{team.name}</div>
+                    <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '2px' }}>
+                      {team.strategy}
                     </div>
-                  </TeamSelector>
-                ))}
-              </CardContent>
-            </Card>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          
+          <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
+            <div style={{ background: 'linear-gradient(90deg, #d97706 0%, #b45309 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <DollarSign size={16} />
+              <span style={{ fontWeight: 600 }}>Algorithm Odds</span>
+            </div>
+            <div>
+              {bettingOdds.map(odds => {
+                const team = RACING_TEAMS[odds.team];
+                return (
+                  <div key={odds.team} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', marginBottom: '0.25rem', background: '#0f172a', borderRadius: '6px', borderLeft: `3px solid ${team.color}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div style={{ 
+                        width: '16px', 
+                        height: '16px', 
+                        borderRadius: '50%', 
+                        backgroundColor: team.color 
+                      }} />
+                      <span style={{ fontSize: '0.875rem' }}>{team.name}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 'bold', color: '#fbbf24' }}>{odds.odds}</span>
+                      {odds.movement === 'up' && <TrendingUp size={14} style={{ color: '#10b981' }} />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        
+        {/* Center Panel */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
+            <div style={{ background: 'linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Gamepad2 size={16} />
+                <span style={{ fontWeight: 600 }}>Race Mode</span>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={() => {
+                    setRaceMode('sprint');
+                    // FIXED: Removed setTimeout, will be called by state change effect below
+                  }}
+                  style={{
+                    background: raceMode === 'sprint' ? '#3b82f6' : '#1e293b',
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <Zap size={14} />
+                  Sprint
+                </button>
+                <button
+                  onClick={() => {
+                    setRaceMode('flags');
+                    // FIXED: Removed setTimeout, will be called by state change effect below
+                  }}
+                  style={{
+                    background: raceMode === 'flags' ? '#3b82f6' : '#1e293b',
+                    border: 'none',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '6px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  <Flag size={14} />
+                  Flag Hunt
+                </button>
+              </div>
+            </div>
             
-            <Card>
-              <CardHeader $color="linear-gradient(90deg, #d97706 0%, #b45309 100%)">
-                <DollarSign size={16} />
-                Algorithm Odds
-              </CardHeader>
-              <CardContent>
-                {bettingOdds.map(odds => {
-                  const team = RACING_TEAMS[odds.team];
-                  return (
-                    <OddsItem key={odds.team} $teamColor={team.color}>
+            <canvas
+              ref={canvasRef}
+              width={VIEWPORT_W}
+              height={VIEWPORT_H}
+              style={{ width: '100%', height: 'auto', borderRadius: '8px', background: '#0a0a0a' }}
+            />
+            
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <button
+                onClick={() => raceStatus === 'preparing' ? startRace() : setRaceStatus('preparing')}
+                disabled={raceStatus === 'starting'}
+                style={{
+                  flex: 1,
+                  background: raceStatus === 'racing' ? 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  color: 'white',
+                  cursor: raceStatus === 'starting' ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  opacity: raceStatus === 'starting' ? 0.5 : 1
+                }}
+              >
+                {raceStatus === 'racing' ? (
+                  <>
+                    <Pause size={16} />
+                    Pause Race
+                  </>
+                ) : raceStatus === 'starting' ? (
+                  <>
+                    <Zap size={16} />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <Play size={16} />
+                    Start Race
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={initializeRace}
+                style={{
+                  background: 'linear-gradient(90deg, #6366f1 0%, #4f46e5 100%)',
+                  border: 'none',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  fontWeight: 600,
+                  fontSize: '1rem'
+                }}
+              >
+                <RotateCcw size={16} />
+                New Track
+              </button>
+            </div>
+          </div>
+          
+          <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
+            <div style={{ background: 'linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Radio size={16} />
+              <span style={{ fontWeight: 600 }}>Race Commentary</span>
+            </div>
+            <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
+              {commentary.slice(-5).reverse().map((comment, i) => (
+                <div key={i} style={{ padding: '0.5rem', marginBottom: '0.25rem', background: comment.type === 'exciting' ? '#1e40af20' : comment.type === 'critical' ? '#dc262620' : '#0f172a', borderRadius: '4px', fontSize: '0.875rem' }}>
+                  <span style={{ opacity: 0.6, fontSize: '0.75rem' }}>
+                    [{formatTime(comment.time)}]
+                  </span>{' '}
+                  {comment.message}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Right Panel - Continues with standings, metrics, and view options... */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Race Standings Panel */}
+          <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
+            <div style={{ background: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Trophy size={16} />
+              <span style={{ fontWeight: 600 }}>Race Standings</span>
+            </div>
+            <div>
+              {racers
+                .sort((a, b) => {
+                  if (a.finishTime === Infinity && b.finishTime !== Infinity) return 1;
+                  if (a.finishTime !== Infinity && b.finishTime === Infinity) return -1;
+                  if (a.finished && !b.finished) return -1;
+                  if (!a.finished && b.finished) return 1;
+                  if (a.finished && b.finished) return a.finishTime - b.finishTime;
+                  if (raceMode === 'flags') {
+                    const flagDiff = b.collectedFlags.size - a.collectedFlags.size;
+                    if (flagDiff !== 0) return flagDiff;
+                  }
+                  return b.currentTarget - a.currentTarget;
+                })
+                .map((racer, position) => (
+                  <div
+                    key={racer.team.id}
+                    style={{
+                      padding: '0.75rem',
+                      marginBottom: '0.5rem',
+                      background: position === 0 && racer.finished ? `${racer.team.color}30` : '#0f172a',
+                      border: `2px solid ${racer.team.color}`,
+                      borderRadius: '8px',
+                      display: 'flex',
+                      gap: '0.75rem'
+                    }}
+                  >
+                    <div style={{ fontSize: '1.125rem', fontWeight: 700, width: '32px' }}>
+                      {racer.finishTime === Infinity 
+                        ? '❌' 
+                        : position === 0 && racer.finished 
+                          ? '🏆' 
+                          : `${position + 1}.`
+                      }
+                    </div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <div style={{ 
                           width: '16px', 
                           height: '16px', 
                           borderRadius: '50%', 
-                          backgroundColor: team.color 
+                          backgroundColor: racer.team.color 
                         }} />
-                        <span style={{ fontSize: '0.875rem' }}>{team.name}</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <OddsValue>{odds.odds}</OddsValue>
-                        {odds.movement === 'up' && <TrendingUp size={14} style={{ color: '#10b981' }} />}
-                      </div>
-                    </OddsItem>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </Panel>
-          
-          <Panel $variant="center">
-            <Card>
-              <CardHeader $color="linear-gradient(90deg, #3b82f6 0%, #2563eb 100%)">
-                <Gamepad2 size={16} />
-                Race Mode
-                <div style={{ marginLeft: 'auto' }}>
-                  <ModeSelector>
-                    <ModeButton 
-                      $active={raceMode === 'sprint'}
-                      onClick={() => {
-                        setRaceMode('sprint');
-                        setTimeout(initializeRace, 0);
-                      }}
-                    >
-                      <Zap size={14} />
-                      Sprint
-                    </ModeButton>
-                    <ModeButton 
-                      $active={raceMode === 'flags'}
-                      onClick={() => {
-                        setRaceMode('flags');
-                        setTimeout(initializeRace, 0);
-                      }}
-                    >
-                      <Flag size={14} />
-                      Flag Hunt
-                    </ModeButton>
-                  </ModeSelector>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <TrackCanvas
-                  ref={canvasRef}
-                  width={VIEWPORT_W}
-                  height={VIEWPORT_H}
-                />
-                
-                <ControlsBar>
-                  <Button
-                    onClick={() => raceStatus === 'preparing' ? startRace() : setRaceStatus('preparing')}
-                    disabled={raceStatus === 'starting'}
-                    $variant={raceStatus === 'racing' ? 'danger' : 'primary'}
-                  >
-                    {raceStatus === 'racing' ? (
-                      <>
-                        <Pause size={16} />
-                        Pause Race
-                      </>
-                    ) : raceStatus === 'starting' ? (
-                      <>
-                        <Zap size={16} />
-                        Starting...
-                      </>
-                    ) : (
-                      <>
-                        <Play size={16} />
-                        Start Race
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button
-                    onClick={initializeRace}
-                    $variant="secondary"
-                  >
-                    <RotateCcw size={16} />
-                    New Track
-                  </Button>
-                </ControlsBar>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader $color="linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)">
-                <Radio size={16} />
-                Race Commentary
-              </CardHeader>
-              <CardContent>
-                <div style={{ maxHeight: '120px', overflowY: 'auto' }}>
-                  {commentary.slice(-5).reverse().map((comment, i) => (
-                    <Commentary key={i} $type={comment.type}>
-                      <span style={{ opacity: 0.6, fontSize: '0.75rem' }}>
-                        [{formatTime(comment.time)}]
-                      </span>{' '}
-                      {comment.message}
-                    </Commentary>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </Panel>
-          
-          <Panel $variant="right">
-            <Card>
-              <CardHeader $color="linear-gradient(90deg, #f59e0b 0%, #d97706 100%)">
-                <Trophy size={16} />
-                Race Standings
-              </CardHeader>
-              <CardContent>
-                {racers
-                  .sort((a, b) => {
-                    if (a.finished && !b.finished) return -1;
-                    if (!a.finished && b.finished) return 1;
-                    if (a.finished && b.finished) return a.finishTime - b.finishTime;
-                    
-                    if (raceMode === 'flags') {
-                      const flagDiff = b.collectedFlags.size - a.collectedFlags.size;
-                      if (flagDiff !== 0) return flagDiff;
-                    }
-                    
-                    return b.currentTarget - a.currentTarget;
-                  })
-                  .map((racer, position) => (
-                    <LeaderboardItem
-                      key={racer.team.id}
-                      $position={position}
-                      $teamColor={racer.team.color}
-                    >
-                      <div style={{ fontSize: '1.125rem', fontWeight: 700, width: '32px' }}>
-                        {position === 0 && racer.finished ? '🏆' : `${position + 1}.`}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <div style={{ 
-                            width: '16px', 
-                            height: '16px', 
-                            borderRadius: '50%', 
-                            backgroundColor: racer.team.color 
-                          }} />
-                          <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                            #{racer.team.number}
-                          </span>
-                          <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
-                            {racer.team.name}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.25rem' }}>
-                          {racer.finished 
-                            ? `Finished: ${formatTime(racer.finishTime)} • ${racer.path.length} steps`
-                            : `Progress: ${Math.round((racer.currentTarget / Math.max(1, racer.path.length - 1)) * 100)}% • ${racer.path.length} steps`
-                          }
-                        </div>
-                        {raceMode === 'flags' && (
-                          <FlagCounter>
-                            {[...Array(7)].map((_, i) => (
-                              <FlagIcon key={i} $collected={racer.collectedFlags.has(i)}>
-                                {racer.collectedFlags.has(i) ? <CheckCircle2 size={12} /> : <Circle size={12} />}
-                              </FlagIcon>
-                            ))}
-                          </FlagCounter>
-                        )}
-                      </div>
-                    </LeaderboardItem>
-                  ))}
-              </CardContent>
-            </Card>
-            
-            {showMetrics && (
-              <Card>
-                <CardHeader $color="linear-gradient(90deg, #06b6d4 0%, #0891b2 100%)">
-                  <Gauge size={16} />
-                  Algorithm Metrics
-                </CardHeader>
-                <CardContent>
-                  {racers.slice(0, 3).map(racer => (
-                    <div key={racer.team.id} style={{ marginBottom: '1rem' }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        marginBottom: '0.5rem' 
-                      }}>
-                        <span style={{ 
-                          fontSize: '0.75rem', 
-                          fontWeight: 600, 
-                          color: racer.team.color 
-                        }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                          #{racer.team.number}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
                           {racer.team.name}
                         </span>
-                        <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>
-                          {racer.currentSpeed.toFixed(1)} m/s
+                      </div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.25rem' }}>
+                        {racer.finished 
+                          ? racer.finishTime === Infinity 
+                            ? `DNF - No path found`
+                            : `Finished: ${formatTime(racer.finishTime)} • ${racer.path.length} steps`
+                          : `Progress: ${Math.round((racer.currentTarget / Math.max(1, racer.path.length - 1)) * 100)}% • ${racer.path.length} steps`
+                        }
+                      </div>
+                      {raceMode === 'flags' && (
+                        <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.5rem' }}>
+                          {[...Array(7)].map((_, i) => (
+                            <div key={i} style={{ color: racer.collectedFlags.has(i) ? '#10b981' : '#374151' }}>
+                              {racer.collectedFlags.has(i) ? <CheckCircle2 size={12} /> : <Circle size={12} />}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+          
+          {showMetrics && (
+            <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
+              <div style={{ background: 'linear-gradient(90deg, #06b6d4 0%, #0891b2 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Gauge size={16} />
+                <span style={{ fontWeight: 600 }}>Algorithm Metrics</span>
+              </div>
+              <div>
+                {racers.slice(0, 3).map(racer => (
+                  <div key={racer.team.id} style={{ marginBottom: '1rem' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      marginBottom: '0.5rem' 
+                    }}>
+                      <span style={{ 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: racer.team.color 
+                      }}>
+                        {racer.team.name}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>
+                        {racer.currentSpeed.toFixed(1)} m/s
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.6, width: '60px' }}>Path</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                          {racer.path.length} steps
                         </span>
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.75rem', opacity: 0.6, width: '60px' }}>Path</span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>
-                            {racer.path.length} steps
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.75rem', opacity: 0.6, width: '60px' }}>Explored</span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>
-                            {racer.explored.size} cells
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.75rem', opacity: 0.6, width: '60px' }}>Efficiency</span>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>
-                            {racer.telemetry.efficiency.toFixed(1)}%
-                          </span>
-                        </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.6, width: '60px' }}>Explored</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                          {racer.explored.size} cells
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.75rem', opacity: 0.6, width: '60px' }}>Efficiency</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+                          {racer.telemetry.efficiency.toFixed(1)}%
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-            
-            <Card>
-              <CardHeader $color="linear-gradient(90deg, #64748b 0%, #475569 100%)">
-                <Settings size={16} />
-                View Options
-              </CardHeader>
-              <CardContent>
-                <ToggleSwitch>
-                  <input
-                    type="checkbox"
-                    checked={showExploration}
-                    onChange={(e) => setShowExploration(e.target.checked)}
-                  />
-                  <Eye size={16} />
-                  <span>Show Exploration</span>
-                </ToggleSwitch>
-                <ToggleSwitch>
-                  <input
-                    type="checkbox"
-                    checked={showTrails}
-                    onChange={(e) => setShowTrails(e.target.checked)}
-                  />
-                  <Sparkles size={16} />
-                  <span>Show Trails</span>
-                </ToggleSwitch>
-                <ToggleSwitch>
-                  <input
-                    type="checkbox"
-                    checked={showMetrics}
-                    onChange={(e) => setShowMetrics(e.target.checked)}
-                  />
-                  <Activity size={16} />
-                  <span>Algorithm Metrics</span>
-                </ToggleSwitch>
-              </CardContent>
-            </Card>
-          </Panel>
-        </GridLayout>
-      </MainContainer>
-    </PageContainer>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
+            <div style={{ background: 'linear-gradient(90deg, #64748b 0%, #475569 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Settings size={16} />
+              <span style={{ fontWeight: 600 }}>View Options</span>
+            </div>
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showExploration}
+                  onChange={(e) => setShowExploration(e.target.checked)}
+                />
+                <Eye size={16} />
+                <span style={{ fontSize: '0.875rem' }}>Show Exploration</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showTrails}
+                  onChange={(e) => setShowTrails(e.target.checked)}
+                />
+                <Sparkles size={16} />
+                <span style={{ fontSize: '0.875rem' }}>Show Trails</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showMetrics}
+                  onChange={(e) => setShowMetrics(e.target.checked)}
+                />
+                <Activity size={16} />
+                <span style={{ fontSize: '0.875rem' }}>Algorithm Metrics</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
