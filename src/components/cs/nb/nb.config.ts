@@ -16,22 +16,29 @@ import {
   PLANET_KEYS
 } from './nb.planetConstants';
 
+import {
+  SPACECRAFT_CONSTANTS,
+  SPACECRAFT_KEYS,
+  SPACECRAFT_COLORS,
+  SpacecraftKey
+} from './nb.spaceCraftConstants';
+
 // ===== CORE TYPES =====
 
 export interface Vector3Data {
-    x: number;
-    y: number;
-    z: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 export interface OrbitalElements {
-    semiMajorAxis: number;      // a (AU)
-    eccentricity: number;       // e (0-1)
-    inclination: number;        // i (radians)
-    longitudeOfAscendingNode: number;  // Ω (radians)
-    argumentOfPeriapsis: number;       // ω (radians)
-    meanAnomalyAtEpoch: number;        // M0 (radians)
-    epochTime: number;                 // t0 (seconds)
+  semiMajorAxis: number;      // a (AU)
+  eccentricity: number;       // e (0-1)
+  inclination: number;        // i (radians)
+  longitudeOfAscendingNode: number;  // Ω (radians)
+  argumentOfPeriapsis: number;       // ω (radians)
+  meanAnomalyAtEpoch: number;        // M0 (radians)
+  epochTime: number;                 // t0 (seconds)
 }
 
 export type BodyType = 'star' | 'planet' | 'moon' | 'asteroid' | 'comet' | 'artificial' | 'particle' | 'blackhole';
@@ -39,182 +46,182 @@ export type IntegratorType = 'euler' | 'leapfrog' | 'runge-kutta-4' | 'verlet' |
 export type ForceAlgorithm = 'brute-force' | 'barnes-hut' | 'fast-multipole' | 'tree-code';
 
 export interface CelestialBodyDefinition {
-    id: string;
-    name: string;
-    type: BodyType;
+  id: string;
+  name: string;
+  type: BodyType;
 
-    // Physical properties
-    position: Vector3Data;
-    velocity: Vector3Data;
-    mass: number;           // kg
-    radius: number;         // meters
-    density?: number;       // kg/m³ (calculated if not provided)
+  // Physical properties
+  position: Vector3Data;
+  velocity: Vector3Data;
+  mass: number;           // kg
+  radius: number;         // meters
+  density?: number;       // kg/m³ (calculated if not provided)
 
-    // Visual properties
-    color: string;
-    emissive?: string;      // for stars
-    texture?: string;
-    albedo: number;         // 0-1 reflectivity
-    temperature?: number;   // Kelvin (for color calculation)
+  // Visual properties
+  color: string;
+  emissive?: string;      // for stars
+  texture?: string;
+  albedo: number;         // 0-1 reflectivity
+  temperature?: number;   // Kelvin (for color calculation)
 
-    // Hierarchical relationships
-    parentId?: string;
-    childIds: string[];
+  // Hierarchical relationships
+  parentId?: string;
+  childIds: string[];
 
-    // Advanced properties
-    orbitalElements?: OrbitalElements;  // For analytical orbits
-    rotationPeriod?: number;            // seconds
-    obliquity?: number;                 // axial tilt in radians
-    magneticField?: number;             // Tesla
-    atmosphere?: {
-        pressure: number;     // Pascals
-        composition: Record<string, number>; // gas percentages
-    };
+  // Advanced properties
+  orbitalElements?: OrbitalElements;  // For analytical orbits
+  rotationPeriod?: number;            // seconds
+  obliquity?: number;                 // axial tilt in radians
+  magneticField?: number;             // Tesla
+  atmosphere?: {
+    pressure: number;     // Pascals
+    composition: Record<string, number>; // gas percentages
+  };
 
-    // Optimization flags
-    isFixed: boolean;       // doesn't move (like galactic center)
-    useAnalyticalOrbit: boolean;  // Use Kepler's laws instead of N-body
-    collisionRadius?: number;     // different from visual radius
+  // Optimization flags
+  isFixed: boolean;       // doesn't move (like galactic center)
+  useAnalyticalOrbit: boolean;  // Use Kepler's laws instead of N-body
+  collisionRadius?: number;     // different from visual radius
 
-    // Metadata
-    realWorldObject?: string;     // "Earth", "Alpha Centauri A", etc.
-    discoveryDate?: string;
-    physicalDescription?: string;
+  // Metadata
+  realWorldObject?: string;     // "Earth", "Alpha Centauri A", etc.
+  discoveryDate?: string;
+  physicalDescription?: string;
 }
 
 // ===== PHYSICS CONFIGURATION =====
 
 export interface PhysicsConfig {
-    // Core constants
-    gravitationalConstant: number;    // m³ kg⁻¹ s⁻²
-    speedOfLight: number;            // m/s (for relativistic effects)
+  // Core constants
+  gravitationalConstant: number;    // m³ kg⁻¹ s⁻²
+  speedOfLight: number;            // m/s (for relativistic effects)
 
-    // Integration settings
-    timeStep: number;                // seconds per step
-    maxTimeStep: number;             // adaptive stepping limit
-    minTimeStep: number;             // prevent infinite subdivision
-    integrator: IntegratorType;
-    adaptiveTimeStep: boolean;
-    errorTolerance: number;          // for adaptive stepping
+  // Integration settings
+  timeStep: number;                // seconds per step
+  maxTimeStep: number;             // adaptive stepping limit
+  minTimeStep: number;             // prevent infinite subdivision
+  integrator: IntegratorType;
+  adaptiveTimeStep: boolean;
+  errorTolerance: number;          // for adaptive stepping
 
-    // Force calculation
-    algorithm: ForceAlgorithm;
-    barnesHutTheta: number;         // accuracy parameter (0.1-1.0)
-    softening: number;              // prevent r=0 singularities (meters)
+  // Force calculation
+  algorithm: ForceAlgorithm;
+  barnesHutTheta: number;         // accuracy parameter (0.1-1.0)
+  softening: number;              // prevent r=0 singularities (meters)
 
-    // Collision detection
-    enableCollisions: boolean;
-    collisionType: 'merge' | 'bounce' | 'shatter' | 'ignore';
-    coefficientOfRestitution: number;  // bounce energy loss
+  // Collision detection
+  enableCollisions: boolean;
+  collisionType: 'merge' | 'bounce' | 'shatter' | 'ignore';
+  coefficientOfRestitution: number;  // bounce energy loss
 
-    // Advanced physics
-    enableRelativisticEffects: boolean;
-    enableTidalForces: boolean;
-    enableRadiationPressure: boolean;
-    enableStellarWind: boolean;
+  // Advanced physics
+  enableRelativisticEffects: boolean;
+  enableTidalForces: boolean;
+  enableRadiationPressure: boolean;
+  enableStellarWind: boolean;
 
-    // Performance limits
-    maxBodies: number;
-    spatialSubdivisionDepth: number;
-    forceCalculationThreads: number;
+  // Performance limits
+  maxBodies: number;
+  spatialSubdivisionDepth: number;
+  forceCalculationThreads: number;
 
-    // Energy conservation tracking
-    trackConservationLaws: boolean;
-    energyDriftThreshold: number;    // warning threshold for energy drift
+  // Energy conservation tracking
+  trackConservationLaws: boolean;
+  energyDriftThreshold: number;    // warning threshold for energy drift
 }
 
 // ===== VISUAL CONFIGURATION =====
 
 export interface VisualConfig {
-    // Rendering quality
-    qualityLevel: 'low' | 'medium' | 'high' | 'ultra';
-    targetFrameRate: number;
-    adaptiveQuality: boolean;        // reduce quality to maintain FPS
+  // Rendering quality
+  qualityLevel: 'low' | 'medium' | 'high' | 'ultra';
+  targetFrameRate: number;
+  adaptiveQuality: boolean;        // reduce quality to maintain FPS
 
-    // Particle rendering
-    particleSize: 'realistic' | 'enhanced' | 'adaptive';
-    minParticleSize: number;         // pixels
-    maxParticleSize: number;         // pixels
-    particleGlow: boolean;
-    glowIntensity: number;          // 0-2
+  // Particle rendering
+  particleSize: 'realistic' | 'enhanced' | 'adaptive';
+  minParticleSize: number;         // pixels
+  maxParticleSize: number;         // pixels
+  particleGlow: boolean;
+  glowIntensity: number;          // 0-2
 
-    // Trail system
-    enableTrails: boolean;
-    trailLength: number;            // number of points
-    trailFadeType: 'linear' | 'exponential' | 'logarithmic';
-    trailOpacity: number;           // 0-1
-    trailWidth: number;             // pixels
+  // Trail system
+  enableTrails: boolean;
+  trailLength: number;            // number of points
+  trailFadeType: 'linear' | 'exponential' | 'logarithmic';
+  trailOpacity: number;           // 0-1
+  trailWidth: number;             // pixels
 
-    // Physics visualization overlays
-    showVelocityVectors: boolean;
-    showAccelerationVectors: boolean;
-    showGravitationalField: boolean;
-    showPotentialWells: boolean;
-    showCenterOfMass: boolean;
-    showHillSpheres: boolean;
-    showRocheLobes: boolean;
+  // Physics visualization overlays
+  showVelocityVectors: boolean;
+  showAccelerationVectors: boolean;
+  showGravitationalField: boolean;
+  showPotentialWells: boolean;
+  showCenterOfMass: boolean;
+  showHillSpheres: boolean;
+  showRocheLobes: boolean;
 
-    // time-space visualization
-    showSpacetimeGrid: boolean;
-    spacetimeGridOpacity: number;   // 0-1
-    spacetimeGridColor: string;     // hex color
-    spacetimeGridSize: number;      // size of grid in meters
-    spacetimeGridDivisions: number; // number of divisions
-    spacetimeWarpStrength: number; // 0-1
-    showGravitationalWaves: boolean;
+  // time-space visualization
+  showSpacetimeGrid: boolean;
+  spacetimeGridOpacity: number;   // 0-1
+  spacetimeGridColor: string;     // hex color
+  spacetimeGridSize: number;      // size of grid in meters
+  spacetimeGridDivisions: number; // number of divisions
+  spacetimeWarpStrength: number; // 0-1
+  showGravitationalWaves: boolean;
 
 
-    // Advanced visual effects
-    enableBloom: boolean;
-    enableGravitationalLensing: boolean;
-    enableDopplerShift: boolean;     // color shift for high velocities
-    enableRelativisticBeaming: boolean;
+  // Advanced visual effects
+  enableBloom: boolean;
+  enableGravitationalLensing: boolean;
+  enableDopplerShift: boolean;     // color shift for high velocities
+  enableRelativisticBeaming: boolean;
 
-    // Background and environment
-    showStarField: boolean;
-    starFieldDensity: number;       // stars per square degree
-    showGrid: boolean;
-    showScale: boolean;
-    ambientLightIntensity: number;  // 0-1
+  // Background and environment
+  showStarField: boolean;
+  starFieldDensity: number;       // stars per square degree
+  showGrid: boolean;
+  showScale: boolean;
+  ambientLightIntensity: number;  // 0-1
 
-    // Color schemes
-    colorScheme: 'realistic' | 'temperature' | 'velocity' | 'mass' | 'type' | 'custom';
-    customColorMap?: Record<string, string>;
+  // Color schemes
+  colorScheme: 'realistic' | 'temperature' | 'velocity' | 'mass' | 'type' | 'custom';
+  customColorMap?: Record<string, string>;
 
-    // UI overlays
-    showBodyLabels: boolean;
-    showDistances: boolean;
-    showOrbitalPeriods: boolean;
-    showPhysicalProperties: boolean;
+  // UI overlays
+  showBodyLabels: boolean;
+  showDistances: boolean;
+  showOrbitalPeriods: boolean;
+  showPhysicalProperties: boolean;
 }
 
 // ===== CAMERA CONFIGURATION =====
 
 export interface CameraConfig {
-    position: Vector3Data;
-    target: Vector3Data;
-    up: Vector3Data;
+  position: Vector3Data;
+  target: Vector3Data;
+  up: Vector3Data;
 
-    // Movement settings
-    followBody?: string;            // body ID to follow
-    followDistance: number;         // meters
-    followDamping: number;         // 0-1 smoothing
+  // Movement settings
+  followBody?: string;            // body ID to follow
+  followDistance: number;         // meters
+  followDamping: number;         // 0-1 smoothing
 
-    // Controls
-    enableZoom: boolean;
-    minZoom: number;               // meters
-    maxZoom: number;               // meters
-    zoomSpeed: number;
+  // Controls
+  enableZoom: boolean;
+  minZoom: number;               // meters
+  maxZoom: number;               // meters
+  zoomSpeed: number;
 
-    enableRotation: boolean;
-    rotationSpeed: number;
-    enablePan: boolean;
-    panSpeed: number;
+  enableRotation: boolean;
+  rotationSpeed: number;
+  enablePan: boolean;
+  panSpeed: number;
 
-    // Automation
-    autoOrbit: boolean;
-    orbitSpeed: number;            // radians per second
-    autoZoomToFit: boolean;        // zoom to show all bodies
+  // Automation
+  autoOrbit: boolean;
+  orbitSpeed: number;            // radians per second
+  autoZoomToFit: boolean;        // zoom to show all bodies
 }
 
 // ====== BODY_SCALE TYPE (if not already present) =====
@@ -230,13 +237,22 @@ export type BodyScale = {
 };
 
 export const BODY_SCALE: Record<string, BodyScale> = {
-  star: { min: 5, max: 15, multiplier: 2e-7, lodDistances: [0,500,1000,2000], glowScale: 3, enableTrails: false, trailLength: 0 },
-  planet: { min: 1, max: 5, multiplier: 5e-6, lodDistances: [0,300,800,1500], enableTrails: true, trailLength: 300 },
-  moon: { min: 0.3, max: 2, multiplier: 1e-5, lodDistances: [0,200,600,1200], enableTrails: true, trailLength: 150 },
-  asteroid: { min: 0.1, max: 0.5, multiplier: 1e-4, lodDistances: [0,100,400,800], enableTrails: true, trailLength: 80 },
-  comet: { min: 0.2, max: 1, multiplier: 5e-5, lodDistances: [0,150,500,1000], enableTrails: true, trailLength: 400 },
-  artificial: { min: 0.05, max: 0.2, multiplier: 1e-3, lodDistances: [0,50,200,600], enableTrails: false, trailLength: 50 },
-  particle: { min: 0.01, max: 0.1, multiplier: 1e-3, lodDistances: [0,30,100,400], enableTrails: false, trailLength: 0 }
+  star: { min: 5, max: 15, multiplier: 2e-7, lodDistances: [0, 500, 1000, 2000], glowScale: 3, enableTrails: false, trailLength: 0 },
+  planet: { min: 1, max: 5, multiplier: 5e-6, lodDistances: [0, 300, 800, 1500], enableTrails: true, trailLength: 300 },
+  moon: { min: 0.3, max: 2, multiplier: 1e-5, lodDistances: [0, 200, 600, 1200], enableTrails: true, trailLength: 150 },
+  asteroid: { min: 0.1, max: 0.5, multiplier: 1e-4, lodDistances: [0, 100, 400, 800], enableTrails: true, trailLength: 80 },
+  comet: { min: 0.2, max: 1, multiplier: 5e-5, lodDistances: [0, 150, 500, 1000], enableTrails: true, trailLength: 400 },
+  // UPDATED: Better spacecraft visualization
+  artificial: {
+    min: 0.3,          // Bigger than before (was 0.05)
+    max: 2,            // Much bigger (was 0.2)
+    multiplier: 5e-4,  // Scale up more (was 1e-3)
+    lodDistances: [0, 100, 500, 1500],
+    enableTrails: true,  // Enable trails!
+    trailLength: 500,    // Long trails to see trajectory
+    trailFadeType: 'linear'
+  },
+  particle: { min: 0.01, max: 0.1, multiplier: 1e-3, lodDistances: [0, 30, 100, 400], enableTrails: false, trailLength: 0 }
 };
 
 // -------------------------------
@@ -249,7 +265,7 @@ function capitalizeId(id: string) {
 
 function makePlanet(id: keyof typeof PLANETARY_CONSTANTS, overrides: Partial<CelestialBodyDefinition> = {}): CelestialBodyDefinition {
   const p = PLANETARY_CONSTANTS[id];
-  const color = (DEFAULT_BODY_COLORS as Record<string,string>)[id] ?? '#888';
+  const color = (DEFAULT_BODY_COLORS as Record<string, string>)[id] ?? '#888';
 
   return {
     id,
@@ -274,18 +290,18 @@ function makePlanet(id: keyof typeof PLANETARY_CONSTANTS, overrides: Partial<Cel
 }
 
 function makeMoon(
-  id: string, 
-  parentId: keyof typeof PLANETARY_CONSTANTS, 
+  id: string,
+  parentId: keyof typeof PLANETARY_CONSTANTS,
   overrides: Partial<CelestialBodyDefinition> = {}
 ): CelestialBodyDefinition {
   const m = MOON_CONSTANTS[id];
   const parent = PLANETARY_CONSTANTS[parentId];
   const sun = PLANETARY_CONSTANTS.sun;
-  
+
   const parentSemi = parent?.semiMajorAxis ?? 0;
   const semiFromParent = m?.semiMajorAxisFromParent ?? 0;
   const parentOrbitalV = parent?.orbitalVelocity ?? 0;
-  
+
   // CRITICAL FIX: Vary the initial orbital phase for each moon
   // Instead of placing all moons at 0°, distribute them around parent
   const phaseMap: Record<string, number> = {
@@ -299,24 +315,24 @@ function makeMoon(
     'titan': Math.PI / 4,
     'enceladus': 3 * Math.PI / 4
   };
-  
+
   const phase = phaseMap[id] || 0;
-  
+
   // Calculate circular orbital velocity around parent
   const G = 6.67430e-11;
   const circularVelocity = Math.sqrt(G * parent.mass / semiFromParent);
-  
+
   // Position: moon at 'phase' angle from parent's position
   // Parent is at (parentSemi, 0, 0)
   // Moon orbits in XZ plane (same as planets orbit sun in XY)
   const moonX = parentSemi + semiFromParent * Math.cos(phase);
   const moonZ = semiFromParent * Math.sin(phase);
-  
+
   // Velocity: parent's velocity + moon's perpendicular velocity
   // Moon velocity direction is tangent to its orbit around parent
   const moonVelX = -circularVelocity * Math.sin(phase);
   const moonVelZ = circularVelocity * Math.cos(phase);
-  
+
   return {
     id,
     name: capitalizeId(id),
@@ -332,6 +348,36 @@ function makeMoon(
     isFixed: false,
     useAnalyticalOrbit: false, // Patched conics handles this dynamically
     rotationPeriod: m?.rotationPeriod,
+    ...overrides
+  } as CelestialBodyDefinition;
+}
+
+/**
+ * Creates a spacecraft body definition from constants
+ */
+function makeSpacecraft(
+  id: SpacecraftKey,
+  overrides: Partial<CelestialBodyDefinition> = {}
+): CelestialBodyDefinition {
+  const s = SPACECRAFT_CONSTANTS[id];
+
+  return {
+    id,
+    name: s.description.split(',')[0], // Use first part of description as name
+    type: 'artificial',  // Uses existing 'artificial' body type!
+    position: s.position,
+    velocity: s.velocity,
+    mass: s.mass,
+    radius: s.radius,
+    color: s.color,
+    albedo: 0.5,  // Reflective metal surfaces
+    parentId: undefined,  // Spacecraft are independent bodies
+    childIds: [],
+    isFixed: false,
+    useAnalyticalOrbit: false,  // Use full N-body physics
+    realWorldObject: id,
+    discoveryDate: s.launchDate,
+    physicalDescription: s.description,
     ...overrides
   } as CelestialBodyDefinition;
 }
@@ -358,6 +404,7 @@ const sunBody: CelestialBodyDefinition = {
 };
 
 const planetBodies = planetOrder.map(k => makePlanet(k));
+
 const moonBodies: CelestialBodyDefinition[] = [];
 for (const pKey of planetOrder) {
   const moons = PLANETARY_CONSTANTS[pKey].moons ?? [];
@@ -366,334 +413,338 @@ for (const pKey of planetOrder) {
   }
 }
 
+const spacecraftBodies = SPACECRAFT_KEYS
+  .filter(k => SPACECRAFT_CONSTANTS[k].missionStatus === 'active')
+  .map(k => makeSpacecraft(k));
+
 const solarBodies: CelestialBodyDefinition[] = [sunBody, ...planetBodies, ...moonBodies];
 
 // ===== SCENARIO DEFINITIONS =====
 
 export interface ScenarioWaypoint {
-    time: number;                  // simulation time in seconds
-    cameraPosition: Vector3Data;
-    cameraTarget: Vector3Data;
-    description: string;
-    narration?: string;            // educational text
-    highlightBodies?: string[];    // body IDs to highlight
-    overlaysToShow?: string[];     // which visual overlays to enable
+  time: number;                  // simulation time in seconds
+  cameraPosition: Vector3Data;
+  cameraTarget: Vector3Data;
+  description: string;
+  narration?: string;            // educational text
+  highlightBodies?: string[];    // body IDs to highlight
+  overlaysToShow?: string[];     // which visual overlays to enable
 }
 
 export interface Scenario {
-    id: string;
-    name: string;
-    description: string;
-    category: 'solar-system' | 'binary-stars' | 'galaxy' | 'chaos' | 'educational' | 'sandbox';
-    difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
+  id: string;
+  name: string;
+  description: string;
+  category: 'solar-system' | 'binary-stars' | 'galaxy' | 'chaos' | 'educational' | 'sandbox';
+  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'expert';
 
-    // Scenario content
-    bodies: CelestialBodyDefinition[];
-    initialCamera: CameraConfig;
-    physicsConfig: Partial<PhysicsConfig>;  // overrides for this scenario
-    visualConfig: Partial<VisualConfig>;   // visual settings for this scenario
+  // Scenario content
+  bodies: CelestialBodyDefinition[];
+  initialCamera: CameraConfig;
+  physicsConfig: Partial<PhysicsConfig>;  // overrides for this scenario
+  visualConfig: Partial<VisualConfig>;   // visual settings for this scenario
 
-    // Educational content
-    learningObjectives?: string[];
-    educationalContext?: string;
-    keyPhysicsConcepts?: string[];
-    estimatedDuration: number;     // seconds
+  // Educational content
+  learningObjectives?: string[];
+  educationalContext?: string;
+  keyPhysicsConcepts?: string[];
+  estimatedDuration: number;     // seconds
 
-    // Guided experience
-    waypoints?: ScenarioWaypoint[];
-    autoNarration?: boolean;
-    interactiveElements?: string[]; // what users can modify
+  // Guided experience
+  waypoints?: ScenarioWaypoint[];
+  autoNarration?: boolean;
+  interactiveElements?: string[]; // what users can modify
 
-    // Metadata
-    basedOnRealSystem?: boolean;
-    dataSource?: string;           // scientific paper, NASA data, etc.
-    accuracy?: 'educational' | 'research' | 'entertainment';
+  // Metadata
+  basedOnRealSystem?: boolean;
+  dataSource?: string;           // scientific paper, NASA data, etc.
+  accuracy?: 'educational' | 'research' | 'entertainment';
 }
 
 // ===== PERFORMANCE CONFIGURATION =====
 
 export interface PerformanceConfig {
-    // Computation distribution
-    useWebWorkers: boolean;
-    maxWorkerThreads: number;
-    workerTaskSize: number;        // bodies per worker chunk
+  // Computation distribution
+  useWebWorkers: boolean;
+  maxWorkerThreads: number;
+  workerTaskSize: number;        // bodies per worker chunk
 
-    // Memory management
-    enableObjectPooling: boolean;
-    maxPoolSize: number;
-    gcThreshold: number;           // trigger cleanup after N steps
+  // Memory management
+  enableObjectPooling: boolean;
+  maxPoolSize: number;
+  gcThreshold: number;           // trigger cleanup after N steps
 
-    // Adaptive performance
-    enableAdaptiveQuality: boolean;
-    targetFrameRate: number;
-    qualityAdjustmentRate: number; // how quickly to adapt
+  // Adaptive performance
+  enableAdaptiveQuality: boolean;
+  targetFrameRate: number;
+  qualityAdjustmentRate: number; // how quickly to adapt
 
-    // Spatial optimization
-    enableSpatialHashing: boolean;
-    spatialHashSize: number;       // grid size for spatial hash
-    enableOctree: boolean;
-    octreeDepth: number;
+  // Spatial optimization
+  enableSpatialHashing: boolean;
+  spatialHashSize: number;       // grid size for spatial hash
+  enableOctree: boolean;
+  octreeDepth: number;
 
-    // Level of detail
-    enableLOD: boolean;
-    lodDistanceThreshold: number;  // meters
-    lodParticleReduction: number;  // factor to reduce particles by
+  // Level of detail
+  enableLOD: boolean;
+  lodDistanceThreshold: number;  // meters
+  lodParticleReduction: number;  // factor to reduce particles by
 
-    // Profiling
-    enableProfiling: boolean;
-    profilingInterval: number;     // seconds between reports
-    logPerformanceWarnings: boolean;
+  // Profiling
+  enableProfiling: boolean;
+  profilingInterval: number;     // seconds between reports
+  logPerformanceWarnings: boolean;
 }
 
 // ===== DEFAULT CONFIGURATIONS =====
 
 export const DEFAULT_PHYSICS: PhysicsConfig = {
-    gravitationalConstant: 6.67430e-11,
-    speedOfLight: 299792458,
-    timeStep: 86400, // 1 day in seconds
-    maxTimeStep: 86400 * 7, // 1 week
-    minTimeStep: 3600, // 1 hour
-    integrator: 'leapfrog',
-    adaptiveTimeStep: true,
-    errorTolerance: 1e-6,
-    algorithm: 'barnes-hut',
-    barnesHutTheta: 0.5,
-    softening: 1000, // 1 km
-    enableCollisions: true,
-    collisionType: 'merge',
-    coefficientOfRestitution: 0.3,
-    enableRelativisticEffects: false,
-    enableTidalForces: false,
-    enableRadiationPressure: false,
-    enableStellarWind: false,
-    maxBodies: 10000,
-    spatialSubdivisionDepth: 8,
-    forceCalculationThreads: 4,
-    trackConservationLaws: true,
-    energyDriftThreshold: 0.001
+  gravitationalConstant: 6.67430e-11,
+  speedOfLight: 299792458,
+  timeStep: 86400, // 1 day in seconds
+  maxTimeStep: 86400 * 7, // 1 week
+  minTimeStep: 3600, // 1 hour
+  integrator: 'leapfrog',
+  adaptiveTimeStep: true,
+  errorTolerance: 1e-6,
+  algorithm: 'barnes-hut',
+  barnesHutTheta: 0.5,
+  softening: 1000, // 1 km
+  enableCollisions: true,
+  collisionType: 'merge',
+  coefficientOfRestitution: 0.3,
+  enableRelativisticEffects: false,
+  enableTidalForces: false,
+  enableRadiationPressure: false,
+  enableStellarWind: false,
+  maxBodies: 10000,
+  spatialSubdivisionDepth: 8,
+  forceCalculationThreads: 4,
+  trackConservationLaws: true,
+  energyDriftThreshold: 0.001
 };
 
 export const DEFAULT_VISUAL: VisualConfig = {
-    qualityLevel: 'high',
-    targetFrameRate: 60,
-    adaptiveQuality: true,
-    particleSize: 'adaptive',
-    minParticleSize: 2,
-    maxParticleSize: 100,
-    particleGlow: true,
-    glowIntensity: 1.2,
-    enableTrails: true,
-    trailLength: 100,
-    trailFadeType: 'exponential',
-    trailOpacity: 0.7,
-    trailWidth: 2,
-    showVelocityVectors: false,
-    showAccelerationVectors: false,
-    showGravitationalField: false,
-    showPotentialWells: false,
-    showCenterOfMass: false,
-    showHillSpheres: false,
-    showRocheLobes: false,
+  qualityLevel: 'high',
+  targetFrameRate: 60,
+  adaptiveQuality: true,
+  particleSize: 'adaptive',
+  minParticleSize: 2,
+  maxParticleSize: 100,
+  particleGlow: true,
+  glowIntensity: 1.2,
+  enableTrails: true,
+  trailLength: 100,
+  trailFadeType: 'exponential',
+  trailOpacity: 0.7,
+  trailWidth: 2,
+  showVelocityVectors: false,
+  showAccelerationVectors: false,
+  showGravitationalField: false,
+  showPotentialWells: false,
+  showCenterOfMass: false,
+  showHillSpheres: false,
+  showRocheLobes: false,
 
-    // NEW: Spacetime defaults
-    showSpacetimeGrid: false,
-    spacetimeGridOpacity: 0.15,
-    spacetimeGridColor: '#0066ff',
-    spacetimeGridSize: 2000,
-    spacetimeGridDivisions: 60,
-    spacetimeWarpStrength: 0.05,
-    showGravitationalWaves: true,
+  // NEW: Spacetime defaults
+  showSpacetimeGrid: false,
+  spacetimeGridOpacity: 0.15,
+  spacetimeGridColor: '#0066ff',
+  spacetimeGridSize: 2000,
+  spacetimeGridDivisions: 60,
+  spacetimeWarpStrength: 0.05,
+  showGravitationalWaves: true,
 
-    enableBloom: true,
-    enableGravitationalLensing: false,
-    enableDopplerShift: false,
-    enableRelativisticBeaming: false,
-    showStarField: true,
-    starFieldDensity: 1000,
-    showGrid: false,
-    showScale: true,
-    ambientLightIntensity: 0.1,
-    colorScheme: 'realistic',
-    showBodyLabels: true,
-    showDistances: false,
-    showOrbitalPeriods: false,
-    showPhysicalProperties: false
+  enableBloom: true,
+  enableGravitationalLensing: false,
+  enableDopplerShift: false,
+  enableRelativisticBeaming: false,
+  showStarField: true,
+  starFieldDensity: 1000,
+  showGrid: false,
+  showScale: true,
+  ambientLightIntensity: 0.1,
+  colorScheme: 'realistic',
+  showBodyLabels: true,
+  showDistances: false,
+  showOrbitalPeriods: false,
+  showPhysicalProperties: false
 };
 
 export const DEFAULT_CAMERA: CameraConfig = {
-    position: { x: 0, y: 0, z: 1.496e11 }, // 1 AU away
-    target: { x: 0, y: 0, z: 0 },
-    up: { x: 0, y: 1, z: 0 },
-    followDistance: 1.496e11, // 1 AU
-    followDamping: 0.95,
-    enableZoom: true,
-    minZoom: 1e6, // 1000 km
-    maxZoom: 1e15, // ~67 AU
-    zoomSpeed: 1.5,
-    enableRotation: true,
-    rotationSpeed: 1.0,
-    enablePan: true,
-    panSpeed: 1.0,
-    autoOrbit: false,
-    orbitSpeed: 0.1,
-    autoZoomToFit: false
+  position: { x: 0, y: 0, z: 1.496e11 }, // 1 AU away
+  target: { x: 0, y: 0, z: 0 },
+  up: { x: 0, y: 1, z: 0 },
+  followDistance: 1.496e11, // 1 AU
+  followDamping: 0.95,
+  enableZoom: true,
+  minZoom: 1e6, // 1000 km
+  maxZoom: 1e15, // ~67 AU
+  zoomSpeed: 1.5,
+  enableRotation: true,
+  rotationSpeed: 1.0,
+  enablePan: true,
+  panSpeed: 1.0,
+  autoOrbit: false,
+  orbitSpeed: 0.1,
+  autoZoomToFit: false
 };
 
 export const DEFAULT_PERFORMANCE: PerformanceConfig = {
-    useWebWorkers: true,
-    maxWorkerThreads: 4,
-    workerTaskSize: 100,
-    enableObjectPooling: true,
-    maxPoolSize: 1000,
-    gcThreshold: 1000,
-    enableAdaptiveQuality: true,
-    targetFrameRate: 60,
-    qualityAdjustmentRate: 0.1,
-    enableSpatialHashing: true,
-    spatialHashSize: 1000,
-    enableOctree: true,
-    octreeDepth: 6,
-    enableLOD: true,
-    lodDistanceThreshold: 1e12, // ~6700 AU
-    lodParticleReduction: 0.5,
-    enableProfiling: false,
-    profilingInterval: 5,
-    logPerformanceWarnings: true
+  useWebWorkers: true,
+  maxWorkerThreads: 4,
+  workerTaskSize: 100,
+  enableObjectPooling: true,
+  maxPoolSize: 1000,
+  gcThreshold: 1000,
+  enableAdaptiveQuality: true,
+  targetFrameRate: 60,
+  qualityAdjustmentRate: 0.1,
+  enableSpatialHashing: true,
+  spatialHashSize: 1000,
+  enableOctree: true,
+  octreeDepth: 6,
+  enableLOD: true,
+  lodDistanceThreshold: 1e12, // ~6700 AU
+  lodParticleReduction: 0.5,
+  enableProfiling: false,
+  profilingInterval: 5,
+  logPerformanceWarnings: true
 };
 
 // ===== PREDEFINED SCENARIOS =====
 
 // Solar System - bodies built from planet constants (keeps exports identical)
 export const SOLAR_SYSTEM_SCENARIO: Scenario = {
-    id: 'solar-system',
-    name: 'Our Solar System',
-    description: 'Explore the planets and their motions around the Sun',
-    category: 'solar-system',
-    difficulty: 'beginner',
-    bodies: solarBodies,
-    initialCamera: {
-        ...DEFAULT_CAMERA,
-        position: { x: 0, y: 5e10, z: 5e10 }, // Above and away from solar system
-        followBody: 'earth'
-    },
-    physicsConfig: {
-        timeStep: 3600, // 1 hour steps for smoother planetary motion
-        algorithm: 'barnes-hut'
-    },
-    visualConfig: {
-        enableTrails: true,
-        trailLength: 365, // Show one year of orbital history
-        showBodyLabels: true
-    },
-    learningObjectives: [
-        'Understand orbital mechanics',
-        'Observe Kepler\'s laws in action',
-        'Compare planetary sizes and distances'
-    ],
-    educationalContext: 'The solar system demonstrates fundamental principles of celestial mechanics, including gravitational attraction, orbital motion, and the conservation of energy and angular momentum.',
-    keyPhysicsConcepts: ['Gravity', 'Orbital mechanics', 'Kepler\'s laws', 'Conservation laws'],
-    estimatedDuration: 300, // 5 minutes
-    basedOnRealSystem: true,
-    dataSource: 'NASA JPL Horizons System',
-    accuracy: 'educational'
+  id: 'solar-system',
+  name: 'Our Solar System',
+  description: 'Explore the planets and their motions around the Sun',
+  category: 'solar-system',
+  difficulty: 'beginner',
+  bodies: solarBodies,
+  initialCamera: {
+    ...DEFAULT_CAMERA,
+    position: { x: 0, y: 5e10, z: 5e10 }, // Above and away from solar system
+    followBody: 'earth'
+  },
+  physicsConfig: {
+    timeStep: 3600, // 1 hour steps for smoother planetary motion
+    algorithm: 'barnes-hut'
+  },
+  visualConfig: {
+    enableTrails: true,
+    trailLength: 365, // Show one year of orbital history
+    showBodyLabels: true
+  },
+  learningObjectives: [
+    'Understand orbital mechanics',
+    'Observe Kepler\'s laws in action',
+    'Compare planetary sizes and distances'
+  ],
+  educationalContext: 'The solar system demonstrates fundamental principles of celestial mechanics, including gravitational attraction, orbital motion, and the conservation of energy and angular momentum.',
+  keyPhysicsConcepts: ['Gravity', 'Orbital mechanics', 'Kepler\'s laws', 'Conservation laws'],
+  estimatedDuration: 300, // 5 minutes
+  basedOnRealSystem: true,
+  dataSource: 'NASA JPL Horizons System',
+  accuracy: 'educational'
 };
 
 // Binary Star System
 export const BINARY_STAR_SCENARIO: Scenario = {
-    id: 'binary-star',
-    name: 'Alpha Centauri A & B',
-    description: 'Watch two stars dance around their common center of mass',
-    category: 'binary-stars',
-    difficulty: 'intermediate',
-    bodies: [
-        {
-            id: 'alpha-cen-a',
-            name: 'Alpha Centauri A',
-            type: 'star',
-            position: { x: -1.1e11, y: 0, z: 0 }, // Offset from barycenter
-            velocity: { x: 0, y: -15000, z: 0 },
-            mass: 2.2e30, // 1.1 solar masses
-            radius: 8.5e8,
-            color: '#FFF4EA',
-            emissive: '#FFF4EA',
-            albedo: 1.0,
-            temperature: 5790,
-            parentId: undefined,
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: false,
-            realWorldObject: 'Alpha Centauri A'
-        },
-        {
-            id: 'alpha-cen-b',
-            name: 'Alpha Centauri B',
-            type: 'star',
-            position: { x: 1.3e11, y: 0, z: 0 }, // Offset from barycenter
-            velocity: { x: 0, y: 12500, z: 0 },
-            mass: 1.8e30, // 0.9 solar masses
-            radius: 6.0e8,
-            color: '#FFE4B5',
-            emissive: '#FFE4B5',
-            albedo: 1.0,
-            temperature: 5260,
-            parentId: undefined,
-            childIds: [],
-            isFixed: false,
-            useAnalyticalOrbit: false,
-            realWorldObject: 'Alpha Centauri B'
-        }
-    ],
-    initialCamera: {
-        ...DEFAULT_CAMERA,
-        position: { x: 0, y: 0, z: 5e11 },
-        target: { x: 0, y: 0, z: 0 }
+  id: 'binary-star',
+  name: 'Alpha Centauri A & B',
+  description: 'Watch two stars dance around their common center of mass',
+  category: 'binary-stars',
+  difficulty: 'intermediate',
+  bodies: [
+    {
+      id: 'alpha-cen-a',
+      name: 'Alpha Centauri A',
+      type: 'star',
+      position: { x: -1.1e11, y: 0, z: 0 }, // Offset from barycenter
+      velocity: { x: 0, y: -15000, z: 0 },
+      mass: 2.2e30, // 1.1 solar masses
+      radius: 8.5e8,
+      color: '#FFF4EA',
+      emissive: '#FFF4EA',
+      albedo: 1.0,
+      temperature: 5790,
+      parentId: undefined,
+      childIds: [],
+      isFixed: false,
+      useAnalyticalOrbit: false,
+      realWorldObject: 'Alpha Centauri A'
     },
-    physicsConfig: {
-        timeStep: 86400 * 30, // 30 days
-        algorithm: 'brute-force' // Only 2 bodies, direct calculation is fine
-    },
-    visualConfig: {
-        enableTrails: true,
-        trailLength: 200,
-        showCenterOfMass: true,
-        enableBloom: true
-    },
-    learningObjectives: [
-        'Understand binary star systems',
-        'Observe center of mass motion',
-        'See how stellar masses affect orbits'
-    ],
-    educationalContext: 'Binary star systems are common in the universe. The two stars orbit around their common center of mass (barycenter), demonstrating Newton\'s laws and conservation of momentum.',
-    keyPhysicsConcepts: ['Center of mass', 'Mutual orbits', 'Stellar evolution'],
-    estimatedDuration: 240,
-    basedOnRealSystem: true,
-    accuracy: 'educational'
+    {
+      id: 'alpha-cen-b',
+      name: 'Alpha Centauri B',
+      type: 'star',
+      position: { x: 1.3e11, y: 0, z: 0 }, // Offset from barycenter
+      velocity: { x: 0, y: 12500, z: 0 },
+      mass: 1.8e30, // 0.9 solar masses
+      radius: 6.0e8,
+      color: '#FFE4B5',
+      emissive: '#FFE4B5',
+      albedo: 1.0,
+      temperature: 5260,
+      parentId: undefined,
+      childIds: [],
+      isFixed: false,
+      useAnalyticalOrbit: false,
+      realWorldObject: 'Alpha Centauri B'
+    }
+  ],
+  initialCamera: {
+    ...DEFAULT_CAMERA,
+    position: { x: 0, y: 0, z: 5e11 },
+    target: { x: 0, y: 0, z: 0 }
+  },
+  physicsConfig: {
+    timeStep: 86400 * 30, // 30 days
+    algorithm: 'brute-force' // Only 2 bodies, direct calculation is fine
+  },
+  visualConfig: {
+    enableTrails: true,
+    trailLength: 200,
+    showCenterOfMass: true,
+    enableBloom: true
+  },
+  learningObjectives: [
+    'Understand binary star systems',
+    'Observe center of mass motion',
+    'See how stellar masses affect orbits'
+  ],
+  educationalContext: 'Binary star systems are common in the universe. The two stars orbit around their common center of mass (barycenter), demonstrating Newton\'s laws and conservation of momentum.',
+  keyPhysicsConcepts: ['Center of mass', 'Mutual orbits', 'Stellar evolution'],
+  estimatedDuration: 240,
+  basedOnRealSystem: true,
+  accuracy: 'educational'
 };
 
 // Empty Sandbox
 export const SANDBOX_SCENARIO: Scenario = {
-    id: 'sandbox',
-    name: 'Empty Space',
-    description: 'Start with empty space and create your own system',
-    category: 'sandbox',
-    difficulty: 'beginner',
-    bodies: [],
-    initialCamera: DEFAULT_CAMERA,
-    physicsConfig: {},
-    visualConfig: {
-        showGrid: true,
-        showScale: true
-    },
-    learningObjectives: [
-        'Experiment with different configurations',
-        'Understand the effects of mass and distance',
-        'Discover stable and unstable orbits'
-    ],
-    educationalContext: 'Use the sandbox to experiment with different gravitational configurations. Try creating stable orbits, binary systems, or chaotic three-body systems.',
-    keyPhysicsConcepts: ['Gravitational force', 'Orbital stability', 'Three-body problem'],
-    estimatedDuration: 600, // 10 minutes
-    basedOnRealSystem: false,
-    accuracy: 'educational'
+  id: 'sandbox',
+  name: 'Empty Space',
+  description: 'Start with empty space and create your own system',
+  category: 'sandbox',
+  difficulty: 'beginner',
+  bodies: [],
+  initialCamera: DEFAULT_CAMERA,
+  physicsConfig: {},
+  visualConfig: {
+    showGrid: true,
+    showScale: true
+  },
+  learningObjectives: [
+    'Experiment with different configurations',
+    'Understand the effects of mass and distance',
+    'Discover stable and unstable orbits'
+  ],
+  educationalContext: 'Use the sandbox to experiment with different gravitational configurations. Try creating stable orbits, binary systems, or chaotic three-body systems.',
+  keyPhysicsConcepts: ['Gravitational force', 'Orbital stability', 'Three-body problem'],
+  estimatedDuration: 600, // 10 minutes
+  basedOnRealSystem: false,
+  accuracy: 'educational'
 };
 
 // Galaxy Explorer scenario
@@ -750,75 +801,255 @@ export const GALAXY_EXPLORER_SCENARIO: Scenario = {
   accuracy: 'entertainment'
 };
 
+
+// ===== SPACECRAFT SCENARIOS =====
+
+export const VOYAGER_GRAND_TOUR_SCENARIO: Scenario = {
+  id: 'voyager-grand-tour',
+  name: 'Voyager Grand Tour',
+  description: 'Follow Voyager 1 and 2 through their historic journey past the outer planets',
+  category: 'educational',
+  difficulty: 'beginner',
+
+  bodies: [
+    sunBody,
+    ...planetBodies,
+    makeSpacecraft('voyager1'),
+    makeSpacecraft('voyager2')
+  ],
+
+  initialCamera: {
+    ...DEFAULT_CAMERA,
+    position: { x: 0, y: 5e11, z: 5e11 },
+    followBody: 'voyager1',
+    followDistance: 2e12
+  },
+
+  physicsConfig: {
+    timeStep: 86400 * 30, // 30 day steps for long journey
+    algorithm: 'barnes-hut'
+  },
+
+  visualConfig: {
+    enableTrails: true,
+    trailLength: 500,
+    showBodyLabels: true,
+    showVelocityVectors: true
+  },
+
+  learningObjectives: [
+    'Understand gravity assists',
+    'See how spacecraft navigate solar system',
+    'Appreciate the scale of interstellar distances'
+  ],
+
+  educationalContext: 'The Voyager missions used gravity assists from Jupiter and Saturn to reach incredible speeds. This "slingshot" effect demonstrates conservation of momentum and energy transfer between bodies.',
+
+  keyPhysicsConcepts: ['Gravity assists', 'Orbital mechanics', 'Escape velocity'],
+  estimatedDuration: 420,
+  basedOnRealSystem: true,
+  dataSource: 'NASA JPL Horizons',
+  accuracy: 'educational'
+};
+
+export const JWST_L2_SCENARIO: Scenario = {
+  id: 'jwst-lagrange',
+  name: 'James Webb at L2',
+  description: 'Observe how JWST maintains a stable halo orbit around the Sun-Earth L2 Lagrange point',
+  category: 'educational',
+  difficulty: 'intermediate',
+
+  bodies: [
+    sunBody,
+    makePlanet('earth'),
+    makeMoon('moon', 'earth'),
+    makeSpacecraft('jwst', {
+      // Override to show halo orbit (simplified)
+      orbitalElements: {
+        semiMajorAxis: 1.495978707e11 + 1.5e9,
+        eccentricity: 0.01,
+        inclination: 0.1,
+        longitudeOfAscendingNode: 0,
+        argumentOfPeriapsis: 0,
+        meanAnomalyAtEpoch: 0,
+        epochTime: 0
+      }
+    })
+  ],
+
+  initialCamera: {
+    ...DEFAULT_CAMERA,
+    position: { x: 1.6e11, y: 3e10, z: 3e10 },
+    followBody: 'jwst',
+    followDistance: 5e9
+  },
+
+  physicsConfig: {
+    timeStep: 3600, // 1 hour steps
+    algorithm: 'brute-force', // Few bodies, precise calculation
+    enableTidalForces: true
+  },
+
+  visualConfig: {
+    enableTrails: true,
+    trailLength: 200,
+    showBodyLabels: true,
+    showCenterOfMass: true,
+    // NEW: Show Lagrange points!
+    showGravitationalField: true
+  },
+
+  learningObjectives: [
+    'Understand Lagrange points',
+    'See three-body problem dynamics',
+    'Learn about orbital stability'
+  ],
+
+  educationalContext: 'Lagrange points are positions where gravitational forces of two large bodies precisely balance the centrifugal force felt by a smaller object. L2 is ideal for space telescopes because it offers a stable thermal environment and unobstructed view of deep space.',
+
+  keyPhysicsConcepts: ['Lagrange points', 'Three-body problem', 'Orbital resonance', 'Halo orbits'],
+  estimatedDuration: 300,
+  basedOnRealSystem: true,
+  dataSource: 'NASA Webb Mission',
+  accuracy: 'educational',
+
+  waypoints: [
+    {
+      time: 0,
+      cameraPosition: { x: 1.6e11, y: 3e10, z: 3e10 },
+      cameraTarget: { x: 1.495978707e11 + 1.5e9, y: 0, z: 0 },
+      description: 'JWST at L2 Point',
+      narration: 'James Webb Space Telescope orbits the Sun-Earth L2 Lagrange point, about 1.5 million km from Earth.',
+      highlightBodies: ['jwst', 'earth'],
+      overlaysToShow: ['showGravitationalField']
+    }
+  ]
+};
+
+export const PARKER_SOLAR_SCENARIO: Scenario = {
+  id: 'parker-solar-probe',
+  name: 'Parker Solar Probe',
+  description: 'Experience the fastest spacecraft ever built diving into the Sun\'s corona',
+  category: 'educational',
+  difficulty: 'beginner',
+
+  bodies: [
+    sunBody,
+    makePlanet('mercury'),
+    makePlanet('venus'),
+    makeSpacecraft('parker-solar')
+  ],
+
+  initialCamera: {
+    ...DEFAULT_CAMERA,
+    position: { x: 0, y: 2e11, z: 2e11 },
+    followBody: 'parker-solar',
+    followDistance: 1e11
+  },
+
+  physicsConfig: {
+    timeStep: 3600, // 1 hour
+    algorithm: 'brute-force',
+    enableRadiationPressure: true,
+    enableStellarWind: true
+  },
+
+  visualConfig: {
+    enableTrails: true,
+    trailLength: 400,
+    showBodyLabels: true,
+    showVelocityVectors: true,
+    enableBloom: true,
+    showSpacetimeGrid: true,  // SPACETIME VISUALIZATION!
+    spacetimeWarpStrength: 0.3  // Show Sun's gravity well
+  },
+
+  learningObjectives: [
+    'Understand extreme velocities near the Sun',
+    'See gravity assists with Venus',
+    'Appreciate solar radiation effects'
+  ],
+
+  educationalContext: 'Parker Solar Probe uses Venus gravity assists to gradually lower its orbit, reaching speeds over 200 km/s - the fastest human-made object ever. It studies the Sun\'s corona and solar wind.',
+
+  keyPhysicsConcepts: ['Extreme velocities', 'Gravity assists', 'Radiation pressure'],
+  estimatedDuration: 360,
+  basedOnRealSystem: true,
+  accuracy: 'educational'
+};
+
+// UPDATE PREDEFINED_SCENARIOS to include new scenarios
 export const PREDEFINED_SCENARIOS: Record<string, Scenario> = {
-    'solar-system': SOLAR_SYSTEM_SCENARIO,
-    'binary-star': BINARY_STAR_SCENARIO,
-    'sandbox': SANDBOX_SCENARIO,
-    'galaxy-explorer': GALAXY_EXPLORER_SCENARIO
+  'solar-system': SOLAR_SYSTEM_SCENARIO,
+  'binary-star': BINARY_STAR_SCENARIO,
+  'sandbox': SANDBOX_SCENARIO,
+  'voyager-grand-tour': VOYAGER_GRAND_TOUR_SCENARIO,
+  'jwst-lagrange': JWST_L2_SCENARIO,
+  'parker-solar-probe': PARKER_SOLAR_SCENARIO,
+  'galaxy-explorer': GALAXY_EXPLORER_SCENARIO
 };
 
 // ===== UTILITY CONSTANTS =====
 
 export const ASTRONOMICAL_UNITS = {
-    METER: 1,
-    KILOMETER: 1e3,
-    ASTRONOMICAL_UNIT: 1.496e11,
-    LIGHT_YEAR: 9.461e15,
-    PARSEC: 3.086e16,
-    SOLAR_RADIUS: 6.96e8,
-    EARTH_RADIUS: 6.371e6,
-    JUPITER_RADIUS: 6.9911e7
+  METER: 1,
+  KILOMETER: 1e3,
+  ASTRONOMICAL_UNIT: 1.496e11,
+  LIGHT_YEAR: 9.461e15,
+  PARSEC: 3.086e16,
+  SOLAR_RADIUS: 6.96e8,
+  EARTH_RADIUS: 6.371e6,
+  JUPITER_RADIUS: 6.9911e7
 } as const;
 
 export const MASS_UNITS = {
-    KILOGRAM: 1,
-    SOLAR_MASS: 1.989e30,
-    EARTH_MASS: 5.972e24,
-    JUPITER_MASS: 1.898e27,
-    LUNAR_MASS: 7.342e22
+  KILOGRAM: 1,
+  SOLAR_MASS: 1.989e30,
+  EARTH_MASS: 5.972e24,
+  JUPITER_MASS: 1.898e27,
+  LUNAR_MASS: 7.342e22
 } as const;
 
 export const TIME_UNITS = {
-    SECOND: 1,
-    MINUTE: 60,
-    HOUR: 3600,
-    DAY: 86400,
-    YEAR: 31557600, // Julian year
-    MILLION_YEARS: 31557600e6
+  SECOND: 1,
+  MINUTE: 60,
+  HOUR: 3600,
+  DAY: 86400,
+  YEAR: 31557600, // Julian year
+  MILLION_YEARS: 31557600e6
 } as const;
 
 // ===== BODY TEMPLATES =====
-
 export const BODY_TEMPLATES = {
-    STAR: {
-        type: 'star' as const,
-        mass: MASS_UNITS.SOLAR_MASS,
-        radius: ASTRONOMICAL_UNITS.SOLAR_RADIUS,
-        color: '#FDB813',
-        emissive: '#FDB813',
-        temperature: 5778,
-        albedo: 1.0
-    },
-    PLANET: {
-        type: 'planet' as const,
-        mass: MASS_UNITS.EARTH_MASS,
-        radius: ASTRONOMICAL_UNITS.EARTH_RADIUS,
-        color: '#6B93D6',
-        temperature: 288,
-        albedo: 0.3
-    },
-    MOON: {
-        type: 'moon' as const,
-        mass: MASS_UNITS.LUNAR_MASS,
-        radius: ASTRONOMICAL_UNITS.EARTH_RADIUS * 0.27,
-        color: '#C0C0C0',
-        albedo: 0.136
-    },
-    ASTEROID: {
-        type: 'asteroid' as const,
-        mass: 1e15, // ~1 km diameter rocky body
-        radius: 500,
-        color: '#8C7853',
-        albedo: 0.05
-    }
+  STAR: {
+    type: 'star' as const,
+    mass: MASS_UNITS.SOLAR_MASS,
+    radius: ASTRONOMICAL_UNITS.SOLAR_RADIUS,
+    color: '#FDB813',
+    emissive: '#FDB813',
+    temperature: 5778,
+    albedo: 1.0
+  },
+  PLANET: {
+    type: 'planet' as const,
+    mass: MASS_UNITS.EARTH_MASS,
+    radius: ASTRONOMICAL_UNITS.EARTH_RADIUS,
+    color: '#6B93D6',
+    temperature: 288,
+    albedo: 0.3
+  },
+  MOON: {
+    type: 'moon' as const,
+    mass: MASS_UNITS.LUNAR_MASS,
+    radius: ASTRONOMICAL_UNITS.EARTH_RADIUS * 0.27,
+    color: '#C0C0C0',
+    albedo: 0.136
+  },
+  ASTEROID: {
+    type: 'asteroid' as const,
+    mass: 1e15, // ~1 km diameter rocky body
+    radius: 500,
+    color: '#8C7853',
+    albedo: 0.05
+  }
 } as const;

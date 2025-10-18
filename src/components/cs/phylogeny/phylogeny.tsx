@@ -1674,7 +1674,7 @@ export default function LUCASimulation({ isRunning: externalIsRunning, speed: ex
             <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
                 <div style={{ marginBottom: '2rem' }}>
                     <h1 style={{ fontSize: '1.5rem', fontWeight: 600, margin: '0 0 0.5rem 0', letterSpacing: '-0.02em' }}>
-                        The Origin of Life: Hydrothermal Vent Simulation
+                        The Origin of Life: Luca
                     </h1>
                     <p style={{ color: COLORS.textMuted, fontSize: '0.9rem', margin: '0 0 1rem 0' }}>
                         {phaseLabels[engine.world.phase]}
