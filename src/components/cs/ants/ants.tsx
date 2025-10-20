@@ -21,13 +21,21 @@ const COLORS = {
 };
 
 // Types
-type AlgorithmType = 'greedy' | 'twoOpt' | 'annealing' | 'genetic' | 'antColony';
+type AlgorithmType = 'greedy' | 'twoOpt' | 'annealing' | 'genetic' | 'antColony' | 'bmssp';
 type CityMode = 'random' | 'circle' | 'grid' | 'clusters' | 'spiral';
 
 interface City {
   x: number;
   y: number;
   id: number;
+}
+
+interface BMSSPState {
+  pivots: Set<number>;
+  distances: number[][];
+  phase: 'exploration' | 'refinement';
+  iteration: number;
+  W: Set<number>;
 }
 
 interface Algorithm {
@@ -49,6 +57,7 @@ interface Algorithm {
   history?: number[];
   improvementRate?: number;
   lastImprovement?: number;
+  bmsspState?: BMSSPState;
 }
 
 interface Particle {
@@ -63,6 +72,12 @@ interface Particle {
 interface TSPAlgorithmRaceProps {
   isRunning?: boolean;
   speed?: number;
+}
+
+interface TrailPoint {
+  x: number;
+  y: number;
+  alpha: number;
 }
 
 // Animations
@@ -695,6 +710,14 @@ const algorithmConfigs = {
     glow: '#34d399',
     description: 'Follow the pheromone highway',
     funFact: 'Inspired by real ant behavior'
+  },
+  bmssp: {
+    name: 'BMSSP Multi-Source',
+    emoji: '🌊',
+    color: '#ec4899',
+    glow: '#f472b6',
+    description: 'Wave expansion from pivots',
+    funFact: 'Multi-source shortest path adaptation'
   }
 };
 
@@ -900,6 +923,118 @@ class TSP {
     
     return { best: bestTour, pheromones: newPheromones };
   }
+
+  static bmssp(cities: City[], state?: BMSSPState): { path: number[], improved: boolean, state: BMSSPState } {
+    const n = cities.length;
+    
+    if (!state) {
+      const k = Math.max(3, Math.ceil(Math.sqrt(n)));
+      const pivots = new Set<number>();
+      
+      for (let i = 0; i < k; i++) {
+        pivots.add(Math.floor(i * n / k));
+      }
+      
+      const distances: number[][] = Array(n).fill(null).map(() => Array(n).fill(Infinity));
+      
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          if (i === j) {
+            distances[i][j] = 0;
+          } else {
+            distances[i][j] = Math.hypot(cities[i].x - cities[j].x, cities[i].y - cities[j].y);
+          }
+        }
+      }
+      
+      state = {
+        pivots,
+        distances,
+        phase: 'exploration',
+        iteration: 0,
+        W: new Set(pivots)
+      };
+    }
+
+    if (state.phase === 'exploration') {
+      const visited = new Set<number>();
+      const tour: number[] = [];
+      
+      const bd: Map<number, number> = new Map();
+      for (let i = 0; i < n; i++) {
+        let minDist = Infinity;
+        for (const pivot of state.pivots) {
+          minDist = Math.min(minDist, state.distances[i][pivot]);
+        }
+        bd.set(i, minDist);
+      }
+      
+      const sortedCities = Array.from(bd.entries())
+        .sort((a, b) => a[1] - b[1])
+        .map(([city]) => city);
+      
+      let current = sortedCities[0];
+      tour.push(current);
+      visited.add(current);
+      
+      while (visited.size < n) {
+        let bestNext = -1;
+        let bestScore = -Infinity;
+        
+        for (let i = 0; i < n; i++) {
+          if (visited.has(i)) continue;
+          
+          const dist = state.distances[current][i];
+          const boundary = bd.get(i) || Infinity;
+          const isPivot = state.pivots.has(i) ? 3 : 1;
+          const inW = state.W.has(i) ? 1.5 : 1;
+          
+          const score = (isPivot * inW) / (dist + 1) / (boundary + 1);
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestNext = i;
+          }
+        }
+        
+        if (bestNext !== -1) {
+          tour.push(bestNext);
+          visited.add(bestNext);
+          current = bestNext;
+          
+          if (bd.get(bestNext)! < 50) {
+            state.W.add(bestNext);
+          }
+        } else {
+          break;
+        }
+      }
+      
+      for (let i = 0; i < n; i++) {
+        if (!visited.has(i)) {
+          tour.push(i);
+        }
+      }
+      
+      state.iteration++;
+      
+      if (state.iteration > 15 || state.W.size > n * 0.6) {
+        state.phase = 'refinement';
+      }
+      
+      return { path: tour, improved: true, state };
+      
+    } else {
+      const currentTour = TSP.greedy(cities);
+      const refinedResult = TSP.twoOpt(cities, currentTour);
+      
+      return {
+        path: refinedResult.path,
+        improved: refinedResult.improved,
+        state
+      };
+    }
+  }
 }
 
 const generateCities = (count: number, mode: CityMode, canvasWidth: number, canvasHeight: number): City[] => {
@@ -992,9 +1127,6 @@ const generateCities = (count: number, mode: CityMode, canvasWidth: number, canv
   return cities;
 };
 
-// Store reference to built-in Map before any potential naming conflicts
-type TrailMap = Map<string, Array<{x: number, y: number, alpha: number}>>;
-
 export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAlgorithmRaceProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPlaying, setIsPlaying] = useState(isRunning);
@@ -1015,7 +1147,7 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
   const populationRef = useRef<Record<string, number[][]>>({});
   const pheromonesRef = useRef<number[][]>([]);
   const timeRef = useRef(0);
-  const trailsRef = useRef<TrailMap>(new Map());
+  const trailsRef = useRef(new Map<string, TrailPoint[]>());
   const previouslyRunningRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -1026,7 +1158,6 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
     setLocalSpeed(speed);
   }, [speed]);
 
-  // Mobile viewing lifecycle
   useEffect(() => {
     if (!mobileViewing) return;
 
@@ -1063,7 +1194,6 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
     enterMobileView();
   }, [mobileViewing, isPlaying]);
 
-  // Exit fullscreen handler
   useEffect(() => {
     const handleFullscreenChange = () => {
       const doc = document as any;
@@ -1085,7 +1215,6 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
     };
   }, [mobileViewing]);
 
-  // Canvas resize handling
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1226,6 +1355,29 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
               return { ...algo, status: 'finished' as const, iterations: algo.iterations + 1 };
             }
             break;
+
+          case 'bmssp':
+            const bmsspResult = TSP.bmssp(cities, algo.bmsspState);
+            newTour = bmsspResult.path;
+            improved = bmsspResult.improved;
+            
+            if (algo.iterations > 40) {
+              return { ...algo, status: 'finished' as const, iterations: algo.iterations + 1, bmsspState: bmsspResult.state };
+            }
+            
+            return {
+              ...algo,
+              tour: newTour,
+              distance: TSP.distance(cities, newTour),
+              bestDistance: Math.min(algo.bestDistance, TSP.distance(cities, newTour)),
+              iterations: algo.iterations + 1,
+              improvements: improved ? algo.improvements + 1 : algo.improvements,
+              bmsspState: bmsspResult.state,
+              particles: algo.particles,
+              history: [...(algo.history || []), TSP.distance(cities, newTour)].slice(-50),
+              improvementRate: improved ? ((algo.bestDistance - TSP.distance(cities, newTour)) / algo.bestDistance * 100) : algo.improvementRate,
+              lastImprovement: improved ? algo.iterations : algo.lastImprovement
+            };
         }
         
         const newDistance = TSP.distance(cities, newTour);
@@ -1296,11 +1448,9 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
     const width = canvas.width / (window.devicePixelRatio || 1);
     const height = canvas.height / (window.devicePixelRatio || 1);
     
-    // Background
     ctx.fillStyle = COLORS.bg1;
     ctx.fillRect(0, 0, width, height);
     
-    // Grid
     const gridSize = 30;
     const gridOffset = (timeRef.current * 0.05) % gridSize;
     ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)';
@@ -1319,7 +1469,6 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
       ctx.stroke();
     }
     
-    // Pheromone trails for ant colony
     const antAlgo = algorithms.find(a => a.id === 'antColony');
     if (antAlgo && pheromonesRef.current.length > 0 && showTrails) {
       const maxPheromone = Math.max(...pheromonesRef.current.flat());
@@ -1338,14 +1487,12 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
       }
     }
     
-    // Algorithm paths
     algorithms.forEach((algo) => {
       if (algo.tour.length === 0) return;
       
-      // Trails
       if (showTrails) {
         const trail = trailsRef.current.get(algo.id) || [];
-        trail.forEach((point) => {
+        trail.forEach((point: TrailPoint) => {
           ctx.fillStyle = `${algo.color}${Math.floor(point.alpha * 255).toString(16).padStart(2, '0')}`;
           ctx.beginPath();
           ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
@@ -1356,7 +1503,6 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
         if (trail.length > 100) trail.shift();
       }
       
-      // Main path
       ctx.strokeStyle = algo.color;
       ctx.lineWidth = algo.status === 'winner' ? 4 : 2;
       ctx.shadowColor = algo.glow;
@@ -1384,7 +1530,6 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
       ctx.stroke();
       ctx.shadowBlur = 0;
       
-      // Particles
       algo.particles?.forEach(p => {
         ctx.fillStyle = `${p.color}${Math.floor(p.life * 255).toString(16).padStart(2, '0')}`;
         ctx.beginPath();
@@ -1393,16 +1538,13 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
       });
     });
     
-    // Cities
     cities.forEach((city) => {
-      // Glow
       const gradient = ctx.createRadialGradient(city.x, city.y, 0, city.x, city.y, 25);
       gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
       gradient.addColorStop(1, 'transparent');
       ctx.fillStyle = gradient;
       ctx.fillRect(city.x - 25, city.y - 25, 50, 50);
       
-      // City dot
       ctx.fillStyle = COLORS.accent;
       ctx.strokeStyle = COLORS.bg1;
       ctx.lineWidth = 2;
@@ -1414,7 +1556,6 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
       ctx.stroke();
       ctx.shadowBlur = 0;
       
-      // City ID
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
