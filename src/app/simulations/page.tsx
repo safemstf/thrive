@@ -880,12 +880,15 @@ export default function SimulationsPage() {
   const simulationItems = allItems.filter(item => item.category === 'simulations');
   const algorithmItems = allItems.filter(item => item.category === 'algorithms');
 
-  // FPS Tracking
+  // FPS Tracking - Throttled updates
   useEffect(() => {
     if (!isRunning) return;
 
     let frameId: number;
-    const updateFPS = () => {
+    let lastUpdate = 0;
+    const UPDATE_INTERVAL = 500; // Update FPS display every 500ms
+
+    const updateFPS = (timestamp: number) => {
       const now = performance.now();
       const delta = now - lastFrameTimeRef.current;
       lastFrameTimeRef.current = now;
@@ -897,8 +900,12 @@ export default function SimulationsPage() {
         fpsRef.current.shift();
       }
 
-      const avgFps = Math.round(fpsRef.current.reduce((a, b) => a + b, 0) / fpsRef.current.length);
-      setFps(avgFps);
+      // Only update state periodically to avoid excessive re-renders
+      if (timestamp - lastUpdate > UPDATE_INTERVAL) {
+        const avgFps = Math.round(fpsRef.current.reduce((a, b) => a + b, 0) / fpsRef.current.length);
+        setFps(avgFps);
+        lastUpdate = timestamp;
+      }
 
       frameId = requestAnimationFrame(updateFPS);
     };

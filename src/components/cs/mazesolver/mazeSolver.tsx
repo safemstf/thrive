@@ -2,18 +2,18 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
-import { 
-  Play, Pause, RotateCcw, Trophy, Zap, Activity, 
+import {
+  Play, Pause, RotateCcw, Trophy, Zap, Activity,
   Radio, Users, DollarSign, TrendingUp, Flag,
   Volume2, VolumeX, Gauge, Target,
   CheckCircle2, Circle, Gamepad2, Eye, Sparkles, Settings
 } from 'lucide-react';
 
 // Import the actual pathfinding algorithms
-import { 
-  breadthFirstSearch, 
-  depthFirstSearch, 
-  aStarSearch, 
+import {
+  breadthFirstSearch,
+  depthFirstSearch,
+  aStarSearch,
   dijkstraSearch,
   greedyBestFirstSearch,
   bidirectionalSearch,
@@ -22,17 +22,17 @@ import {
   AlgorithmConfig
 } from './algorithms';
 
-import { 
-  BroadcastBadge, Button, Card, CardContent, CardHeader, Commentary, 
-  ControlsBar, FlagIcon, FlagCounter, GridLayout, Header, HeaderContent, 
-  LeaderboardItem, MainContainer, ModeButton, ModeSelector, OddsItem, 
-  OddsValue, PageContainer, Panel, RoundBadge, TeamBadge, TeamSelector, 
-  TimeDisplay, Title, ToggleSwitch, TrackCanvas 
+import {
+  BroadcastBadge, Button, Card, CardContent, CardHeader, Commentary,
+  ControlsBar, FlagIcon, FlagCounter, GridLayout, Header, HeaderContent,
+  LeaderboardItem, MainContainer, ModeButton, ModeSelector, OddsItem,
+  OddsValue, PageContainer, Panel, RoundBadge, TeamBadge, TeamSelector,
+  TimeDisplay, Title, ToggleSwitch, TrackCanvas
 } from './mazeStyles';
 
-import { 
-  AlgorithmClass, RacingTeam, Racer, RaceStatus, RaceMode, 
-  RaceCommentary, BettingOdds, RaceTrack 
+import {
+  AlgorithmClass, RacingTeam, Racer, RaceStatus, RaceMode,
+  RaceCommentary, BettingOdds, RaceTrack
 } from './mazeTypes';
 
 import { RACING_TEAMS } from './agent';
@@ -55,39 +55,39 @@ export default function ProfessionalAlgorithmDerby() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const commentaryQueueRef = useRef<RaceCommentary[]>([]);
-  
+
   const [track, setTrack] = useState<RaceTrack | null>(null);
   const [racers, setRacers] = useState<Racer[]>([]);
   const [raceStatus, setRaceStatus] = useState<RaceStatus>('preparing');
   const [raceTime, setRaceTime] = useState(0);
   const [selectedTeams, setSelectedTeams] = useState<AlgorithmClass[]>(['BFS', 'AStar', 'BMSSP']);
   const [raceMode, setRaceMode] = useState<RaceMode>('flags');
-  
+
   const [showMetrics, setShowMetrics] = useState(true);
   const [showExploration, setShowExploration] = useState(true);
   const [showTrails, setShowTrails] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [commentary, setCommentary] = useState<RaceCommentary[]>([]);
   const [bettingOdds, setBettingOdds] = useState<BettingOdds[]>([]);
-  
+
   // Calculate flag collection order based on algorithm strategy
   const calculateFlagOrder = useCallback((
-    start: [number, number], 
-    flags: [number, number][], 
-    teamId: AlgorithmClass, 
+    start: [number, number],
+    flags: [number, number][],
+    teamId: AlgorithmClass,
     finishPos: [number, number]
   ): number[] => {
     const order: number[] = [];
     const remaining = new Set(flags.map((_, i) => i));
     let current = start;
-    
+
     // Different strategies for different algorithms
     if (teamId === 'Greedy' || teamId === 'DFS') {
       // Greedy and DFS: Always pick nearest flag
       while (remaining.size > 0) {
         let nearest = -1;
         let nearestDist = Infinity;
-        
+
         for (const i of remaining) {
           const dist = Math.abs(flags[i][0] - current[0]) + Math.abs(flags[i][1] - current[1]);
           if (dist < nearestDist) {
@@ -95,7 +95,7 @@ export default function ProfessionalAlgorithmDerby() {
             nearest = i;
           }
         }
-        
+
         if (nearest !== -1) {
           order.push(nearest);
           remaining.delete(nearest);
@@ -109,18 +109,18 @@ export default function ProfessionalAlgorithmDerby() {
       while (remaining.size > 0) {
         let best = -1;
         let bestScore = Infinity;
-        
+
         for (const i of remaining) {
           const distToFlag = Math.abs(flags[i][0] - current[0]) + Math.abs(flags[i][1] - current[1]);
           const distToFinish = Math.abs(flags[i][0] - finishPos[0]) + Math.abs(flags[i][1] - finishPos[1]);
           const score = distToFlag + distToFinish * 0.3;
-          
+
           if (score < bestScore) {
             bestScore = score;
             best = i;
           }
         }
-        
+
         if (best !== -1) {
           order.push(best);
           remaining.delete(best);
@@ -133,7 +133,7 @@ export default function ProfessionalAlgorithmDerby() {
       // BFS and Bidirectional: Systematic coverage
       const sections = Math.ceil(Math.sqrt(flags.length));
       const sectorFlags: number[][] = Array(sections * sections).fill(null).map(() => []);
-      
+
       flags.forEach((flag, i) => {
         const sx = Math.floor(flag[0] / (TRACK_WIDTH / sections));
         const sy = Math.floor(flag[1] / (TRACK_HEIGHT / sections));
@@ -142,7 +142,7 @@ export default function ProfessionalAlgorithmDerby() {
           sectorFlags[sector].push(i);
         }
       });
-      
+
       for (const sector of sectorFlags) {
         for (const flagIdx of sector) {
           if (remaining.has(flagIdx)) {
@@ -152,10 +152,10 @@ export default function ProfessionalAlgorithmDerby() {
         }
       }
     }
-    
+
     return order;
   }, []);
-  
+
   // Run algorithm based on team ID
   const runAlgorithm = useCallback((
     teamId: AlgorithmClass,
@@ -183,88 +183,80 @@ export default function ProfessionalAlgorithmDerby() {
         return breadthFirstSearch(maze, start, goal, config);
     }
   }, []);
-  
+
   const calculateOdds = useCallback((racer: Racer): string => {
     // Odds based on algorithm type and path efficiency
     const baseOdds: Record<AlgorithmClass, number> = {
-      'AStar': 2.5,      // Usually finds optimal path
-      'BMSSP': 2.3,      // New algorithm - theoretically fastest
-      'Dijkstra': 2.8,   // Optimal but explores more
-      'BFS': 3.2,        // Optimal but explores everything
-      'Bidirectional': 4.0, // Good but depends on maze
-      'Greedy': 5.5,     // Fast but often suboptimal
-      'DFS': 7.0         // Can take very long paths
+      'AStar': 2.5,
+      'BMSSP': 2.3,
+      'Dijkstra': 2.8,
+      'BFS': 3.2,
+      'Bidirectional': 4.0,
+      'Greedy': 5.5,
+      'DFS': 7.0
     };
-    
+
     const base = baseOdds[racer.team.id] || 5.0;
-    
-    // Adjust based on actual path length if available
+
     if (racer.path.length > 0) {
       const pathPenalty = racer.path.length / 100;
       return `${Math.max(1.5, base + pathPenalty).toFixed(1)}:1`;
     }
-    
+
     return `${base.toFixed(1)}:1`;
   }, []);
-  
+
   const initializeRace = useCallback(() => {
     const flagCount = raceMode === 'flags' ? 7 : 0;
     const newTrack = new RaceTrack(TRACK_WIDTH, TRACK_HEIGHT, flagCount);
     setTrack(newTrack);
-    
-    // Convert track to 2D array for the algorithms
+
     const maze = newTrack.to2DArray();
     const newRacers: Racer[] = [];
-    
+
     const config: AlgorithmConfig = {
       maxSteps: 100000,
       allowDiagonal: false,
       timeLimit: 5000
     };
-    
+
     for (const teamId of selectedTeams) {
       const team = RACING_TEAMS[teamId];
       let fullPath: [number, number][] = [];
       let totalExplored = new Set<string>();
       let algorithmResult: AlgorithmResult;
-      
+
       if (raceMode === 'flags') {
-        // Calculate flag collection order based on algorithm characteristics
         const flagOrder = calculateFlagOrder(newTrack.start, newTrack.flags, teamId, newTrack.finish);
-        
-        // Build path through all flags
         let currentPos = newTrack.start;
-        
+
         for (const flagIdx of flagOrder) {
           const flagPos = newTrack.flags[flagIdx];
           algorithmResult = runAlgorithm(teamId, maze, currentPos, flagPos, config);
-          
+
           if (algorithmResult.success && algorithmResult.path.length > 0) {
             fullPath = fullPath.concat(algorithmResult.path.slice(fullPath.length > 0 ? 1 : 0));
             algorithmResult.explored.forEach(e => totalExplored.add(`${e[0]},${e[1]}`));
             currentPos = flagPos;
           }
         }
-        
-        // Path from last flag to finish
+
         algorithmResult = runAlgorithm(teamId, maze, currentPos, newTrack.finish, config);
-        
+
         if (algorithmResult.success && algorithmResult.path.length > 0) {
           fullPath = fullPath.concat(algorithmResult.path.slice(1));
           algorithmResult.explored.forEach(e => totalExplored.add(`${e[0]},${e[1]}`));
         }
       } else {
-        // Sprint mode - direct path to finish
         algorithmResult = runAlgorithm(teamId, maze, newTrack.start, newTrack.finish, config);
         fullPath = algorithmResult.path;
         algorithmResult.explored.forEach(e => totalExplored.add(`${e[0]},${e[1]}`));
       }
-      
-      // Check if algorithm found a valid path
+
       if (!algorithmResult.success || fullPath.length === 0) {
         console.warn(`${team.name} failed to find a path!`);
       }
-      
+
       newRacers.push({
         team,
         position: { x: newTrack.start[0], y: newTrack.start[1] },
@@ -292,11 +284,11 @@ export default function ProfessionalAlgorithmDerby() {
         flagPath: []
       });
     }
-    
+
     setRacers(newRacers);
     setRaceStatus('preparing');
     setRaceTime(0);
-    
+
     const modeText = raceMode === 'flags' ? 'Flag Collection Challenge' : 'Sprint to the Finish';
     setCommentary([{
       time: 0,
@@ -307,7 +299,7 @@ export default function ProfessionalAlgorithmDerby() {
       message: `All algorithms race at the same speed - only their pathfinding efficiency matters!`,
       type: 'normal'
     }]);
-    
+
     const odds = newRacers.map(racer => ({
       team: racer.team.id,
       odds: calculateOdds(racer),
@@ -315,29 +307,29 @@ export default function ProfessionalAlgorithmDerby() {
     }));
     setBettingOdds(odds);
   }, [selectedTeams, raceMode, calculateFlagOrder, runAlgorithm, calculateOdds]);
-  
+
   const startRace = () => {
     setRaceStatus('starting');
-    const modeMessage = raceMode === 'flags' 
-      ? "7 flags to collect before the finish!" 
+    const modeMessage = raceMode === 'flags'
+      ? "7 flags to collect before the finish!"
       : "A straight sprint to the checkered flag!";
-    
+
     setCommentary(prev => [...prev, {
       time: raceTime,
       message: `Engines are revving! ${modeMessage}`,
       type: 'exciting'
     }]);
-    
+
     setTimeout(() => {
       setRaceStatus('racing');
-      
+
       const failedRacers = racers.filter(r => !r.path || r.path.length === 0);
       const initialCommentary: RaceCommentary[] = [{
         time: raceTime,
         message: "AND THEY'RE OFF! The algorithms are racing through the maze!",
         type: 'exciting'
       }];
-      
+
       if (failedRacers.length > 0) {
         initialCommentary.push({
           time: raceTime,
@@ -345,76 +337,74 @@ export default function ProfessionalAlgorithmDerby() {
           type: 'critical'
         });
       }
-      
+
       initialCommentary.push({
         time: raceTime,
         message: `Watch how each algorithm takes a different path - shorter paths win!`,
         type: 'normal'
       });
-      
+
       setCommentary(prev => [...prev, ...initialCommentary]);
     }, 2000);
   };
-  
+
+  // FIXED: Remove raceTime from dependencies - it's updated internally
   const animate = useCallback(() => {
     if (raceStatus !== 'racing') return;
-    
+
     commentaryQueueRef.current = [];
-    
+
     setRacers(prevRacers => {
       const updated = prevRacers.map(racer => {
         if (racer.finished) return racer;
-        
-        // CRITICAL: Skip racers with no path (algorithm failed)
+
         if (!racer.path || racer.path.length === 0) {
           return {
             ...racer,
             finished: true,
-            finishTime: Infinity // Mark as DNF
+            finishTime: Infinity
           };
         }
-        
+
         let updatedRacer = { ...racer };
-        
-        // Check for flag collection
+
         if (raceMode === 'flags' && track) {
           let flagsUpdated = false;
           const newCollectedFlags = new Set(racer.collectedFlags);
-          
+
           track.flags.forEach((flag, idx) => {
             const dist = Math.abs(racer.position.x - flag[0]) + Math.abs(racer.position.y - flag[1]);
             if (dist < 0.5 && !racer.collectedFlags.has(idx)) {
               newCollectedFlags.add(idx);
               flagsUpdated = true;
-              
+
               commentaryQueueRef.current.push({
-                time: raceTime,
+                time: Date.now(),
                 message: `${racer.team.name} collects flag #${idx + 1}! (${newCollectedFlags.size}/7)`,
                 type: 'exciting'
               });
             }
           });
-          
+
           if (flagsUpdated) {
             updatedRacer.collectedFlags = newCollectedFlags;
           }
-          
-          // Can only finish after collecting all flags
+
           if (updatedRacer.collectedFlags.size < 7) {
-            // Keep racing to collect flags
+            // Keep racing
           } else if (racer.currentTarget >= racer.path.length - 1) {
             if (!racer.finished) {
               commentaryQueueRef.current.push({
-                time: raceTime,
+                time: Date.now(),
                 message: `${racer.team.name} (#${racer.team.number}) completes the challenge with ${racer.path.length} steps!`,
                 type: 'exciting'
               });
             }
-            
+
             return {
               ...updatedRacer,
               finished: true,
-              finishTime: raceTime,
+              finishTime: Date.now(),
               position: {
                 x: racer.path[racer.path.length - 1][0],
                 y: racer.path[racer.path.length - 1][1]
@@ -422,71 +412,67 @@ export default function ProfessionalAlgorithmDerby() {
             };
           }
         } else if (racer.currentTarget >= racer.path.length - 1) {
-          // Sprint mode finish
           if (!racer.finished) {
             commentaryQueueRef.current.push({
-              time: raceTime,
+              time: Date.now(),
               message: `${racer.team.name} (#${racer.team.number}) crosses the finish line with ${racer.path.length} steps!`,
               type: 'exciting'
             });
           }
-          
+
           return {
             ...updatedRacer,
             finished: true,
-            finishTime: raceTime,
+            finishTime: Date.now(),
             position: {
               x: racer.path[racer.path.length - 1][0],
               y: racer.path[racer.path.length - 1][1]
             }
           };
         }
-        
-        // All racers move at the same base speed - only path efficiency matters
+
         const BASE_SPEED = 0.2;
         const nextTarget = Math.min(
           updatedRacer.currentTarget + BASE_SPEED,
           updatedRacer.path.length - 1
         );
-        
+
         const targetIndex = Math.floor(nextTarget);
         const t = nextTarget - targetIndex;
-        
-        // CRITICAL: Bounds check for path access
+
         if (targetIndex >= updatedRacer.path.length) {
           return {
             ...updatedRacer,
             finished: true,
-            finishTime: raceTime
+            finishTime: Date.now()
           };
         }
-        
+
         const current = updatedRacer.path[targetIndex];
         const next = updatedRacer.path[Math.min(targetIndex + 1, updatedRacer.path.length - 1)];
-        
-        // CRITICAL: Validate current and next positions
+
         if (!current || !next) {
           return {
             ...updatedRacer,
             finished: true,
-            finishTime: raceTime
+            finishTime: Date.now()
           };
         }
-        
+
         const newX = current[0] + (next[0] - current[0]) * t;
         const newY = current[1] + (next[1] - current[1]) * t;
-        
-        const newTrail = [...updatedRacer.trail, { 
-          x: updatedRacer.position.x, 
-          y: updatedRacer.position.y, 
-          alpha: 1 
+
+        const newTrail = [...updatedRacer.trail, {
+          x: updatedRacer.position.x,
+          y: updatedRacer.position.y,
+          alpha: 1
         }].slice(-20).map(t => ({ ...t, alpha: t.alpha * 0.95 }));
-        
+
         const newSpeed = Math.sqrt(
-          Math.pow(newX - updatedRacer.position.x, 2) + 
+          Math.pow(newX - updatedRacer.position.x, 2) +
           Math.pow(newY - updatedRacer.position.y, 2)
         ) * 60;
-        
+
         return {
           ...updatedRacer,
           position: { x: newX, y: newY },
@@ -500,56 +486,55 @@ export default function ProfessionalAlgorithmDerby() {
           }
         };
       });
-      
+
       if (updated.every(r => r.finished)) {
         setRaceStatus('finished');
         if (updated.length > 0) {
-          // Find winner (excluding DNF racers)
           const finishers = updated.filter(r => r.finishTime !== Infinity);
           if (finishers.length > 0) {
-            const winner = finishers.reduce((prev, current) => 
+            const winner = finishers.reduce((prev, current) =>
               current.finishTime < prev.finishTime ? current : prev
             );
             commentaryQueueRef.current.push({
-              time: raceTime,
+              time: Date.now(),
               message: `Race complete! ${winner.team.name} wins with the most efficient path (${winner.path.length} steps)!`,
               type: 'exciting'
             });
           } else {
             commentaryQueueRef.current.push({
-              time: raceTime,
+              time: Date.now(),
               message: `Race complete! All algorithms failed to find valid paths.`,
               type: 'critical'
             });
           }
         }
       }
-      
+
       return updated;
     });
-    
+
     if (commentaryQueueRef.current.length > 0) {
       setCommentary(prev => [...prev, ...commentaryQueueRef.current]);
     }
-    
+
     setRaceTime(prev => prev + 16);
-  }, [raceStatus, raceTime, raceMode, track]);
-  
+  }, [raceStatus, raceMode, track]);
+
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !track) return;
-    
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    
+
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, VIEWPORT_W, VIEWPORT_H);
-    
+
     // Draw track
     for (let y = 0; y < TRACK_HEIGHT; y++) {
       for (let x = 0; x < TRACK_WIDTH; x++) {
         const cell = track.getCell(x, y);
-        
+
         if (cell === 1) {
           const gradient = ctx.createLinearGradient(
             x * CELL_SIZE, y * CELL_SIZE,
@@ -559,13 +544,13 @@ export default function ProfessionalAlgorithmDerby() {
           gradient.addColorStop(1, '#0f172a');
           ctx.fillStyle = gradient;
           ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-          
+
           ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
           ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, 1);
         } else {
           ctx.fillStyle = '#18181b';
           ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-          
+
           if (x % 2 === 0 && y % 2 === 0) {
             ctx.fillStyle = 'rgba(255, 255, 255, 0.02)';
             ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
@@ -573,7 +558,7 @@ export default function ProfessionalAlgorithmDerby() {
         }
       }
     }
-    
+
     // Draw exploration
     if (showExploration) {
       racers.forEach(racer => {
@@ -584,26 +569,26 @@ export default function ProfessionalAlgorithmDerby() {
         });
       });
     }
-    
+
     // Draw flags
     if (raceMode === 'flags') {
       track.flags.forEach((flag, idx) => {
-        const x = flag[0] * CELL_SIZE + CELL_SIZE/2;
-        const y = flag[1] * CELL_SIZE + CELL_SIZE/2;
-        
+        const x = flag[0] * CELL_SIZE + CELL_SIZE / 2;
+        const y = flag[1] * CELL_SIZE + CELL_SIZE / 2;
+
         const glow = ctx.createRadialGradient(x, y, 0, x, y, CELL_SIZE);
         glow.addColorStop(0, 'rgba(251, 191, 36, 0.3)');
         glow.addColorStop(1, 'transparent');
         ctx.fillStyle = glow;
         ctx.fillRect(x - CELL_SIZE, y - CELL_SIZE, CELL_SIZE * 2, CELL_SIZE * 2);
-        
+
         ctx.strokeStyle = '#94a3b8';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.moveTo(x, y + CELL_SIZE * 0.4);
         ctx.lineTo(x, y - CELL_SIZE * 0.4);
         ctx.stroke();
-        
+
         ctx.fillStyle = '#fbbf24';
         ctx.beginPath();
         ctx.moveTo(x, y - CELL_SIZE * 0.4);
@@ -612,13 +597,13 @@ export default function ProfessionalAlgorithmDerby() {
         ctx.lineTo(x, y);
         ctx.closePath();
         ctx.fill();
-        
+
         ctx.fillStyle = '#713f12';
         ctx.font = 'bold 8px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText((idx + 1).toString(), x + CELL_SIZE * 0.2, y - CELL_SIZE * 0.2);
-        
+
         const isCollected = racers.some(r => r.collectedFlags.has(idx));
         if (isCollected) {
           ctx.fillStyle = 'rgba(16, 185, 129, 0.6)';
@@ -626,7 +611,7 @@ export default function ProfessionalAlgorithmDerby() {
         }
       });
     }
-    
+
     // Draw start
     ctx.fillStyle = '#10b981';
     ctx.fillRect(track.start[0] * CELL_SIZE, track.start[1] * CELL_SIZE, CELL_SIZE, CELL_SIZE);
@@ -634,18 +619,18 @@ export default function ProfessionalAlgorithmDerby() {
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('START', track.start[0] * CELL_SIZE + CELL_SIZE/2, track.start[1] * CELL_SIZE + CELL_SIZE/2);
-    
+    ctx.fillText('START', track.start[0] * CELL_SIZE + CELL_SIZE / 2, track.start[1] * CELL_SIZE + CELL_SIZE / 2);
+
     // Draw finish
     const fx = track.finish[0] * CELL_SIZE;
     const fy = track.finish[1] * CELL_SIZE;
     for (let i = 0; i < 2; i++) {
       for (let j = 0; j < 2; j++) {
         ctx.fillStyle = (i + j) % 2 === 0 ? 'white' : 'black';
-        ctx.fillRect(fx + i * CELL_SIZE/2, fy + j * CELL_SIZE/2, CELL_SIZE/2, CELL_SIZE/2);
+        ctx.fillRect(fx + i * CELL_SIZE / 2, fy + j * CELL_SIZE / 2, CELL_SIZE / 2, CELL_SIZE / 2);
       }
     }
-    
+
     // Draw trails
     if (showTrails) {
       racers.forEach(racer => {
@@ -653,8 +638,8 @@ export default function ProfessionalAlgorithmDerby() {
           ctx.fillStyle = `${racer.team.color}${Math.floor(point.alpha * 255).toString(16).padStart(2, '0')}`;
           ctx.beginPath();
           ctx.arc(
-            point.x * CELL_SIZE + CELL_SIZE/2,
-            point.y * CELL_SIZE + CELL_SIZE/2,
+            point.x * CELL_SIZE + CELL_SIZE / 2,
+            point.y * CELL_SIZE + CELL_SIZE / 2,
             CELL_SIZE * 0.15,
             0,
             Math.PI * 2
@@ -663,100 +648,109 @@ export default function ProfessionalAlgorithmDerby() {
         });
       });
     }
-    
+
     // Draw racers
     racers.forEach(racer => {
-      const x = racer.position.x * CELL_SIZE + CELL_SIZE/2;
-      const y = racer.position.y * CELL_SIZE + CELL_SIZE/2;
-      
+      const x = racer.position.x * CELL_SIZE + CELL_SIZE / 2;
+      const y = racer.position.y * CELL_SIZE + CELL_SIZE / 2;
+
       const glow = ctx.createRadialGradient(x, y, 0, x, y, CELL_SIZE * 0.5);
       glow.addColorStop(0, `${racer.team.color}40`);
       glow.addColorStop(1, 'transparent');
       ctx.fillStyle = glow;
       ctx.fillRect(x - CELL_SIZE, y - CELL_SIZE, CELL_SIZE * 2, CELL_SIZE * 2);
-      
+
       ctx.save();
       ctx.translate(x, y);
-      
+
       if (racer.currentTarget > 0 && racer.currentTarget < racer.path.length - 1) {
         const prev = racer.path[Math.floor(racer.currentTarget)];
         const next = racer.path[Math.ceil(racer.currentTarget)];
         const angle = Math.atan2(next[1] - prev[1], next[0] - prev[0]);
         ctx.rotate(angle);
       }
-      
+
       ctx.fillStyle = racer.team.color;
       ctx.fillRect(-CELL_SIZE * 0.4, -CELL_SIZE * 0.2, CELL_SIZE * 0.8, CELL_SIZE * 0.4);
-      
+
       ctx.fillStyle = racer.team.accentColor;
       ctx.fillRect(-CELL_SIZE * 0.35, -CELL_SIZE * 0.05, CELL_SIZE * 0.7, CELL_SIZE * 0.1);
-      
+
       ctx.restore();
       ctx.fillStyle = 'white';
       ctx.font = 'bold 8px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(racer.team.number.toString(), x, y);
-      
+
       if (racer.finished) {
         ctx.font = '12px sans-serif';
         ctx.fillText('🏁', x, y - CELL_SIZE);
       }
-      
+
       if (raceMode === 'flags' && racer.collectedFlags.size > 0) {
         ctx.fillStyle = '#fbbf24';
         ctx.font = 'bold 10px sans-serif';
         ctx.fillText(`${racer.collectedFlags.size}/7`, x, y - CELL_SIZE * 0.7);
       }
     });
-    
+
     // Draw starting lights
     if (raceStatus === 'starting') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(0, 0, VIEWPORT_W, VIEWPORT_H);
-      
+
       const lights = 3 - Math.floor((Date.now() % 3000) / 1000);
       for (let i = 0; i < 3; i++) {
         ctx.fillStyle = i < lights ? '#ef4444' : '#374151';
         ctx.beginPath();
-        ctx.arc(VIEWPORT_W/2 + (i - 1) * 40, VIEWPORT_H/2, 15, 0, Math.PI * 2);
+        ctx.arc(VIEWPORT_W / 2 + (i - 1) * 40, VIEWPORT_H / 2, 15, 0, Math.PI * 2);
         ctx.fill();
       }
     }
   }, [track, racers, showExploration, showTrails, raceStatus, raceMode]);
-  
+
+  // FIXED: Store animate and render in refs AFTER they're defined
+  const animateRef = useRef(animate);
+  const renderRef = useRef(render);
+
+  useEffect(() => {
+    animateRef.current = animate;
+    renderRef.current = render;
+  }, [animate, render]);
+
+  // FIXED: Animation loop without animate/render in dependencies
   useEffect(() => {
     let frameId: number;
-    
+
     const loop = () => {
-      animate();
-      render();
+      animateRef.current();
+      renderRef.current();
       frameId = requestAnimationFrame(loop);
     };
-    
+
     if (raceStatus === 'racing') {
       loop();
     } else {
-      render();
+      renderRef.current();
     }
-    
+
     return () => {
       if (frameId) cancelAnimationFrame(frameId);
     };
-  }, [raceStatus, animate, render]);
-  
-  // FIXED: Only initialize race on mount, not on every initializeRace change
+  }, [raceStatus]);
+
+  // Initialize race when dependencies change
   useEffect(() => {
     initializeRace();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty array = only on mount
-  
+  }, [initializeRace]);
+
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
     const milliseconds = Math.floor((ms % 1000) / 10);
     return `${seconds}.${milliseconds.toString().padStart(2, '0')}`;
   };
-  
+
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0a0a0a 0%, #1a1a1a 100%)', color: 'white', padding: '1rem' }}>
       <div style={{ background: 'linear-gradient(90deg, #1e3a8a 0%, #1e40af 100%)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem' }}>
@@ -771,9 +765,9 @@ export default function ProfessionalAlgorithmDerby() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
-              style={{ 
-                background: 'rgba(0, 0, 0, 0.2)', 
-                border: 'none', 
+              style={{
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: 'none',
                 padding: '0.5rem',
                 borderRadius: '8px',
                 cursor: 'pointer',
@@ -791,7 +785,7 @@ export default function ProfessionalAlgorithmDerby() {
           </div>
         </div>
       </div>
-      
+
       <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr 300px', gap: '1rem' }}>
         {/* Left Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -829,10 +823,10 @@ export default function ProfessionalAlgorithmDerby() {
                       // FIXED: Removed setTimeout, will be called by state change effect below
                     }}
                   />
-                  <div style={{ 
-                    width: '24px', 
-                    height: '24px', 
-                    borderRadius: '50%', 
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
                     background: team.color,
                     display: 'flex',
                     alignItems: 'center',
@@ -852,7 +846,7 @@ export default function ProfessionalAlgorithmDerby() {
               ))}
             </div>
           </div>
-          
+
           <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
             <div style={{ background: 'linear-gradient(90deg, #d97706 0%, #b45309 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <DollarSign size={16} />
@@ -864,11 +858,11 @@ export default function ProfessionalAlgorithmDerby() {
                 return (
                   <div key={odds.team} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', marginBottom: '0.25rem', background: '#0f172a', borderRadius: '6px', borderLeft: `3px solid ${team.color}` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ 
-                        width: '16px', 
-                        height: '16px', 
-                        borderRadius: '50%', 
-                        backgroundColor: team.color 
+                      <div style={{
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: team.color
                       }} />
                       <span style={{ fontSize: '0.875rem' }}>{team.name}</span>
                     </div>
@@ -882,7 +876,7 @@ export default function ProfessionalAlgorithmDerby() {
             </div>
           </div>
         </div>
-        
+
         {/* Center Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
@@ -936,14 +930,14 @@ export default function ProfessionalAlgorithmDerby() {
                 </button>
               </div>
             </div>
-            
+
             <canvas
               ref={canvasRef}
               width={VIEWPORT_W}
               height={VIEWPORT_H}
               style={{ width: '100%', height: 'auto', borderRadius: '8px', background: '#0a0a0a' }}
             />
-            
+
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
               <button
                 onClick={() => raceStatus === 'preparing' ? startRace() : setRaceStatus('preparing')}
@@ -982,7 +976,7 @@ export default function ProfessionalAlgorithmDerby() {
                   </>
                 )}
               </button>
-              
+
               <button
                 onClick={initializeRace}
                 style={{
@@ -1005,7 +999,7 @@ export default function ProfessionalAlgorithmDerby() {
               </button>
             </div>
           </div>
-          
+
           <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
             <div style={{ background: 'linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Radio size={16} />
@@ -1023,7 +1017,7 @@ export default function ProfessionalAlgorithmDerby() {
             </div>
           </div>
         </div>
-        
+
         {/* Right Panel - Continues with standings, metrics, and view options... */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {/* Race Standings Panel */}
@@ -1060,20 +1054,20 @@ export default function ProfessionalAlgorithmDerby() {
                     }}
                   >
                     <div style={{ fontSize: '1.125rem', fontWeight: 700, width: '32px' }}>
-                      {racer.finishTime === Infinity 
-                        ? '❌' 
-                        : position === 0 && racer.finished 
-                          ? '🏆' 
+                      {racer.finishTime === Infinity
+                        ? '❌'
+                        : position === 0 && racer.finished
+                          ? '🏆'
                           : `${position + 1}.`
                       }
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <div style={{ 
-                          width: '16px', 
-                          height: '16px', 
-                          borderRadius: '50%', 
-                          backgroundColor: racer.team.color 
+                        <div style={{
+                          width: '16px',
+                          height: '16px',
+                          borderRadius: '50%',
+                          backgroundColor: racer.team.color
                         }} />
                         <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>
                           #{racer.team.number}
@@ -1083,8 +1077,8 @@ export default function ProfessionalAlgorithmDerby() {
                         </span>
                       </div>
                       <div style={{ fontSize: '0.75rem', opacity: 0.6, marginTop: '0.25rem' }}>
-                        {racer.finished 
-                          ? racer.finishTime === Infinity 
+                        {racer.finished
+                          ? racer.finishTime === Infinity
                             ? `DNF - No path found`
                             : `Finished: ${formatTime(racer.finishTime)} • ${racer.path.length} steps`
                           : `Progress: ${Math.round((racer.currentTarget / Math.max(1, racer.path.length - 1)) * 100)}% • ${racer.path.length} steps`
@@ -1104,7 +1098,7 @@ export default function ProfessionalAlgorithmDerby() {
                 ))}
             </div>
           </div>
-          
+
           {showMetrics && (
             <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
               <div style={{ background: 'linear-gradient(90deg, #06b6d4 0%, #0891b2 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -1114,15 +1108,15 @@ export default function ProfessionalAlgorithmDerby() {
               <div>
                 {racers.slice(0, 3).map(racer => (
                   <div key={racer.team.id} style={{ marginBottom: '1rem' }}>
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      marginBottom: '0.5rem' 
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '0.5rem'
                     }}>
-                      <span style={{ 
-                        fontSize: '0.75rem', 
-                        fontWeight: 600, 
-                        color: racer.team.color 
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: racer.team.color
                       }}>
                         {racer.team.name}
                       </span>
@@ -1155,7 +1149,7 @@ export default function ProfessionalAlgorithmDerby() {
               </div>
             </div>
           )}
-          
+
           <div style={{ background: '#1e293b', borderRadius: '8px', padding: '1rem' }}>
             <div style={{ background: 'linear-gradient(90deg, #64748b 0%, #475569 100%)', padding: '0.5rem 1rem', borderRadius: '6px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Settings size={16} />
