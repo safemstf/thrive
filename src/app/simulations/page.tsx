@@ -227,9 +227,9 @@ const TabButton = styled.button<{ $active: boolean }>`
 
   &:hover {
     background: ${({ $active }) =>
-      $active
-        ? 'linear-gradient(135deg, #ffffff, #f1f5f9)'
-        : 'rgba(59, 130, 246, 0.06)'};
+    $active
+      ? 'linear-gradient(135deg, #ffffff, #f1f5f9)'
+      : 'rgba(59, 130, 246, 0.06)'};
     color: ${({ $active }) => ($active ? '#1e293b' : '#3b82f6')};
     transform: translateY(-1px);
   }
@@ -253,38 +253,36 @@ const ItemCard = styled.div<{
 }>`
   position: relative;
   padding: 2rem;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(248, 250, 252, 0.96)
-  );
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
   border-radius: 18px;
-  border: 1px solid
-    ${({ $active, $featured }) =>
-      $active || $featured ? '#3b82f6' : 'rgba(148, 163, 184, 0.18)'};
+  border: 1px solid ${({ $active, $featured }) =>
+    $active || $featured ? '#3b82f6' : 'rgba(148,163,184,0.18)'};
   cursor: ${({ $comingSoon }) => ($comingSoon ? 'default' : 'pointer')};
   opacity: ${({ $comingSoon }) => ($comingSoon ? 0.6 : 1)};
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 6px 24px rgba(15,23,42,0.06);
   backdrop-filter: blur(8px);
   transform: translateY(0);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden; /* important to clip :before and preserve rounded corners */
+
+  /* ensure card content sits above the decorative layer */
+  > * {
+    position: relative;
+    z-index: 1;
+  }
 
   ${({ $active }) =>
     $active &&
     css`
-      box-shadow: 0 10px 36px rgba(59, 130, 246, 0.18);
+      box-shadow: 0 10px 36px rgba(59,130,246,0.18);
       transform: translateY(-3px);
     `}
 
   &:hover {
-    transform: ${({ $comingSoon }) =>
-      $comingSoon ? 'none' : 'translateY(-6px)'};
+    transform: ${({ $comingSoon }) => ($comingSoon ? 'none' : 'translateY(-6px)')};
     box-shadow: ${({ $comingSoon }) =>
-      $comingSoon
-        ? '0 6px 24px rgba(15, 23, 42, 0.06)'
-        : '0 14px 44px rgba(37, 99, 235, 0.15)'};
-    border-color: ${({ $comingSoon }) =>
-      $comingSoon ? 'rgba(148, 163, 184, 0.18)' : '#3b82f6'};
+    $comingSoon ? '0 6px 24px rgba(15,23,42,0.06)' : '0 14px 44px rgba(37,99,235,0.15)'};
+    border-color: ${({ $comingSoon }) => ($comingSoon ? 'rgba(148,163,184,0.18)' : '#3b82f6')};
   }
 
   &:before {
@@ -293,12 +291,13 @@ const ItemCard = styled.div<{
     inset: 0;
     border-radius: 18px;
     background: ${({ $featured }) =>
-      $featured
-        ? 'linear-gradient(120deg, rgba(59,130,246,0.15), rgba(6,182,212,0.15))'
-        : 'none'};
+    $featured ? 'linear-gradient(120deg, rgba(59,130,246,0.12), rgba(6,182,212,0.08))' : 'none'};
     z-index: 0;
+    pointer-events: none;
+    transition: opacity 220ms ease;
   }
 `;
+
 
 const ItemTitle = styled.h3<{ $comingSoon?: boolean }>`
   font-weight: 700;
@@ -403,21 +402,69 @@ const FadingElements = styled.div<{ $theater: boolean }>`
   transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1), visibility 0.35s;
 `;
 
+/* ControlsContainer — chip layout with subtle dividers; children keep their own padding */
 const ControlsContainer = styled.div`
   display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: 0;
+  margin: 1.5rem 0 2rem 0;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
+  padding: 0.25rem 0;
+
+  /* each direct child gets horizontal spacing; don't force padding so buttons can manage it */
+  > * {
+    margin: 0 0.5rem;
+    box-sizing: border-box;
+    background: transparent;
+    border: none;
+  }
+
+  /* thin vertical separators between chips (except wrap/new-line) */
+  > * + * {
+    position: relative;
+  }
+  > * + *::before {
+    content: '';
+    position: absolute;
+    left: -0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 40%;
+    background: rgba(148, 163, 184, 0.06);
+    pointer-events: none;
+  }
+
+  @media (max-width: 520px) {
+    > * {
+      margin: 0 0.35rem;
+    }
+    > * + *::before {
+      height: 30%;
+      left: -0.35rem;
+    }
+  }
 `;
 
-const ControlButton = styled.button<{ $variant?: string; $active?: boolean; $theater?: boolean }>`
+/* ControlButton — retain your colors/variants but add touch-target, focus, and reduced-motion handling */
+const ControlButton = styled.button<{
+  $variant?: string;
+  $active?: boolean;
+  $theater?: boolean;
+}>`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.875rem 1.5rem;
+
+  /* keep original padding, but ensure minimum touch target */
+  padding: 0.75rem 1.25rem;
+  min-height: 40px;
+  min-width: 44px;
   border-radius: 8px;
-  border: 1px solid ${({ $variant, $active, $theater }) => {
+
+  border: 1px solid
+    ${({ $variant, $active, $theater }) => {
     if ($theater) return $active ? 'rgba(59, 130, 246, 0.5)' : 'rgba(148, 163, 184, 0.3)';
     if ($variant === 'danger') return '#f87171';
     if ($active) return '#3b82f6';
@@ -435,13 +482,17 @@ const ControlButton = styled.button<{ $variant?: string; $active?: boolean; $the
     if ($active) return '#2563eb';
     return '#475569';
   }};
+
   font-family: 'Inter', system-ui, sans-serif;
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s ease;
-  width: ${({ $theater }) => $theater ? '100%' : 'auto'};
-  justify-content: ${({ $theater }) => $theater ? 'center' : 'flex-start'};
+  transition: box-shadow 180ms ease, transform 120ms ease, background 120ms ease;
+  width: ${({ $theater }) => ($theater ? '100%' : 'auto')};
+  justify-content: ${({ $theater }) => ($theater ? 'center' : 'flex-start')};
+
+  /* keep spacing inside the container but avoid double-padding from parent > * */
+  margin: 0; /* parent controls horizontal spacing */
 
   &:hover {
     background: ${({ $variant, $active, $theater }) => {
@@ -451,12 +502,37 @@ const ControlButton = styled.button<{ $variant?: string; $active?: boolean; $the
     return '#f8fafc';
   }};
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px ${({ $variant, $theater }) =>
-    $theater ? 'rgba(59, 130, 246, 0.3)' : ($variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.2)')
-  };
-    border-color: ${({ $theater }) => $theater ? 'rgba(59, 130, 246, 0.5)' : ''};
+    box-shadow: 0 4px 12px
+      ${({ $variant, $theater }) => ($theater ? 'rgba(59, 130, 246, 0.3)' : ($variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.12)'))};
+    border-color: ${({ $theater }) => ($theater ? 'rgba(59, 130, 246, 0.5)' : '')};
+  }
+
+  /* keyboard focus (accessible) */
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+  }
+
+  /* disabled state */
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* avoid hover/transform on touch-only devices */
+  @media (hover: none) {
+    &:hover { transform: none; box-shadow: none; }
+  }
+
+  /* respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &:hover { transform: none; box-shadow: none; }
   }
 `;
+
 
 const SpeedControl = styled.div<{ $theater?: boolean }>`
   display: flex;
