@@ -884,7 +884,7 @@ const allItems: SimulationItem[] = [
     color: '#7c3aed',
     description: 'Recursion visualizer',
     optimized: true,
-    featured: false,
+    featured: true,
     category: 'algorithms'
   },
   {
@@ -894,7 +894,7 @@ const allItems: SimulationItem[] = [
     color: '#06b6d4',
     description: 'OFDM and routing protocols',
     optimized: true,
-    featured: true,
+    featured: false,
     category: 'algorithms'
   },
   {
