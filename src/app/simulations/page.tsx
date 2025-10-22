@@ -193,12 +193,13 @@ const TabContainer = styled.div`
 
 const TabWrapper = styled.div`
   display: flex;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 12px;
-  padding: 4px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  padding: 5px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+  transition: all 0.3s ease;
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
@@ -207,22 +208,30 @@ const TabButton = styled.button<{ $active: boolean }>`
   gap: 0.75rem;
   padding: 0.875rem 1.75rem;
   border: none;
-  border-radius: 8px;
-  background: ${({ $active }) => $active ? 'white' : 'transparent'};
-  color: ${({ $active }) => $active ? '#1e293b' : '#64748b'};
+  border-radius: 10px;
+  background: ${({ $active }) =>
+    $active ? 'linear-gradient(135deg, #ffffff, #f8fafc)' : 'transparent'};
+  color: ${({ $active }) => ($active ? '#1e293b' : '#64748b')};
   font-family: 'Inter', system-ui, sans-serif;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s ease;
-  
-  ${({ $active }) => $active && css`
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  `}
+  transition: all 0.25s ease;
+
+  ${({ $active }) =>
+    $active &&
+    css`
+      box-shadow: 0 3px 10px rgba(59, 130, 246, 0.12);
+      transform: translateY(-1px);
+    `}
 
   &:hover {
-    background: ${({ $active }) => $active ? 'white' : 'rgba(59, 130, 246, 0.05)'};
-    color: ${({ $active }) => $active ? '#1e293b' : '#3b82f6'};
+    background: ${({ $active }) =>
+      $active
+        ? 'linear-gradient(135deg, #ffffff, #f1f5f9)'
+        : 'rgba(59, 130, 246, 0.06)'};
+    color: ${({ $active }) => ($active ? '#1e293b' : '#3b82f6')};
+    transform: translateY(-1px);
   }
 `;
 
@@ -237,34 +246,67 @@ const ItemsGrid = styled.div`
   }
 `;
 
-const ItemCard = styled.div<{ $active?: boolean; $featured?: boolean; $comingSoon?: boolean }>`
+const ItemCard = styled.div<{
+  $active?: boolean;
+  $featured?: boolean;
+  $comingSoon?: boolean;
+}>`
   position: relative;
   padding: 2rem;
-  background: white;
-  border-radius: 16px;
-  border: 1px solid ${({ $active, $featured }) => {
-    if ($featured && $active) return '#3b82f6';
-    if ($active) return '#3b82f6';
-    return 'rgba(148, 163, 184, 0.2)';
-  }};
-  cursor: ${({ $comingSoon }) => $comingSoon ? 'default' : 'pointer'};
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: ${({ $comingSoon }) => $comingSoon ? 0.6 : 1};
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  
-  ${({ $active }) => $active && css`
-    box-shadow: 0 8px 30px rgba(59, 130, 246, 0.15);
-    transform: translateY(-2px);
-  `}
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98),
+    rgba(248, 250, 252, 0.96)
+  );
+  border-radius: 18px;
+  border: 1px solid
+    ${({ $active, $featured }) =>
+      $active || $featured ? '#3b82f6' : 'rgba(148, 163, 184, 0.18)'};
+  cursor: ${({ $comingSoon }) => ($comingSoon ? 'default' : 'pointer')};
+  opacity: ${({ $comingSoon }) => ($comingSoon ? 0.6 : 1)};
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(8px);
+  transform: translateY(0);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  ${({ $active }) =>
+    $active &&
+    css`
+      box-shadow: 0 10px 36px rgba(59, 130, 246, 0.18);
+      transform: translateY(-3px);
+    `}
 
   &:hover {
-    transform: ${({ $comingSoon }) => $comingSoon ? 'none' : 'translateY(-4px)'};
+    transform: ${({ $comingSoon }) =>
+      $comingSoon ? 'none' : 'translateY(-6px)'};
     box-shadow: ${({ $comingSoon }) =>
-    $comingSoon ? '0 4px 20px rgba(0, 0, 0, 0.05)' : '0 12px 40px rgba(0, 0, 0, 0.1)'};
-    border-color: ${({ $comingSoon }) => $comingSoon ? 'rgba(148, 163, 184, 0.2)' : '#3b82f6'};
+      $comingSoon
+        ? '0 6px 24px rgba(15, 23, 42, 0.06)'
+        : '0 14px 44px rgba(37, 99, 235, 0.15)'};
+    border-color: ${({ $comingSoon }) =>
+      $comingSoon ? 'rgba(148, 163, 184, 0.18)' : '#3b82f6'};
+  }
+
+  &:before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 18px;
+    background: ${({ $featured }) =>
+      $featured
+        ? 'linear-gradient(120deg, rgba(59,130,246,0.15), rgba(6,182,212,0.15))'
+        : 'none'};
+    z-index: 0;
   }
 `;
 
+const ItemTitle = styled.h3<{ $comingSoon?: boolean }>`
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: ${({ $comingSoon }) => ($comingSoon ? '#94a3b8' : '#1e293b')};
+  line-height: 1.3;
+  margin-bottom: 0.5rem;
+`;
 const ItemHeader = styled.div`
   display: flex;
   align-items: flex-start;
@@ -290,14 +332,6 @@ const ItemContent = styled.div`
   min-width: 0;
 `;
 
-const ItemTitle = styled.h3<{ $comingSoon?: boolean }>`
-  font-family: 'Inter', system-ui, sans-serif;
-  font-weight: 600;
-  font-size: 1.125rem;
-  margin: 0 0 0.5rem 0;
-  color: ${({ $comingSoon }) => $comingSoon ? '#94a3b8' : '#1e293b'};
-  line-height: 1.3;
-`;
 
 const ItemDescription = styled.p`
   font-family: 'Inter', system-ui, sans-serif;
@@ -318,15 +352,15 @@ const BadgeContainer = styled.div`
 `;
 
 const Badge = styled.div<{ $variant?: string }>`
-  padding: 0.25rem 0.75rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
-  font-family: 'Inter', system-ui, sans-serif;
   display: flex;
   align-items: center;
   gap: 0.375rem;
-  
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+
   ${({ $variant }) => {
     switch ($variant) {
       case 'featured':
@@ -336,7 +370,7 @@ const Badge = styled.div<{ $variant?: string }>`
         `;
       case 'optimized':
         return css`
-          background: #f0fdf4;
+          background: #ecfdf5;
           color: #16a34a;
           border: 1px solid #bbf7d0;
         `;
