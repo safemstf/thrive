@@ -54,8 +54,13 @@ const PhylogeneticTreeBuilder = dynamic(() => import('@/components/cs/phylogeny/
   loading: () => <SimulationLoader>Loading Phylogenetic Tree Builder...</SimulationLoader>
 });
 
+const ShortestPathAlgorithmDemo = dynamic(() => import('@/components/cs/shortestPath/shortestPath'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Shortest Path Algorithm Builder...</SimulationLoader>
+});
+
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks';
 type TabType = 'simulations' | 'algorithms';
 
 interface SimulationItem {
@@ -857,6 +862,17 @@ const allItems: SimulationItem[] = [
     optimized: true,
     featured: true,
     category: 'algorithms'
+  },
+  {
+    key: 'Shortest-Path-Networks',
+    label: 'Shortest Path',
+    icon: <Users size={24} />,
+    color: '#0077ff',
+    description: 'Shortest path algorithms comparison',
+    optimized: true,
+    featured: true,
+    special: true,
+    category: 'algorithms'
   }
 ];
 
@@ -1051,6 +1067,10 @@ export default function SimulationsPage() {
 
       case 'phylogeny':
         return <PhylogeneticTreeBuilder isRunning={isRunning} speed={speed} />;
+
+      case 'Shortest-Path-Networks':
+        return <ShortestPathAlgorithmDemo isRunning={isRunning} speed={speed} />;
+
       default:
         return (
           <PlaceholderContent>
