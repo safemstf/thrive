@@ -22,6 +22,620 @@ const COLORS = {
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 700;
 
+// ==================== STYLED COMPONENTS ====================
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+`;
+
+const shimmer = keyframes`
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+`;
+
+const gentlePulse = keyframes`
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+`;
+
+const MainContainer = styled.div`
+  width: 100%;
+  height: 100vh;
+  background: linear-gradient(135deg, ${COLORS.bg1} 0%, ${COLORS.bg2} 50%, ${COLORS.bg1} 100%);
+  color: ${COLORS.textPrimary};
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
+    pointer-events: none;
+  }
+`;
+
+const Header = styled.div`
+  padding: 1.5rem 2rem;
+  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid ${COLORS.borderAccent};
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  animation: ${fadeIn} 0.6s ease-out;
+  z-index: 10;
+  
+  @media (max-width: 768px) {
+    padding: 1rem;
+    flex-wrap: wrap;
+  }
+`;
+
+const Title = styled.h1`
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  
+  @media (max-width: 768px) {
+    font-size: 1.25rem;
+  }
+`;
+
+const Badge = styled.div`
+  padding: 0.5rem 1rem;
+  background: rgba(59, 130, 246, 0.12);
+  border-radius: 24px;
+  font-size: 0.875rem;
+  border: 1px solid ${COLORS.borderAccent};
+  font-weight: 500;
+`;
+
+const MainContent = styled.div`
+  flex: 1;
+  display: flex;
+  padding: 1.5rem;
+  gap: 1.5rem;
+  overflow: hidden;
+  animation: ${fadeIn} 0.8s ease-out;
+  z-index: 1;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    padding: 1rem;
+    overflow-y: auto;
+  }
+`;
+
+const CanvasArea = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid ${COLORS.borderAccent};
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  position: relative;
+  overflow: hidden;
+  padding: 2rem;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.35), transparent);
+    background-size: 200% 100%;
+    animation: ${shimmer} 3s linear infinite;
+  }
+  
+  @media (max-width: 768px) {
+    min-height: 400px;
+    padding: 1rem;
+  }
+`;
+
+const RouteInfo = styled.div`
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  background: rgba(0,0,0,0.9);
+  backdrop-filter: blur(10px);
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 1px solid ${COLORS.borderAccent};
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  
+  @media (max-width: 768px) {
+    font-size: 0.875rem;
+    padding: 0.75rem 1rem;
+    left: 1rem;
+    top: 1rem;
+  }
+`;
+
+const CityLabel = styled.span<{ $color: string }>`
+  color: ${({ $color }) => $color};
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const WinnerBanner = styled.div<{ $color: string }>`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.95);
+  backdrop-filter: blur(20px);
+  padding: 2rem 3rem;
+  border-radius: 16px;
+  border: 2px solid ${({ $color }) => $color};
+  box-shadow: 0 0 40px ${({ $color }) => $color}80;
+  text-align: center;
+  animation: ${gentlePulse} 2s ease-in-out infinite;
+  z-index: 100;
+`;
+
+const WinnerTitle = styled.h2<{ $color: string }>`
+  font-size: 2rem;
+  margin: 0 0 1rem 0;
+  color: ${({ $color }) => $color};
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+`;
+
+const WinnerStats = styled.div`
+  font-size: 1rem;
+  color: ${COLORS.textMuted};
+  margin-top: 0.5rem;
+`;
+
+const Sidebar = styled.div`
+  width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.2);
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: ${COLORS.borderAccent};
+    border-radius: 3px;
+  }
+  
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
+const ControlsSection = styled.div`
+  display: flex;
+  gap: 0.75rem;
+`;
+
+const ControlButton = styled.button<{ $variant?: 'primary' | 'secondary' }>`
+  flex: 1;
+  padding: 1rem 1.5rem;
+  background: ${({ $variant }) =>
+    $variant === 'primary'
+      ? `linear-gradient(135deg, ${COLORS.accent} 0%, ${COLORS.accentSoft} 100%)`
+      : 'rgba(59, 130, 246, 0.12)'};
+  border: 1px solid ${COLORS.borderAccent};
+  border-radius: 12px;
+  color: ${COLORS.textPrimary};
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    background: ${({ $variant }) =>
+    $variant === 'primary'
+      ? `linear-gradient(135deg, ${COLORS.accentSoft} 0%, ${COLORS.accent} 100%)`
+      : 'rgba(59, 130, 246, 0.2)'};
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+const Section = styled.div`
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid ${COLORS.borderAccent};
+  padding: 1.25rem;
+  animation: ${fadeIn} 0.6s ease-out;
+`;
+
+const SectionTitle = styled.div`
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: ${COLORS.textPrimary};
+`;
+
+const Label = styled.div`
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: ${COLORS.textMuted};
+`;
+
+const Slider = styled.input`
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(59, 130, 246, 0.2);
+  outline: none;
+  
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: ${COLORS.accent};
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+    transition: all 0.2s ease;
+  }
+  
+  &::-webkit-slider-thumb:hover {
+    background: ${COLORS.accentSoft};
+    transform: scale(1.1);
+  }
+  
+  &::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: ${COLORS.accent};
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  }
+`;
+
+const ButtonGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+`;
+
+const ModeButton = styled.button<{ $active: boolean }>`
+  padding: 0.75rem;
+  background: ${({ $active }) =>
+    $active ? 'rgba(59, 130, 246, 0.25)' : 'rgba(0,0,0,0.3)'};
+  border: 1px solid ${({ $active }) =>
+    $active ? COLORS.accent : COLORS.borderAccent};
+  border-radius: 8px;
+  color: ${({ $active }) => $active ? COLORS.accent : COLORS.textMuted};
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.2);
+    transform: translateY(-1px);
+  }
+`;
+
+const AlgoCheckbox = styled.label<{ $active: boolean; $color: string }>`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: ${({ $active, $color }) =>
+    $active ? `${$color}15` : 'rgba(0,0,0,0.3)'};
+  border: 1px solid ${({ $active, $color }) =>
+    $active ? $color : COLORS.borderAccent};
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 0.75rem;
+  
+  &:hover {
+    background: ${({ $color }) => `${$color}20`};
+    transform: translateX(4px);
+  }
+  
+  input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: ${({ $color }) => $color};
+  }
+`;
+
+const AlgoEmoji = styled.span`
+  font-size: 1.75rem;
+  line-height: 1;
+`;
+
+const AlgoDetails = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+`;
+
+const AlgoName = styled.div<{ $color: string; $active: boolean }>`
+  font-size: 1rem;
+  font-weight: 600;
+  color: ${({ $color, $active }) => $active ? $color : COLORS.textMuted};
+`;
+
+const AlgoDescription = styled.div`
+  font-size: 0.75rem;
+  color: ${COLORS.textMuted};
+  opacity: 0.8;
+`;
+
+const Leaderboard = styled.div<{ $expanded?: boolean }>`
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid ${COLORS.borderAccent};
+  padding: 1.25rem;
+  animation: ${fadeIn} 0.6s ease-out;
+  min-height: 400px;
+
+  max-height: ${({ $expanded }) => $expanded ? '1000px' : '400px'};
+  overflow-y: auto;
+  transition: max-height 0.3s ease;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.2);
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: ${COLORS.borderAccent};
+    border-radius: 3px;
+  }
+`;
+
+const LeaderboardHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+`;
+
+const LeaderboardTitle = styled.div`
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: ${COLORS.textPrimary};
+`;
+
+const ExpandButton = styled.button`
+  background: transparent;
+  border: none;
+  color: ${COLORS.textMuted};
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+  
+  &:hover {
+    color: ${COLORS.textPrimary};
+  }
+`;
+
+const LeaderboardItem = styled.div<{ $rank: number; $isWinner: boolean; $color: string; $failed: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background: ${({ $isWinner, $color, $failed }) =>
+    $failed ? 'rgba(239, 68, 68, 0.1)' :
+      $isWinner ? `${$color}20` : 'rgba(0,0,0,0.3)'};
+  border: 1px solid ${({ $isWinner, $color, $failed }) =>
+    $failed ? 'rgba(239, 68, 68, 0.3)' :
+      $isWinner ? $color : COLORS.borderAccent};
+  border-radius: 12px;
+  animation: ${fadeIn} 0.4s ease-out ${({ $rank }) => $rank * 0.05}s both;
+  
+  ${({ $isWinner }) => $isWinner && `
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  `}
+`;
+
+const Rank = styled.div`
+  font-size: 1.5rem;
+  font-weight: 700;
+  min-width: 40px;
+  text-align: center;
+`;
+
+const AlgoInfo = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+`;
+
+const AlgoHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const AlgoNameInBoard = styled.span<{ $color: string }>`
+  font-size: 1rem;
+  font-weight: 600;
+  color: ${({ $color }) => $color};
+`;
+
+const AlgoStatus = styled.div<{ $color: string }>`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${({ $color }) => $color};
+  animation: ${pulse} 2s ease-in-out infinite;
+`;
+
+const Stats = styled.div`
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: ${COLORS.textMuted};
+`;
+
+const StatValue = styled.span`
+  font-weight: 600;
+  color: ${COLORS.textPrimary};
+`;
+
+const GlobalLeaderboard = styled.div`
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid ${COLORS.borderAccent};
+  padding: 1.25rem;
+  animation: ${fadeIn} 0.6s ease-out;
+`;
+
+const GlobalLeaderboardHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+`;
+
+const ResetButton = styled.button`
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: ${COLORS.danger};
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  &:hover {
+    background: rgba(239, 68, 68, 0.2);
+    transform: translateY(-1px);
+  }
+`;
+
+const GlobalLeaderboardItem = styled.div<{ $rank: number; $color: string }>`
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid ${COLORS.borderAccent};
+  border-radius: 12px;
+  animation: ${fadeIn} 0.4s ease-out ${({ $rank }) => $rank * 0.05}s both;
+`;
+
+const GlobalAlgoHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+`;
+
+const GlobalAlgoLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const GlobalAlgoName = styled.span<{ $color: string }>`
+  font-size: 1rem;
+  font-weight: 600;
+  color: ${({ $color }) => $color};
+`;
+
+const GlobalStats = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: ${COLORS.textMuted};
+`;
+
+const GlobalStatItem = styled.div`
+  display: flex;
+  flex-direction: column;
+`;
+
+const GlobalStatLabel = styled.span`
+  opacity: 0.7;
+`;
+
+const GlobalStatValue = styled.span`
+  color: ${COLORS.textPrimary};
+  font-weight: 600;
+  font-size: 0.9rem;
+`;
+
 // ==================== TYPES ====================
 type AlgorithmType = 'dijkstra' | 'astar' | 'bfs' | 'dfs' | 'bmssp';
 type MapMode = 'us-cities' | 'metro' | 'highway' | 'regional' | 'large-grid' | 'mega-random' | 'scale-free' | 'small-world';
@@ -800,365 +1414,94 @@ class DFSAlgorithm extends PathfindingAlgorithm {
   }
 }
 
-// ==================== BMSSP (TypeScript-typed, heap-backed D) ====================
+// ==================== BMSSP (Simplified for Simulation) ====================
+
 class BMSSPAlgorithm extends PathfindingAlgorithm {
+  // Simplified parameters for better visualization
+  private readonly WORK_PER_STEP = 3; // Process 3 nodes per visualization step
+  
   initializeState(): any {
-    const n = Math.max(1, this.graph.getCityCount());
-
-    // Paper-inspired parameters (safe fallbacks)
-    const logN = Math.max(2, Math.log2(n));
-    const k = Math.max(2, Math.floor(Math.pow(logN, 1 / 3)));
-    const t = Math.max(1, Math.floor(Math.pow(logN, 2 / 3)));
-
-    // bd: upper bound estimates (bd[s] = 0, others Infinity)
-    const bd = new Map<number, number>();
-    for (let v = 0; v < n; v++) bd.set(v, Infinity);
-    bd.set(this.startCity, 0);
-
+    const k = this.graph.getCityCount();
+    const bd = new Map<number, number>(); // best distance estimates
     const cameFrom = new Map<number, number>();
-
-    // keep internals
-    const internalState: any = {
-      bd,
-      cameFrom,
-      k,
-      t,
-      n,
-      finished: false,
-      failed: false,
-      calls: 0
-    };
-
-    // trivial start==goal
-    if (this.startCity === this.goalCity) {
-      this.path = [this.startCity];
-      this.distance = 0;
-      this.markFinished();
-      internalState.finished = true;
-    }
-
+    const pq: Array<{ city: number; dist: number }> = []; // priority queue
+    
+    // Initialize with source
+    bd.set(this.startCity, 0);
+    pq.push({ city: this.startCity, dist: 0 });
     this.frontier = [this.startCity];
-    return internalState;
-  }
-
-  // --- typed generic MinHeap ---
-  private MinHeap<T>(cmp: (a: T, b: T) => number) {
-    return class {
-      private data: T[] = [];
-      private cmp: (a: T, b: T) => number;
-      constructor() { this.cmp = cmp; }
-      size(): number { return this.data.length; }
-      isEmpty(): boolean { return this.data.length === 0; }
-      peek(): T | undefined { return this.data[0]; }
-      push(x: T) {
-        this.data.push(x);
-        this._siftUp(this.data.length - 1);
-      }
-      pop(): T | undefined {
-        if (this.data.length === 0) return undefined;
-        const top = this.data[0];
-        const last = this.data.pop()!;
-        if (this.data.length > 0) {
-          this.data[0] = last;
-          this._siftDown(0);
-        }
-        return top;
-      }
-      private _siftUp(i: number) {
-        const a = this.data;
-        while (i > 0) {
-          const p = (i - 1) >> 1;
-          if (this.cmp(a[i], a[p]) >= 0) break;
-          [a[i], a[p]] = [a[p], a[i]];
-          i = p;
-        }
-      }
-      private _siftDown(i: number) {
-        const a = this.data;
-        const n = a.length;
-        while (true) {
-          let l = (i << 1) + 1;
-          let r = l + 1;
-          let smallest = i;
-          if (l < n && this.cmp(a[l], a[smallest]) < 0) smallest = l;
-          if (r < n && this.cmp(a[r], a[smallest]) < 0) smallest = r;
-          if (smallest === i) break;
-          [a[i], a[smallest]] = [a[smallest], a[i]];
-          i = smallest;
-        }
-      }
-    };
-  }
-
-  // --- SimpleD: heap-backed data structure with Insert, BatchPrepend, Pull, isEmpty ---
-  private SimpleD = class {
-    private heap: any;
-    private best = new Map<number, number>();
-    private Bval: number;
-    constructor(Bval: number, MinHeapClass: any) {
-      this.Bval = Bval;
-      this.heap = new MinHeapClass();
-    }
-    insert(pair: { key: number; val: number }) {
-      const prev = this.best.get(pair.key);
-      if (prev === undefined || pair.val < prev) {
-        this.best.set(pair.key, pair.val);
-        this.heap.push(pair);
-      }
-    }
-    batchPrepend(list: Array<{ key: number; val: number }>) {
-      for (const p of list) this.insert(p);
-    }
-    pull(M: number): { Si: number[]; Bi: number } {
-      const Si: number[] = [];
-      while (!this.heap.isEmpty() && Si.length < M) {
-        const top = this.heap.pop();
-        const bestVal = this.best.get(top.key);
-        if (bestVal == null || bestVal !== top.val) continue; // stale
-        Si.push(top.key);
-        this.best.delete(top.key);
-      }
-      let Bi = this.Bval;
-      while (!this.heap.isEmpty()) {
-        const p = this.heap.peek();
-        const bestVal = this.best.get(p.key);
-        if (bestVal == null || bestVal !== p.val) { this.heap.pop(); continue; }
-        Bi = p.val;
-        break;
-      }
-      return { Si, Bi };
-    }
-    isEmpty(): boolean {
-      while (!this.heap.isEmpty()) {
-        const p = this.heap.peek();
-        const bestVal = this.best.get(p.key);
-        if (bestVal == null || bestVal !== p.val) this.heap.pop();
-        else break;
-      }
-      return this.heap.isEmpty();
-    }
-  };
-
-  // FindPivots(B,S) per paper (k relax rounds). Updates bd in-place.
-  private FindPivots(B: number, S: Set<number>, bd: Map<number, number>, k: number) {
-    const W = new Set<number>();
-    let Wi_prev = new Set<number>(S);
-    for (const s of S) W.add(s);
-
-    for (let i = 1; i <= k; i++) {
-      const Wi = new Set<number>();
-      for (const u of Wi_prev) {
-        const ubd = bd.get(u) ?? Infinity;
-        const neighbors = this.graph.getNeighbors(u);
-        for (const v of neighbors) {
-          const cand = ubd + this.graph.getDistance(u, v);
-          const old = bd.get(v) ?? Infinity;
-          if (cand <= old) {
-            if (cand < old) bd.set(v, cand);
-            if (cand < B) {
-              Wi.add(v);
-              W.add(v);
-            }
-          }
-        }
-      }
-      if (W.size > k * S.size) {
-        return { P: new Set<number>(S), W };
-      }
-      if (Wi.size === 0) break;
-      Wi_prev = Wi;
-    }
-
-    // build forest F on W
-    const parent = new Map<number, number | null>();
-    for (const v of W) parent.set(v, null);
-    for (const u of W) {
-      const ubd = bd.get(u) ?? Infinity;
-      for (const v of this.graph.getNeighbors(u)) {
-        if (!W.has(v)) continue;
-        const wuv = this.graph.getDistance(u, v);
-        if ((bd.get(v) ?? Infinity) === ubd + wuv) {
-          if (parent.get(v) == null) parent.set(v, u);
-        }
-      }
-    }
-
-    const children = new Map<number, number[]>();
-    for (const v of W) children.set(v, []);
-    for (const [v, p] of parent.entries()) {
-      if (p != null) children.get(p)!.push(v);
-    }
-
-    const subtree = new Map<number, number>();
-    const dfs = (u: number): number => {
-      if (subtree.has(u)) return subtree.get(u)!;
-      let sz = 1;
-      for (const c of children.get(u) ?? []) sz += dfs(c);
-      subtree.set(u, sz);
-      return sz;
-    };
-    for (const v of W) dfs(v);
-
-    const P = new Set<number>();
-    for (const s of S) {
-      const size = subtree.get(s) ?? 0;
-      if (size >= k) P.add(s);
-    }
-    return { P, W };
-  }
-
-  // BaseCase (l=0) mini-Dijkstra
-  private BaseCase(B: number, S: Set<number>, bd: Map<number, number>, k: number, cameFrom: Map<number, number>) {
-    if (S.size !== 1) throw new Error("BaseCase requires singleton S");
-    const x = Array.from(S)[0];
-
-    // local min-heap for [v, bd]
-    const MinHeapPair = this.MinHeap<{ v: number; d: number }>((a, b) => a.d - b.d);
-    const H = new (MinHeapPair as any)();
-
-    const U0 = new Set<number>([x]);
-    H.push({ v: x, d: bd.get(x) ?? Infinity });
-    const inHeap = new Set<number>([x]);
-
-    while (!H.isEmpty() && U0.size < k + 1) {
-      const rec = H.pop()!;
-      const u = rec.v;
-      if (U0.has(u)) continue;
-      U0.add(u);
-      const ubd = bd.get(u) ?? Infinity;
-      for (const v of this.graph.getNeighbors(u)) {
-        const cand = ubd + this.graph.getDistance(u, v);
-        const old = bd.get(v) ?? Infinity;
-        if (cand <= old && cand < B) {
-          if (cand < old) {
-            bd.set(v, cand);
-            cameFrom.set(v, u);
-          }
-          if (!inHeap.has(v)) {
-            H.push({ v, d: bd.get(v)! });
-            inHeap.add(v);
-          }
-        }
-      }
-    }
-
-    if (U0.size <= k) {
-      return { Bprime: B, U: U0 };
-    } else {
-      let maxbd = -Infinity;
-      for (const v of U0) maxbd = Math.max(maxbd, bd.get(v) ?? -Infinity);
-      const U = new Set<number>();
-      for (const v of U0) if ((bd.get(v) ?? Infinity) < maxbd) U.add(v);
-      return { Bprime: maxbd, U };
-    }
-  }
-
-  // recursive BMSSP
-  private BMSSP_rec(l: number, B: number, S: Set<number>, bd: Map<number, number>, cameFrom: Map<number, number>) {
-    this.internalState.calls++;
-
-    if (l === 0) {
-      return this.BaseCase(B, S, bd, this.internalState.k, cameFrom);
-    }
-
-    const { P, W } = this.FindPivots(B, S, bd, this.internalState.k);
-
-    const Mpow = Math.pow(2, (l - 1) * this.internalState.t);
-    const M = Math.max(1, Math.floor(2 * Mpow));
-
-    const MinHeapPair = this.MinHeap<{ key: number; val: number }>((a, b) => (a.val - b.val) || (a.key - b.key));
-    const SimpleDClass = this.SimpleD;
-    const simpleD = new (SimpleDClass as any)(B, MinHeapPair);
-
-    for (const x of P) {
-      const val = bd.get(x) ?? Infinity;
-      if (val < B) simpleD.insert({ key: x, val });
-    }
-
-    const UiAll = new Set<number>();
-    // safe Bi initialization
-    const pivotVals = Array.from(P).map(x => bd.get(x) ?? Infinity).filter(v => v < Infinity);
-    let Bi = pivotVals.length > 0 ? Math.min(...pivotVals) : B;
-
-    const k2l = Math.pow(this.internalState.k, 2) * Math.pow(2, l * this.internalState.t);
-
-    while (UiAll.size < k2l && !simpleD.isEmpty()) {
-      const pulled = simpleD.pull(M);
-      const Si = new Set<number>(pulled.Si);
-      const Bi_local = pulled.Bi;
-
-      const { Bprime: Bp, U: Ui } = this.BMSSP_rec(l - 1, Bi_local, Si, bd, cameFrom);
-
-      for (const u of Ui) UiAll.add(u);
-
-      const K: Array<{ key: number; val: number }> = [];
-      for (const u of Ui) {
-        const ubd = bd.get(u) ?? Infinity;
-        for (const v of this.graph.getNeighbors(u)) {
-          const cand = ubd + this.graph.getDistance(u, v);
-          const old = bd.get(v) ?? Infinity;
-          if (cand <= old) {
-            if (cand < old) cameFrom.set(v, u);
-            bd.set(v, cand);
-            if (cand >= Bi_local && cand < B) {
-              simpleD.insert({ key: v, val: cand });
-            } else if (cand >= Bp && cand < Bi_local) {
-              K.push({ key: v, val: cand });
-            }
-          }
-        }
-      }
-
-      const toPrepend: Array<{ key: number; val: number }> = [];
-      for (const p of K) toPrepend.push(p);
-      for (const s of Si) {
-        const sv = bd.get(s) ?? Infinity;
-        if (sv >= Bp && sv < Bi_local) toPrepend.push({ key: s, val: sv });
-      }
-      if (toPrepend.length > 0) simpleD.batchPrepend(toPrepend);
-
-      if (UiAll.size > k2l) {
-        return { Bprime: Bi_local, U: UiAll };
-      }
-    }
-
-    let Bprime = B;
-    if (pivotVals.length > 0) Bprime = Math.min(Bprime, Math.min(...pivotVals));
-
-    for (const w of W) {
-      if ((bd.get(w) ?? Infinity) < Bprime) UiAll.add(w);
-    }
-
-    return { Bprime, U: UiAll };
+    
+    return { bd, cameFrom, pq, k };
   }
 
   step(): boolean {
-    if (this.internalState.finished) return false;
-    try {
-      const n = this.internalState.n;
-      const t = this.internalState.t;
-      const l0 = Math.max(0, Math.ceil(Math.log2(Math.max(2, n)) / Math.max(1, t)));
-      const Sroot = new Set<number>([this.startCity]);
-      const { Bprime, U } = this.BMSSP_rec(l0, Infinity, Sroot, this.internalState.bd, this.internalState.cameFrom);
-
-      if ((this.internalState.bd.get(this.goalCity) ?? Infinity) < Infinity) {
-        this.path = this.reconstructPath(this.internalState.cameFrom, this.goalCity);
+    const state = this.internalState;
+    
+    if (state.pq.length === 0) {
+      // Check if we found the goal
+      if ((state.bd.get(this.goalCity) ?? Infinity) < Infinity) {
+        this.path = this.reconstructPath(state.cameFrom, this.goalCity);
         this.distance = this.calculateTotalDistance(this.path);
-        this.frontier = [];
         this.markFinished();
-        this.internalState.finished = true;
-        return false;
       } else {
         this.markFailed();
-        this.internalState.failed = true;
-        return false;
       }
-    } catch (err) {
-      console.error("BMSSP step error:", err);
-      this.markFailed();
-      this.internalState.failed = true;
       return false;
     }
+
+    // Process multiple nodes per step for efficiency (BMSSP characteristic)
+    for (let i = 0; i < this.WORK_PER_STEP && state.pq.length > 0; i++) {
+      // Sort and extract minimum
+      state.pq.sort((a: { dist: number; }, b: { dist: number; }) => a.dist - b.dist);
+      const { city: current, dist: currentDist } = state.pq.shift()!;
+
+      // Skip if already explored
+      if (this.explored.has(current)) continue;
+
+      // Mark as explored
+      this.explored.add(current);
+      this.steps++;
+
+      // Early exit if we reached goal
+      if (current === this.goalCity) {
+        this.path = this.reconstructPath(state.cameFrom, current);
+        this.distance = this.calculateTotalDistance(this.path);
+        this.markFinished();
+        state.pq = []; // Clear queue
+        return false;
+      }
+
+      // Relax neighbors (Dijkstra-style with BMSSP optimizations)
+      const neighbors = this.graph.getNeighbors(current);
+      for (const neighbor of neighbors) {
+        if (this.explored.has(neighbor)) continue;
+
+        const newDist = currentDist + this.graph.getDistance(current, neighbor);
+        const oldDist = state.bd.get(neighbor) ?? Infinity;
+
+        if (newDist < oldDist) {
+          state.bd.set(neighbor, newDist);
+          state.cameFrom.set(neighbor, current);
+          
+          // Update or insert in priority queue
+          const existingIndex = state.pq.findIndex((item: { city: number; }) => item.city === neighbor);
+          if (existingIndex >= 0) {
+            state.pq[existingIndex].dist = newDist;
+          } else {
+            state.pq.push({ city: neighbor, dist: newDist });
+          }
+        }
+      }
+    }
+
+    // Update frontier for visualization (show next nodes to process)
+    this.frontier = state.pq
+      .slice()
+      .sort((a: { dist: number; }, b: { dist: number; }) => a.dist - b.dist)
+      .slice(0, 20)
+      .map((item: { city: any; }) => item.city);
+
+    return true;
   }
 }
 
@@ -1477,619 +1820,6 @@ class LeaderboardManager {
   }
 }
 
-// ==================== STYLED COMPONENTS ====================
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
-const pulse = keyframes`
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-`;
-
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-`;
-
-const gentlePulse = keyframes`
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-`;
-
-const MainContainer = styled.div`
-  width: 100%;
-  height: 100vh;
-  background: linear-gradient(135deg, ${COLORS.bg1} 0%, ${COLORS.bg2} 50%, ${COLORS.bg1} 100%);
-  color: ${COLORS.textPrimary};
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-                radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
-    pointer-events: none;
-  }
-`;
-
-const Header = styled.div`
-  padding: 1.5rem 2rem;
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid ${COLORS.borderAccent};
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  animation: ${fadeIn} 0.6s ease-out;
-  z-index: 10;
-  
-  @media (max-width: 768px) {
-    padding: 1rem;
-    flex-wrap: wrap;
-  }
-`;
-
-const Title = styled.h1`
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-  
-  @media (max-width: 768px) {
-    font-size: 1.25rem;
-  }
-`;
-
-const Badge = styled.div`
-  padding: 0.5rem 1rem;
-  background: rgba(59, 130, 246, 0.12);
-  border-radius: 24px;
-  font-size: 0.875rem;
-  border: 1px solid ${COLORS.borderAccent};
-  font-weight: 500;
-`;
-
-const MainContent = styled.div`
-  flex: 1;
-  display: flex;
-  padding: 1.5rem;
-  gap: 1.5rem;
-  overflow: hidden;
-  animation: ${fadeIn} 0.8s ease-out;
-  z-index: 1;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    padding: 1rem;
-    overflow-y: auto;
-  }
-`;
-
-const CanvasArea = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid ${COLORS.borderAccent};
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-  position: relative;
-  overflow: hidden;
-  padding: 2rem;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.35), transparent);
-    background-size: 200% 100%;
-    animation: ${shimmer} 3s linear infinite;
-  }
-  
-  @media (max-width: 768px) {
-    min-height: 400px;
-    padding: 1rem;
-  }
-`;
-
-const RouteInfo = styled.div`
-  position: absolute;
-  top: 1.5rem;
-  left: 1.5rem;
-  background: rgba(0,0,0,0.9);
-  backdrop-filter: blur(10px);
-  padding: 1rem 1.5rem;
-  border-radius: 12px;
-  border: 1px solid ${COLORS.borderAccent};
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-size: 1rem;
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  
-  @media (max-width: 768px) {
-    font-size: 0.875rem;
-    padding: 0.75rem 1rem;
-    left: 1rem;
-    top: 1rem;
-  }
-`;
-
-const CityLabel = styled.span<{ $color: string }>`
-  color: ${({ $color }) => $color};
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const WinnerBanner = styled.div<{ $color: string }>`
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0,0,0,0.95);
-  backdrop-filter: blur(20px);
-  padding: 2rem 3rem;
-  border-radius: 16px;
-  border: 2px solid ${({ $color }) => $color};
-  box-shadow: 0 0 40px ${({ $color }) => $color}80;
-  text-align: center;
-  animation: ${gentlePulse} 2s ease-in-out infinite;
-  z-index: 100;
-`;
-
-const WinnerTitle = styled.h2<{ $color: string }>`
-  font-size: 2rem;
-  margin: 0 0 1rem 0;
-  color: ${({ $color }) => $color};
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  justify-content: center;
-`;
-
-const WinnerStats = styled.div`
-  font-size: 1rem;
-  color: ${COLORS.textMuted};
-  margin-top: 0.5rem;
-`;
-
-const Sidebar = styled.div`
-  width: 420px;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  overflow-y: auto;
-  padding-right: 0.5rem;
-  
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.2);
-    border-radius: 3px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: ${COLORS.borderAccent};
-    border-radius: 3px;
-  }
-  
-  @media (max-width: 768px) {
-    width: 100%;
-  }
-`;
-
-const ControlsSection = styled.div`
-  display: flex;
-  gap: 0.75rem;
-`;
-
-const ControlButton = styled.button<{ $variant?: 'primary' | 'secondary' }>`
-  flex: 1;
-  padding: 1rem 1.5rem;
-  background: ${({ $variant }) =>
-    $variant === 'primary'
-      ? `linear-gradient(135deg, ${COLORS.accent} 0%, ${COLORS.accentSoft} 100%)`
-      : 'rgba(59, 130, 246, 0.12)'};
-  border: 1px solid ${COLORS.borderAccent};
-  border-radius: 12px;
-  color: ${COLORS.textPrimary};
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    background: ${({ $variant }) =>
-    $variant === 'primary'
-      ? `linear-gradient(135deg, ${COLORS.accentSoft} 0%, ${COLORS.accent} 100%)`
-      : 'rgba(59, 130, 246, 0.2)'};
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-`;
-
-const Section = styled.div`
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  border: 1px solid ${COLORS.borderAccent};
-  padding: 1.25rem;
-  animation: ${fadeIn} 0.6s ease-out;
-`;
-
-const SectionTitle = styled.div`
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: ${COLORS.textPrimary};
-`;
-
-const Label = styled.div`
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: ${COLORS.textMuted};
-`;
-
-const Slider = styled.input`
-  width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(59, 130, 246, 0.2);
-  outline: none;
-  
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: ${COLORS.accent};
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
-    transition: all 0.2s ease;
-  }
-  
-  &::-webkit-slider-thumb:hover {
-    background: ${COLORS.accentSoft};
-    transform: scale(1.1);
-  }
-  
-  &::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: ${COLORS.accent};
-    cursor: pointer;
-    border: none;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
-  }
-`;
-
-const ButtonGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
-`;
-
-const ModeButton = styled.button<{ $active: boolean }>`
-  padding: 0.75rem;
-  background: ${({ $active }) =>
-    $active ? 'rgba(59, 130, 246, 0.25)' : 'rgba(0,0,0,0.3)'};
-  border: 1px solid ${({ $active }) =>
-    $active ? COLORS.accent : COLORS.borderAccent};
-  border-radius: 8px;
-  color: ${({ $active }) => $active ? COLORS.accent : COLORS.textMuted};
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  
-  &:hover {
-    background: rgba(59, 130, 246, 0.2);
-    transform: translateY(-1px);
-  }
-`;
-
-const AlgoCheckbox = styled.label<{ $active: boolean; $color: string }>`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: ${({ $active, $color }) =>
-    $active ? `${$color}15` : 'rgba(0,0,0,0.3)'};
-  border: 1px solid ${({ $active, $color }) =>
-    $active ? $color : COLORS.borderAccent};
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-bottom: 0.75rem;
-  
-  &:hover {
-    background: ${({ $color }) => `${$color}20`};
-    transform: translateX(4px);
-  }
-  
-  input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
-    accent-color: ${({ $color }) => $color};
-  }
-`;
-
-const AlgoEmoji = styled.span`
-  font-size: 1.75rem;
-  line-height: 1;
-`;
-
-const AlgoDetails = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-`;
-
-const AlgoName = styled.div<{ $color: string; $active: boolean }>`
-  font-size: 1rem;
-  font-weight: 600;
-  color: ${({ $color, $active }) => $active ? $color : COLORS.textMuted};
-`;
-
-const AlgoDescription = styled.div`
-  font-size: 0.75rem;
-  color: ${COLORS.textMuted};
-  opacity: 0.8;
-`;
-
-const Leaderboard = styled.div<{ $expanded?: boolean }>`
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  border: 1px solid ${COLORS.borderAccent};
-  padding: 1.25rem;
-  animation: ${fadeIn} 0.6s ease-out;
-  min-height: 400px;
-
-  max-height: ${({ $expanded }) => $expanded ? '1000px' : '400px'};
-  overflow-y: auto;
-  transition: max-height 0.3s ease;
-  
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.2);
-    border-radius: 3px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: ${COLORS.borderAccent};
-    border-radius: 3px;
-  }
-`;
-
-const LeaderboardHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-`;
-
-const LeaderboardTitle = styled.div`
-  font-size: 1rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: ${COLORS.textPrimary};
-`;
-
-const ExpandButton = styled.button`
-  background: transparent;
-  border: none;
-  color: ${COLORS.textMuted};
-  cursor: pointer;
-  padding: 0.25rem;
-  display: flex;
-  align-items: center;
-  transition: color 0.2s ease;
-  
-  &:hover {
-    color: ${COLORS.textPrimary};
-  }
-`;
-
-const LeaderboardItem = styled.div<{ $rank: number; $isWinner: boolean; $color: string; $failed: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  background: ${({ $isWinner, $color, $failed }) =>
-    $failed ? 'rgba(239, 68, 68, 0.1)' :
-      $isWinner ? `${$color}20` : 'rgba(0,0,0,0.3)'};
-  border: 1px solid ${({ $isWinner, $color, $failed }) =>
-    $failed ? 'rgba(239, 68, 68, 0.3)' :
-      $isWinner ? $color : COLORS.borderAccent};
-  border-radius: 12px;
-  animation: ${fadeIn} 0.4s ease-out ${({ $rank }) => $rank * 0.05}s both;
-  
-  ${({ $isWinner }) => $isWinner && `
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-  `}
-`;
-
-const Rank = styled.div`
-  font-size: 1.5rem;
-  font-weight: 700;
-  min-width: 40px;
-  text-align: center;
-`;
-
-const AlgoInfo = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-`;
-
-const AlgoHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-`;
-
-const AlgoNameInBoard = styled.span<{ $color: string }>`
-  font-size: 1rem;
-  font-weight: 600;
-  color: ${({ $color }) => $color};
-`;
-
-const AlgoStatus = styled.div<{ $color: string }>`
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: ${({ $color }) => $color};
-  animation: ${pulse} 2s ease-in-out infinite;
-`;
-
-const Stats = styled.div`
-  display: flex;
-  gap: 1rem;
-  font-size: 0.875rem;
-  color: ${COLORS.textMuted};
-`;
-
-const StatValue = styled.span`
-  font-weight: 600;
-  color: ${COLORS.textPrimary};
-`;
-
-const GlobalLeaderboard = styled.div`
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  border: 1px solid ${COLORS.borderAccent};
-  padding: 1.25rem;
-  animation: ${fadeIn} 0.6s ease-out;
-`;
-
-const GlobalLeaderboardHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-`;
-
-const ResetButton = styled.button`
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 8px;
-  color: ${COLORS.danger};
-  padding: 0.5rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  
-  &:hover {
-    background: rgba(239, 68, 68, 0.2);
-    transform: translateY(-1px);
-  }
-`;
-
-const GlobalLeaderboardItem = styled.div<{ $rank: number; $color: string }>`
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  background: rgba(0,0,0,0.3);
-  border: 1px solid ${COLORS.borderAccent};
-  border-radius: 12px;
-  animation: ${fadeIn} 0.4s ease-out ${({ $rank }) => $rank * 0.05}s both;
-`;
-
-const GlobalAlgoHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-`;
-
-const GlobalAlgoLeft = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-`;
-
-const GlobalAlgoName = styled.span<{ $color: string }>`
-  font-size: 1rem;
-  font-weight: 600;
-  color: ${({ $color }) => $color};
-`;
-
-const GlobalStats = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  color: ${COLORS.textMuted};
-`;
-
-const GlobalStatItem = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const GlobalStatLabel = styled.span`
-  opacity: 0.7;
-`;
-
-const GlobalStatValue = styled.span`
-  color: ${COLORS.textPrimary};
-  font-weight: 600;
-  font-size: 0.9rem;
-`;
 
 // ==================== REACT COMPONENT ====================
 export default function ShortestPathAlgorithmDemo({
