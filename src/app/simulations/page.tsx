@@ -59,8 +59,14 @@ const ShortestPathAlgorithmDemo = dynamic(() => import('@/components/cs/shortest
   loading: () => <SimulationLoader>Loading Shortest Path Algorithm Builder...</SimulationLoader>
 });
 
+const MedicalModelsDemo = dynamic(() => import('@/components/cs/medicalModels/medicalModels'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Medical Models Simulation...</SimulationLoader>
+
+});
+
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'chem-resonance' | 'nbody' | 'three-body' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'three-body' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks';
 type TabType = 'simulations' | 'algorithms';
 
 interface SimulationItem {
@@ -891,14 +897,14 @@ const allItems: SimulationItem[] = [
     category: 'simulations'
   },
   {
-    key: 'chem-resonance',
-    label: 'Chemistry Lab',
+    key: 'medical-models',
+    label: 'Medical Models',
     icon: <Microscope size={24} />,
     color: '#a78bfa',
-    description: 'Interactive molecular visualization',
+    description: 'medical models',
     optimized: false,
     featured: false,
-    comingSoon: true,
+    comingSoon: false,
     category: 'simulations'
   },
   {
@@ -1156,14 +1162,16 @@ export default function SimulationsPage() {
       case 'maze':
         return <MazeSolverDemo />;
       case 'disease':
-      case 'disease':
         return <DiseaseSimulation
           isRunning={isRunning}
           speed={speed}
           isDark={false}
           isTheaterMode={theaterMode}  // Add this if you want external theater control
-        />; case 'life':
+        />;
+      case 'life':
         return <LifeSimulation isDark={false} isRunning={isRunning} speed={speed} />;
+      case 'medical-models':
+        return <MedicalModelsDemo isDark={false} isRunning={isRunning} speed={speed} />;
       case 'bacteria-phage':
         return <AdvancedBacteremiaSimulator initialRunning={isRunning} initialSpeed={speed} isDark={false} />;
       case 'amdahl':
@@ -1174,10 +1182,8 @@ export default function SimulationsPage() {
         return <PermutationSimulation isRunning={isRunning} speed={speed} isDark={false} />;
       case 'nbody':
         return <NBodySandbox isRunning={isRunning} speed={speed} isDark={false} />;
-
       case 'phylogeny':
         return <PhylogeneticTreeBuilder isRunning={isRunning} speed={speed} />;
-
       case 'Shortest-Path-Networks':
         return <ShortestPathAlgorithmDemo isRunning={isRunning} speed={speed} />;
 

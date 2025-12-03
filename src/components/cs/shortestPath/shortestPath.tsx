@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Zap, MapPin, Navigation, Building2, Brain, Shuffle, Trophy, Cpu, BarChart3, ChevronDown, ChevronUp, Home, Compass, CheckCircle2, AlertCircle, TrendingUp, Award, RotateCcw } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Play, Pause, Zap, MapPin, Navigation, Building2, Brain, Shuffle, Trophy, Cpu, BarChart3, ChevronDown, ChevronUp, Home, Compass, CheckCircle2, AlertCircle, TrendingUp, Award, RotateCcw, Layers } from 'lucide-react';
 import styled, { keyframes } from 'styled-components';
 
 // ==================== CONSTANTS ====================
@@ -22,7 +22,23 @@ const COLORS = {
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 700;
 
+// Performance thresholds
+const SMALL_NETWORK = 50;
+const MEDIUM_NETWORK = 150;
+const LARGE_NETWORK = 500;
+
 // ==================== STYLED COMPONENTS ====================
+const slideUp = keyframes`
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+`;
+
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -103,6 +119,21 @@ const Badge = styled.div`
   font-weight: 500;
 `;
 
+const PerformanceBadge = styled(Badge) <{ $level: 'good' | 'medium' | 'heavy' }>`
+  background: ${({ $level }) =>
+    $level === 'good' ? 'rgba(34, 197, 94, 0.12)' :
+      $level === 'medium' ? 'rgba(251, 191, 36, 0.12)' :
+        'rgba(239, 68, 68, 0.12)'};
+  border-color: ${({ $level }) =>
+    $level === 'good' ? 'rgba(34, 197, 94, 0.3)' :
+      $level === 'medium' ? 'rgba(251, 191, 36, 0.3)' :
+        'rgba(239, 68, 68, 0.3)'};
+  color: ${({ $level }) =>
+    $level === 'good' ? COLORS.success :
+      $level === 'medium' ? COLORS.warn :
+        COLORS.danger};
+`;
+
 const MainContent = styled.div`
   flex: 1;
   display: flex;
@@ -150,6 +181,17 @@ const CanvasArea = styled.div`
   }
 `;
 
+const CanvasColumn = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+  }
+`;
+
 const RouteInfo = styled.div`
   position: absolute;
   top: 1.5rem;
@@ -182,35 +224,48 @@ const CityLabel = styled.span<{ $color: string }>`
 `;
 
 const WinnerBanner = styled.div<{ $color: string }>`
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0,0,0,0.95);
+  width: 100%;
+  background: linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(0,10,30,0.95) 100%);
   backdrop-filter: blur(20px);
-  padding: 2rem 3rem;
-  border-radius: 16px;
+  padding: 1.5rem 2rem;
+  border-radius: 12px;
   border: 2px solid ${({ $color }) => $color};
-  box-shadow: 0 0 40px ${({ $color }) => $color}80;
+  box-shadow: 0 0 30px ${({ $color }) => $color}60;
   text-align: center;
-  animation: ${gentlePulse} 2s ease-in-out infinite;
-  z-index: 100;
+  animation: ${slideUp} 0.5s ease-out;
+  
+  @media (max-width: 768px) {
+    padding: 1rem 1.5rem;
+  }
 `;
 
 const WinnerTitle = styled.h2<{ $color: string }>`
-  font-size: 2rem;
-  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+  margin: 0;
   color: ${({ $color }) => $color};
   display: flex;
   align-items: center;
   gap: 0.75rem;
   justify-content: center;
+  font-weight: 700;
+  flex-wrap: wrap;
+  
+  @media (max-width: 768px) {
+    font-size: 1.125rem;
+    gap: 0.5rem;
+  }
 `;
 
 const WinnerStats = styled.div`
-  font-size: 1rem;
+  font-size: 0.875rem;
   color: ${COLORS.textMuted};
-  margin-top: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  @media (max-width: 768px) {
+    font-size: 0.75rem;
+  }
 `;
 
 const Sidebar = styled.div`
@@ -432,7 +487,6 @@ const Leaderboard = styled.div<{ $expanded?: boolean }>`
   padding: 1.25rem;
   animation: ${fadeIn} 0.6s ease-out;
   min-height: 400px;
-
   max-height: ${({ $expanded }) => $expanded ? '1000px' : '400px'};
   overflow-y: auto;
   transition: max-height 0.3s ease;
@@ -615,8 +669,8 @@ const GlobalAlgoName = styled.span<{ $color: string }>`
 
 const GlobalStats = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 0.5rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
   font-size: 0.75rem;
   color: ${COLORS.textMuted};
 `;
@@ -633,12 +687,13 @@ const GlobalStatLabel = styled.span`
 const GlobalStatValue = styled.span`
   color: ${COLORS.textPrimary};
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
 `;
 
 // ==================== TYPES ====================
 type AlgorithmType = 'dijkstra' | 'astar' | 'bfs' | 'dfs' | 'bmssp';
-type MapMode = 'us-cities' | 'metro' | 'highway' | 'regional' | 'large-grid' | 'mega-random' | 'scale-free' | 'small-world';
+type MapMode = 'us-cities' | 'metro' | 'highway' | 'regional' | 'large-grid' | 'mega-random' | 'scale-free' | 'small-world' | 'ultra-grid' | 'massive-random' | 'super-scale' | 'mega-world';
 type AlgorithmStatus = 'idle' | 'running' | 'finished' | 'winner' | 'failed';
 
 interface City {
@@ -665,6 +720,7 @@ interface AlgorithmState {
   status: AlgorithmStatus;
   steps: number;
   distance: number;
+  partialPaths: Map<number, number[]>; // Map from frontier node to its path from start
 }
 
 interface shortestPathDemoProps {
@@ -675,7 +731,9 @@ interface shortestPathDemoProps {
 }
 
 interface LeaderboardStats {
-  wins: number;
+  firstPlace: number;
+  secondPlace: number;
+  thirdPlace: number;
   totalRuns: number;
   totalSteps: number;
   totalDistance: number;
@@ -720,6 +778,18 @@ class CityGraph {
         break;
       case 'small-world':
         this.cities = this.generateSmallWorld(250); // 250 nodes
+        break;
+      case 'ultra-grid':
+        this.cities = this.generateLargeGrid(40, 25); // 1000 nodes
+        break;
+      case 'massive-random':
+        this.cities = this.generateMegaRandom(2000); // 2000 nodes
+        break;
+      case 'super-scale':
+        this.cities = this.generateScaleFree(1500); // 1500 nodes
+        break;
+      case 'mega-world':
+        this.cities = this.generateSmallWorld(3000); // 3000 nodes
         break;
     }
     this.calculateDistances();
@@ -926,7 +996,7 @@ class CityGraph {
     }
 
     // Connect each node to k nearest neighbors
-    const k = Math.min(6, Math.floor(count / 10)); // avg degree ~6
+    const k = Math.min(8, Math.max(4, Math.floor(Math.sqrt(count)))); // adaptive degree
 
     for (let i = 0; i < count; i++) {
       const distances: Array<{ id: number; dist: number }> = [];
@@ -999,8 +1069,11 @@ class CityGraph {
       const degrees: number[] = cities.slice(0, i).map(c => c.connections.length);
       const totalDegree = degrees.reduce((sum, d) => sum + d, 0);
 
+      if (totalDegree === 0) continue;
+
       const targets = new Set<number>();
-      while (targets.size < Math.min(m, i)) {
+      let attempts = 0;
+      while (targets.size < Math.min(m, i) && attempts < 50) {
         const rand = Math.random() * totalDegree;
         let cumulative = 0;
 
@@ -1011,6 +1084,7 @@ class CityGraph {
             break;
           }
         }
+        attempts++;
       }
 
       targets.forEach(target => {
@@ -1025,7 +1099,7 @@ class CityGraph {
   private generateSmallWorld(count: number): City[] {
     // Watts-Strogatz model for small-world network
     const cities: City[] = [];
-    const k = 6; // initial connections per node
+    const k = Math.min(8, Math.max(4, Math.floor(Math.sqrt(count)))); // adaptive initial connections
     const beta = 0.3; // rewiring probability
 
     // Arrange nodes in a circle
@@ -1112,6 +1186,9 @@ class CityGraph {
   }
 
   getHeuristic(from: number, to: number): number {
+    // A* heuristic: Euclidean distance (straight-line distance)
+    // This is admissible (never overestimates) and consistent
+    // Formula: √((x₂-x₁)² + (y₂-y₁)²)
     const fromCity = this.cities[from];
     const toCity = this.cities[to];
     const dx = fromCity.x - toCity.x;
@@ -1138,6 +1215,7 @@ abstract class PathfindingAlgorithm {
   status: AlgorithmStatus;
   steps: number;
   distance: number;
+  partialPaths: Map<number, number[]>;
 
   protected internalState: any;
 
@@ -1154,6 +1232,7 @@ abstract class PathfindingAlgorithm {
     this.status = 'running';
     this.steps = 0;
     this.distance = 0;
+    this.partialPaths = new Map();
 
     this.internalState = this.initializeState();
   }
@@ -1202,7 +1281,8 @@ abstract class PathfindingAlgorithm {
       frontier: this.frontier,
       status: this.status,
       steps: this.steps,
-      distance: this.distance
+      distance: this.distance,
+      partialPaths: this.partialPaths
     };
   }
 }
@@ -1230,7 +1310,14 @@ class DijkstraAlgorithm extends PathfindingAlgorithm {
     this.internalState.pq.sort((a: { dist: number; }, b: { dist: number; }) => a.dist - b.dist);
     const { city: current, dist: currentDist } = this.internalState.pq.shift()!;
 
-    this.frontier = this.internalState.pq.map((item: any) => item.city);
+    this.frontier = this.internalState.pq.slice(0, 50).map((item: any) => item.city);
+
+    // Update partial paths for frontier nodes
+    this.partialPaths.clear();
+    this.frontier.forEach(nodeId => {
+      const partialPath = this.reconstructPath(this.internalState.cameFrom, nodeId);
+      this.partialPaths.set(nodeId, partialPath);
+    });
 
     if (this.explored.has(current)) return true;
 
@@ -1287,7 +1374,14 @@ class AStarAlgorithm extends PathfindingAlgorithm {
     this.internalState.openSet.sort((a: { f: number; }, b: { f: number; }) => a.f - b.f);
     const { city: current } = this.internalState.openSet.shift()!;
 
-    this.frontier = this.internalState.openSet.map((item: any) => item.city);
+    this.frontier = this.internalState.openSet.slice(0, 50).map((item: any) => item.city);
+
+    // Update partial paths for frontier nodes
+    this.partialPaths.clear();
+    this.frontier.forEach(nodeId => {
+      const partialPath = this.reconstructPath(this.internalState.cameFrom, nodeId);
+      this.partialPaths.set(nodeId, partialPath);
+    });
 
     if (this.explored.has(current)) return true;
 
@@ -1346,7 +1440,14 @@ class BFSAlgorithm extends PathfindingAlgorithm {
     }
 
     const current = this.internalState.queue.shift()!;
-    this.frontier = [...this.internalState.queue];
+    this.frontier = this.internalState.queue.slice(0, 50);
+
+    // Update partial paths for frontier nodes
+    this.partialPaths.clear();
+    this.frontier.forEach(nodeId => {
+      const partialPath = this.reconstructPath(this.internalState.cameFrom, nodeId);
+      this.partialPaths.set(nodeId, partialPath);
+    });
 
     if (this.explored.has(current)) return true;
 
@@ -1388,7 +1489,14 @@ class DFSAlgorithm extends PathfindingAlgorithm {
     }
 
     const current = this.internalState.stack.pop()!;
-    this.frontier = [...this.internalState.stack];
+    this.frontier = this.internalState.stack.slice(-50);
+
+    // Update partial paths for frontier nodes
+    this.partialPaths.clear();
+    this.frontier.forEach(nodeId => {
+      const partialPath = this.reconstructPath(this.internalState.cameFrom, nodeId);
+      this.partialPaths.set(nodeId, partialPath);
+    });
 
     if (this.explored.has(current)) return true;
 
@@ -1414,31 +1522,27 @@ class DFSAlgorithm extends PathfindingAlgorithm {
   }
 }
 
-// ==================== BMSSP (Simplified for Simulation) ====================
-
+// ==================== BMSSP (Optimized for large networks) ====================
 class BMSSPAlgorithm extends PathfindingAlgorithm {
-  // Simplified parameters for better visualization
-  private readonly WORK_PER_STEP = 3; // Process 3 nodes per visualization step
-  
+  private readonly WORK_PER_STEP = 5; // Process 5 nodes per step
+
   initializeState(): any {
     const k = this.graph.getCityCount();
-    const bd = new Map<number, number>(); // best distance estimates
+    const bd = new Map<number, number>();
     const cameFrom = new Map<number, number>();
-    const pq: Array<{ city: number; dist: number }> = []; // priority queue
-    
-    // Initialize with source
+    const pq: Array<{ city: number; dist: number }> = [];
+
     bd.set(this.startCity, 0);
     pq.push({ city: this.startCity, dist: 0 });
     this.frontier = [this.startCity];
-    
+
     return { bd, cameFrom, pq, k };
   }
 
   step(): boolean {
     const state = this.internalState;
-    
+
     if (state.pq.length === 0) {
-      // Check if we found the goal
       if ((state.bd.get(this.goalCity) ?? Infinity) < Infinity) {
         this.path = this.reconstructPath(state.cameFrom, this.goalCity);
         this.distance = this.calculateTotalDistance(this.path);
@@ -1449,29 +1553,24 @@ class BMSSPAlgorithm extends PathfindingAlgorithm {
       return false;
     }
 
-    // Process multiple nodes per step for efficiency (BMSSP characteristic)
+    // Process multiple nodes per step
     for (let i = 0; i < this.WORK_PER_STEP && state.pq.length > 0; i++) {
-      // Sort and extract minimum
       state.pq.sort((a: { dist: number; }, b: { dist: number; }) => a.dist - b.dist);
       const { city: current, dist: currentDist } = state.pq.shift()!;
 
-      // Skip if already explored
       if (this.explored.has(current)) continue;
 
-      // Mark as explored
       this.explored.add(current);
       this.steps++;
 
-      // Early exit if we reached goal
       if (current === this.goalCity) {
         this.path = this.reconstructPath(state.cameFrom, current);
         this.distance = this.calculateTotalDistance(this.path);
         this.markFinished();
-        state.pq = []; // Clear queue
+        state.pq = [];
         return false;
       }
 
-      // Relax neighbors (Dijkstra-style with BMSSP optimizations)
       const neighbors = this.graph.getNeighbors(current);
       for (const neighbor of neighbors) {
         if (this.explored.has(neighbor)) continue;
@@ -1482,8 +1581,7 @@ class BMSSPAlgorithm extends PathfindingAlgorithm {
         if (newDist < oldDist) {
           state.bd.set(neighbor, newDist);
           state.cameFrom.set(neighbor, current);
-          
-          // Update or insert in priority queue
+
           const existingIndex = state.pq.findIndex((item: { city: number; }) => item.city === neighbor);
           if (existingIndex >= 0) {
             state.pq[existingIndex].dist = newDist;
@@ -1494,27 +1592,42 @@ class BMSSPAlgorithm extends PathfindingAlgorithm {
       }
     }
 
-    // Update frontier for visualization (show next nodes to process)
     this.frontier = state.pq
       .slice()
       .sort((a: { dist: number; }, b: { dist: number; }) => a.dist - b.dist)
-      .slice(0, 20)
+      .slice(0, 50)
       .map((item: { city: any; }) => item.city);
+
+    // Update partial paths for frontier nodes
+    this.partialPaths.clear();
+    this.frontier.forEach(nodeId => {
+      const partialPath = this.reconstructPath(state.cameFrom, nodeId);
+      this.partialPaths.set(nodeId, partialPath);
+    });
 
     return true;
   }
 }
 
-// ==================== RENDERER ====================
+// ==================== OPTIMIZED RENDERER ====================
 class GraphRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private graph: CityGraph;
+  private offscreenCanvas: HTMLCanvasElement | null = null;
+  private offscreenCtx: CanvasRenderingContext2D | null = null;
+  private staticLayerDirty: boolean = true;
 
   constructor(canvas: HTMLCanvasElement, graph: CityGraph) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.graph = graph;
+
+    // Create offscreen canvas for static elements
+    this.offscreenCanvas = document.createElement('canvas');
+    this.offscreenCanvas.width = canvas.width;
+    this.offscreenCanvas.height = canvas.height;
+    this.offscreenCtx = this.offscreenCanvas.getContext('2d')!;
   }
 
   clear(): void {
@@ -1524,60 +1637,98 @@ class GraphRenderer {
   render(algorithms: PathfindingAlgorithm[], startCity: number, goalCity: number): void {
     this.clear();
 
-    const isLargeNetwork = this.graph.getCityCount() > 50;
+    const nodeCount = this.graph.getCityCount();
+    const isLargeNetwork = nodeCount > LARGE_NETWORK;
+    const isMediumNetwork = nodeCount > MEDIUM_NETWORK;
 
-    this.drawConnections(isLargeNetwork);
-    this.drawAlgorithmStates(algorithms, isLargeNetwork);
-    this.drawCities(algorithms, startCity, goalCity, isLargeNetwork);
+    // Render static layer (connections and cities) only when dirty
+    if (this.staticLayerDirty && this.offscreenCtx) {
+      this.offscreenCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.drawConnections(this.offscreenCtx, isLargeNetwork, isMediumNetwork);
+      this.staticLayerDirty = false;
+    }
+
+    // Draw static layer
+    if (this.offscreenCanvas) {
+      this.ctx.drawImage(this.offscreenCanvas, 0, 0);
+    }
+
+    // Draw dynamic elements
+    this.drawAlgorithmStates(algorithms, isLargeNetwork, isMediumNetwork);
+    this.drawCities(algorithms, startCity, goalCity, isLargeNetwork, isMediumNetwork);
   }
 
-  private drawConnections(isLarge: boolean): void {
-    this.ctx.strokeStyle = COLORS.road;
-    this.ctx.lineWidth = isLarge ? 0.5 : 2;
-    this.ctx.globalAlpha = isLarge ? 0.1 : 0.3;
+  markStaticLayerDirty(): void {
+    this.staticLayerDirty = true;
+  }
+
+  private drawConnections(ctx: CanvasRenderingContext2D, isLarge: boolean, isMedium: boolean): void {
+    if (isLarge) {
+      // For ultra-large networks, draw very subtle connections
+      ctx.strokeStyle = COLORS.road;
+      ctx.lineWidth = 0.3;
+      ctx.globalAlpha = 0.05;
+    } else if (isMedium) {
+      ctx.strokeStyle = COLORS.road;
+      ctx.lineWidth = 0.5;
+      ctx.globalAlpha = 0.1;
+    } else {
+      ctx.strokeStyle = COLORS.road;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.3;
+    }
 
     this.graph.cities.forEach(city => {
       city.connections.forEach(connId => {
-        if (city.id < connId) { // Draw each edge once
+        if (city.id < connId) {
           const target = this.graph.cities[connId];
           if (target) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(city.x, city.y);
-            this.ctx.lineTo(target.x, target.y);
-            this.ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(city.x, city.y);
+            ctx.lineTo(target.x, target.y);
+            ctx.stroke();
           }
         }
       });
     });
 
-    this.ctx.globalAlpha = 1;
+    ctx.globalAlpha = 1;
   }
 
-  private drawAlgorithmStates(algorithms: PathfindingAlgorithm[], isLarge: boolean): void {
+  private drawAlgorithmStates(algorithms: PathfindingAlgorithm[], isLarge: boolean, isMedium: boolean): void {
     algorithms.forEach(algo => {
-      const nodeRadius = isLarge ? 15 : 30;
+      // Draw partial paths (current exploration paths) with lower opacity
+      if (algo.partialPaths && algo.partialPaths.size > 0 && algo.status === 'running') {
+        this.ctx.globalAlpha = 0.3;
+        this.ctx.strokeStyle = algo.config.color;
+        this.ctx.lineWidth = isLarge ? 1 : isMedium ? 2 : 3;
 
-      // Draw explored (smaller radius for large networks)
-      if (!isLarge || algo.explored.size < 1000) {
-        algo.explored.forEach(cityId => {
-          const city = this.graph.cities[cityId];
-          if (city) {
-            this.ctx.fillStyle = algo.config.color;
-            this.ctx.globalAlpha = 0.15;
+        // Draw adaptive number of partial paths based on network size
+        const maxPaths = isLarge ? 5 : isMedium ? 15 : 25;
+        const pathsToDraw = Array.from(algo.partialPaths.entries()).slice(0, maxPaths);
+
+        pathsToDraw.forEach(([nodeId, path]) => {
+          if (path.length > 1) {
             this.ctx.beginPath();
-            this.ctx.arc(city.x, city.y, nodeRadius, 0, Math.PI * 2);
-            this.ctx.fill();
+            this.ctx.moveTo(this.graph.cities[path[0]].x, this.graph.cities[path[0]].y);
+            for (let i = 1; i < path.length; i++) {
+              const city = this.graph.cities[path[i]];
+              if (city) {
+                this.ctx.lineTo(city.x, city.y);
+              }
+            }
+            this.ctx.stroke();
           }
         });
       }
 
-      // Draw path
+      // Draw final path (when complete) with full opacity
       if (algo.path.length > 1) {
-        this.ctx.globalAlpha = 0.7;
+        this.ctx.globalAlpha = 0.9;
         this.ctx.strokeStyle = algo.config.color;
-        this.ctx.lineWidth = isLarge ? 2 : 4;
+        this.ctx.lineWidth = isLarge ? 3 : isMedium ? 4 : 5;
         this.ctx.shadowColor = algo.config.glow;
-        this.ctx.shadowBlur = isLarge ? 5 : 10;
+        this.ctx.shadowBlur = isLarge ? 8 : isMedium ? 10 : 15;
 
         this.ctx.beginPath();
         this.ctx.moveTo(this.graph.cities[algo.path[0]].x, this.graph.cities[algo.path[0]].y);
@@ -1593,10 +1744,11 @@ class GraphRenderer {
     });
   }
 
-  private drawCities(algorithms: PathfindingAlgorithm[], startCity: number, goalCity: number, isLarge: boolean): void {
-    const nodeSize = isLarge ? 4 : 8;
-    const specialSize = isLarge ? 8 : 12;
+  private drawCities(algorithms: PathfindingAlgorithm[], startCity: number, goalCity: number, isLarge: boolean, isMedium: boolean): void {
+    const nodeSize = isLarge ? 1.5 : isMedium ? 4 : 8;
+    const specialSize = isLarge ? 8 : isMedium ? 10 : 14;
 
+    // Draw all cities
     this.graph.cities.forEach(city => {
       const isStart = city.id === startCity;
       const isGoal = city.id === goalCity;
@@ -1604,27 +1756,29 @@ class GraphRenderer {
       if (isStart) {
         this.ctx.fillStyle = COLORS.success;
         this.ctx.shadowColor = COLORS.success;
+        this.ctx.shadowBlur = isLarge ? 12 : 10;
       } else if (isGoal) {
         this.ctx.fillStyle = COLORS.danger;
         this.ctx.shadowColor = COLORS.danger;
+        this.ctx.shadowBlur = isLarge ? 12 : 10;
       } else {
-        this.ctx.fillStyle = COLORS.textMuted;
+        this.ctx.fillStyle = isLarge ? 'rgba(222, 229, 239, 0.3)' : COLORS.textMuted;
         this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
       }
 
-      this.ctx.shadowBlur = isStart || isGoal ? 10 : 0;
       this.ctx.beginPath();
       this.ctx.arc(city.x, city.y, isStart || isGoal ? specialSize : nodeSize, 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.shadowBlur = 0;
 
       // Only show names for small networks or start/goal
-      if (!isLarge && (isStart || isGoal)) {
+      if (!isMedium && !isLarge && (isStart || isGoal)) {
         this.ctx.fillStyle = COLORS.textPrimary;
         this.ctx.font = 'bold 14px sans-serif';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'bottom';
-        this.ctx.fillText(city.name, city.x, city.y - 25);
+        this.ctx.fillText(city.name, city.x, city.y - 20);
       }
     });
   }
@@ -1638,6 +1792,7 @@ class SimulationController {
   private startCity: number;
   private goalCity: number;
   private winner: AlgorithmType | null;
+  private completionCheckInterval: number = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.graph = new CityGraph();
@@ -1650,27 +1805,34 @@ class SimulationController {
 
   initialize(mapMode: MapMode, selectedAlgos: AlgorithmType[], algorithmConfigs: Record<AlgorithmType, AlgorithmConfig>): void {
     this.graph.initializeCities(mapMode);
+    this.renderer.markStaticLayerDirty();
 
     const cityCount = this.graph.getCityCount();
 
-    // Random city selection
-    this.startCity = Math.floor(Math.random() * cityCount);
+    // Smart city selection for large networks
+    if (cityCount > 500) {
+      // For very large networks, ensure start and goal are far apart
+      this.startCity = Math.floor(Math.random() * (cityCount / 4));
+      this.goalCity = Math.floor(cityCount * 3 / 4 + Math.random() * (cityCount / 4));
+    } else {
+      this.startCity = Math.floor(Math.random() * cityCount);
+      let attempts = 0;
+      do {
+        this.goalCity = Math.floor(Math.random() * cityCount);
+        attempts++;
+      } while (
+        (this.goalCity === this.startCity ||
+          this.graph.getHeuristic(this.startCity, this.goalCity) < 200) &&
+        attempts < 20
+      );
 
-    let attempts = 0;
-    do {
-      this.goalCity = Math.floor(Math.random() * cityCount);
-      attempts++;
-    } while (
-      (this.goalCity === this.startCity ||
-        this.graph.getHeuristic(this.startCity, this.goalCity) < 200) &&
-      attempts < 20
-    );
-
-    if (this.goalCity === this.startCity) {
-      this.goalCity = (this.startCity + Math.floor(cityCount / 2)) % cityCount;
+      if (this.goalCity === this.startCity) {
+        this.goalCity = (this.startCity + Math.floor(cityCount / 2)) % cityCount;
+      }
     }
 
     this.winner = null;
+    this.completionCheckInterval = 0;
 
     this.algorithms = selectedAlgos.map(algoType => {
       const config = algorithmConfigs[algoType];
@@ -1694,12 +1856,17 @@ class SimulationController {
   }
 
   step(): boolean {
-    // Continue stepping algorithms that aren't complete
+    let anyRunning = false;
+
+    // Step all non-complete algorithms
     this.algorithms.forEach(algo => {
       if (!algo.isComplete()) {
-        algo.step();
+        const shouldContinue = algo.step();
+        if (shouldContinue) {
+          anyRunning = true;
+        }
 
-        // Mark first to finish as winner
+        // Check for winner
         if (algo.status === 'finished' && !this.winner) {
           this.winner = algo.id;
           algo.markWinner();
@@ -1707,11 +1874,17 @@ class SimulationController {
       }
     });
 
-    // Check if ALL algorithms are complete
-    const allComplete = this.algorithms.every(algo => algo.isComplete());
+    // Periodically check if all are complete to avoid infinite loops
+    this.completionCheckInterval++;
+    if (this.completionCheckInterval > 100) {
+      this.completionCheckInterval = 0;
+      const allComplete = this.algorithms.every(algo => algo.isComplete());
+      if (allComplete) {
+        return false;
+      }
+    }
 
-    // Return true if simulation should continue, false if all done
-    return !allComplete;
+    return anyRunning;
   }
 
   render(): void {
@@ -1754,7 +1927,20 @@ class LeaderboardManager {
     if (!stored) return this.getDefaultStats();
 
     try {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      const defaults = this.getDefaultStats();
+
+      // Merge stored with defaults to ensure all algorithms exist
+      // This handles cases where new algorithms were added after initial storage
+      const merged: Record<AlgorithmType, LeaderboardStats> = { ...defaults };
+
+      for (const key of Object.keys(defaults) as AlgorithmType[]) {
+        if (parsed[key]) {
+          merged[key] = { ...defaults[key], ...parsed[key] };
+        }
+      }
+
+      return merged;
     } catch {
       return this.getDefaultStats();
     }
@@ -1765,33 +1951,69 @@ class LeaderboardManager {
 
     const stats = this.getStats();
 
-    algorithmStates.forEach(algo => {
-      if (algo.status === 'failed') return;
+    // Get all successful algorithms (not failed, has a path)
+    const successfulAlgos = algorithmStates
+      .filter(algo => algo.status !== 'failed' && algo.path.length > 0)
+      .sort((a, b) => {
+        // Sort by steps first
+        if (a.steps !== b.steps) return a.steps - b.steps;
+        // If steps equal, sort by distance
+        return a.distance - b.distance;
+      });
 
+    console.log('📊 Updating leaderboard stats:', {
+      totalCompeting: algorithmStates.length,
+      successful: successfulAlgos.length,
+      placements: successfulAlgos.map((a, i) => `${i + 1}. ${a.id} (${a.steps} steps, status: ${a.status}, pathLen: ${a.path.length})`)
+    });
+
+    // Award places to successful algorithms
+    successfulAlgos.forEach((algo, index) => {
       const algoStats = stats[algo.id];
-      algoStats.totalRuns++;
 
-      if (algo.id === winner) {
-        algoStats.wins++;
+      // Safety check - ensure stats exist for this algorithm
+      if (!algoStats) {
+        console.warn(`⚠️ No stats entry for algorithm: ${algo.id}`);
+        return;
       }
 
-      if (algo.path.length > 0) {
-        algoStats.totalSteps += algo.steps;
-        algoStats.totalDistance += algo.distance;
-        algoStats.avgSteps = algoStats.totalSteps / algoStats.totalRuns;
-        algoStats.avgDistance = algoStats.totalDistance / algoStats.totalRuns;
+      // Only increment totalRuns for successful completions
+      // (This keeps averages accurate - only successful runs contribute to totals)
+      algoStats.totalRuns++;
 
-        if (algoStats.fastestSteps === 0 || algo.steps < algoStats.fastestSteps) {
-          algoStats.fastestSteps = algo.steps;
-        }
+      // Award placement
+      if (index === 0) {
+        algoStats.firstPlace++;
+        console.log(`🥇 ${algo.id} gets 1st place`);
+      } else if (index === 1) {
+        algoStats.secondPlace++;
+        console.log(`🥈 ${algo.id} gets 2nd place`);
+      } else if (index === 2) {
+        algoStats.thirdPlace++;
+        console.log(`🥉 ${algo.id} gets 3rd place`);
+      }
 
-        if (algoStats.shortestDistance === 0 || algo.distance < algoStats.shortestDistance) {
-          algoStats.shortestDistance = algo.distance;
-        }
+      // Update cumulative stats
+      algoStats.totalSteps += algo.steps;
+      algoStats.totalDistance += algo.distance;
+
+      // Recalculate averages based on successful runs only
+      algoStats.avgSteps = algoStats.totalSteps / algoStats.totalRuns;
+      algoStats.avgDistance = algoStats.totalDistance / algoStats.totalRuns;
+
+      // Track personal bests
+      if (algoStats.fastestSteps === 0 || algo.steps < algoStats.fastestSteps) {
+        algoStats.fastestSteps = algo.steps;
+      }
+
+      if (algoStats.shortestDistance === 0 || algo.distance < algoStats.shortestDistance) {
+        algoStats.shortestDistance = algo.distance;
       }
     });
 
+    // Save to localStorage
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(stats));
+    console.log('✅ Stats saved to localStorage', stats);
   }
 
   static reset(): void {
@@ -1805,7 +2027,9 @@ class LeaderboardManager {
 
     algorithms.forEach(algo => {
       stats[algo] = {
-        wins: 0,
+        firstPlace: 0,
+        secondPlace: 0,
+        thirdPlace: 0,
         totalRuns: 0,
         totalSteps: 0,
         totalDistance: 0,
@@ -1837,7 +2061,7 @@ export default function ShortestPathAlgorithmDemo({
   const [showStats, setShowStats] = useState(true);
   const [showGlobalLeaderboard, setShowGlobalLeaderboard] = useState(true);
   const [expandedStats, setExpandedStats] = useState(false);
-  const [mapMode, setMapMode] = useState<MapMode>('us-cities');
+  const [mapMode, setMapMode] = useState<MapMode>('massive-random');
   const [selectedAlgos, setSelectedAlgos] = useState<AlgorithmType[]>([
     'dijkstra', 'astar', 'bfs', 'dfs', 'bmssp'
   ]);
@@ -1848,7 +2072,15 @@ export default function ShortestPathAlgorithmDemo({
   const [startCity, setStartCity] = useState(0);
   const [goalCity, setGoalCity] = useState(0);
   const [globalStats, setGlobalStats] = useState<Record<AlgorithmType, LeaderboardStats>>(LeaderboardManager.getStats());
-  const [statsUpdated, setStatsUpdated] = useState(false);
+
+  // Use refs to track mutable state that needs to be accessed in callbacks without stale closures
+  const statsUpdatedRef = useRef(false);
+  const isPlayingRef = useRef(isPlaying);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   useEffect(() => {
     setIsPlaying(isRunningProp);
@@ -1857,6 +2089,21 @@ export default function ShortestPathAlgorithmDemo({
   useEffect(() => {
     setLocalSpeed(speedProp);
   }, [speedProp]);
+
+  // Refresh global stats from localStorage periodically to ensure UI stays in sync
+  useEffect(() => {
+    const refreshStats = () => {
+      setGlobalStats({ ...LeaderboardManager.getStats() });
+    };
+
+    // Refresh on mount
+    refreshStats();
+
+    // Set up interval to refresh every 2 seconds (catches any missed updates)
+    const interval = setInterval(refreshStats, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const algorithmConfigs: Record<AlgorithmType, AlgorithmConfig> = {
     dijkstra: {
@@ -1871,7 +2118,7 @@ export default function ShortestPathAlgorithmDemo({
       emoji: '⭐',
       color: '#fbbf24',
       glow: 'rgba(251, 191, 36, 0.6)',
-      funFact: 'Heuristic-guided'
+      funFact: 'Euclidean heuristic-guided'
     },
     bfs: {
       name: 'BFS',
@@ -1896,6 +2143,28 @@ export default function ShortestPathAlgorithmDemo({
     }
   };
 
+  // Memoized function to save stats - called when simulation completes
+  const saveStatsIfNeeded = useCallback(() => {
+    if (!controllerRef.current) return false;
+
+    if (controllerRef.current.isSimulationComplete() && !statsUpdatedRef.current) {
+      const states = controllerRef.current.getAlgorithmStates();
+      const currentWinner = controllerRef.current.getWinner();
+
+      console.log('🏁 Simulation complete, saving stats...', {
+        winner: currentWinner,
+        statesCount: states.length
+      });
+
+      LeaderboardManager.updateStats(states, currentWinner);
+      setGlobalStats({ ...LeaderboardManager.getStats() });
+      statsUpdatedRef.current = true;
+      return true;
+    }
+    return false;
+  }, []);
+
+  // Initialize simulation
   useEffect(() => {
     if (!canvasRef.current) return;
 
@@ -1910,54 +2179,68 @@ export default function ShortestPathAlgorithmDemo({
     setCities(controllerRef.current.getCities());
     setStartCity(controllerRef.current.getStartCity());
     setGoalCity(controllerRef.current.getGoalCity());
-    setStatsUpdated(false);
+
+    // Reset the stats updated flag for new simulation
+    statsUpdatedRef.current = false;
 
     controllerRef.current.render();
   }, [mapMode, selectedAlgos]);
 
+  // Animation loop
   useEffect(() => {
+    if (!isPlaying) return;
+
+    let animationId: number;
+
     const animate = () => {
       if (!controllerRef.current) return;
 
-      // Run multiple steps based on speed
-      for (let i = 0; i < localSpeed; i++) {
-        const shouldContinue = controllerRef.current.step();
+      // Adaptive stepping based on speed
+      const stepsPerFrame = Math.max(1, localSpeed);
+
+      let shouldContinue = true;
+      for (let i = 0; i < stepsPerFrame; i++) {
+        shouldContinue = controllerRef.current.step();
         if (!shouldContinue) {
-          // All algorithms are complete, auto-pause
-          setIsPlaying(false);
           break;
         }
       }
 
       controllerRef.current.render();
+
       const states = controllerRef.current.getAlgorithmStates();
       const currentWinner = controllerRef.current.getWinner();
 
       setAlgorithmStates(states);
       setWinner(currentWinner);
 
-      // Update global stats when simulation completes (only once)
-      if (controllerRef.current.isSimulationComplete() && !statsUpdated) {
-        LeaderboardManager.updateStats(states, currentWinner);
-        setGlobalStats(LeaderboardManager.getStats());
-        setStatsUpdated(true);
+      // Check if simulation just completed and save stats
+      if (!shouldContinue || controllerRef.current.isSimulationComplete()) {
+        // Save stats immediately when simulation completes
+        if (!statsUpdatedRef.current) {
+          console.log('🏁 Simulation complete, saving stats...');
+          LeaderboardManager.updateStats(states, currentWinner);
+          setGlobalStats({ ...LeaderboardManager.getStats() });
+          statsUpdatedRef.current = true;
+        }
+        setIsPlaying(false);
+        return; // Don't schedule another frame
       }
 
-      if (isPlaying) {
-        frameRef.current = requestAnimationFrame(animate);
+      // Only schedule next frame if still playing
+      if (isPlayingRef.current) {
+        animationId = requestAnimationFrame(animate);
       }
     };
 
-    if (isPlaying) {
-      frameRef.current = requestAnimationFrame(animate);
-    }
+    animationId = requestAnimationFrame(animate);
 
     return () => {
-      if (frameRef.current) {
-        cancelAnimationFrame(frameRef.current);
+      if (animationId) {
+        cancelAnimationFrame(animationId);
       }
     };
-  }, [isPlaying, localSpeed, statsUpdated]);
+  }, [isPlaying, localSpeed]);
 
   const handlePlay = () => {
     setIsPlaying(!isPlaying);
@@ -1965,6 +2248,20 @@ export default function ShortestPathAlgorithmDemo({
 
   const handleReset = () => {
     setIsPlaying(false);
+
+    // Save stats before resetting if simulation was complete AND we haven't saved yet
+    if (controllerRef.current && controllerRef.current.isSimulationComplete() && !statsUpdatedRef.current) {
+      const states = controllerRef.current.getAlgorithmStates();
+      const currentWinner = controllerRef.current.getWinner();
+      console.log('💾 Saving stats on reset...');
+      LeaderboardManager.updateStats(states, currentWinner);
+      statsUpdatedRef.current = true;
+    }
+
+    // Force refresh global stats from localStorage with new object reference
+    setGlobalStats({ ...LeaderboardManager.getStats() });
+
+    // Now reset to new map
     if (controllerRef.current && canvasRef.current) {
       controllerRef.current.initialize(mapMode, selectedAlgos, algorithmConfigs);
       setAlgorithmStates(controllerRef.current.getAlgorithmStates());
@@ -1972,7 +2269,10 @@ export default function ShortestPathAlgorithmDemo({
       setCities(controllerRef.current.getCities());
       setStartCity(controllerRef.current.getStartCity());
       setGoalCity(controllerRef.current.getGoalCity());
-      setStatsUpdated(false);
+
+      // Reset the flag for the new simulation
+      statsUpdatedRef.current = false;
+
       controllerRef.current.render();
     }
   };
@@ -1980,77 +2280,110 @@ export default function ShortestPathAlgorithmDemo({
   const handleResetGlobalStats = () => {
     if (confirm('Reset all global statistics?')) {
       LeaderboardManager.reset();
-      setGlobalStats(LeaderboardManager.getStats());
+      setGlobalStats({ ...LeaderboardManager.getStats() });
     }
   };
 
   const mapModeIcons: Record<MapMode, { icon: React.ReactElement; label: string }> = {
-    'us-cities': { icon: <Compass size={16} />, label: 'US' },
-    'metro': { icon: <Building2 size={16} />, label: 'Metro' },
-    'highway': { icon: <Navigation size={16} />, label: 'Highway' },
-    'regional': { icon: <MapPin size={16} />, label: 'Regional' },
-    'large-grid': { icon: <BarChart3 size={16} />, label: 'Grid 150' },
-    'mega-random': { icon: <Zap size={16} />, label: 'Random 300' },
-    'scale-free': { icon: <TrendingUp size={16} />, label: 'Scale 200' },
-    'small-world': { icon: <Cpu size={16} />, label: 'Small 250' }
+    'us-cities': { icon: <Compass size={16} />, label: 'US (30)' },
+    'metro': { icon: <Building2 size={16} />, label: 'Metro (20)' },
+    'highway': { icon: <Navigation size={16} />, label: 'Highway (13)' },
+    'regional': { icon: <MapPin size={16} />, label: 'Regional (14)' },
+    'large-grid': { icon: <BarChart3 size={16} />, label: 'Grid (150)' },
+    'mega-random': { icon: <Zap size={16} />, label: 'Random (300)' },
+    'scale-free': { icon: <TrendingUp size={16} />, label: 'Scale (200)' },
+    'small-world': { icon: <Cpu size={16} />, label: 'Small (250)' },
+    'ultra-grid': { icon: <Layers size={16} />, label: 'Ultra (1K)' },
+    'massive-random': { icon: <Zap size={16} />, label: 'Massive (2K)' },
+    'super-scale': { icon: <TrendingUp size={16} />, label: 'Super (1.5K)' },
+    'mega-world': { icon: <Cpu size={16} />, label: 'Mega (3K)' }
+  };
+
+  const getPerformanceLevel = (nodeCount: number): 'good' | 'medium' | 'heavy' => {
+    if (nodeCount <= MEDIUM_NETWORK) return 'good';
+    if (nodeCount <= LARGE_NETWORK) return 'medium';
+    return 'heavy';
   };
 
   const winnerConfig = winner ? algorithmConfigs[winner] : null;
   const winnerState = algorithmStates.find(a => a.id === winner);
 
   const sortedGlobalStats = Object.entries(globalStats)
-    .sort((a, b) => b[1].wins - a[1].wins);
+    .sort((a, b) => {
+      // Weighted scoring: 1st = 3pts, 2nd = 2pts, 3rd = 1pt
+      const scoreA = a[1].firstPlace * 3 + a[1].secondPlace * 2 + a[1].thirdPlace * 1;
+      const scoreB = b[1].firstPlace * 3 + b[1].secondPlace * 2 + b[1].thirdPlace * 1;
+
+      if (scoreB !== scoreA) return scoreB - scoreA;
+
+      // Tiebreaker: more 1st places wins
+      if (b[1].firstPlace !== a[1].firstPlace) return b[1].firstPlace - a[1].firstPlace;
+
+      // Tiebreaker: more 2nd places wins
+      return b[1].secondPlace - a[1].secondPlace;
+    });
+
+  const performanceLevel = getPerformanceLevel(cities.length);
 
   return (
     <MainContainer>
       <Header>
         <Title>
           <Cpu size={32} />
-          Pathfinding Arena
+          Pathfinding Arena Ultra
         </Title>
 
         <Badge>
-          {cities.length} Nodes • {selectedAlgos.length} Algorithms
+          {cities.length.toLocaleString()} Nodes • {selectedAlgos.length} Algorithms
         </Badge>
+
+        <PerformanceBadge $level={performanceLevel}>
+          {performanceLevel === 'good' ? '⚡ Fast' :
+            performanceLevel === 'medium' ? '⚠️ Medium' :
+              '🔥 Heavy'}
+        </PerformanceBadge>
       </Header>
 
       <MainContent>
-        <CanvasArea>
-          <RouteInfo>
-            <CityLabel $color={COLORS.success}>
-              <Home size={16} />
-              {cities[startCity]?.name || 'Start'}
-            </CityLabel>
-            <Navigation size={16} color={COLORS.textMuted} />
-            <CityLabel $color={COLORS.danger}>
-              <MapPin size={16} />
-              {cities[goalCity]?.name || 'Goal'}
-            </CityLabel>
-          </RouteInfo>
+        <CanvasColumn>
+          <CanvasArea>
+            <RouteInfo>
+              <CityLabel $color={COLORS.success}>
+                <Home size={16} />
+                {cities[startCity]?.name || `Node ${startCity}`}
+              </CityLabel>
+              <Navigation size={16} color={COLORS.textMuted} />
+              <CityLabel $color={COLORS.danger}>
+                <MapPin size={16} />
+                {cities[goalCity]?.name || `Node ${goalCity}`}
+              </CityLabel>
+            </RouteInfo>
+
+            <canvas
+              ref={canvasRef}
+              width={CANVAS_WIDTH}
+              height={CANVAS_HEIGHT}
+              style={{
+                maxWidth: '100%',
+                height: 'auto',
+                borderRadius: '8px'
+              }}
+            />
+          </CanvasArea>
 
           {winnerConfig && winnerState && (
             <WinnerBanner $color={winnerConfig.color}>
               <WinnerTitle $color={winnerConfig.color}>
-                <Trophy size={32} />
-                {winnerConfig.emoji} {winnerConfig.name} Wins!
+                <Trophy size={28} />
+                <span>{winnerConfig.emoji} {winnerConfig.name} Wins!</span>
+                <span style={{ opacity: 0.5, margin: '0 0.5rem' }}>•</span>
+                <WinnerStats>
+                  {winnerState.steps.toLocaleString()} steps • {winnerState.path.length} nodes • {winnerState.distance.toFixed(0)} distance
+                </WinnerStats>
               </WinnerTitle>
-              <WinnerStats>
-                {winnerState.steps} steps • {winnerState.path.length} nodes • {winnerState.distance.toFixed(0)} distance
-              </WinnerStats>
             </WinnerBanner>
           )}
-
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            style={{
-              maxWidth: '100%',
-              height: 'auto',
-              borderRadius: '8px'
-            }}
-          />
-        </CanvasArea>
+        </CanvasColumn>
 
         <Sidebar>
           <ControlsSection>
@@ -2079,7 +2412,9 @@ export default function ShortestPathAlgorithmDemo({
 
               {sortedGlobalStats.map(([id, stats], idx) => {
                 const config = algorithmConfigs[id as AlgorithmType];
-                const winRate = stats.totalRuns > 0 ? ((stats.wins / stats.totalRuns) * 100).toFixed(0) : '0';
+                const totalScore = stats.firstPlace * 3 + stats.secondPlace * 2 + stats.thirdPlace * 1;
+                const podiumFinishes = stats.firstPlace + stats.secondPlace + stats.thirdPlace;
+                const podiumRate = stats.totalRuns > 0 ? ((podiumFinishes / stats.totalRuns) * 100).toFixed(0) : '0';
 
                 return (
                   <GlobalLeaderboardItem key={id} $rank={idx} $color={config.color}>
@@ -2097,16 +2432,20 @@ export default function ShortestPathAlgorithmDemo({
 
                     <GlobalStats>
                       <GlobalStatItem>
-                        <GlobalStatLabel>Wins</GlobalStatLabel>
-                        <GlobalStatValue>{stats.wins} ({winRate}%)</GlobalStatValue>
+                        <GlobalStatLabel>Score</GlobalStatLabel>
+                        <GlobalStatValue>{totalScore} pts</GlobalStatValue>
                       </GlobalStatItem>
                       <GlobalStatItem>
-                        <GlobalStatLabel>Avg Steps</GlobalStatLabel>
-                        <GlobalStatValue>{stats.avgSteps > 0 ? stats.avgSteps.toFixed(0) : '-'}</GlobalStatValue>
+                        <GlobalStatLabel>Podium Rate</GlobalStatLabel>
+                        <GlobalStatValue>{podiumRate}%</GlobalStatValue>
                       </GlobalStatItem>
-                      <GlobalStatItem>
-                        <GlobalStatLabel>Best</GlobalStatLabel>
-                        <GlobalStatValue>{stats.fastestSteps > 0 ? stats.fastestSteps : '-'}</GlobalStatValue>
+                      <GlobalStatItem style={{ gridColumn: '1 / -1' }}>
+                        <GlobalStatLabel>Finishes</GlobalStatLabel>
+                        <GlobalStatValue>
+                          <span style={{ marginRight: '0.75rem' }}>🥇 {stats.firstPlace}</span>
+                          <span style={{ marginRight: '0.75rem' }}>🥈 {stats.secondPlace}</span>
+                          <span>🥉 {stats.thirdPlace}</span>
+                        </GlobalStatValue>
                       </GlobalStatItem>
                     </GlobalStats>
                   </GlobalLeaderboardItem>
@@ -2167,7 +2506,7 @@ export default function ShortestPathAlgorithmDemo({
                         </AlgoHeader>
 
                         <Stats>
-                          <span>Steps: <StatValue>{algo.steps}</StatValue></span>
+                          <span>Steps: <StatValue>{algo.steps.toLocaleString()}</StatValue></span>
                           <span>Nodes: <StatValue>{algo.path.length > 0 ? algo.path.length : '-'}</StatValue></span>
                           {algo.distance > 0 && (
                             <span>Dist: <StatValue>{algo.distance.toFixed(0)}</StatValue></span>
@@ -2188,7 +2527,7 @@ export default function ShortestPathAlgorithmDemo({
             <Slider
               type="range"
               min="1"
-              max="10"
+              max="20"
               step="1"
               value={localSpeed}
               onChange={(e) => setLocalSpeed(Number(e.target.value))}
