@@ -1,312 +1,161 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { COLORS } from './phylogeny.config';
+import React, { useEffect, useRef } from 'react';
 import { SimulationEngine, wrapDelta } from './phylogeny.logic';
+import { MOLECULE_INFO, PHASE_LABELS, MoleculeType } from './phylogeny.config';
 
 interface PhylogenySimProps {
     isRunning: boolean;
     speed: number;
 }
 
-// Helper: Add texture noise for surface variation
-function addNoise(base: number, amount: number): number {
-    return base + (Math.random() - 0.5) * amount;
-}
+// Clean color palette
+const PALETTE = {
+    bgDeep: '#0a0e14',
+    bgMid: '#0f1419',
+    gridLine: 'rgba(40, 60, 80, 0.25)',
+    
+    ventCore: '#ff6b35',
+    ventGlow: '#ff9f1c',
+    ventPlume: '#ffbe0b',
+    
+    aminoAcid: '#ec4899',
+    nucleotide: '#8b5cf6',
+    lipid: '#facc15',
+    sugar: '#6bcb77',
+    peptide: '#db2777',
+    rnaFragment: '#7c3aed',
+    simple: '#64748b',
+    
+    membrane: '#facc15',
+    luca: '#f72585',
+    lucaGlow: 'rgba(247, 37, 133, 0.3)',
+    
+    uiBg: 'rgba(10, 14, 20, 0.95)',
+    uiBorder: 'rgba(64, 100, 140, 0.4)',
+    uiText: '#94a3b8',
+    uiTextBright: '#e2e8f0',
+    uiHighlight: '#00d4ff',
+    uiWarn: '#ff6b35',
+    uiSuccess: '#22c55e',
+};
+
+const MOLECULE_COLORS: Record<string, string> = {
+    water: '#60a5fa',
+    carbon: '#78716c',
+    nitrogen: '#93c5fd',
+    oxygen: '#ef4444',
+    amino_acid: '#ec4899',
+    nucleotide: '#8b5cf6',
+    lipid: '#facc15',
+    sugar: '#86efac',
+    peptide: '#db2777',
+    rna_fragment: '#7c3aed',
+    membrane_vesicle: '#f59e0b',
+};
 
 function renderSimulation(ctx: CanvasRenderingContext2D, engine: SimulationEngine) {
     const world = engine.world;
+    const W = world.width;
+    const H = world.height;
 
-    // OCEAN FLOOR BASE - deep sea ambient lighting with blue-green cast
-    const baseGradient = ctx.createRadialGradient(world.width / 2, world.height / 2, 0, world.width / 2, world.height / 2, Math.max(world.width, world.height) * 0.7);
-    baseGradient.addColorStop(0, 'rgba(48, 55, 62, 1)');
-    baseGradient.addColorStop(1, 'rgba(35, 42, 48, 1)');
-    ctx.fillStyle = baseGradient;
-    ctx.fillRect(0, 0, world.width, world.height);
-    
-    // Sediment patches scattered across floor
-    for (let i = 0; i < 200; i++) {
-        const x = Math.random() * world.width;
-        const y = Math.random() * world.height;
-        const size = 2 + Math.random() * 6;
-        const alpha = 0.3 + Math.random() * 0.25;
-        ctx.fillStyle = `rgba(${addNoise(60, 10)}, ${addNoise(63, 10)}, ${addNoise(56, 8)}, ${alpha})`;
+    // Background
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    bgGrad.addColorStop(0, PALETTE.bgDeep);
+    bgGrad.addColorStop(1, PALETTE.bgMid);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Subtle grid
+    ctx.strokeStyle = PALETTE.gridLine;
+    ctx.lineWidth = 0.5;
+    const gridSize = 80;
+    for (let x = 0; x < W; x += gridSize) {
         ctx.beginPath();
-        ctx.arc(x, y, size, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    
-    // Pillow basalt formations (top-down view)
-    for (let i = 0; i < 30; i++) {
-        const x = Math.random() * world.width;
-        const y = Math.random() * world.height;
-        const w = 18 + Math.random() * 30;
-        const h = 15 + Math.random() * 25;
-        
-        const rockGrad = ctx.createRadialGradient(x - w * 0.15, y - h * 0.15, 0, x, y, Math.max(w, h) * 0.7);
-        rockGrad.addColorStop(0, `rgba(${addNoise(70, 10)}, ${addNoise(74, 10)}, ${addNoise(67, 9)}, 0.75)`);
-        rockGrad.addColorStop(0.6, `rgba(${addNoise(55, 8)}, ${addNoise(59, 8)}, ${addNoise(53, 7)}, 0.65)`);
-        rockGrad.addColorStop(1, `rgba(${addNoise(45, 6)}, ${addNoise(49, 6)}, ${addNoise(43, 5)}, 0.45)`);
-        
-        ctx.fillStyle = rockGrad;
-        ctx.beginPath();
-        ctx.ellipse(x, y, w, h, Math.random() * Math.PI * 2, 0, Math.PI * 2);
-        ctx.fill();
-    }
-    
-    // Crack patterns in seafloor
-    ctx.strokeStyle = 'rgba(20, 22, 24, 0.4)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 12; i++) {
-        const startX = Math.random() * world.width;
-        const startY = Math.random() * world.height;
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        let x = startX;
-        let y = startY;
-        for (let j = 0; j < 6; j++) {
-            x += (Math.random() - 0.5) * 50;
-            y += (Math.random() - 0.5) * 50;
-            ctx.lineTo(x, y);
-        }
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, H);
         ctx.stroke();
     }
-    
-    // Distant suspended particles (marine snow)
-    for (let i = 0; i < 180; i++) {
-        const x = (Math.random() * world.width + world.time * 0.05) % world.width;
-        const y = (Math.random() * world.height + world.time * 0.08) % world.height;
-        const alpha = 0.1 + Math.random() * 0.15;
-        const size = Math.random() < 0.95 ? 0.9 : 1.5;
-        ctx.fillStyle = `rgba(220, 230, 240, ${alpha})`;
-        ctx.fillRect(x, y, size, size);
+    for (let y = 0; y < H; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
     }
 
-    // Hydrothermal vents (top-down view - circular plumes)
-    for (const vent of world.vents) {
-        const pulse = Math.sin(world.time * 0.05 + vent.phase) * 0.08 + 0.92;
-
-        // Turbulent mineral plume spreading radially (top-down)
-        const maxRadius = 120;
-        const particleCount = 60;
-        
-        for (let i = 0; i < particleCount; i++) {
-            const t = i / particleCount;
-            const radius = t * maxRadius;
-            const angle = Math.random() * Math.PI * 2 + world.time * 0.03;
-            
-            const turbulence = Math.sin(world.time * 0.09 + i * 0.35) * 8 * t;
-            const wobble = Math.sin(world.time * 0.14 + i * 0.65) * 5 * t;
-            
-            const x = vent.x + Math.cos(angle) * (radius + turbulence + wobble);
-            const y = vent.y + Math.sin(angle) * (radius + turbulence + wobble);
-            
-            if (x > 0 && x < world.width && y > 0 && y < world.height) {
-                const alpha = (1 - t) * 0.25 * pulse * (0.6 + Math.random() * 0.4);
-                const size = (1 - t * 0.65) * (0.9 + Math.random() * 1.9);
-                
-                const brightness = 140 + Math.random() * 60;
-                ctx.fillStyle = `rgba(${brightness}, ${brightness * 0.82}, ${brightness * 0.7}, ${alpha})`;
-                ctx.beginPath();
-                ctx.arc(x, y, size, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        // Vent opening (top-down circular view)
-        const ventRadius = 14;
-        
-        // Outer ambient occlusion ring
-        const aoGradient = ctx.createRadialGradient(vent.x, vent.y, ventRadius * 0.3, vent.x, vent.y, ventRadius * 2.5);
-        aoGradient.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
-        aoGradient.addColorStop(0.4, 'rgba(0, 0, 0, 0.2)');
-        aoGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = aoGradient;
+    // Floating particles
+    ctx.fillStyle = 'rgba(100, 140, 180, 0.12)';
+    for (let i = 0; i < 30; i++) {
+        const x = (i * 137.5 + world.time * 0.02) % W;
+        const y = (i * 89.3 + world.time * 0.015) % H;
         ctx.beginPath();
-        ctx.arc(vent.x, vent.y, ventRadius * 2.5, 0, Math.PI * 2);
+        ctx.arc(x, y, 1, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Vent crater
-        ctx.fillStyle = 'rgba(18, 16, 14, 0.85)';
-        ctx.beginPath();
-        ctx.arc(vent.x, vent.y, ventRadius, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Hot fluid core
-        const coreGradient = ctx.createRadialGradient(vent.x, vent.y, 0, vent.x, vent.y, ventRadius * 0.6);
-        coreGradient.addColorStop(0, `rgba(255, 170, 80, ${0.6 * pulse})`);
-        coreGradient.addColorStop(0.7, `rgba(240, 130, 55, ${0.4 * pulse})`);
-        coreGradient.addColorStop(1, 'rgba(210, 100, 35, 0)');
-        ctx.fillStyle = coreGradient;
-        ctx.beginPath();
-        ctx.arc(vent.x, vent.y, ventRadius * 0.6, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Heat shimmer rings
-        for (let ring = 0; ring < 3; ring++) {
-            const ringRadius = 20 + ring * 10 + pulse * 5;
-            const ringAlpha = (0.12 - ring * 0.03) * pulse;
-            ctx.strokeStyle = `rgba(220, 115, 45, ${ringAlpha})`;
-            ctx.lineWidth = 1.8 - ring * 0.4;
-            ctx.beginPath();
-            ctx.arc(vent.x, vent.y, ringRadius, 0, Math.PI * 2);
-            ctx.stroke();
-        }
     }
 
-    // ROCKS (top-down view)
+    // Rocks (simplified)
     for (const rock of world.rocks) {
-        if (rock.type === 'chimney') {
-            // Chimney from above - circular with radial texture
-            const radius = rock.radius * 2;
-            
-            // Shadow
-            const aoGradient = ctx.createRadialGradient(rock.x, rock.y, radius * 0.3, rock.x, rock.y, radius * 1.5);
-            aoGradient.addColorStop(0, 'rgba(0, 0, 0, 0.45)');
-            aoGradient.addColorStop(0.7, 'rgba(0, 0, 0, 0.2)');
-            aoGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = aoGradient;
-            ctx.beginPath();
-            ctx.arc(rock.x, rock.y, radius * 1.5, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Main chimney body
-            const mainGrad = ctx.createRadialGradient(rock.x - radius * 0.2, rock.y - radius * 0.2, 0, rock.x, rock.y, radius);
-            mainGrad.addColorStop(0, `rgba(${addNoise(54, 8)}, ${addNoise(50, 7)}, ${addNoise(46, 6)}, 0.6)`);
-            mainGrad.addColorStop(0.5, `rgba(${addNoise(44, 6)}, ${addNoise(41, 5)}, ${addNoise(38, 5)}, 0.5)`);
-            mainGrad.addColorStop(1, `rgba(${addNoise(34, 5)}, ${addNoise(32, 4)}, ${addNoise(30, 4)}, 0.4)`);
-            ctx.fillStyle = mainGrad;
-            ctx.beginPath();
-            ctx.arc(rock.x, rock.y, radius, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Radial mineral deposits
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2 + rock.roughness;
-                const length = radius * (0.7 + Math.random() * 0.3);
-                ctx.strokeStyle = `rgba(${addNoise(68, 10)}, ${addNoise(60, 9)}, ${addNoise(54, 8)}, ${0.35 + Math.random() * 0.15})`;
-                ctx.lineWidth = 1.2 + Math.random() * 0.6;
-                ctx.beginPath();
-                ctx.moveTo(rock.x, rock.y);
-                ctx.lineTo(rock.x + Math.cos(angle) * length, rock.y + Math.sin(angle) * length);
-                ctx.stroke();
-            }
-            
-        } else if (rock.type === 'ridge') {
-            // Ridge from above - elongated irregular shape
-            const points = 9;
-            const vertices = [];
-            
-            for (let i = 0; i < points; i++) {
-                const angle = (i / points) * Math.PI * 2;
-                const radiusVar = rock.radius * (0.75 + Math.sin(i * 2.5 + rock.roughness * 6) * 0.4);
-                const stretch = Math.cos(angle) > 0 ? 1.7 : 0.9;
-                vertices.push({
-                    x: rock.x + Math.cos(angle) * radiusVar * stretch,
-                    y: rock.y + Math.sin(angle) * radiusVar * 0.55
-                });
-            }
-            
-            // Shadow
-            const shadowGrad = ctx.createRadialGradient(rock.x, rock.y, 0, rock.x + 8, rock.y + 8, rock.radius * 1.5);
-            shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.4)');
-            shadowGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.18)');
-            shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = shadowGrad;
-            ctx.beginPath();
-            vertices.forEach((v, i) => {
-                if (i === 0) ctx.moveTo(v.x + 8, v.y + 8);
-                else ctx.lineTo(v.x + 8, v.y + 8);
-            });
-            ctx.closePath();
-            ctx.fill();
-            
-            // Main body
-            const lightGrad = ctx.createRadialGradient(
-                rock.x - rock.radius * 0.25, rock.y - rock.radius * 0.25, 0,
-                rock.x, rock.y, rock.radius * 1.5
-            );
-            lightGrad.addColorStop(0, `rgba(${addNoise(60, 8)}, ${addNoise(56, 7)}, ${addNoise(52, 6)}, 0.55)`);
-            lightGrad.addColorStop(0.5, `rgba(${addNoise(50, 6)}, ${addNoise(46, 5)}, ${addNoise(42, 5)}, 0.48)`);
-            lightGrad.addColorStop(1, `rgba(${addNoise(40, 5)}, ${addNoise(37, 4)}, ${addNoise(34, 4)}, 0.38)`);
-            ctx.fillStyle = lightGrad;
-            ctx.beginPath();
-            vertices.forEach((v, i) => {
-                if (i === 0) ctx.moveTo(v.x, v.y);
-                else ctx.lineTo(v.x, v.y);
-            });
-            ctx.closePath();
-            ctx.fill();
-            
-            // Edge definition
-            ctx.strokeStyle = `rgba(${addNoise(26, 4)}, ${addNoise(24, 3)}, ${addNoise(22, 3)}, 0.45)`;
-            ctx.lineWidth = 1.3;
-            ctx.stroke();
-            
-        } else {
-            // Boulder - circular irregular
-            const sides = 8;
-            const vertices = [];
-            
-            for (let i = 0; i < sides; i++) {
-                const angle = (i / sides) * Math.PI * 2 + rock.roughness * 0.9;
-                const r = rock.radius * (0.65 + Math.sin(i * 2.9 + rock.roughness * 7) * 0.45);
-                vertices.push({
-                    x: rock.x + Math.cos(angle) * r,
-                    y: rock.y + Math.sin(angle) * r
-                });
-            }
-            
-            // Shadow
-            const shadowGrad = ctx.createRadialGradient(rock.x, rock.y, 0, rock.x + 6, rock.y + 6, rock.radius * 1.3);
-            shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.42)');
-            shadowGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.2)');
-            shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-            ctx.fillStyle = shadowGrad;
-            ctx.beginPath();
-            vertices.forEach((v, i) => {
-                if (i === 0) ctx.moveTo(v.x + 6, v.y + 6);
-                else ctx.lineTo(v.x + 6, v.y + 6);
-            });
-            ctx.closePath();
-            ctx.fill();
-            
-            // Main body
-            const mainGrad = ctx.createRadialGradient(
-                rock.x - rock.radius * 0.3, rock.y - rock.radius * 0.3, 0,
-                rock.x, rock.y, rock.radius * 1.2
-            );
-            mainGrad.addColorStop(0, `rgba(${addNoise(64, 9)}, ${addNoise(58, 8)}, ${addNoise(54, 7)}, 0.52)`);
-            mainGrad.addColorStop(0.6, `rgba(${addNoise(50, 7)}, ${addNoise(46, 6)}, ${addNoise(42, 5)}, 0.45)`);
-            mainGrad.addColorStop(1, `rgba(${addNoise(38, 5)}, ${addNoise(35, 4)}, ${addNoise(32, 4)}, 0.36)`);
-            ctx.fillStyle = mainGrad;
-            ctx.beginPath();
-            vertices.forEach((v, i) => {
-                if (i === 0) ctx.moveTo(v.x, v.y);
-                else ctx.lineTo(v.x, v.y);
-            });
-            ctx.closePath();
-            ctx.fill();
-            
-            // Edge
-            ctx.strokeStyle = `rgba(${addNoise(27, 4)}, ${addNoise(25, 3)}, ${addNoise(23, 3)}, 0.48)`;
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-        }
+        ctx.fillStyle = 'rgba(30, 40, 50, 0.5)';
+        ctx.strokeStyle = 'rgba(50, 65, 80, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(rock.x, rock.y, rock.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
     }
 
-    // Chemical bonds - more visible
+    // Hydrothermal vents
+    for (const vent of world.vents) {
+        const pulse = 0.85 + Math.sin(world.time * 0.08 + vent.phase) * 0.15;
+
+        // Glow
+        const glowGrad = ctx.createRadialGradient(vent.x, vent.y, 0, vent.x, vent.y, 90);
+        glowGrad.addColorStop(0, `rgba(255, 159, 28, ${0.18 * pulse})`);
+        glowGrad.addColorStop(0.5, `rgba(255, 107, 53, ${0.08 * pulse})`);
+        glowGrad.addColorStop(1, 'rgba(255, 107, 53, 0)');
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(vent.x, vent.y, 90, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Plume particles
+        for (let i = 0; i < 15; i++) {
+            const age = ((world.time * 0.05 + i * 0.15) % 1);
+            const spread = age * 35;
+            const angle = (i / 15) * Math.PI * 2 + world.time * 0.02;
+            const px = vent.x + Math.cos(angle) * spread;
+            const py = vent.y + Math.sin(angle) * spread;
+            const alpha = (1 - age) * 0.5 * pulse;
+            const size = (1 - age * 0.5) * 2.5;
+            
+            ctx.fillStyle = `rgba(255, 190, 11, ${alpha})`;
+            ctx.beginPath();
+            ctx.arc(px, py, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Core
+        const coreGrad = ctx.createRadialGradient(vent.x, vent.y, 0, vent.x, vent.y, 16);
+        coreGrad.addColorStop(0, `rgba(255, 255, 200, ${0.9 * pulse})`);
+        coreGrad.addColorStop(0.4, `rgba(255, 159, 28, ${0.7 * pulse})`);
+        coreGrad.addColorStop(1, 'rgba(255, 107, 53, 0)');
+        ctx.fillStyle = coreGrad;
+        ctx.beginPath();
+        ctx.arc(vent.x, vent.y, 16, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Chemical bonds
     for (const bond of engine.bonds) {
         const mol1 = engine.moleculeMap.get(bond.mol1);
         const mol2 = engine.moleculeMap.get(bond.mol2);
         if (mol1 && mol2) {
-            const dx = wrapDelta(mol2.x - mol1.x, world.width);
-            const dy = wrapDelta(mol2.y - mol1.y, world.height);
+            const dx = wrapDelta(mol2.x - mol1.x, W);
+            const dy = wrapDelta(mol2.y - mol1.y, H);
             
-            let alpha = 0.18;
-            if (bond.type === 'covalent') alpha = 0.4;
-            else if (bond.type === 'hydrogen') alpha = 0.14;
-            
-            ctx.strokeStyle = `rgba(${addNoise(195, 18)}, ${addNoise(205, 18)}, ${addNoise(220, 18)}, ${alpha})`;
-            ctx.lineWidth = bond.type === 'covalent' ? 1.6 : 1.0;
+            const isCovalent = bond.type === 'covalent';
+            ctx.strokeStyle = isCovalent 
+                ? 'rgba(150, 200, 255, 0.45)' 
+                : 'rgba(150, 200, 255, 0.2)';
+            ctx.lineWidth = isCovalent ? 1.5 : 1;
             ctx.beginPath();
             ctx.moveTo(mol1.x, mol1.y);
             ctx.lineTo(mol1.x + dx, mol1.y + dy);
@@ -314,393 +163,401 @@ function renderSimulation(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         }
     }
 
-    // VOLUMETRIC MOLECULES - Bright and visible
+    // Molecules
     if (!engine.lucaBorn) {
-        engine.molecules.forEach((m) => {
-            const baseOpacity = m.complexity === 1 ? 0.15 : m.complexity === 2 ? 0.4 : 0.7;
-            const bondBonus = Math.min(m.bondedTo.size * 0.09, 0.22);
-            const finalOpacity = baseOpacity + bondBonus;
-            
-            let r = 190, g = 195, b = 205;
-            if (m.type === 'amino_acid') { r = 215; g = 180; b = 195; }
-            else if (m.type === 'nucleotide') { r = 160; g = 175; b = 215; }
-            else if (m.type === 'lipid') { r = 225; g = 200; b = 160; }
-            else if (m.type === 'sugar') { r = 185; g = 205; b = 185; }
-            
-            if (m.type === 'peptide') {
-                r = 200; g = 140; b = 170;
-                const segments = 4;
-                const segmentLen = m.radius * 0.7;
-                const zigzagHeight = m.radius * 0.32;
-                
-                ctx.strokeStyle = `rgba(${addNoise(r, 12)}, ${addNoise(g, 10)}, ${addNoise(b, 10)}, ${finalOpacity * 0.9})`;
-                ctx.lineWidth = 2.4;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
+        for (const m of engine.molecules) {
+            const color = MOLECULE_COLORS[m.type] || PALETTE.simple;
+            const baseSize = m.radius * (m.complexity === 1 ? 1 : m.complexity === 2 ? 1.3 : 1.8);
+            const bonded = m.bondedTo.size > 0;
+
+            // Glow for complex/bonded
+            if (m.complexity > 1 || bonded) {
+                const glowGrad = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, baseSize * 1.8);
+                glowGrad.addColorStop(0, `${color}50`);
+                glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = glowGrad;
                 ctx.beginPath();
-                ctx.moveTo(m.x - segmentLen, m.y);
-                
-                for (let i = 0; i < segments; i++) {
-                    const x = m.x - segmentLen + (i * segmentLen / (segments - 1)) * 2;
-                    const y = m.y + (i % 2 === 0 ? -zigzagHeight : zigzagHeight);
-                    ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-                
-                for (let i = 0; i < segments; i++) {
-                    const x = m.x - segmentLen + (i * segmentLen / (segments - 1)) * 2;
-                    const y = m.y + (i % 2 === 0 ? -zigzagHeight : zigzagHeight);
-                    
-                    const nodeGrad = ctx.createRadialGradient(x, y, 0, x, y, 3.8);
-                    nodeGrad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${finalOpacity * 1.0})`);
-                    nodeGrad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, ${finalOpacity * 0.55})`);
-                    nodeGrad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-                    ctx.fillStyle = nodeGrad;
-                    ctx.beginPath();
-                    ctx.arc(x, y, 3.8, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-            else if (m.type === 'rna_fragment') {
-                r = 135; g = 130; b = 195;
-                const fragmentLength = m.radius * 2.5;
-                
-                ctx.strokeStyle = `rgba(${addNoise(r, 10)}, ${addNoise(g, 10)}, ${addNoise(b, 12)}, ${finalOpacity * 0.95})`;
-                ctx.lineWidth = 2.2;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.beginPath();
-                
-                const startX = m.x - fragmentLength * 0.5;
-                const startY = m.y;
-                ctx.moveTo(startX, startY);
-                
-                for (let i = 1; i <= 5; i++) {
-                    const t = i / 15;
-                    const x = startX + fragmentLength * t * 0.3;
-                    const y = startY - fragmentLength * t * 0.6 + Math.sin(t * Math.PI * 3) * 2;
-                    ctx.lineTo(x, y);
-                }
-                
-                const loopCenterX = m.x - fragmentLength * 0.2;
-                const loopCenterY = m.y - fragmentLength * 0.4;
-                const loopRadius = fragmentLength * 0.15;
-                for (let i = 0; i <= 8; i++) {
-                    const angle = Math.PI + (i / 8) * Math.PI;
-                    const x = loopCenterX + Math.cos(angle) * loopRadius;
-                    const y = loopCenterY + Math.sin(angle) * loopRadius;
-                    ctx.lineTo(x, y);
-                }
-                
-                for (let i = 5; i >= 1; i--) {
-                    const t = i / 15;
-                    const x = startX + fragmentLength * t * 0.3 + fragmentLength * 0.08;
-                    const y = startY - fragmentLength * t * 0.6 + Math.sin(t * Math.PI * 3) * 2;
-                    ctx.lineTo(x, y);
-                }
-                ctx.lineTo(m.x + fragmentLength * 0.3, startY);
-                ctx.stroke();
-                
-                ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${finalOpacity * 0.65})`;
-                ctx.lineWidth = 1.3;
-                for (let i = 1; i <= 4; i++) {
-                    const t = i / 5;
-                    const x1 = startX + fragmentLength * t * 0.3;
-                    const x2 = x1 + fragmentLength * 0.08;
-                    const y = startY - fragmentLength * t * 0.6 + Math.sin(t * Math.PI * 3) * 2;
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y);
-                    ctx.lineTo(x2, y);
-                    ctx.stroke();
-                }
-            }
-            else if (m.type === 'lipid' || m.type === 'membrane_vesicle') {
-                const layers = 3;
-                for (let layer = 0; layer < layers; layer++) {
-                    const layerOpacity = finalOpacity * (1.05 - layer * 0.18);
-                    const layerSize = 1 + layer * 0.4;
-                    
-                    const grad = ctx.createRadialGradient(
-                        m.x, m.y - m.radius * 0.5, 0,
-                        m.x, m.y, m.radius * layerSize * 1.1
-                    );
-                    grad.addColorStop(0, `rgba(${addNoise(r, 12)}, ${addNoise(g, 10)}, ${addNoise(b, 10)}, ${layerOpacity})`);
-                    grad.addColorStop(0.5, `rgba(${addNoise(r, 12)}, ${addNoise(g, 10)}, ${addNoise(b, 10)}, ${layerOpacity * 0.75})`);
-                    grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-                    
-                    ctx.fillStyle = grad;
-                    ctx.beginPath();
-                    ctx.ellipse(m.x, m.y, m.radius * 0.6 * layerSize, m.radius * 1.3 * layerSize, m.vx * 0.08, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                
-                const headGrad = ctx.createRadialGradient(m.x, m.y - m.radius * 0.9, 0, m.x, m.y - m.radius * 0.9, m.radius * 0.6);
-                headGrad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${finalOpacity * 1.25})`);
-                headGrad.addColorStop(0.7, `rgba(${r}, ${g}, ${b}, ${finalOpacity * 0.75})`);
-                headGrad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-                ctx.fillStyle = headGrad;
-                ctx.beginPath();
-                ctx.arc(m.x, m.y - m.radius * 0.9, m.radius * 0.5, 0, Math.PI * 2);
+                ctx.arc(m.x, m.y, baseSize * 1.8, 0, Math.PI * 2);
                 ctx.fill();
             }
-            else {
-                const layers = m.complexity === 1 ? 4 : 3;
-                for (let layer = 0; layer < layers; layer++) {
-                    const layerOpacity = finalOpacity * (1.25 - layer * 0.28);
-                    const layerRadius = m.radius * (2.1 - layer * 0.42);
-                    
-                    const grad = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, layerRadius);
-                    grad.addColorStop(0, `rgba(${addNoise(r, 14)}, ${addNoise(g, 14)}, ${addNoise(b, 14)}, ${layerOpacity})`);
-                    grad.addColorStop(0.5, `rgba(${addNoise(r, 12)}, ${addNoise(g, 12)}, ${addNoise(b, 12)}, ${layerOpacity * 0.65})`);
-                    grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-                    ctx.fillStyle = grad;
+
+            // Molecule shape based on type
+            if (m.type === 'peptide') {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                for (let i = 0; i <= 3; i++) {
+                    const px = m.x - 8 + i * 5;
+                    const py = m.y + (i % 2 === 0 ? -3 : 3);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.stroke();
+                
+                for (let i = 0; i <= 3; i++) {
+                    const px = m.x - 8 + i * 5;
+                    const py = m.y + (i % 2 === 0 ? -3 : 3);
+                    ctx.fillStyle = color;
                     ctx.beginPath();
-                    ctx.arc(m.x, m.y, layerRadius, 0, Math.PI * 2);
+                    ctx.arc(px, py, 2.5, 0, Math.PI * 2);
                     ctx.fill();
                 }
+            } else if (m.type === 'rna_fragment') {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.8;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(m.x - 6, m.y + 8);
+                ctx.lineTo(m.x - 6, m.y - 3);
+                ctx.arc(m.x, m.y - 3, 6, Math.PI, 0, false);
+                ctx.lineTo(m.x + 6, m.y + 8);
+                ctx.stroke();
+            } else if (m.type === 'lipid') {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(m.x, m.y - 4, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(m.x - 1.5, m.y);
+                ctx.lineTo(m.x - 1.5, m.y + 8);
+                ctx.moveTo(m.x + 1.5, m.y);
+                ctx.lineTo(m.x + 1.5, m.y + 8);
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(m.x, m.y, baseSize * 0.55, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Highlight
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+                ctx.beginPath();
+                ctx.arc(m.x - baseSize * 0.15, m.y - baseSize * 0.15, baseSize * 0.2, 0, Math.PI * 2);
+                ctx.fill();
             }
-        });
+        }
     }
-
-    // Animated caustics light patterns (Cesium-style water effects)
-    for (let i = 0; i < 30; i++) {
-        const x = (Math.random() * world.width + world.time * 0.3) % world.width;
-        const y = (Math.random() * world.height + world.time * 0.25) % world.height;
-        const radius = 15 + Math.random() * 35;
-        const alpha = 0.018 + Math.random() * 0.03;
-        
-        const causticsGrad = ctx.createRadialGradient(x, y, 0, x, y, radius);
-        causticsGrad.addColorStop(0, `rgba(155, 185, 205, ${alpha})`);
-        causticsGrad.addColorStop(0.5, `rgba(135, 165, 185, ${alpha * 0.65})`);
-        causticsGrad.addColorStop(1, 'rgba(135, 165, 185, 0)');
-        ctx.fillStyle = causticsGrad;
-        ctx.beginPath();
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    // Water fog overlay for depth (Cesium-style atmospheric perspective)
-    const fogGradient = ctx.createRadialGradient(world.width / 2, world.height / 2, 0, world.width / 2, world.height / 2, Math.max(world.width, world.height) * 0.65);
-    fogGradient.addColorStop(0, 'rgba(38, 52, 67, 0)');
-    fogGradient.addColorStop(0.65, 'rgba(38, 52, 67, 0.09)');
-    fogGradient.addColorStop(1, 'rgba(30, 44, 57, 0.16)');
-    ctx.fillStyle = fogGradient;
-    ctx.fillRect(0, 0, world.width, world.height);
 
     // Protocells
-    engine.protoCells.forEach((p) => {
+    for (const p of engine.protoCells) {
         const stability = p.stability / 100;
-        ctx.fillStyle = `rgba(95, 100, 115, ${0.12 * stability})`;
+        
+        // Interior
+        ctx.fillStyle = `rgba(255, 217, 61, ${0.06 * stability})`;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius - 4, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, p.radius - 2, 0, Math.PI * 2);
         ctx.fill();
 
+        // Membrane
         if (p.hasMembrane) {
-            const lipids = 24;
-            for (let i = 0; i < lipids; i++) {
-                const angle = (i / lipids) * Math.PI * 2 + world.time * 0.01;
-                const x = p.x + Math.cos(angle) * p.radius;
-                const y = p.y + Math.sin(angle) * p.radius;
-                ctx.strokeStyle = `rgba(200, 170, 130, ${0.35 * stability})`;
-                ctx.lineWidth = 1.2;
+            ctx.strokeStyle = `rgba(255, 217, 61, ${0.65 * stability})`;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Lipid markers
+            const lipidCount = 14;
+            for (let i = 0; i < lipidCount; i++) {
+                const angle = (i / lipidCount) * Math.PI * 2;
+                const lx = p.x + Math.cos(angle) * p.radius;
+                const ly = p.y + Math.sin(angle) * p.radius;
+                ctx.fillStyle = `rgba(255, 217, 61, ${0.85 * stability})`;
                 ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.lineTo(x - Math.cos(angle) * 3, y - Math.sin(angle) * 3);
-                ctx.stroke();
-                ctx.fillStyle = `rgba(215, 180, 120, ${0.45 * stability})`;
-                ctx.beginPath();
-                ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+                ctx.arc(lx, ly, 2, 0, Math.PI * 2);
                 ctx.fill();
             }
         } else {
-            ctx.strokeStyle = `rgba(200, 170, 130, ${0.22 * stability})`;
-            ctx.lineWidth = 1.6;
-            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = `rgba(255, 217, 61, ${0.25 * stability})`;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 4]);
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
             ctx.stroke();
             ctx.setLineDash([]);
         }
 
-        if (p.canReplicate) {
-            ctx.strokeStyle = `rgba(130, 120, 180, ${0.28 * stability})`;
-            ctx.lineWidth = 1.2;
-            for (let s = 0; s < 2; s++) {
-                ctx.beginPath();
-                const offset = s * 8 - 4;
-                for (let i = 0; i <= 15; i++) {
-                    const t = i / 15;
-                    const angle = t * Math.PI * 4;
-                    const x = p.x + offset + Math.cos(angle) * 3;
-                    const y = p.y - 8 + t * 16;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-            }
+        // Capability indicators
+        const indicators: string[] = [];
+        if (p.hasMembrane) indicators.push('🧫');
+        if (p.hasMetabolism) indicators.push('⚡');
+        if (p.canReplicate) indicators.push('🧬');
+        
+        if (indicators.length > 0) {
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.8 * stability})`;
+            ctx.fillText(indicators.join(' '), p.x, p.y - p.radius - 8);
+        }
+
+        // Label
+        let label = 'Vesicle';
+        let labelColor = PALETTE.uiText;
+        if (p.hasMembrane && p.hasMetabolism && p.canReplicate) {
+            label = '★ Protocell';
+            labelColor = PALETTE.uiSuccess;
+        } else if (p.hasMembrane) {
+            label = 'Liposome';
         }
         
-        if (p.hasMetabolism) {
-            ctx.strokeStyle = `rgba(180, 120, 150, ${0.25 * stability})`;
-            ctx.lineWidth = 1.2;
-            for (let s = 0; s < 3; s++) {
-                const angle = s * Math.PI * 2 / 3;
-                const baseX = p.x + Math.cos(angle) * (p.radius * 0.4);
-                const baseY = p.y + Math.sin(angle) * (p.radius * 0.4);
-                ctx.beginPath();
-                for (let i = 0; i < 4; i++) {
-                    const x = baseX + (i % 2 === 0 ? -2 : 2);
-                    const y = baseY - 4 + i * 2.5;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-            }
-        }
-
-        ctx.font = '9px system-ui';
+        ctx.font = 'bold 9px system-ui';
         ctx.textAlign = 'center';
-        const labelY = p.y - p.radius - 6;
-        let label = 'Vesicle';
-        if (p.hasMembrane && p.hasMetabolism && p.canReplicate) label = 'Protocell';
-        else if (p.hasMembrane) label = 'Liposome';
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-        const metrics = ctx.measureText(label);
-        ctx.fillRect(p.x - metrics.width / 2 - 2, labelY - 7, metrics.width + 4, 11);
-        ctx.fillStyle = `rgba(200, 210, 220, ${0.6 + stability * 0.35})`;
-        ctx.fillText(label, p.x, labelY);
-    });
+        ctx.fillStyle = labelColor;
+        ctx.fillText(label, p.x, p.y + p.radius + 12);
+        
+        // Size indicator
+        ctx.font = '8px system-ui';
+        ctx.fillStyle = PALETTE.uiText;
+        ctx.fillText(`${p.molecules.size} mols`, p.x, p.y + p.radius + 22);
+    }
 
+    // LUCA
     if (engine.luca && engine.luca.isAlive) {
         const luca = engine.luca;
-        const auraGradient = ctx.createRadialGradient(luca.x, luca.y, 0, luca.x, luca.y, luca.radius * 1.8);
-        auraGradient.addColorStop(0, 'rgba(210, 190, 150, 0.12)');
-        auraGradient.addColorStop(1, 'rgba(210, 190, 150, 0)');
-        ctx.fillStyle = auraGradient;
+        
+        // Aura
+        const auraGrad = ctx.createRadialGradient(luca.x, luca.y, 0, luca.x, luca.y, luca.radius * 2.5);
+        auraGrad.addColorStop(0, 'rgba(247, 37, 133, 0.25)');
+        auraGrad.addColorStop(0.5, 'rgba(247, 37, 133, 0.1)');
+        auraGrad.addColorStop(1, 'rgba(247, 37, 133, 0)');
+        ctx.fillStyle = auraGrad;
         ctx.beginPath();
-        ctx.arc(luca.x, luca.y, luca.radius * 1.8, 0, Math.PI * 2);
+        ctx.arc(luca.x, luca.y, luca.radius * 2.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = 'rgba(115, 110, 125, 0.4)';
+
+        // Pulse ring
+        const pulseR = luca.radius * (1.25 + Math.sin(world.time * 0.1) * 0.1);
+        ctx.strokeStyle = 'rgba(247, 37, 133, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(luca.x, luca.y, pulseR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Interior
+        const interiorGrad = ctx.createRadialGradient(luca.x, luca.y, 0, luca.x, luca.y, luca.radius);
+        interiorGrad.addColorStop(0, 'rgba(247, 37, 133, 0.35)');
+        interiorGrad.addColorStop(1, 'rgba(247, 37, 133, 0.15)');
+        ctx.fillStyle = interiorGrad;
         ctx.beginPath();
         ctx.arc(luca.x, luca.y, luca.radius, 0, Math.PI * 2);
         ctx.fill();
-        const lipidCount = 32;
-        for (let i = 0; i < lipidCount; i++) {
-            const angle = (i / lipidCount) * Math.PI * 2 + world.time * 0.005;
-            const x = luca.x + Math.cos(angle) * luca.radius;
-            const y = luca.y + Math.sin(angle) * luca.radius;
-            ctx.strokeStyle = 'rgba(200, 170, 130, 0.5)';
-            ctx.lineWidth = 1.2;
+
+        // Membrane
+        ctx.strokeStyle = PALETTE.luca;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(luca.x, luca.y, luca.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Internal ribosomes
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2 + world.time * 0.02;
+            const r = luca.radius * 0.5;
+            const rx = luca.x + Math.cos(angle) * r;
+            const ry = luca.y + Math.sin(angle) * r;
             ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x - Math.cos(angle) * 3.5, y - Math.sin(angle) * 3.5);
-            ctx.stroke();
-            ctx.fillStyle = 'rgba(210, 180, 140, 0.6)';
-            ctx.beginPath();
-            ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+            ctx.arc(rx, ry, 2, 0, Math.PI * 2);
             ctx.fill();
         }
-        ctx.strokeStyle = 'rgba(130, 120, 170, 0.32)';
-        ctx.lineWidth = 1.6;
-        for (let r = 0; r < 3; r++) {
-            ctx.beginPath();
-            ctx.arc(luca.x, luca.y, 10 + r * 3, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-        ctx.fillStyle = 'rgba(150, 140, 170, 0.38)';
-        for (let i = 0; i < 16; i++) {
-            const angle = (world.time * 0.003 + i * Math.PI / 8);
-            const r = luca.radius * (0.3 + (i % 4) * 0.12);
-            ctx.beginPath();
-            ctx.arc(luca.x + Math.cos(angle) * r, luca.y + Math.sin(angle) * r, 1.2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.font = 'bold 11px system-ui';
+
+        // Label
+        ctx.font = 'bold 13px system-ui';
         ctx.textAlign = 'center';
-        const titleY = luca.y - luca.radius - 16;
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        const titleMetrics = ctx.measureText('LUCA');
-        ctx.fillRect(luca.x - titleMetrics.width / 2 - 3, titleY - 9, titleMetrics.width + 6, 14);
-        ctx.fillStyle = 'rgba(215, 195, 155, 0.95)';
-        ctx.fillText('LUCA', luca.x, titleY);
-        ctx.font = '7px system-ui';
-        ctx.fillStyle = 'rgba(185, 185, 195, 0.8)';
-        ctx.fillText('Last Universal Common Ancestor', luca.x, titleY + 12);
+        ctx.fillStyle = PALETTE.luca;
+        ctx.fillText('★ LUCA ★', luca.x, luca.y - luca.radius - 16);
+        ctx.font = '9px system-ui';
+        ctx.fillStyle = PALETTE.uiText;
+        ctx.fillText('Last Universal Common Ancestor', luca.x, luca.y - luca.radius - 4);
     }
 
-    engine.organisms.forEach((o) => {
+    // Organisms
+    for (const o of engine.organisms) {
         if (!o.isAlive) {
-            ctx.fillStyle = 'rgba(70, 68, 72, 0.28)';
+            ctx.fillStyle = 'rgba(80, 80, 90, 0.25)';
             ctx.beginPath();
-            ctx.arc(o.x, o.y, o.radius * 0.4, 0, Math.PI * 2);
+            ctx.arc(o.x, o.y, o.radius * 0.5, 0, Math.PI * 2);
             ctx.fill();
-            return;
+            continue;
         }
-        const energy = Math.min(100, o.energy);
-        const vitalityAlpha = 0.2 + (energy / 100) * 0.25;
-        ctx.fillStyle = o.traits.color.replace(')', `, ${vitalityAlpha})`).replace('hsl', 'hsla');
+
+        const energy = Math.min(100, o.energy) / 100;
+        
+        // Glow
+        if (energy > 0.5) {
+            const glowGrad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.radius * 1.6);
+            glowGrad.addColorStop(0, o.traits.color.replace('hsl', 'hsla').replace(')', ', 0.2)'));
+            glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(o.x, o.y, o.radius * 1.6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Body
+        ctx.fillStyle = o.traits.color.replace('hsl', 'hsla').replace(')', `, ${0.35 + energy * 0.4})`);
         ctx.beginPath();
         ctx.arc(o.x, o.y, o.radius, 0, Math.PI * 2);
         ctx.fill();
-        const cellLipids = Math.floor(o.radius * 1.5);
-        const membraneAlpha = 0.35 + (energy / 150) * 0.25;
-        for (let i = 0; i < cellLipids; i++) {
-            const angle = (i / cellLipids) * Math.PI * 2;
-            const x = o.x + Math.cos(angle) * o.radius;
-            const y = o.y + Math.sin(angle) * o.radius;
-            ctx.strokeStyle = o.traits.color.replace(')', `, ${membraneAlpha * 0.9})`).replace('hsl', 'hsla');
-            ctx.lineWidth = 1.0;
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x - Math.cos(angle) * 2, y - Math.sin(angle) * 2);
-            ctx.stroke();
-            ctx.fillStyle = o.traits.color.replace(')', `, ${membraneAlpha})`).replace('hsl', 'hsla');
-            ctx.beginPath();
-            ctx.arc(x, y, 1.0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.fillStyle = o.traits.color.replace(')', `, ${vitalityAlpha * 1.4})`).replace('hsl', 'hsla');
-        ctx.beginPath();
-        ctx.arc(o.x, o.y, o.radius * 0.35, 0, Math.PI * 2);
-        ctx.fill();
-        if (o.radius > 10) {
-            ctx.font = `${Math.max(7, o.radius * 0.4)}px system-ui`;
-            ctx.textAlign = 'center';
-            const labelY = o.y - o.radius - 5;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-            const metrics = ctx.measureText(o.name);
-            ctx.fillRect(o.x - metrics.width / 2 - 2, labelY - 6, metrics.width + 4, 9);
-            ctx.fillStyle = `rgba(220, 220, 230, ${0.6 + vitalityAlpha * 1.4})`;
-            ctx.fillText(o.name, o.x, labelY);
-        }
-    });
 
-    // Scientific UI - brighter
-    ctx.fillStyle = 'rgba(15, 22, 30, 0.85)';
-    ctx.fillRect(10, 10, 270, 120);
-    ctx.strokeStyle = 'rgba(80, 90, 105, 0.4)';
+        // Membrane
+        ctx.strokeStyle = o.traits.color.replace('hsl', 'hsla').replace(')', `, ${0.6 + energy * 0.3})`);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, o.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Nucleus
+        ctx.fillStyle = o.traits.color.replace('hsl', 'hsla').replace(')', `, ${0.55 + energy * 0.35})`);
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, o.radius * 0.28, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        if (o.radius > 8) {
+            ctx.font = `bold ${Math.max(8, o.radius * 0.45)}px system-ui`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.fillText(o.name, o.x, o.y - o.radius - 5);
+            ctx.font = '7px system-ui';
+            ctx.fillStyle = PALETTE.uiText;
+            ctx.fillText(`Gen ${o.generation}`, o.x, o.y + o.radius + 9);
+        }
+    }
+
+    // === UI PANEL ===
+    const panelW = 220;
+    const panelH = 150;
+    const panelX = 12;
+    const panelY = 12;
+    
+    ctx.fillStyle = PALETTE.uiBg;
+    ctx.beginPath();
+    ctx.roundRect(panelX, panelY, panelW, panelH, 6);
+    ctx.fill();
+    
+    ctx.strokeStyle = PALETTE.uiBorder;
     ctx.lineWidth = 1;
-    ctx.strokeRect(10, 10, 270, 120);
-    ctx.font = '10px system-ui';
+    ctx.stroke();
+
+    // Phase label
+    ctx.font = 'bold 11px system-ui';
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(185, 195, 210, 0.9)';
-    const phaseLabel = world.phase.replace(/_/g, ' ');
-    ctx.fillText(`Phase: ${phaseLabel}`, 18, 26);
-    ctx.fillText(`t = ${Math.floor(world.time / 60)}s`, 18, 42);
-    ctx.fillText(`T = ${world.temperature.toFixed(1)}°C`, 18, 58);
-    ctx.fillStyle = 'rgba(165, 175, 190, 0.85)';
-    ctx.fillText(`Molecules: ${engine.molecules.length}`, 18, 74);
-    ctx.fillText(`Bonds: ${engine.bonds.length}`, 150, 74);
-    ctx.fillText(`Protocells: ${engine.protoCells.length}`, 18, 90);
-    if (engine.lucaBorn) {
-        ctx.fillStyle = 'rgba(215, 195, 155, 0.95)';
-        ctx.fillText(`✓ LUCA emerged`, 18, 106);
-    }
+    const phaseColor = world.phase === 'luca_emergence' ? PALETTE.uiSuccess : PALETTE.uiHighlight;
+    ctx.fillStyle = phaseColor;
+    ctx.fillText(PHASE_LABELS[world.phase] || world.phase, panelX + 12, panelY + 20);
+
+    ctx.font = '10px system-ui';
+    ctx.fillStyle = PALETTE.uiText;
+    
+    let rowY = panelY + 38;
+    const rowH = 16;
+    const col1X = panelX + 12;
+    const col2X = panelX + 115;
+
+    ctx.fillText(`Time: ${Math.floor(world.time / 60)}s`, col1X, rowY);
+    ctx.fillText(`Temp: ${world.temperature.toFixed(0)}°C`, col2X, rowY);
+    rowY += rowH;
+
+    ctx.fillText(`Molecules: ${engine.molecules.length}`, col1X, rowY);
+    ctx.fillText(`Bonds: ${engine.bonds.length}`, col2X, rowY);
+    rowY += rowH;
+
+    ctx.fillText(`Protocells: ${engine.protoCells.length}`, col1X, rowY);
     if (engine.organisms.length > 0) {
-        ctx.fillStyle = 'rgba(165, 175, 190, 0.85)';
-        ctx.fillText(`Organisms: ${engine.organisms.length}`, 150, 90);
-        ctx.fillText(`Max Gen: ${engine.maxGeneration}`, 150, 106);
+        ctx.fillText(`Organisms: ${engine.organisms.length}`, col2X, rowY);
     }
+    rowY += rowH;
+
+    if (engine.lucaBorn) {
+        ctx.fillStyle = PALETTE.uiSuccess;
+        ctx.fillText('✓ LUCA Emerged', col1X, rowY);
+        if (engine.maxGeneration > 0) {
+            ctx.fillStyle = PALETTE.uiText;
+            ctx.fillText(`Gen: ${engine.maxGeneration}`, col2X, rowY);
+        }
+    }
+    rowY += rowH + 4;
+
+    // Mini molecule counts
+    ctx.font = '8px system-ui';
+    ctx.fillStyle = PALETTE.uiText;
+    const counts = engine.moleculeCounts;
+    const complex = (counts.get('peptide' as MoleculeType) || 0) + 
+                   (counts.get('rna_fragment' as MoleculeType) || 0);
+    const building = (counts.get('amino_acid' as MoleculeType) || 0) + 
+                    (counts.get('nucleotide' as MoleculeType) || 0) +
+                    (counts.get('lipid' as MoleculeType) || 0);
+    ctx.fillText(`Complex: ${complex}  Building: ${building}`, col1X, rowY);
+
+    // === LEGEND with counts ===
+    const legendH = 55;
+    const legendY = H - legendH - 10;
+    
+    ctx.fillStyle = PALETTE.uiBg;
+    ctx.beginPath();
+    ctx.roundRect(12, legendY, W - 24, legendH, 6);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.uiBorder;
+    ctx.stroke();
+
+    // Building blocks row
+    ctx.font = 'bold 9px system-ui';
+    ctx.fillStyle = PALETTE.uiTextBright;
+    ctx.textAlign = 'left';
+    ctx.fillText('Building Blocks:', 20, legendY + 14);
+
+    const buildingBlocks = [
+        { type: 'amino_acid', label: 'Amino', color: MOLECULE_COLORS.amino_acid },
+        { type: 'nucleotide', label: 'Nucleo', color: MOLECULE_COLORS.nucleotide },
+        { type: 'lipid', label: 'Lipid', color: MOLECULE_COLORS.lipid },
+        { type: 'sugar', label: 'Sugar', color: MOLECULE_COLORS.sugar },
+    ];
+
+    let bx = 120;
+    ctx.font = '9px system-ui';
+    for (const item of buildingBlocks) {
+        const count = counts.get(item.type as MoleculeType) || 0;
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(bx, legendY + 11, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = PALETTE.uiText;
+        ctx.fillText(`${item.label}: ${count}`, bx + 8, legendY + 14);
+        bx += 85;
+    }
+
+    // Complex molecules row
+    ctx.font = 'bold 9px system-ui';
+    ctx.fillStyle = PALETTE.uiTextBright;
+    ctx.fillText('Complex:', 20, legendY + 32);
+
+    const complexMols = [
+        { type: 'peptide', label: 'Peptide', color: MOLECULE_COLORS.peptide },
+        { type: 'rna_fragment', label: 'RNA', color: MOLECULE_COLORS.rna_fragment },
+    ];
+
+    bx = 120;
+    ctx.font = '9px system-ui';
+    for (const item of complexMols) {
+        const count = counts.get(item.type as MoleculeType) || 0;
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(bx, legendY + 29, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = PALETTE.uiText;
+        ctx.fillText(`${item.label}: ${count}`, bx + 8, legendY + 32);
+        bx += 85;
+    }
+
+    // Requirements hint
+    ctx.font = '8px system-ui';
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
+    ctx.textAlign = 'right';
+    ctx.fillText('LUCA needs: 4+ Lipids, 2+ Peptides, 3+ RNA', W - 20, legendY + 48);
 }
 
 export default function LUCASimulation({ isRunning, speed }: PhylogenySimProps) {
@@ -713,22 +570,23 @@ export default function LUCASimulation({ isRunning, speed }: PhylogenySimProps) 
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
+        
         if (!engineRef.current) {
             engineRef.current = new SimulationEngine();
         }
         const engine = engineRef.current;
+        
         const animate = () => {
             if (isRunning) {
                 for (let i = 0; i < speed; i++) {
                     engine.update();
                 }
-                renderSimulation(ctx, engine);
-            } else {
-                renderSimulation(ctx, engine);
             }
+            renderSimulation(ctx, engine);
             animationRef.current = requestAnimationFrame(animate);
         };
         animate();
+        
         return () => {
             if (animationRef.current) {
                 cancelAnimationFrame(animationRef.current);
@@ -744,8 +602,9 @@ export default function LUCASimulation({ isRunning, speed }: PhylogenySimProps) 
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: '#000000',
-            padding: '20px'
+            backgroundColor: '#050508',
+            padding: '16px',
+            boxSizing: 'border-box'
         }}>
             <canvas 
                 ref={canvasRef} 
@@ -755,25 +614,18 @@ export default function LUCASimulation({ isRunning, speed }: PhylogenySimProps) 
                     display: 'block', 
                     maxWidth: '100%', 
                     height: 'auto',
-                    border: '1px solid #1a1f28',
-                    borderRadius: '2px',
-                    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.8)'
+                    borderRadius: '8px',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)'
                 }}
             />
             <div style={{
-                marginTop: '16px',
-                color: '#8b92a0',
+                marginTop: '12px',
+                color: '#64748b',
                 fontSize: '11px',
                 fontFamily: 'system-ui',
                 textAlign: 'center',
-                maxWidth: '750px',
-                lineHeight: '1.7'
             }}>
-                Top-down view of deep-sea hydrothermal vent ecosystem (~3000m depth)
-                <br/>
-                Cesium-style atmospheric rendering · Animated caustics · Depth cueing fog · Volumetric molecules
-                <br/>
-                RNA hairpin loops · Peptide chains · Lipid membranes · Black smoker chimneys
+                Abiogenesis: The Emergence of Life from Chemistry
             </div>
         </div>
     );
