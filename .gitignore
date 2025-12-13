@@ -40,6 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-next.configjs
+next.config.js
 next.config.ts
 package.lock.json
