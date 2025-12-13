@@ -1177,7 +1177,7 @@ export default function SimulationsPage() {
       case 'amdahl':
         return <AmdahlsLawSimulator isRunning={isRunning} speed={speed} isDark={false} />;
       case 'wireless':
-        return <NetworkProtocolSimulation isRunning={isRunning} speed={speed} isDark={false} />;
+        return <NetworkProtocolSimulation/>;
       case 'permutations-visual':
         return <PermutationSimulation isRunning={isRunning} speed={speed} isDark={false} />;
       case 'nbody':
