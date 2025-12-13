@@ -31,14 +31,14 @@ const nextConfig: NextConfig = {
   images: {
     // Enable optimization in production, disable in development for faster builds
     unoptimized: isDevelopment,
-        
+
     // Supported formats (WebP, AVIF for better compression)
     formats: ['image/webp', 'image/avif'],
-    
+
     // Device sizes for responsive images
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    
+
     // Remote patterns with improved organization
     remotePatterns: [
       // Production domains
@@ -57,7 +57,7 @@ const nextConfig: NextConfig = {
         hostname: 'api.learnmorra.com',
         pathname: '/uploads/**',
       },
-      
+
       // Development domains
       ...(isDevelopment ? [
         {
@@ -83,7 +83,7 @@ const nextConfig: NextConfig = {
           pathname: '/uploads/**',
         },
       ] : []),
-      
+
       // External services
       {
         protocol: 'https',
@@ -96,23 +96,23 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-    
+
     // Loader configuration
     loader: 'default',
-    
+
     // Cache optimization
     minimumCacheTTL: 31536000, // 1 year for static images
   },
 
   // Performance optimizations
   reactStrictMode: true,
-  
+
   // Output configuration
   output: 'standalone',
-  
+
   // Compression
   compress: true,
-  
+
   // Bundle analyzer (enable with ANALYZE=true)
   ...(process.env.ANALYZE === 'true' && {
     webpack: (config: any) => {
@@ -186,12 +186,6 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
 
-  // ESLint configuration
-  eslint: {
-    // Enable linting during builds
-    ignoreDuringBuilds: false,
-    dirs: ['pages', 'components', 'lib', 'hooks', 'app'],
-  },
 
   // Webpack customizations
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
@@ -200,7 +194,7 @@ const nextConfig: NextConfig = {
       // Tree shaking improvements
       config.optimization.usedExports = true;
       config.optimization.sideEffects = false;
-      
+
       // Split chunks for better caching
       config.optimization.splitChunks = {
         chunks: 'all',
@@ -238,11 +232,9 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // Development server configuration
   ...(isDevelopment && {
     devIndicators: {
-      buildActivity: true,
-      buildActivityPosition: 'bottom-right',
+      position: 'bottom-right',
     },
   }),
 };
