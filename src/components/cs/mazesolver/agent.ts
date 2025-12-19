@@ -1,16 +1,16 @@
 import { AlgorithmClass, RacingTeam } from "./mazeTypes";
 
-// Professional Racing Teams Database
+// Algorithm Teams Database - Colors matched to design tokens
 export const RACING_TEAMS: Record<AlgorithmClass, RacingTeam> = {
   'BFS': {
     id: 'BFS',
-    name: 'BFS Racer',
+    name: 'BFS',
     number: 1,
     stable: 'Classic Computing',
     jockeyName: 'B. First',
-    color: '#3b82f6',
-    accentColor: '#60a5fa',
-    strategy: 'Explores layer by layer - guaranteed optimal',
+    color: '#58a6ff',
+    accentColor: '#79c0ff',
+    strategy: 'Layer-by-layer exploration',
     topSpeed: 85,
     acceleration: 80,
     handling: 90,
@@ -18,13 +18,13 @@ export const RACING_TEAMS: Record<AlgorithmClass, RacingTeam> = {
   },
   'DFS': {
     id: 'DFS',
-    name: 'DFS Diver',
+    name: 'DFS',
     number: 2,
     stable: 'Recursive Racing',
     jockeyName: 'D. Stack',
-    color: '#8b5cf6',
-    accentColor: '#a78bfa',
-    strategy: 'Goes deep fast - unpredictable paths',
+    color: '#a371f7',
+    accentColor: '#c9a0ff',
+    strategy: 'Deep path exploration',
     topSpeed: 90,
     acceleration: 95,
     handling: 70,
@@ -32,13 +32,13 @@ export const RACING_TEAMS: Record<AlgorithmClass, RacingTeam> = {
   },
   'AStar': {
     id: 'AStar',
-    name: 'AStar Pathfinder',
+    name: 'A*',
     number: 3,
     stable: 'Heuristic Heroes',
     jockeyName: 'A. Smart',
-    color: '#10b981',
-    accentColor: '#34d399',
-    strategy: 'Intelligent search with goal awareness',
+    color: '#3fb950',
+    accentColor: '#56d364',
+    strategy: 'Heuristic-guided search',
     topSpeed: 95,
     acceleration: 90,
     handling: 95,
@@ -46,13 +46,13 @@ export const RACING_TEAMS: Record<AlgorithmClass, RacingTeam> = {
   },
   'Dijkstra': {
     id: 'Dijkstra',
-    name: 'Dijkstra Master',
+    name: 'Dijkstra',
     number: 4,
     stable: 'Optimal Routes Inc',
     jockeyName: 'E. Dijkstra',
-    color: '#f59e0b',
-    accentColor: '#fbbf24',
-    strategy: 'Explores everything - finds best path',
+    color: '#d29922',
+    accentColor: '#e3b341',
+    strategy: 'Exhaustive shortest path',
     topSpeed: 88,
     acceleration: 85,
     handling: 92,
@@ -60,13 +60,13 @@ export const RACING_TEAMS: Record<AlgorithmClass, RacingTeam> = {
   },
   'Greedy': {
     id: 'Greedy',
-    name: 'Greedy Demon',
+    name: 'Greedy',
     number: 5,
     stable: 'Quick Decisions',
     jockeyName: 'G. Fast',
-    color: '#ef4444',
-    accentColor: '#f87171',
-    strategy: 'Always picks closest - fast but risky',
+    color: '#f85149',
+    accentColor: '#ff7b72',
+    strategy: 'Always nearest first',
     topSpeed: 98,
     acceleration: 100,
     handling: 75,
@@ -74,13 +74,13 @@ export const RACING_TEAMS: Record<AlgorithmClass, RacingTeam> = {
   },
   'Bidirectional': {
     id: 'Bidirectional',
-    name: 'Bidirectional Runner',
+    name: 'Bidir',
     number: 6,
     stable: 'Dual Search Division',
     jockeyName: 'B. Directional',
-    color: '#06b6d4',
-    accentColor: '#22d3ee',
-    strategy: 'Searches from both ends simultaneously',
+    color: '#79c0ff',
+    accentColor: '#a5d6ff',
+    strategy: 'Search from both ends',
     topSpeed: 92,
     acceleration: 88,
     handling: 88,
@@ -88,16 +88,31 @@ export const RACING_TEAMS: Record<AlgorithmClass, RacingTeam> = {
   },
   'BMSSP': {
     id: 'BMSSP',
-    name: 'BMSSP Master',
+    name: 'BMSSP',
     number: 7,
     stable: 'Research Labs',
     jockeyName: 'Dr. Algorithm',
-    color: '#ec4899',
-    accentColor: '#f472b6',
-    strategy: 'Multi-level partitioning with pivots',
+    color: '#f778ba',
+    accentColor: '#ffa5d2',
+    strategy: 'Hierarchical partitioning',
     topSpeed: 96,
     acceleration: 92,
     handling: 94,
     stamina: 93
   }
+};
+
+// Presets for quick configuration
+export const MAZE_PRESETS = {
+  small: { size: 21, label: 'Small (21×21)' },
+  medium: { size: 31, label: 'Medium (31×31)' },
+  large: { size: 41, label: 'Large (41×41)' },
+  huge: { size: 51, label: 'Huge (51×51)' }
+};
+
+export const NETWORK_PRESETS = {
+  sparse: { nodes: 12, label: 'Sparse (12 nodes)' },
+  medium: { nodes: 20, label: 'Medium (20 nodes)' },
+  dense: { nodes: 30, label: 'Dense (30 nodes)' },
+  complex: { nodes: 40, label: 'Complex (40 nodes)' }
 };
