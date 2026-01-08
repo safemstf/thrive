@@ -6,8 +6,9 @@ import {
   Filter, Search, Star, TrendingUp, Home,
   X, ChevronDown, SlidersHorizontal, Navigation,
   Sparkles, Target, BarChart3, Zap, ZoomIn, ZoomOut,
-  Calendar, TrendingDown, Info, ExternalLink, Heart
+  Calendar, TrendingDown, Info, ExternalLink, Heart, Loader2
 } from 'lucide-react';
+import { loadPropertyData, Property, PriceHistory } from './propertyLoader';
 
 /* ---------- GOLDEN RATIO + ANIMATIONS ---------- */
 const PHI = 1.618033988749;
@@ -70,35 +71,10 @@ const modalSlideUp = keyframes`
   to { opacity: 1; transform: translateY(0) scale(1); }
 `;
 
-/* ---------- TYPES ---------- */
-interface PriceHistory {
-  date: string;
-  price: number;
-  type: 'historical' | 'current' | 'projected';
-}
-
-interface Property {
-  id: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  price: number;
-  bedrooms: number;
-  bathrooms: number;
-  sqft: number;
-  lat: number;
-  lng: number;
-  imageUrl: string;
-  listingDate: string;
-  status: 'active' | 'pending' | 'sold';
-  score?: number;
-  yearBuilt?: number;
-  lotSize?: number;
-  priceHistory: PriceHistory[];
-  appreciation: number; // Annual appreciation rate
-  marketTrend: 'up' | 'down' | 'stable';
-}
+const spin = keyframes`
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+`;
 
 /* ---------- LAYOUT ---------- */
 const Page = styled.main`
@@ -281,6 +257,39 @@ const Container = styled.div`
   @media (max-width: 1024px) {
     grid-template-columns: 1fr;
   }
+`;
+
+/* ---------- LOADING STATE ---------- */
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: ${GOLDEN_SPACING.md};
+  animation: ${fadeInUp} 0.5s ease-out;
+`;
+
+const LoadingSpinner = styled(Loader2)`
+  animation: ${spin} 1s linear infinite;
+  color: #667eea;
+`;
+
+const LoadingText = styled.div`
+  font-size: 1.1rem;
+  color: #64748b;
+  font-weight: 600;
+`;
+
+const ErrorContainer = styled.div`
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  border: 2px solid #ef4444;
+  border-radius: 16px;
+  padding: ${GOLDEN_SPACING.lg};
+  color: #991b1b;
+  font-weight: 600;
+  text-align: center;
+  animation: ${scaleIn} 0.4s ease-out;
 `;
 
 /* ---------- SIDEBAR (FILTERS) ---------- */
@@ -1270,179 +1279,11 @@ const ActionButton = styled.button<{ $variant?: 'primary' | 'secondary' }>`
   `}
 `;
 
-/* ---------- MOCK DATA WITH PRICE HISTORY ---------- */
-const generatePriceHistory = (currentPrice: number, appreciation: number): PriceHistory[] => {
-  const history: PriceHistory[] = [];
-  const currentYear = 2025;
-  
-  // Historical data (5 years back)
-  for (let i = 5; i >= 1; i--) {
-    const yearPrice = currentPrice / Math.pow(1 + appreciation, i);
-    history.push({
-      date: `Jan ${currentYear - i}`,
-      price: Math.round(yearPrice),
-      type: 'historical'
-    });
-  }
-  
-  // Current price
-  history.push({
-    date: `Jan ${currentYear}`,
-    price: currentPrice,
-    type: 'current'
-  });
-  
-  // Projected data (5 years forward)
-  for (let i = 1; i <= 5; i++) {
-    const yearPrice = currentPrice * Math.pow(1 + appreciation, i);
-    history.push({
-      date: `Jan ${currentYear + i}`,
-      price: Math.round(yearPrice),
-      type: 'projected'
-    });
-  }
-  
-  return history;
-};
-
-const MOCK_PROPERTIES: Property[] = [
-  {
-    id: '1',
-    address: '123 Oak Street',
-    city: 'Dallas',
-    state: 'TX',
-    zipCode: '75201',
-    price: 425000,
-    bedrooms: 3,
-    bathrooms: 2,
-    sqft: 1850,
-    lat: 32.7767,
-    lng: -96.7970,
-    imageUrl: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800&h=600&fit=crop',
-    listingDate: '2024-01-15',
-    status: 'active',
-    score: 8.5,
-    yearBuilt: 2015,
-    lotSize: 6500,
-    appreciation: 0.05,
-    marketTrend: 'up',
-    priceHistory: generatePriceHistory(425000, 0.05)
-  },
-  {
-    id: '2',
-    address: '456 Maple Avenue',
-    city: 'Dallas',
-    state: 'TX',
-    zipCode: '75202',
-    price: 385000,
-    bedrooms: 2,
-    bathrooms: 2,
-    sqft: 1600,
-    lat: 32.7820,
-    lng: -96.8050,
-    imageUrl: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800&h=600&fit=crop',
-    listingDate: '2024-01-18',
-    status: 'active',
-    score: 7.8,
-    yearBuilt: 2018,
-    lotSize: 5200,
-    appreciation: 0.04,
-    marketTrend: 'up',
-    priceHistory: generatePriceHistory(385000, 0.04)
-  },
-  {
-    id: '3',
-    address: '789 Pine Boulevard',
-    city: 'Dallas',
-    state: 'TX',
-    zipCode: '75203',
-    price: 550000,
-    bedrooms: 4,
-    bathrooms: 3,
-    sqft: 2400,
-    lat: 32.7700,
-    lng: -96.7850,
-    imageUrl: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=600&fit=crop',
-    listingDate: '2024-01-20',
-    status: 'pending',
-    score: 9.2,
-    yearBuilt: 2020,
-    lotSize: 8000,
-    appreciation: 0.06,
-    marketTrend: 'up',
-    priceHistory: generatePriceHistory(550000, 0.06)
-  },
-  {
-    id: '4',
-    address: '321 Cedar Lane',
-    city: 'Dallas',
-    state: 'TX',
-    zipCode: '75204',
-    price: 295000,
-    bedrooms: 2,
-    bathrooms: 1,
-    sqft: 1200,
-    lat: 32.7850,
-    lng: -96.7900,
-    imageUrl: 'https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=800&h=600&fit=crop',
-    listingDate: '2024-01-22',
-    status: 'active',
-    score: 7.2,
-    yearBuilt: 2010,
-    lotSize: 4500,
-    appreciation: 0.03,
-    marketTrend: 'stable',
-    priceHistory: generatePriceHistory(295000, 0.03)
-  },
-  {
-    id: '5',
-    address: '654 Birch Court',
-    city: 'Dallas',
-    state: 'TX',
-    zipCode: '75205',
-    price: 675000,
-    bedrooms: 5,
-    bathrooms: 4,
-    sqft: 3200,
-    lat: 32.7650,
-    lng: -96.8100,
-    imageUrl: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop',
-    listingDate: '2024-01-25',
-    status: 'active',
-    score: 9.5,
-    yearBuilt: 2022,
-    lotSize: 10000,
-    appreciation: 0.07,
-    marketTrend: 'up',
-    priceHistory: generatePriceHistory(675000, 0.07)
-  },
-  {
-    id: '6',
-    address: '987 Elm Drive',
-    city: 'Dallas',
-    state: 'TX',
-    zipCode: '75206',
-    price: 510000,
-    bedrooms: 3,
-    bathrooms: 3,
-    sqft: 2100,
-    lat: 32.7800,
-    lng: -96.7750,
-    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=600&fit=crop',
-    listingDate: '2024-01-28',
-    status: 'sold',
-    score: 8.8,
-    yearBuilt: 2019,
-    lotSize: 7200,
-    appreciation: 0.05,
-    marketTrend: 'up',
-    priceHistory: generatePriceHistory(510000, 0.05)
-  }
-];
-
 /* ---------- COMPONENT ---------- */
 export default function HomeRankPage() {
-  const [properties] = useState<Property[]>(MOCK_PROPERTIES);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeProperty, setActiveProperty] = useState<string | null>(null);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [filters, setFilters] = useState({
@@ -1461,6 +1302,25 @@ export default function HomeRankPage() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const mapRef = useRef<HTMLDivElement>(null);
 
+  // Load property data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await loadPropertyData(500); // Load 500 properties
+        setProperties(data);
+      } catch (err) {
+        console.error('Failed to load property data:', err);
+        setError('Failed to load property data. Please check that the CSV file is in the public/data directory.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
   const filteredProperties = properties.filter(prop => {
     if (filters.minPrice && prop.price < Number(filters.minPrice)) return false;
     if (filters.maxPrice && prop.price > Number(filters.maxPrice)) return false;
@@ -1471,9 +1331,9 @@ export default function HomeRankPage() {
     return true;
   });
 
-  const avgPrice = Math.round(
-    filteredProperties.reduce((sum, p) => sum + p.price, 0) / (filteredProperties.length || 1)
-  );
+  const avgPrice = filteredProperties.length > 0
+    ? Math.round(filteredProperties.reduce((sum, p) => sum + p.price, 0) / filteredProperties.length)
+    : 0;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -1496,10 +1356,13 @@ export default function HomeRankPage() {
 
   // Convert lat/lng to x/y percentages for map display
   const latLngToPercent = (lat: number, lng: number) => {
-    const minLat = 32.76;
-    const maxLat = 32.79;
-    const minLng = -96.82;
-    const maxLng = -96.77;
+    // Find min/max bounds from all properties
+    const lats = properties.map(p => p.lat);
+    const lngs = properties.map(p => p.lng);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
     
     const x = ((lng - minLng) / (maxLng - minLng)) * 100;
     const y = ((maxLat - lat) / (maxLat - minLat)) * 100;
@@ -1558,13 +1421,6 @@ export default function HomeRankPage() {
     };
     
     const currentIndex = property.priceHistory.findIndex(h => h.type === 'current');
-    
-    // Generate path
-    const pathData = property.priceHistory.map((h, i) => {
-      const x = xScale(i);
-      const y = yScale(h.price);
-      return i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
-    }).join(' ');
     
     return (
       <ChartContainer>
@@ -1664,6 +1520,63 @@ export default function HomeRankPage() {
     );
   };
 
+  // Show loading state
+  if (loading) {
+    return (
+      <Page>
+        <BackgroundPattern />
+        <FloatingOrb $delay={0} $size={300} $top="10%" $left="5%" $color="#667eea" />
+        <FloatingOrb $delay={2} $size={250} $top="60%" $left="80%" $color="#f472b6" />
+        
+        <Hero>
+          <HeroInner>
+            <HeroIconWrapper>
+              <Home size={40} />
+            </HeroIconWrapper>
+            <HeroText>
+              <HeroTitle>
+                Home <span>Rank</span>
+              </HeroTitle>
+              <HeroSubtitle>
+                Smart property analysis powered by data-driven insights for buyers and realtors
+              </HeroSubtitle>
+            </HeroText>
+          </HeroInner>
+        </Hero>
+
+        <LoadingContainer>
+          <LoadingSpinner size={48} />
+          <LoadingText>Loading property data...</LoadingText>
+        </LoadingContainer>
+      </Page>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Page>
+        <BackgroundPattern />
+        <Hero>
+          <HeroInner>
+            <HeroIconWrapper>
+              <Home size={40} />
+            </HeroIconWrapper>
+            <HeroText>
+              <HeroTitle>
+                Home <span>Rank</span>
+              </HeroTitle>
+            </HeroText>
+          </HeroInner>
+        </Hero>
+
+        <Container style={{ gridTemplateColumns: '1fr' }}>
+          <ErrorContainer>{error}</ErrorContainer>
+        </Container>
+      </Page>
+    );
+  }
+
   return (
     <Page>
       <BackgroundPattern />
@@ -1685,11 +1598,11 @@ export default function HomeRankPage() {
             </HeroSubtitle>
             <HeroStats>
               <HeroStat>
-                <HeroStatValue>500+</HeroStatValue>
+                <HeroStatValue>{properties.length}+</HeroStatValue>
                 <HeroStatLabel>Properties</HeroStatLabel>
               </HeroStat>
               <HeroStat>
-                <HeroStatValue>$2.5M</HeroStatValue>
+                <HeroStatValue>{formatPrice(avgPrice)}</HeroStatValue>
                 <HeroStatLabel>Avg Value</HeroStatLabel>
               </HeroStat>
               <HeroStat>
@@ -1860,7 +1773,7 @@ export default function HomeRankPage() {
               <MapLegend>
                 <LegendTitle>
                   <Navigation size={18} />
-                  Dallas Area
+                  Property Map
                 </LegendTitle>
                 <LegendItem>
                   <LegendDot $color="#10b981" />
@@ -1915,7 +1828,10 @@ export default function HomeRankPage() {
               <StatContent>
                 <StatLabel>Average Score</StatLabel>
                 <StatValue>
-                  {(filteredProperties.reduce((sum, p) => sum + (p.score || 0), 0) / (filteredProperties.length || 1)).toFixed(1)}
+                  {filteredProperties.length > 0
+                    ? (filteredProperties.reduce((sum, p) => sum + (p.score || 0), 0) / filteredProperties.length).toFixed(1)
+                    : '0.0'
+                  }
                 </StatValue>
               </StatContent>
             </StatCard>
