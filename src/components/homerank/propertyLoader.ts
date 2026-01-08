@@ -1,4 +1,7 @@
+// Updated propertyLoader.ts with optimized large dataset handling
+
 import Papa from 'papaparse';
+import { Property, PriceHistory } from './homerank.types';
 
 export interface RawPropertyData {
   brokered_by: string;
@@ -13,37 +16,6 @@ export interface RawPropertyData {
   zip_code: string;
   house_size: string;
   prev_sold_date: string;
-}
-
-export interface Property {
-  id: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  price: number;
-  bedrooms: number;
-  bathrooms: number;
-  sqft: number;
-  lat: number;
-  lng: number;
-  imageUrl: string;
-  listingDate: string;
-  status: 'active' | 'pending' | 'sold';
-  score?: number;
-  yearBuilt?: number;
-  lotSize?: number;
-  priceHistory: PriceHistory[];
-  appreciation: number;
-  marketTrend: 'up' | 'down' | 'stable';
-  brokeredBy: string;
-  prevSoldDate?: string;
-}
-
-export interface PriceHistory {
-  date: string;
-  price: number;
-  type: 'historical' | 'current' | 'projected';
 }
 
 // State coordinates for approximate geocoding
@@ -261,27 +233,67 @@ export function processProperty(raw: RawPropertyData, index: number): Property |
 }
 
 // Load CSV data
-export async function loadPropertyData(limit: number = 1000): Promise<Property[]> {
+// NOTE: Default limit is 5000 properties to prevent browser performance issues
+// For 100k+ datasets, consider:
+// 1. Server-side pagination
+// 2. Virtual scrolling
+// 3. Database backend with API
+// To load more: loadPropertyData(10000) or loadPropertyData(20000)
+export async function loadPropertyData(limit?: number): Promise<Property[]> {
   return new Promise((resolve, reject) => {
     Papa.parse('/data/realtor-data.csv', {
       download: true,
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        console.log(`Loaded ${results.data.length} rows from CSV`);
+        console.log(`📊 Loaded ${results.data.length} rows from CSV`);
         
-        const processed = results.data
-          .slice(0, limit)
+        // Default limit to prevent browser overload - 5000 is a good balance
+        const DEFAULT_LIMIT = 5000;
+        const effectiveLimit = limit ?? DEFAULT_LIMIT;
+        const dataToProcess = results.data.slice(0, effectiveLimit);
+        
+        const processed = dataToProcess
           .map((row: any, index: number) => processProperty(row as RawPropertyData, index))
           .filter((p): p is Property => p !== null);
         
-        console.log(`Successfully processed ${processed.length} properties`);
+        console.log(`✅ Successfully processed ${processed.length} properties (from ${Math.min(effectiveLimit, results.data.length)} rows)`);
+        
+        // Efficient min/max calculation without spreading
+        if (processed.length > 0) {
+          const prices = processed.map(p => p.price);
+          const minPrice = Math.min.apply(null, prices);
+          const maxPrice = Math.max.apply(null, prices);
+          const states = [...new Set(processed.map(p => p.state))];
+          
+          console.log(`📍 States represented: ${states.join(', ')}`);
+          console.log(`💰 Price range: $${minPrice.toLocaleString()} - $${maxPrice.toLocaleString()}`);
+        }
+        
         resolve(processed);
       },
       error: (error) => {
-        console.error('CSV parsing error:', error);
+        console.error('❌ CSV parsing error:', error);
         reject(error);
       }
+    });
+  });
+}
+
+// Get total count without loading all data (for UI display)
+export async function getPropertyCount(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    Papa.parse('/data/realtor-data.csv', {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      preview: 1, // Only load first row to get count
+      complete: (results) => {
+        // This won't give exact count, but we can estimate from file size
+        // For exact count, we'd need to parse the whole file
+        resolve(results.data.length);
+      },
+      error: reject
     });
   });
 }

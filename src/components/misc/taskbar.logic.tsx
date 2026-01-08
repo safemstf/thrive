@@ -85,6 +85,7 @@ const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
         { href: '/simulations', label: 'The Matrix' },
         { href: '/talkohtaco', label: "Talk Oh—Taco" },
         { href: '/homerank', label: "Home Rank" },
+        
     ];
 
     if (!isAuthenticated) {
