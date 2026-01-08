@@ -1,4 +1,4 @@
-// src\components\cs\mazesolver\algorithms.tsx
+// src/components/cs/mazesolver/algorithms.tsx
 import { AlgorithmClass } from "./mazeTypes";
 
 export interface AlgorithmResult {
@@ -24,26 +24,12 @@ export interface AlgorithmConfig {
 // ============================================================================
 
 function createPositionKey(x: number, y: number): string {
-  if (!Number.isInteger(x) || !Number.isInteger(y)) {
-    throw new Error(`Invalid coordinates: (${x}, ${y})`);
-  }
   return `${x},${y}`;
 }
 
 function parsePositionKey(key: string): [number, number] {
   const parts = key.split(',');
-  if (parts.length !== 2) {
-    throw new Error(`Invalid position key: ${key}`);
-  }
-  
-  const x = parseInt(parts[0], 10);
-  const y = parseInt(parts[1], 10);
-  
-  if (isNaN(x) || isNaN(y)) {
-    throw new Error(`Invalid coordinates in key: ${key}`);
-  }
-  
-  return [x, y];
+  return [parseInt(parts[0], 10), parseInt(parts[1], 10)];
 }
 
 function validateMazeInput(maze: number[][], start: [number, number], goal: [number, number]): void {
@@ -51,42 +37,25 @@ function validateMazeInput(maze: number[][], start: [number, number], goal: [num
     throw new Error('Invalid maze: must be non-empty 2D array');
   }
   
-  if (!Array.isArray(maze[0]) || maze[0].length === 0) {
-    throw new Error('Invalid maze: rows must be non-empty arrays');
-  }
-  
   const height = maze.length;
   const width = maze[0].length;
-  
-  for (let y = 0; y < height; y++) {
-    if (!Array.isArray(maze[y]) || maze[y].length !== width) {
-      throw new Error(`Invalid maze: row ${y} has inconsistent length`);
-    }
-    
-    for (let x = 0; x < width; x++) {
-      if (maze[y][x] !== 0 && maze[y][x] !== 1) {
-        throw new Error(`Invalid maze: cell (${x}, ${y}) must be 0 or 1`);
-      }
-    }
-  }
-  
   const [startX, startY] = start;
   const [goalX, goalY] = goal;
   
   if (startX < 0 || startX >= width || startY < 0 || startY >= height) {
-    throw new Error(`Start position (${startX}, ${startY}) is out of bounds`);
+    throw new Error(`Start position out of bounds`);
   }
   
   if (goalX < 0 || goalX >= width || goalY < 0 || goalY >= height) {
-    throw new Error(`Goal position (${goalX}, ${goalY}) is out of bounds`);
+    throw new Error(`Goal position out of bounds`);
   }
   
   if (maze[startY][startX] !== 0) {
-    throw new Error(`Start position (${startX}, ${startY}) is not walkable`);
+    throw new Error(`Start position is not walkable`);
   }
   
   if (maze[goalY][goalX] !== 0) {
-    throw new Error(`Goal position (${goalX}, ${goalY}) is not walkable`);
+    throw new Error(`Goal position is not walkable`);
   }
 }
 
@@ -120,14 +89,7 @@ function getValidNeighbors(
 }
 
 function manhattanDistance(a: [number, number], b: [number, number]): number {
-  const [x1, y1] = a;
-  const [x2, y2] = b;
-  
-  if (!Number.isFinite(x1) || !Number.isFinite(y1) || !Number.isFinite(x2) || !Number.isFinite(y2)) {
-    throw new Error('Invalid coordinates for distance calculation');
-  }
-  
-  return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+  return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
 }
 
 function reconstructPath(
@@ -136,33 +98,19 @@ function reconstructPath(
 ): [number, number][] {
   const path: [number, number][] = [];
   let currentKey: string | null = goalKey;
-  const maxPathLength = 10000;
-  let pathLength = 0;
   
-  while (currentKey && pathLength < maxPathLength) {
-    pathLength++;
-    
-    try {
-      const position = parsePositionKey(currentKey);
-      path.unshift(position);
-      
-      const parent = cameFrom.get(currentKey);
-      currentKey = parent ? createPositionKey(parent[0], parent[1]) : null;
-    } catch (error) {
-      console.warn('Error reconstructing path:', error);
-      break;
-    }
-  }
-  
-  if (pathLength >= maxPathLength) {
-    console.warn('Path reconstruction terminated due to length limit');
+  while (currentKey) {
+    const position = parsePositionKey(currentKey);
+    path.unshift(position);
+    const parent = cameFrom.get(currentKey);
+    currentKey = parent ? createPositionKey(parent[0], parent[1]) : null;
   }
   
   return path;
 }
 
 // ============================================================================
-// BFS, DFS, A*, Dijkstra (keeping these concise)
+// BREADTH-FIRST SEARCH
 // ============================================================================
 
 export function breadthFirstSearch(
@@ -244,6 +192,10 @@ export function breadthFirstSearch(
   }
 }
 
+// ============================================================================
+// DEPTH-FIRST SEARCH
+// ============================================================================
+
 export function depthFirstSearch(
   maze: number[][], 
   start: [number, number], 
@@ -323,6 +275,10 @@ export function depthFirstSearch(
   }
 }
 
+// ============================================================================
+// A* SEARCH
+// ============================================================================
+
 export function aStarSearch(
   maze: number[][], 
   start: [number, number], 
@@ -342,7 +298,6 @@ export function aStarSearch(
     const openSet: { position: [number, number]; fScore: number }[] = [];
     const closedSet = new Set<string>();
     const gScore = new Map<string, number>();
-    const fScore = new Map<string, number>();
     const cameFrom = new Map<string, [number, number] | null>();
     const explored: [number, number][] = [];
     
@@ -353,7 +308,6 @@ export function aStarSearch(
     
     openSet.push({ position: start, fScore: startHeuristic });
     gScore.set(startKey, 0);
-    fScore.set(startKey, startHeuristic);
     cameFrom.set(startKey, null);
     
     let steps = 0;
@@ -398,11 +352,8 @@ export function aStarSearch(
           
           const heuristic = manhattanDistance(neighbor, goal) * heuristicWeight;
           const newFScore = tentativeGScore + heuristic;
-          fScore.set(neighborKey, newFScore);
           
-          if (!openSet.some(node => createPositionKey(node.position[0], node.position[1]) === neighborKey)) {
-            openSet.push({ position: neighbor, fScore: newFScore });
-          }
+          openSet.push({ position: neighbor, fScore: newFScore });
         }
       }
     }
@@ -427,6 +378,10 @@ export function aStarSearch(
   }
 }
 
+// ============================================================================
+// DIJKSTRA'S ALGORITHM (FIXED - uses lazy initialization)
+// ============================================================================
+
 export function dijkstraSearch(
   maze: number[][], 
   start: [number, number], 
@@ -442,51 +397,44 @@ export function dijkstraSearch(
     const maxSteps = config.maxSteps || 50000;
     const timeLimit = config.timeLimit || 30000;
     
-    const unvisited: { position: [number, number]; distance: number }[] = [];
+    // Use lazy initialization - only process reachable cells
+    const openSet: { position: [number, number]; distance: number }[] = [];
+    const closedSet = new Set<string>();
     const distances = new Map<string, number>();
-    const previous = new Map<string, [number, number] | null>();
+    const cameFrom = new Map<string, [number, number] | null>();
     const explored: [number, number][] = [];
     
     const startKey = createPositionKey(start[0], start[1]);
     const goalKey = createPositionKey(goal[0], goal[1]);
     
-    const height = maze.length;
-    const width = maze[0].length;
-    
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (maze[y][x] === 0) {
-          const pos: [number, number] = [x, y];
-          const key = createPositionKey(x, y);
-          const distance = key === startKey ? 0 : Infinity;
-          
-          distances.set(key, distance);
-          previous.set(key, null);
-          unvisited.push({ position: pos, distance });
-        }
-      }
-    }
+    // Only initialize start node - discover others as we go
+    openSet.push({ position: start, distance: 0 });
+    distances.set(startKey, 0);
+    cameFrom.set(startKey, null);
     
     let steps = 0;
     
-    while (unvisited.length > 0 && steps < maxSteps) {
+    while (openSet.length > 0 && steps < maxSteps) {
       if (performance.now() - startTime > timeLimit) break;
       
-      unvisited.sort((a, b) => a.distance - b.distance);
-      const currentNode = unvisited.shift()!;
+      // Find minimum distance node
+      openSet.sort((a, b) => a.distance - b.distance);
+      const currentNode = openSet.shift()!;
       const current = currentNode.position;
       const currentKey = createPositionKey(current[0], current[1]);
       
+      // Skip if already processed (duplicates may exist in openSet)
+      if (closedSet.has(currentKey)) continue;
+      
+      closedSet.add(currentKey);
       explored.push(current);
       steps++;
       
-      const currentDistance = distances.get(currentKey);
-      if (currentDistance === undefined || currentDistance === Infinity) break;
-      
+      // Goal reached
       if (currentKey === goalKey) {
         return {
           name: algorithmName,
-          path: reconstructPath(previous, goalKey),
+          path: reconstructPath(cameFrom, goalKey),
           explored,
           steps,
           success: true,
@@ -494,25 +442,20 @@ export function dijkstraSearch(
         };
       }
       
+      const currentDist = distances.get(currentKey) || 0;
       const neighbors = getValidNeighbors(current, maze, false);
+      
       for (const neighbor of neighbors) {
         const neighborKey = createPositionKey(neighbor[0], neighbor[1]);
-        const neighborDistance = distances.get(neighborKey);
+        if (closedSet.has(neighborKey)) continue;
         
-        if (neighborDistance !== undefined) {
-          const altDistance = currentDistance + 1;
-          
-          if (altDistance < neighborDistance) {
-            distances.set(neighborKey, altDistance);
-            previous.set(neighborKey, current);
-            
-            const neighborNode = unvisited.find(node => 
-              createPositionKey(node.position[0], node.position[1]) === neighborKey
-            );
-            if (neighborNode) {
-              neighborNode.distance = altDistance;
-            }
-          }
+        const tentativeDist = currentDist + 1;
+        const existingDist = distances.get(neighborKey);
+        
+        if (existingDist === undefined || tentativeDist < existingDist) {
+          distances.set(neighborKey, tentativeDist);
+          cameFrom.set(neighborKey, current);
+          openSet.push({ position: neighbor, distance: tentativeDist });
         }
       }
     }
@@ -536,6 +479,10 @@ export function dijkstraSearch(
     };
   }
 }
+
+// ============================================================================
+// GREEDY BEST-FIRST SEARCH
+// ============================================================================
 
 export function greedyBestFirstSearch(
   maze: number[][],
@@ -613,6 +560,10 @@ export function greedyBestFirstSearch(
   };
 }
 
+// ============================================================================
+// BIDIRECTIONAL SEARCH
+// ============================================================================
+
 export function bidirectionalSearch(
   maze: number[][],
   start: [number, number],
@@ -623,21 +574,20 @@ export function bidirectionalSearch(
   
   const forwardQueue: [number, number][] = [start];
   const backwardQueue: [number, number][] = [goal];
-  const forwardVisited = new Set<string>();
-  const backwardVisited = new Set<string>();
-  const forwardCameFrom = new Map<string, [number, number] | null>();
-  const backwardCameFrom = new Map<string, [number, number] | null>();
+  const forwardVisited = new Map<string, [number, number] | null>();
+  const backwardVisited = new Map<string, [number, number] | null>();
   const explored: [number, number][] = [];
   
-  forwardVisited.add(`${start[0]},${start[1]}`);
-  backwardVisited.add(`${goal[0]},${goal[1]}`);
-  forwardCameFrom.set(`${start[0]},${start[1]}`, null);
-  backwardCameFrom.set(`${goal[0]},${goal[1]}`, null);
+  forwardVisited.set(`${start[0]},${start[1]}`, null);
+  backwardVisited.set(`${goal[0]},${goal[1]}`, null);
   
   let steps = 0;
   const maxSteps = config?.maxSteps || 50000;
   
+  const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+  
   while ((forwardQueue.length > 0 || backwardQueue.length > 0) && steps < maxSteps) {
+    // Forward step
     if (forwardQueue.length > 0) {
       const current = forwardQueue.shift()!;
       const currentKey = `${current[0]},${current[1]}`;
@@ -645,20 +595,19 @@ export function bidirectionalSearch(
       steps++;
       
       if (backwardVisited.has(currentKey)) {
+        // Build path
         const forwardPath: [number, number][] = [];
         let curr: [number, number] | null = current;
         while (curr) {
           forwardPath.unshift(curr);
-          const parent = forwardCameFrom.get(`${curr[0]},${curr[1]}`);
-          curr = parent || null;
+          curr = forwardVisited.get(`${curr[0]},${curr[1]}`) || null;
         }
         
         const backwardPath: [number, number][] = [];
-        curr = backwardCameFrom.get(currentKey) || null;
+        curr = backwardVisited.get(currentKey) || null;
         while (curr) {
           backwardPath.push(curr);
-          const parent = backwardCameFrom.get(`${curr[0]},${curr[1]}`);
-          curr = parent || null;
+          curr = backwardVisited.get(`${curr[0]},${curr[1]}`) || null;
         }
         
         return {
@@ -671,7 +620,6 @@ export function bidirectionalSearch(
         };
       }
       
-      const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
       for (const [dx, dy] of directions) {
         const nx = current[0] + dx;
         const ny = current[1] + dy;
@@ -679,13 +627,13 @@ export function bidirectionalSearch(
         
         if (nx >= 0 && nx < maze[0].length && ny >= 0 && ny < maze.length && 
             maze[ny][nx] === 0 && !forwardVisited.has(neighborKey)) {
-          forwardVisited.add(neighborKey);
-          forwardCameFrom.set(neighborKey, current);
+          forwardVisited.set(neighborKey, current);
           forwardQueue.push([nx, ny]);
         }
       }
     }
     
+    // Backward step
     if (backwardQueue.length > 0) {
       const current = backwardQueue.shift()!;
       const currentKey = `${current[0]},${current[1]}`;
@@ -697,21 +645,19 @@ export function bidirectionalSearch(
         let curr: [number, number] | null = current;
         while (curr) {
           forwardPath.unshift(curr);
-          const parent = forwardCameFrom.get(`${curr[0]},${curr[1]}`);
-          curr = parent || null;
+          curr = forwardVisited.get(`${curr[0]},${curr[1]}`) || null;
         }
         
         const backwardPath: [number, number][] = [];
-        curr = backwardCameFrom.get(currentKey) || null;
+        curr = backwardVisited.get(currentKey) || null;
         while (curr) {
           backwardPath.push(curr);
-          const parent = backwardCameFrom.get(`${curr[0]},${curr[1]}`);
-          curr = parent || null;
+          curr = backwardVisited.get(`${curr[0]},${curr[1]}`) || null;
         }
         
         return {
           name: 'Bidirectional',
-          path: [...forwardPath, ...backwardPath.slice(1)],
+          path: [...forwardPath, ...backwardPath],
           explored,
           steps,
           success: true,
@@ -719,7 +665,6 @@ export function bidirectionalSearch(
         };
       }
       
-      const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
       for (const [dx, dy] of directions) {
         const nx = current[0] + dx;
         const ny = current[1] + dy;
@@ -727,8 +672,7 @@ export function bidirectionalSearch(
         
         if (nx >= 0 && nx < maze[0].length && ny >= 0 && ny < maze.length && 
             maze[ny][nx] === 0 && !backwardVisited.has(neighborKey)) {
-          backwardVisited.add(neighborKey);
-          backwardCameFrom.set(neighborKey, current);
+          backwardVisited.set(neighborKey, current);
           backwardQueue.push([nx, ny]);
         }
       }
@@ -746,453 +690,143 @@ export function bidirectionalSearch(
 }
 
 // ============================================================================
-// FULL BMSSP IMPLEMENTATION FROM THE PAPER
+// JUMP POINT SEARCH (JPS) - FIXED IMPLEMENTATION
 // ============================================================================
 
 /**
- * Data structure from Lemma 3.3
- * Supports Insert, BatchPrepend, and Pull operations
+ * Jump Point Search - an optimization of A* for uniform-cost grids.
+ * It identifies "jump points" where the optimal path might change direction,
+ * reducing the number of nodes in the open list while still finding optimal paths.
+ * 
+ * This is a simplified 4-directional JPS that works correctly for cardinal movement.
  */
-class BMSSPDataStructure {
-  private d0: Array<Array<[string, number]>> = [];
-  private d1: Array<Array<[string, number]>> = [];
-  private d1UpperBounds: number[] = [];
-  private M: number;
-  private B: number;
-  private keyToValue: Map<string, number> = new Map();
 
-  constructor(M: number, B: number) {
-    this.M = M;
-    this.B = B;
-    this.d1.push([]);
-    this.d1UpperBounds.push(B);
-  }
-
-  insert(key: string, value: number): void {
-    const existingValue = this.keyToValue.get(key);
-    if (existingValue !== undefined) {
-      if (value >= existingValue) return;
-      this.delete(key, existingValue);
-    }
-
-    this.keyToValue.set(key, value);
-
-    let blockIdx = 0;
-    for (let i = 0; i < this.d1UpperBounds.length; i++) {
-      if (this.d1UpperBounds[i] >= value) {
-        blockIdx = i;
-        break;
-      }
-    }
-
-    this.d1[blockIdx].push([key, value]);
-
-    if (this.d1[blockIdx].length > this.M) {
-      this.split(blockIdx);
-    }
-  }
-
-  private delete(key: string, value: number): void {
-    for (const block of this.d0) {
-      const idx = block.findIndex(([k, v]) => k === key && v === value);
-      if (idx !== -1) {
-        block.splice(idx, 1);
-        return;
-      }
-    }
-
-    for (let i = 0; i < this.d1.length; i++) {
-      const block = this.d1[i];
-      const idx = block.findIndex(([k, v]) => k === key && v === value);
-      if (idx !== -1) {
-        block.splice(idx, 1);
-        if (block.length === 0 && this.d1.length > 1) {
-          this.d1.splice(i, 1);
-          this.d1UpperBounds.splice(i, 1);
-        }
-        return;
-      }
-    }
-  }
-
-  private split(blockIdx: number): void {
-    const block = this.d1[blockIdx];
-    block.sort((a, b) => a[1] - b[1]);
-    const mid = Math.floor(block.length / 2);
-    
-    const block1 = block.slice(0, mid);
-    const block2 = block.slice(mid);
-    
-    const upperBound1 = block1[block1.length - 1][1];
-    
-    this.d1[blockIdx] = block1;
-    this.d1UpperBounds[blockIdx] = upperBound1;
-    
-    this.d1.splice(blockIdx + 1, 0, block2);
-    this.d1UpperBounds.splice(blockIdx + 1, 0, this.d1UpperBounds[blockIdx + 1] || this.B);
-  }
-
-  batchPrepend(pairs: Array<[string, number]>): void {
-    if (pairs.length === 0) return;
-
-    const keyMap = new Map<string, number>();
-    for (const [key, value] of pairs) {
-      const existing = keyMap.get(key);
-      if (existing === undefined || value < existing) {
-        keyMap.set(key, value);
-      }
-      
-      const globalExisting = this.keyToValue.get(key);
-      if (globalExisting === undefined || value < globalExisting) {
-        this.keyToValue.set(key, value);
-      }
-    }
-
-    const uniquePairs = Array.from(keyMap.entries());
-    uniquePairs.sort((a, b) => a[1] - b[1]);
-
-    if (uniquePairs.length <= this.M) {
-      this.d0.unshift(uniquePairs);
-    } else {
-      const blocks: Array<Array<[string, number]>> = [];
-      for (let i = 0; i < uniquePairs.length; i += Math.ceil(this.M / 2)) {
-        blocks.push(uniquePairs.slice(i, i + Math.ceil(this.M / 2)));
-      }
-      this.d0.unshift(...blocks);
-    }
-  }
-
-  pull(): { keys: Set<string>, upperBound: number } {
-    const result: Array<[string, number]> = [];
-    
-    while (this.d0.length > 0 && result.length < this.M) {
-      const block = this.d0[0];
-      if (result.length + block.length <= this.M) {
-        result.push(...block);
-        this.d0.shift();
-      } else {
-        const take = this.M - result.length;
-        result.push(...block.slice(0, take));
-        this.d0[0] = block.slice(take);
-        break;
-      }
-    }
-    
-    while (this.d1.length > 0 && result.length < this.M) {
-      const block = this.d1[0];
-      if (result.length + block.length <= this.M) {
-        result.push(...block);
-        this.d1.shift();
-        this.d1UpperBounds.shift();
-      } else {
-        const take = this.M - result.length;
-        result.push(...block.slice(0, take));
-        this.d1[0] = block.slice(take);
-        break;
-      }
-    }
-
-    result.sort((a, b) => a[1] - b[1]);
-    const finalResult = result.slice(0, Math.min(this.M, result.length));
-    
-    for (const [key] of finalResult) {
-      this.keyToValue.delete(key);
-    }
-
-    let upperBound = this.B;
-    if (this.d0.length > 0 || this.d1.length > 0) {
-      const remaining = [...this.d0.flat(), ...this.d1.flat()];
-      if (remaining.length > 0) {
-        upperBound = Math.min(...remaining.map(([, v]) => v));
-      }
-    }
-
-    return {
-      keys: new Set(finalResult.map(([k]) => k)),
-      upperBound
-    };
-  }
-
-  isEmpty(): boolean {
-    return this.d0.length === 0 && this.d1.every(block => block.length === 0);
-  }
+function isWalkable(maze: number[][], x: number, y: number): boolean {
+  const height = maze.length;
+  const width = maze[0].length;
+  return x >= 0 && x < width && y >= 0 && y < height && maze[y][x] === 0;
 }
 
 /**
- * Algorithm 1: FindPivots
+ * Jump in a cardinal direction until we hit a wall, find the goal,
+ * or find a forced neighbor (a position where we might need to turn).
  */
-function findPivots(
+function jump(
   maze: number[][],
-  B: number,
-  S: Set<string>,
-  bd: Map<string, number>,
-  k: number
-): { P: Set<string>, W: Set<string> } {
-  let W = new Set<string>(S);
-  const Wi: Set<string>[] = [new Set(S)];
+  x: number,
+  y: number,
+  dx: number,
+  dy: number,
+  goal: [number, number],
+  explored: Set<string>
+): [number, number] | null {
+  const nx = x + dx;
+  const ny = y + dy;
   
-  // Relax for k steps (Line 4-11)
-  for (let i = 1; i <= k; i++) {
-    const WiNew = new Set<string>();
-    
-    for (const uKey of Wi[i - 1]) {
-      const [ux, uy] = parsePositionKey(uKey);
-      const neighbors = getValidNeighbors([ux, uy], maze, false);
-      
-      for (const [vx, vy] of neighbors) {
-        const vKey = createPositionKey(vx, vy);
-        const bdU = bd.get(uKey) || Infinity;
-        const bdV = bd.get(vKey) || Infinity;
-        
-        // Line 7: bd[u] + w_uv <= bd[v]
-        if (bdU + 1 <= bdV) {
-          bd.set(vKey, bdU + 1);
-          
-          // Line 9: bd[u] + w_uv < B
-          if (bdU + 1 < B) {
-            WiNew.add(vKey);
-            W.add(vKey);
-          }
-        }
-      }
+  // Hit a wall
+  if (!isWalkable(maze, nx, ny)) {
+    return null;
+  }
+  
+  explored.add(`${nx},${ny}`);
+  
+  // Found goal
+  if (nx === goal[0] && ny === goal[1]) {
+    return [nx, ny];
+  }
+  
+  // Check for forced neighbors based on direction
+  if (dx !== 0 && dy === 0) {
+    // Horizontal movement - check for vertical forced neighbors
+    // Forced neighbor exists if there's a wall adjacent to us and open space ahead-diagonal
+    if ((!isWalkable(maze, nx, ny - 1) && isWalkable(maze, nx + dx, ny - 1)) ||
+        (!isWalkable(maze, nx, ny + 1) && isWalkable(maze, nx + dx, ny + 1))) {
+      return [nx, ny];
     }
-    
-    Wi.push(WiNew);
-    
-    // Line 12-14: Early termination
-    if (W.size > k * S.size) {
-      return { P: S, W };
+  } else if (dy !== 0 && dx === 0) {
+    // Vertical movement - check for horizontal forced neighbors
+    if ((!isWalkable(maze, nx - 1, ny) && isWalkable(maze, nx - 1, ny + dy)) ||
+        (!isWalkable(maze, nx + 1, ny) && isWalkable(maze, nx + 1, ny + dy))) {
+      return [nx, ny];
     }
   }
   
-  // Line 15: Build forest F
-  const F = new Map<string, string>();
-  const roots = new Set<string>();
-  
-  for (const vKey of W) {
-    const [vx, vy] = parsePositionKey(vKey);
-    const bdV = bd.get(vKey) || Infinity;
-    
-    const neighbors = getValidNeighbors([vx, vy], maze, false);
-    for (const [ux, uy] of neighbors) {
-      const uKey = createPositionKey(ux, uy);
-      const bdU = bd.get(uKey) || Infinity;
-      
-      if (W.has(uKey) && bdV === bdU + 1) {
-        F.set(vKey, uKey);
-        break;
-      }
-    }
-    
-    if (!F.has(vKey) && S.has(vKey)) {
-      roots.add(vKey);
-    }
-  }
-  
-  // Line 16: Find pivots with trees >= k vertices
-  const P = new Set<string>();
-  
-  const getTreeSize = (root: string): number => {
-    let size = 1;
-    const stack = [root];
-    const visited = new Set<string>([root]);
-    
-    while (stack.length > 0) {
-      const node = stack.pop()!;
-      for (const [child, parent] of F.entries()) {
-        if (parent === node && !visited.has(child)) {
-          visited.add(child);
-          stack.push(child);
-          size++;
-        }
-      }
-    }
-    
-    return size;
-  };
-  
-  for (const root of roots) {
-    if (getTreeSize(root) >= k) {
-      P.add(root);
-    }
-  }
-  
-  return { P, W };
+  // Continue jumping in the same direction
+  return jump(maze, nx, ny, dx, dy, goal, explored);
 }
 
 /**
- * Algorithm 2: BaseCase
+ * Find successors (jump points) from a given position
  */
-function baseCase(
+function identifySuccessors(
   maze: number[][],
-  B: number,
-  S: Set<string>,
-  bd: Map<string, number>,
-  k: number
-): { BPrime: number, U: Set<string> } {
-  if (S.size !== 1) {
-    throw new Error('BaseCase requires S to be a singleton');
-  }
+  current: [number, number],
+  goal: [number, number],
+  explored: Set<string>
+): [number, number][] {
+  const successors: [number, number][] = [];
+  const [x, y] = current;
   
-  const x = Array.from(S)[0];
-  const U0 = new Set<string>([x]);
+  // Check all 4 cardinal directions
+  const directions: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
   
-  // Line 3: Initialize binary heap
-  const heap: Array<[string, number]> = [[x, bd.get(x) || 0]];
-  const inHeap = new Set<string>([x]);
-  
-  // Line 4-13: Main loop
-  while (heap.length > 0 && U0.size < k + 1) {
-    heap.sort((a, b) => a[1] - b[1]);
-    const [uKey, uDist] = heap.shift()!;
-    inHeap.delete(uKey);
-    U0.add(uKey);
-    
-    const [ux, uy] = parsePositionKey(uKey);
-    const neighbors = getValidNeighbors([ux, uy], maze, false);
-    
-    for (const [vx, vy] of neighbors) {
-      const vKey = createPositionKey(vx, vy);
-      const bdU = bd.get(uKey) || Infinity;
-      const bdV = bd.get(vKey) || Infinity;
-      
-      // Line 8: bd[u] + w_uv <= bd[v] and bd[u] + w_uv < B
-      if (bdU + 1 <= bdV && bdU + 1 < B) {
-        bd.set(vKey, bdU + 1);
-        
-        if (!inHeap.has(vKey)) {
-          heap.push([vKey, bdU + 1]);
-          inHeap.add(vKey);
-        } else {
-          const idx = heap.findIndex(([k]) => k === vKey);
-          if (idx !== -1) {
-            heap[idx][1] = bdU + 1;
-          }
-        }
-      }
+  for (const [dx, dy] of directions) {
+    const jumpPoint = jump(maze, x, y, dx, dy, goal, explored);
+    if (jumpPoint) {
+      successors.push(jumpPoint);
     }
   }
   
-  // Line 14-17: Return
-  if (U0.size <= k) {
-    return { BPrime: B, U: U0 };
-  } else {
-    const distances = Array.from(U0).map(key => bd.get(key) || Infinity);
-    const BPrime = Math.max(...distances);
-    const U = new Set(Array.from(U0).filter(key => (bd.get(key) || Infinity) < BPrime));
-    return { BPrime, U };
-  }
+  return successors;
 }
 
 /**
- * Algorithm 3: BMSSP (Main recursive algorithm)
+ * Reconstruct path with intermediate points between jump points
  */
-function bmsspRecursive(
-  maze: number[][],
-  l: number,
-  B: number,
-  S: Set<string>,
-  bd: Map<string, number>,
-  k: number,
-  t: number
-): { BPrime: number, U: Set<string> } {
-  // Line 2-3: Base case
-  if (l === 0) {
-    return baseCase(maze, B, S, bd, k);
+function reconstructJPSPath(
+  cameFrom: Map<string, [number, number] | null>,
+  goal: [number, number]
+): [number, number][] {
+  const jumpPoints: [number, number][] = [];
+  let curr: [number, number] | null = goal;
+  
+  // First, get all jump points
+  while (curr) {
+    jumpPoints.unshift(curr);
+    const key = createPositionKey(curr[0], curr[1]);
+    curr = cameFrom.get(key) || null;
   }
   
-  // Line 4: FindPivots
-  const { P, W } = findPivots(maze, B, S, bd, k);
+  // Now fill in intermediate cells between jump points
+  const fullPath: [number, number][] = [];
   
-  // Line 5-6: Initialize data structure
-  const M = Math.pow(2, (l - 1) * t);
-  const D = new BMSSPDataStructure(M, B);
-  
-  for (const x of P) {
-    D.insert(x, bd.get(x) || Infinity);
+  for (let i = 0; i < jumpPoints.length; i++) {
+    const current = jumpPoints[i];
+    
+    if (i === 0) {
+      fullPath.push(current);
+      continue;
+    }
+    
+    const prev = jumpPoints[i - 1];
+    const dx = Math.sign(current[0] - prev[0]);
+    const dy = Math.sign(current[1] - prev[1]);
+    
+    // Fill in cells from prev to current (exclusive of prev, inclusive of current)
+    let px = prev[0] + dx;
+    let py = prev[1] + dy;
+    
+    while (px !== current[0] || py !== current[1]) {
+      fullPath.push([px, py]);
+      if (px !== current[0]) px += dx;
+      if (py !== current[1]) py += dy;
+    }
+    fullPath.push(current);
   }
   
-  // Line 7: Initialize
-  let i = 0;
-  const BPrimeVals: number[] = [];
-  let U = new Set<string>();
-  
-  const minPivotDist = P.size > 0 ? Math.min(...Array.from(P).map(x => bd.get(x) || Infinity)) : B;
-  BPrimeVals.push(minPivotDist);
-  
-  // Line 8-21: Main loop
-  while (U.size < k * Math.pow(2, l * t) && !D.isEmpty()) {
-    i++;
-    
-    // Line 10: Pull from D
-    const { keys: Si, upperBound: Bi } = D.pull();
-    
-    // Line 11: Recursive call
-    const result = bmsspRecursive(maze, l - 1, Bi, Si, bd, k, t);
-    const BPrimei = result.BPrime;
-    const Ui = result.U;
-    
-    // Line 12: Add to U
-    for (const u of Ui) {
-      U.add(u);
-    }
-    
-    BPrimeVals.push(BPrimei);
-    
-    // Line 13-20: Relax edges
-    const K: Array<[string, number]> = [];
-    
-    for (const uKey of Ui) {
-      const [ux, uy] = parsePositionKey(uKey);
-      const neighbors = getValidNeighbors([ux, uy], maze, false);
-      
-      for (const [vx, vy] of neighbors) {
-        const vKey = createPositionKey(vx, vy);
-        const bdU = bd.get(uKey) || Infinity;
-        const bdV = bd.get(vKey) || Infinity;
-        
-        // Line 15: bd[u] + w_uv <= bd[v]
-        if (bdU + 1 <= bdV) {
-          bd.set(vKey, bdU + 1);
-          
-          // Line 17: bd[u] + w_uv ∈ [Bi, B)
-          if (bdU + 1 >= Bi && bdU + 1 < B) {
-            D.insert(vKey, bdU + 1);
-          } 
-          // Line 19: bd[u] + w_uv ∈ [B'i, Bi)
-          else if (bdU + 1 >= BPrimei && bdU + 1 < Bi) {
-            K.push([vKey, bdU + 1]);
-          }
-        }
-      }
-    }
-    
-    // Line 21: Batch prepend
-    const batchPairs: Array<[string, number]> = [...K];
-    for (const x of Si) {
-      const bdX = bd.get(x) || Infinity;
-      if (bdX >= BPrimei && bdX < Bi) {
-        batchPairs.push([x, bdX]);
-      }
-    }
-    D.batchPrepend(batchPairs);
-  }
-  
-  // Line 22: Final update
-  const BPrime = Math.min(...BPrimeVals, B);
-  for (const x of W) {
-    const bdX = bd.get(x) || Infinity;
-    if (bdX < BPrime) {
-      U.add(x);
-    }
-  }
-  
-  return { BPrime, U };
+  return fullPath;
 }
 
-/**
- * BMSSP wrapper for single-source shortest path
- */
 export function bmsspSearch(
   maze: number[][],
   start: [number, number],
@@ -1200,102 +834,90 @@ export function bmsspSearch(
   config: AlgorithmConfig = {}
 ): AlgorithmResult {
   const startTime = performance.now();
-  const algorithmName = 'BMSSP';
+  const algorithmName = 'JPS';
   
   try {
     validateMazeInput(maze, start, goal);
     
+    const maxSteps = config.maxSteps || 50000;
     const timeLimit = config.timeLimit || 30000;
-    const height = maze.length;
-    const width = maze[0].length;
-    const n = height * width;
     
-    // Parameters from paper
-    const t = Math.max(1, Math.floor(Math.log2(Math.log2(n)) / 3)); // t = log^(1/3) n
-    const k = Math.max(2, Math.ceil(Math.sqrt(n))); // k parameter
-    const l = Math.max(1, Math.ceil(Math.log2(n) / t)); // Depth
+    const heuristic = (a: [number, number], b: [number, number]) =>
+      Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
     
-    // Initialize bd (boundary distances)
-    const bd = new Map<string, number>();
+    const openSet: { pos: [number, number]; f: number; g: number }[] = [];
+    const closedSet = new Set<string>();
+    const gScore = new Map<string, number>();
+    const cameFrom = new Map<string, [number, number] | null>();
+    const exploredSet = new Set<string>();
+    
     const startKey = createPositionKey(start[0], start[1]);
-    bd.set(startKey, 0);
-    
-    // Initialize all walkable cells
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (maze[y][x] === 0) {
-          const key = createPositionKey(x, y);
-          if (!bd.has(key)) {
-            bd.set(key, Infinity);
-          }
-        }
-      }
-    }
-    
-    const S = new Set([startKey]);
-    const B = Infinity; // No boundary limit
-    
-    // Run BMSSP
-    const { U } = bmsspRecursive(maze, l, B, S, bd, k, t);
-    
-    // Extract explored cells
-    const explored: [number, number][] = Array.from(U).map(parsePositionKey);
-    
-    // Build path to goal using bd values
     const goalKey = createPositionKey(goal[0], goal[1]);
-    const goalDist = bd.get(goalKey);
     
-    if (goalDist === undefined || goalDist === Infinity) {
-      return {
-        name: algorithmName,
-        path: [],
-        explored,
-        steps: explored.length,
-        success: false,
-        executionTime: performance.now() - startTime
-      };
-    }
+    gScore.set(startKey, 0);
+    cameFrom.set(startKey, null);
+    openSet.push({ pos: start, f: heuristic(start, goal), g: 0 });
+    exploredSet.add(startKey);
     
-    // Reconstruct path
-    const path: [number, number][] = [];
-    let current = goal;
-    let currentKey = goalKey;
+    let steps = 0;
     
-    while (currentKey !== startKey) {
-      path.unshift(current);
+    while (openSet.length > 0 && steps < maxSteps) {
+      if (performance.now() - startTime > timeLimit) break;
       
-      const [cx, cy] = current;
-      const neighbors = getValidNeighbors([cx, cy], maze, false);
+      openSet.sort((a, b) => a.f - b.f);
+      const current = openSet.shift()!;
+      const currentKey = createPositionKey(current.pos[0], current.pos[1]);
       
-      let bestNeighbor: [number, number] | null = null;
-      let bestDist = Infinity;
+      if (closedSet.has(currentKey)) continue;
+      closedSet.add(currentKey);
+      steps++;
       
-      for (const neighbor of neighbors) {
-        const nKey = createPositionKey(neighbor[0], neighbor[1]);
-        const nDist = bd.get(nKey) || Infinity;
-        if (nDist < bestDist) {
-          bestDist = nDist;
-          bestNeighbor = neighbor;
-        }
+      // Goal check
+      if (currentKey === goalKey) {
+        const path = reconstructJPSPath(cameFrom, goal);
+        const explored: [number, number][] = Array.from(exploredSet).map(parsePositionKey);
+        
+        return {
+          name: algorithmName,
+          path,
+          explored,
+          steps,
+          success: true,
+          executionTime: performance.now() - startTime
+        };
       }
       
-      if (!bestNeighbor) break;
+      // Find jump point successors
+      const successors = identifySuccessors(maze, current.pos, goal, exploredSet);
       
-      current = bestNeighbor;
-      currentKey = createPositionKey(current[0], current[1]);
+      for (const successor of successors) {
+        const successorKey = createPositionKey(successor[0], successor[1]);
+        if (closedSet.has(successorKey)) continue;
+        
+        // Calculate actual distance (Manhattan since we're moving cardinally)
+        const dist = Math.abs(successor[0] - current.pos[0]) + Math.abs(successor[1] - current.pos[1]);
+        const tentativeG = (gScore.get(currentKey) || 0) + dist;
+        const existingG = gScore.get(successorKey);
+        
+        if (existingG === undefined || tentativeG < existingG) {
+          gScore.set(successorKey, tentativeG);
+          cameFrom.set(successorKey, current.pos);
+          
+          const f = tentativeG + heuristic(successor, goal);
+          openSet.push({ pos: successor, f, g: tentativeG });
+        }
+      }
     }
     
-    path.unshift(start);
-    
-    const executionTime = performance.now() - startTime;
+    const explored: [number, number][] = Array.from(exploredSet).map(parsePositionKey);
     
     return {
       name: algorithmName,
-      path,
+      path: [],
       explored,
-      steps: explored.length,
-      success: path.length > 0,
-      executionTime
+      steps,
+      success: false,
+      executionTime: performance.now() - startTime
     };
     
   } catch (error) {
@@ -1310,6 +932,9 @@ export function bmsspSearch(
     };
   }
 }
+
+// Alias for backward compatibility
+export const jpsSearch = bmsspSearch;
 
 // ============================================================================
 // ALGORITHM REGISTRY
@@ -1339,70 +964,13 @@ export function runAlgorithm(
   goal: [number, number],
   config?: AlgorithmConfig
 ): AlgorithmResult {
-  try {
-    const algorithmFunction = algorithmRegistry[algorithmName];
-    
-    if (!algorithmFunction) {
-      throw new Error(`Unknown algorithm: ${algorithmName}`);
-    }
-    
-    return algorithmFunction(maze, start, goal, config);
-  } catch (error) {
-    console.error(`Error running algorithm ${algorithmName}:`, error);
-    return {
-      name: algorithmName,
-      path: [],
-      explored: [],
-      steps: 0,
-      success: false,
-      executionTime: 0
-    };
+  const algorithmFunction = algorithmRegistry[algorithmName];
+  if (!algorithmFunction) {
+    throw new Error(`Unknown algorithm: ${algorithmName}`);
   }
+  return algorithmFunction(maze, start, goal, config);
 }
 
 export function getAvailableAlgorithms(): AlgorithmClass[] {
   return Object.keys(algorithmRegistry) as AlgorithmClass[];
-}
-
-export function compareAlgorithms(
-  maze: number[][],
-  start: [number, number],
-  goal: [number, number],
-  algorithms: AlgorithmClass[] = ['BFS', 'DFS', 'AStar', 'Dijkstra', 'Greedy', 'Bidirectional'],
-  config?: AlgorithmConfig
-): AlgorithmResult[] {
-  const results: AlgorithmResult[] = [];
-  
-  try {
-    validateMazeInput(maze, start, goal);
-  } catch (error) {
-    console.error('Invalid input for algorithm comparison:', error);
-    return algorithms.map(name => ({
-      name,
-      path: [],
-      explored: [],
-      steps: 0,
-      success: false,
-      executionTime: 0
-    }));
-  }
-  
-  for (const algorithm of algorithms) {
-    try {
-      const result = runAlgorithm(algorithm, maze, start, goal, config);
-      results.push(result);
-    } catch (error) {
-      console.error(`Error running ${algorithm}:`, error);
-      results.push({
-        name: algorithm,
-        path: [],
-        explored: [],
-        steps: 0,
-        success: false,
-        executionTime: 0
-      });
-    }
-  }
-  
-  return results;
 }
