@@ -58,8 +58,8 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col min-h-screen relative">
       {/* Header with full sidebar config */}
       {!isFullscreen && (
-        <Header 
-          title="LearnMorra" 
+        <Header
+          title="LearnMorra"
           subtitle="Brag Responsibly"
           withSidebar={true}
           sidebarConfig={{
@@ -103,6 +103,13 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                 title: 'Talk Oh—Taco',
                 href: '/talkohtaco',
                 icon: <Mail size={16} />,
+                types: []
+              },
+              {
+                id: 'homerank',
+                title: 'Home Rank',
+                href: '/homerank',
+                icon: <FileText size={16} />,
                 types: []
               }
             ]

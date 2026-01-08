@@ -279,8 +279,8 @@ const SidebarToggle = styled.button<{ $active: boolean }>`
 
   &:hover {
     background: ${props => props.$active
-      ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
-      : 'rgba(0, 0, 0, 0.08)'};
+    ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
+    : 'rgba(0, 0, 0, 0.08)'};
     transform: scale(1.02);
   }
 
@@ -354,7 +354,7 @@ const NavSidebarContent = styled.nav`
   padding: 1rem;
 `;
 
-const NavLinkItem = styled(Link)<{ $active?: boolean }>`
+const NavLinkItem = styled(Link) <{ $active?: boolean }>`
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -674,7 +674,7 @@ const NavList = styled.div`
   gap: 0.25rem;
 `;
 
-const NavItem = styled(Link)<{ $active?: boolean }>`
+const NavItem = styled(Link) <{ $active?: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -791,16 +791,16 @@ export function Header({
     const handleClickOutside = (event: MouseEvent) => {
       // close left sidebar if click outside AND on large screens (desktop behavior)
       if (leftSidebarOpen &&
-          window.innerWidth > 1024 &&
-          leftSidebarRef.current &&
-          !leftSidebarRef.current.contains(event.target as Node)) {
+        window.innerWidth > 1024 &&
+        leftSidebarRef.current &&
+        !leftSidebarRef.current.contains(event.target as Node)) {
         setLeftSidebarOpen(false);
       }
 
       // close right sidebar if click outside and it's open
       if (rightSidebarOpen &&
-          rightSidebarRef.current &&
-          !rightSidebarRef.current.contains(event.target as Node)) {
+        rightSidebarRef.current &&
+        !rightSidebarRef.current.contains(event.target as Node)) {
         setRightSidebarOpen(false);
       }
     };
@@ -825,10 +825,10 @@ export function Header({
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -1057,6 +1057,15 @@ export function Header({
               >
                 <Mail size={20} />
                 Talk Oh—Taco
+              </NavLinkItem>
+
+              <NavLinkItem
+                href="/homerank"
+                $active={pathname === '/homerank'}
+                onClick={closeRightSidebar}
+              >
+                <FileText size={20} />
+                Home Rank
               </NavLinkItem>
 
               {/* Dashboard + account items only when user exists */}

@@ -10,6 +10,19 @@ interface FooterProps {
   className?: string;
 }
 
+const TEAM_MEMBERS = [
+  {
+    name: 'Safe Mustafa',
+    vanity: 'safe-mufasa',
+    profileUrl: 'https://www.linkedin.com/in/safe-mufasa',
+  },
+  {
+    name: 'Dev Gurung',
+    vanity: 'dev-gurung-a8b863136',
+    profileUrl: 'https://www.linkedin.com/in/dev-gurung-a8b863136/',
+  },
+];
+
 // Safe hook wrapper to prevent hook order violations
 function useMatrixSafe() {
   try {
@@ -191,20 +204,52 @@ const BrandSection = styled(FooterSection)`
   }
 `;
 
-const LinkedInBadgeWrapper = styled.div`
+/* NEW: grid & member card styles for the Connect section */
+const MemberGrid = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+`;
+
+const MemberCard = styled.div`
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  padding: 0.5rem 0;
-  
-  .badge-base {
-    max-width: 100%;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  min-width: 220px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(248,250,252,0.5));
+  border: 1px solid rgba(59,130,246,0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 2px 10px rgba(11, 15, 30, 0.02);
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 28px rgba(59,130,246,0.08);
   }
 
-  @media (max-width: 768px) {
-    justify-content: center;
+  .badge-base {
+    max-width: 160px;
+  }
+
+  a.profile-fallback {
+    font-family: 'Work Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #0f172a;
+    text-decoration: none;
   }
 `;
+
+/* small responsive tweak for mobile */
+const MemberCardInner = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+/* end new styles */
 
 export function Footer({ className }: FooterProps) {
   const [currentYear] = useState(() => new Date().getFullYear());
@@ -216,8 +261,8 @@ export function Footer({ className }: FooterProps) {
 
   return (
     <>
-      <Script 
-        src="https://platform.linkedin.com/badges/js/profile.js" 
+      <Script
+        src="https://platform.linkedin.com/badges/js/profile.js"
         strategy="lazyOnload"
       />
       <FooterContainer className={className}>
@@ -240,25 +285,46 @@ export function Footer({ className }: FooterProps) {
 
           <FooterSection>
             <h3>Connect</h3>
-            <FooterText>Feel free to message me</FooterText>
-            <LinkedInBadgeWrapper>
-              <div 
-                className="badge-base LI-profile-badge" 
-                data-locale="en_US" 
-                data-size="medium" 
-                data-theme="dark" 
-                data-type="HORIZONTAL" 
-                data-vanity="safe-mufasa" 
-                data-version="v1"
-              >
-                <a 
-                  className="badge-base__link LI-simple-link" 
-                  href="https://www.linkedin.com/in/safe-mufasa?trk=profile-badge"
-                >
-                  Safe Mustafa
-                </a>
-              </div>
-            </LinkedInBadgeWrapper>
+            <FooterText>Message the LearnMorra team</FooterText>
+
+            <MemberGrid>
+              {TEAM_MEMBERS.map((member) => (
+                <MemberCard key={member.vanity} aria-label={`Connect with ${member.name}`}>
+                  <MemberCardInner>
+                    {/* LinkedIn badge (if script injects it) */}
+                    <div
+                      className="badge-base LI-profile-badge"
+                      data-locale="en_US"
+                      data-size="medium"
+                      data-theme="dark"
+                      data-type="HORIZONTAL"
+                      data-vanity={member.vanity}
+                      data-version="v1"
+                      aria-hidden="true"
+                    >
+                      <a
+                        className="badge-base__link LI-simple-link"
+                        href={`${member.profileUrl}?trk=profile-badge`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {member.name}
+                      </a>
+                    </div>
+
+                    {/* Fallback accessible link for screen readers / if badge doesn't render */}
+                    <a
+                      className="profile-fallback"
+                      href={member.profileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Visit {member.name}'s profile
+                    </a>
+                  </MemberCardInner>
+                </MemberCard>
+              ))}
+            </MemberGrid>
           </FooterSection>
         </FooterContent>
 
