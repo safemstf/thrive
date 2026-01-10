@@ -281,8 +281,8 @@ export function Footer({ className }: FooterProps) {
           <FooterSection>
             <h3>Navigate</h3>
             <FooterLink href="/">Home</FooterLink>
-            <FooterLink href="/thrive">Thrive</FooterLink>
-            <FooterLink href="/simulations">The Matrix</FooterLink>
+            <FooterLink href="/thrive">Assessments</FooterLink>
+            <FooterLink href="/simulations">Simulations</FooterLink>
             <FooterLink href="/dashboard">Dashboard</FooterLink>
           </FooterSection>
 

@@ -7,7 +7,7 @@ import styled, { keyframes, css } from 'styled-components';
 import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen,
-  Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2
+  Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
@@ -75,9 +75,6 @@ interface SimulationItem {
   icon: React.ReactNode;
   color: string;
   description: string;
-  optimized: boolean;
-  featured: boolean;
-  special?: boolean;
   comingSoon?: boolean;
   category: TabType;
 }
@@ -254,151 +251,143 @@ const ItemsGrid = styled.div`
 
 const ItemCard = styled.div<{
   $active?: boolean;
-  $featured?: boolean;
+  $color?: string;
   $comingSoon?: boolean;
 }>`
   position: relative;
-  padding: 2rem;
+  padding: 1.5rem;
+  padding-left: 1.75rem;
   background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
-  border-radius: 18px;
-  border: 1px solid ${({ $active, $featured }) =>
-    $active || $featured ? '#3b82f6' : 'rgba(148,163,184,0.18)'};
+  border-radius: 16px;
+  border: 1px solid ${({ $active, $color }) =>
+    $active ? ($color || '#3b82f6') : 'rgba(148,163,184,0.18)'};
   cursor: ${({ $comingSoon }) => ($comingSoon ? 'default' : 'pointer')};
   opacity: ${({ $comingSoon }) => ($comingSoon ? 0.6 : 1)};
-  box-shadow: 0 6px 24px rgba(15,23,42,0.06);
+  box-shadow: ${({ $active, $color }) =>
+    $active 
+      ? `0 8px 32px ${$color || '#3b82f6'}25, 0 0 0 1px ${$color || '#3b82f6'}20`
+      : '0 4px 16px rgba(15,23,42,0.05)'};
   backdrop-filter: blur(8px);
   transform: translateY(0);
   transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-  overflow: hidden; /* important to clip :before and preserve rounded corners */
+  overflow: hidden;
 
-  /* ensure card content sits above the decorative layer */
+  /* Left accent bar for selected state */
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: ${({ $active, $color }) => $active ? ($color || '#3b82f6') : 'transparent'};
+    border-radius: 16px 0 0 16px;
+    transition: background 0.25s ease;
+  }
+
   > * {
     position: relative;
     z-index: 1;
   }
 
-  ${({ $active }) =>
+  ${({ $active, $color }) =>
     $active &&
     css`
-      box-shadow: 0 10px 36px rgba(59,130,246,0.18);
-      transform: translateY(-3px);
+      transform: translateY(-2px);
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(248,250,252,0.98));
     `}
 
   &:hover {
-    transform: ${({ $comingSoon }) => ($comingSoon ? 'none' : 'translateY(-6px)')};
-    box-shadow: ${({ $comingSoon }) =>
-    $comingSoon ? '0 6px 24px rgba(15,23,42,0.06)' : '0 14px 44px rgba(37,99,235,0.15)'};
-    border-color: ${({ $comingSoon }) => ($comingSoon ? 'rgba(148,163,184,0.18)' : '#3b82f6')};
-  }
-
-  &:before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 18px;
-    background: ${({ $featured }) =>
-    $featured ? 'linear-gradient(120deg, rgba(59,130,246,0.12), rgba(6,182,212,0.08))' : 'none'};
-    z-index: 0;
-    pointer-events: none;
-    transition: opacity 220ms ease;
+    transform: ${({ $comingSoon }) => ($comingSoon ? 'none' : 'translateY(-4px)')};
+    box-shadow: ${({ $comingSoon, $color }) =>
+      $comingSoon 
+        ? '0 4px 16px rgba(15,23,42,0.05)' 
+        : `0 12px 40px ${$color || '#3b82f6'}18`};
+    border-color: ${({ $comingSoon, $color }) => ($comingSoon ? 'rgba(148,163,184,0.18)' : ($color || '#3b82f6'))};
+    
+    &::before {
+      background: ${({ $comingSoon, $color }) => $comingSoon ? 'transparent' : ($color || '#3b82f6')};
+    }
   }
 `;
 
+const SelectionIndicator = styled.div<{ $color: string }>`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: ${({ $color }) => $color};
+  color: white;
+  box-shadow: 0 2px 8px ${({ $color }) => $color}40;
+  
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+`;
+
+const ComingSoonBadge = styled.div`
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.02em;
+`;
 
 const ItemTitle = styled.h3<{ $comingSoon?: boolean }>`
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: 1.05rem;
   color: ${({ $comingSoon }) => ($comingSoon ? '#94a3b8' : '#1e293b')};
   line-height: 1.3;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.375rem;
+  font-family: 'Inter', system-ui, sans-serif;
 `;
+
 const ItemHeader = styled.div`
   display: flex;
   align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 1.5rem;
 `;
 
-const ItemIcon = styled.div<{ $color: string; $comingSoon?: boolean }>`
+const ItemIcon = styled.div<{ $color: string; $comingSoon?: boolean; $active?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
-  background: ${({ $color, $comingSoon }) =>
-    $comingSoon ? '#f1f5f9' : `${$color}15`};
+  background: ${({ $color, $comingSoon, $active }) =>
+    $comingSoon ? '#f1f5f9' : $active ? `${$color}20` : `${$color}12`};
   color: ${({ $color, $comingSoon }) => $comingSoon ? '#94a3b8' : $color};
   flex-shrink: 0;
+  transition: all 0.25s ease;
 `;
 
 const ItemContent = styled.div`
   flex: 1;
   min-width: 0;
+  padding-right: 2rem;
 `;
 
 
 const ItemDescription = styled.p`
   font-family: 'Inter', system-ui, sans-serif;
   margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.6;
+  font-size: 0.825rem;
+  line-height: 1.5;
   color: #64748b;
-`;
-
-const BadgeContainer = styled.div`
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: flex-end;
-`;
-
-const Badge = styled.div<{ $variant?: string }>`
-  padding: 0.3rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-
-  ${({ $variant }) => {
-    switch ($variant) {
-      case 'featured':
-        return css`
-          background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-          color: white;
-        `;
-      case 'optimized':
-        return css`
-          background: #ecfdf5;
-          color: #16a34a;
-          border: 1px solid #bbf7d0;
-        `;
-      case 'social':
-        return css`
-          background: #fefce8;
-          color: #ca8a04;
-          border: 1px solid #fef08a;
-        `;
-      case 'coming-soon':
-        return css`
-          background: #f8fafc;
-          color: #64748b;
-          border: 1px solid #e2e8f0;
-        `;
-      default:
-        return css`
-          background: #eff6ff;
-          color: #2563eb;
-          border: 1px solid #dbeafe;
-        `;
-    }
-  }}
 `;
 
 const FadingElements = styled.div<{ $theater: boolean }>`
@@ -637,7 +626,7 @@ const SimulationWindow = styled.div<{ $fullscreen?: boolean }>`
   background: ${({ $fullscreen }) => $fullscreen ? '#000000' : 'white'};
   border: ${({ $fullscreen }) => $fullscreen ? 'none' : '1px solid rgba(148, 163, 184, 0.2)'};
   border-radius: ${({ $fullscreen }) => $fullscreen ? '0' : '16px'};
-  min-height: ${({ $fullscreen }) => $fullscreen ? '100vh' : '600px'};
+  min-height: ${({ $fullscreen }) => $fullscreen ? '100vh' : 'auto'};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -698,6 +687,7 @@ const StatusBar = styled.div<{ $theater?: boolean }>`
   font-size: 0.75rem;
   font-weight: 600;
   z-index: 2100;
+  opacity: ${({ $theater }) => $theater ? '1' : '0.55'};
   
   .status-item {
     display: flex;
@@ -721,7 +711,6 @@ const StatusBar = styled.div<{ $theater?: boolean }>`
       animation: ${pulse} 2s ease-in-out infinite;
     }
     &.paused { background: #f59e0b; }
-    &.optimized { background: #3b82f6; }
   }
 `;
 
@@ -842,152 +831,120 @@ const HintItem = styled.div`
   }
 `;
 
-// Data
+// Data - Simplified without misleading badges
 const allItems: SimulationItem[] = [
   {
     key: 'life',
     label: "Conway's Game of Life",
-    icon: <Activity size={24} />,
+    icon: <Activity size={22} />,
     color: '#10b981',
     description: 'GPU-accelerated cellular automaton with pattern analysis',
-    optimized: true,
-    featured: false,
     category: 'simulations'
   },
   {
     key: 'ants',
     label: 'Travelling Salesman',
-    icon: <Users size={24} />,
-    color: '#0077ff',
+    icon: <Users size={22} />,
+    color: '#3b82f6',
     description: 'Neural swarm intelligence with real user integration',
-    optimized: true,
-    featured: true,
-    special: true,
     category: 'algorithms'
   },
   {
     key: 'disease',
     label: 'Epidemiological Models',
-    icon: <Target size={24} />,
+    icon: <Target size={22} />,
     color: '#ef4444',
     description: 'Agent-based epidemic models with policy modules',
-    optimized: true,
-    featured: true,
     category: 'simulations'
   },
   {
     key: 'bacteria-phage',
     label: 'Bacteria & Phages',
-    icon: <Droplet size={24} />,
+    icon: <Droplet size={22} />,
     color: '#059669',
     description: 'Bacterial colony interactions with bacteriophage',
-    optimized: false,
-    featured: false,
     category: 'simulations'
   },
   {
     key: 'predprey',
     label: 'Predator–Prey Field',
-    icon: <Zap size={24} />,
+    icon: <Zap size={22} />,
     color: '#10b981',
     description: 'Spatial Lotka–Volterra population dynamics',
-    optimized: false,
-    featured: false,
     comingSoon: true,
     category: 'simulations'
   },
   {
     key: 'medical-models',
     label: 'Medical Models',
-    icon: <Microscope size={24} />,
+    icon: <Microscope size={22} />,
     color: '#a78bfa',
-    description: 'medical models',
-    optimized: false,
-    featured: false,
-    comingSoon: false,
+    description: 'Pharmacokinetic and physiological modeling',
     category: 'simulations'
   },
   {
     key: 'nbody',
     label: 'Space & Stars',
-    icon: <Star size={24} />,
+    icon: <Star size={22} />,
     color: '#f97316',
-    description: 'N-body gravity sandbox',
-    optimized: true,
-    featured: true,
+    description: 'N-body gravity sandbox with orbital mechanics',
     category: 'simulations'
   },
   {
     key: 'three-body',
     label: '3-Body Explorer',
-    icon: <RotateCw size={24} />,
+    icon: <RotateCw size={22} />,
     color: '#ef4444',
     description: '3-body problem chaos visualization',
-    optimized: false,
-    featured: false,
     comingSoon: true,
     category: 'simulations'
   },
   {
     key: 'maze',
     label: 'Pathfinding Derby',
-    icon: <Grid size={24} />,
+    icon: <Grid size={22} />,
     color: '#8b5cf6',
     description: 'Algorithm comparison with live metrics',
-    optimized: true,
-    featured: true,
     category: 'algorithms'
   },
   {
     key: 'phylogeny',
     label: 'Phylogenetic Trees',
-    icon: <Cpu size={24} />,
+    icon: <Cpu size={22} />,
     color: '#f59e0b',
     description: 'Evolutionary tree construction',
-    optimized: true,
-    featured: false,
-    comingSoon: false,
     category: 'simulations'
   },
   {
     key: 'amdahl',
     label: "Amdahl's Law",
-    icon: <Sliders size={24} />,
+    icon: <Sliders size={22} />,
     color: '#fb7185',
     description: 'Performance scaling visualizer',
-    optimized: true,
-    featured: false,
     category: 'algorithms'
   },
   {
     key: 'permutations-visual',
     label: "Permutations",
-    icon: <BookOpen size={24} />,
+    icon: <BookOpen size={22} />,
     color: '#7c3aed',
     description: 'Recursion visualizer',
-    optimized: true,
-    featured: true,
     category: 'algorithms'
   },
   {
     key: 'wireless',
     label: 'Network Protocols',
-    icon: <Wifi size={24} />,
+    icon: <Wifi size={22} />,
     color: '#06b6d4',
     description: 'OFDM and routing protocols',
-    optimized: true,
-    featured: false,
     category: 'algorithms'
   },
   {
     key: 'Shortest-Path-Networks',
     label: 'Shortest Path',
-    icon: <Users size={24} />,
-    color: '#0077ff',
+    icon: <Users size={22} />,
+    color: '#0ea5e9',
     description: 'Shortest path algorithms comparison',
-    optimized: true,
-    featured: true,
-    special: true,
     category: 'algorithms'
   }
 ];
@@ -1166,7 +1123,7 @@ export default function SimulationsPage() {
           isRunning={isRunning}
           speed={speed}
           isDark={false}
-          isTheaterMode={theaterMode}  // Add this if you want external theater control
+          isTheaterMode={theaterMode}
         />;
       case 'life':
         return <LifeSimulation isDark={false} isRunning={isRunning} speed={speed} />;
@@ -1238,42 +1195,42 @@ export default function SimulationsPage() {
           </TabContainer>
 
           <ItemsGrid>
-            {(activeTab === 'simulations' ? simulationItems : algorithmItems).map(item => (
-              <ItemCard
-                key={item.key}
-                onClick={() => handleItemClick(item)}
-                $active={activeSimulation === item.key}
-                $featured={item.featured}
-                $comingSoon={item.comingSoon}
-              >
-                <BadgeContainer>
-                  {item.featured && !item.comingSoon && (
-                    <Badge $variant="featured">Featured</Badge>
+            {(activeTab === 'simulations' ? simulationItems : algorithmItems).map(item => {
+              const isActive = activeSimulation === item.key;
+              return (
+                <ItemCard
+                  key={item.key}
+                  onClick={() => handleItemClick(item)}
+                  $active={isActive}
+                  $color={item.color}
+                  $comingSoon={item.comingSoon}
+                >
+                  {/* Selection checkmark indicator */}
+                  {isActive && !item.comingSoon && (
+                    <SelectionIndicator $color={item.color}>
+                      <Check strokeWidth={3} />
+                    </SelectionIndicator>
                   )}
-                  {item.optimized && (
-                    <Badge $variant="optimized">60 FPS</Badge>
-                  )}
-                  {item.special && (
-                    <Badge $variant="social">Interactive</Badge>
-                  )}
+                  
+                  {/* Coming soon badge - the only badge we keep */}
                   {item.comingSoon && (
-                    <Badge $variant="coming-soon">Soon</Badge>
+                    <ComingSoonBadge>Coming Soon</ComingSoonBadge>
                   )}
-                </BadgeContainer>
 
-                <ItemHeader>
-                  <ItemIcon $color={item.color} $comingSoon={item.comingSoon}>
-                    {item.icon}
-                  </ItemIcon>
-                  <ItemContent>
-                    <ItemTitle $comingSoon={item.comingSoon}>
-                      {item.label}
-                    </ItemTitle>
-                    <ItemDescription>{item.description}</ItemDescription>
-                  </ItemContent>
-                </ItemHeader>
-              </ItemCard>
-            ))}
+                  <ItemHeader>
+                    <ItemIcon $color={item.color} $comingSoon={item.comingSoon} $active={isActive}>
+                      {item.icon}
+                    </ItemIcon>
+                    <ItemContent>
+                      <ItemTitle $comingSoon={item.comingSoon}>
+                        {item.label}
+                      </ItemTitle>
+                      <ItemDescription>{item.description}</ItemDescription>
+                    </ItemContent>
+                  </ItemHeader>
+                </ItemCard>
+              );
+            })}
           </ItemsGrid>
         </FadingElements>
 
@@ -1351,12 +1308,9 @@ export default function SimulationsPage() {
                 <div className="status-item">
                   Speed: {speed.toFixed(1)}x
                 </div>
-                {activeItem.optimized && (
-                  <div className="status-item">
-                    <div className="status-dot optimized" />
-                    GPU
-                  </div>
-                )}
+                <div className="status-item">
+                  FPS: {fps}
+                </div>
               </StatusBar>
 
               <PerformancePanel $show={showPerformance} $theater={theaterMode}>

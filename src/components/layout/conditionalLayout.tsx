@@ -86,14 +86,14 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
               },
               {
                 id: 'thrive',
-                title: 'Thrive',
+                title: 'Assessments',
                 href: '/thrive',
                 icon: <Brush size={16} />,
                 types: []
               },
               {
                 id: 'simulations',
-                title: 'The Matrix',
+                title: 'Simulations',
                 href: '/simulations',
                 icon: <Code size={16} />,
                 types: []

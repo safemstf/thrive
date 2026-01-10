@@ -81,8 +81,8 @@ function useMatrixSafe() {
 const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
     const links: NavLink[] = [
         { href: '/', label: 'Home' },
-        { href: '/thrive', label: 'Thrive' },
-        { href: '/simulations', label: 'The Matrix' },
+        { href: '/thrive', label: 'Assessments' },
+        { href: '/simulations', label: 'Simulations' },
         { href: '/talkohtaco', label: "Talk Oh—Taco" },
         { href: '/homerank', label: "Home Rank" },
         

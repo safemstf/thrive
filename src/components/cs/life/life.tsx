@@ -1,19 +1,73 @@
 'use client'
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
-  Play, Pause, RotateCcw, Palette, ZoomIn, ZoomOut, Grid3X3,
-  Settings, Shapes, Maximize, X
+  RotateCcw, Palette, Grid3X3, Shuffle, ChevronDown, 
+  Layers, Activity, Sparkles, Hash, Timer, Zap
 } from "lucide-react";
-import styled from "styled-components";
+import styled, { keyframes, css } from "styled-components";
 
 // ============================================================================
-// TYPES
+// TYPES & DATA
 // ============================================================================
 
 type ColorMode = "none" | "age" | "rainbow" | "heat";
 type Variant = "conway" | "highlife" | "daynight" | "seeds" | "coral" | "amoeba";
 interface RuleSet { birth: number[]; survive: number[]; }
-interface Pattern { name: string; matrix: number[][]; description: string; }
+interface Pattern { name: string; matrix: number[][]; }
+
+interface LifeSimulationProps {
+  isDark?: boolean;
+  isRunning?: boolean;
+  speed?: number;
+}
+
+const COLORS = {
+  bg1: '#0a0e1a',
+  bg2: '#1a1a2e',
+  surface: 'rgba(0,0,0,0.5)',
+  textPrimary: '#e6eef8',
+  textMuted: '#94a3b8',
+  accent: '#3b82f6',
+  accentSoft: '#60a5fa',
+  purple: '#a78bfa',
+  success: '#22c55e',
+  warn: '#fbbf24',
+  borderAccent: 'rgba(59, 130, 246, 0.15)'
+};
+
+const RULES: Record<Variant, RuleSet> = {
+  conway: { birth: [3], survive: [2, 3] },
+  highlife: { birth: [3, 6], survive: [2, 3] },
+  daynight: { birth: [3, 6, 7, 8], survive: [3, 4, 6, 7, 8] },
+  seeds: { birth: [2], survive: [] },
+  coral: { birth: [3], survive: [4, 5, 6, 7, 8] },
+  amoeba: { birth: [3, 5, 7], survive: [1, 3, 5, 8] }
+};
+
+const PATTERNS: Pattern[] = [
+  { name: "Glider", matrix: [[0, 1, 0], [0, 0, 1], [1, 1, 1]] },
+  { name: "Blinker", matrix: [[0, 1, 0], [0, 1, 0], [0, 1, 0]] },
+  { name: "Block", matrix: [[1, 1], [1, 1]] },
+  { name: "Toad", matrix: [[0, 1, 1, 1], [1, 1, 1, 0]] },
+  { name: "LWSS", matrix: [[0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [1, 0, 0, 0, 1], [1, 1, 1, 1, 0]] },
+  { name: "Pulsar", matrix: [[0,0,1,1,1,0,0,0,1,1,1,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[0,0,1,1,1,0,0,0,1,1,1,0,0],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,1,1,1,0,0,0,1,1,1,0,0],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[1,0,0,0,0,1,0,1,0,0,0,0,1],[0,0,0,0,0,0,0,0,0,0,0,0,0],[0,0,1,1,1,0,0,0,1,1,1,0,0]] }
+];
+
+const VARIANT_LABELS: Record<Variant, string> = {
+  conway: "Conway's Life",
+  highlife: "HighLife",
+  daynight: "Day & Night",
+  seeds: "Seeds",
+  coral: "Coral",
+  amoeba: "Amoeba"
+};
+
+const COLOR_LABELS: Record<ColorMode, string> = {
+  none: "Solid",
+  age: "Age",
+  rainbow: "Rainbow",
+  heat: "Heat"
+};
 
 // ============================================================================
 // SIMULATION CLASSES
@@ -30,23 +84,15 @@ class Grid {
     this.cells = new Uint8Array(cols * rows);
   }
 
-  randomize(density: number = 0.25) {
+  randomize(density: number = 0.55) {
     for (let i = 0; i < this.cells.length; i++) {
       this.cells[i] = Math.random() < density ? 1 : 0;
     }
   }
 
-  clear() {
-    this.cells.fill(0);
-  }
-
-  getCell(row: number, col: number): number {
-    return this.cells[row * this.cols + col];
-  }
-
-  setCell(row: number, col: number, value: number) {
-    this.cells[row * this.cols + col] = value;
-  }
+  clear() { this.cells.fill(0); }
+  getCell(row: number, col: number): number { return this.cells[row * this.cols + col]; }
+  setCell(row: number, col: number, value: number) { this.cells[row * this.cols + col] = value; }
 
   getNeighborCount(row: number, col: number): number {
     let count = 0;
@@ -108,10 +154,7 @@ class Simulation {
     this.generation++;
   }
 
-  reset() {
-    this.grid.randomize();
-    this.generation = 0;
-  }
+  reset() { this.grid.randomize(); this.generation = 0; }
 
   loadPattern(pattern: number[][], centerX: number, centerY: number) {
     this.grid.clear();
@@ -150,33 +193,20 @@ class Renderer {
     this.showGrid = false;
   }
 
-  setPan(x: number, y: number) {
-    this.panX = x;
-    this.panY = y;
-  }
-
-  setZoom(z: number) {
-    this.zoom = Math.max(0.1, Math.min(5, z));
-  }
-
-  setColorMode(mode: ColorMode) {
-    this.colorMode = mode;
-  }
-
-  setShowGrid(show: boolean) {
-    this.showGrid = show;
-  }
-
-  setCellSize(size: number) {
-    this.cellSize = size;
-  }
+  setPan(x: number, y: number) { this.panX = x; this.panY = y; }
+  setZoom(z: number) { this.zoom = Math.max(0.5, Math.min(4, z)); }
+  setColorMode(mode: ColorMode) { this.colorMode = mode; }
+  setShowGrid(show: boolean) { this.showGrid = show; }
 
   render(grid: Grid) {
     const ctx = this.ctx;
     const canvas = ctx.canvas;
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.width / dpr;
+    const height = canvas.height / dpr;
 
-    ctx.fillStyle = "#0a0e1a";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = COLORS.bg1;
+    ctx.fillRect(0, 0, width, height);
 
     ctx.save();
     ctx.translate(this.panX, this.panY);
@@ -193,13 +223,13 @@ class Renderer {
           const x = col * this.cellSize;
           const y = row * this.cellSize;
           ctx.fillStyle = this.getCellColor(cell);
-          ctx.fillRect(x, y, this.cellSize, this.cellSize);
+          ctx.fillRect(x, y, this.cellSize - 0.5, this.cellSize - 0.5);
         }
       }
     }
 
     if (this.showGrid && this.cellSize * this.zoom >= 4) {
-      ctx.strokeStyle = "rgba(100, 116, 139, 0.2)";
+      ctx.strokeStyle = "rgba(100, 116, 139, 0.12)";
       ctx.lineWidth = 0.5 / this.zoom;
       ctx.beginPath();
       for (let x = 0; x <= cols * this.cellSize; x += this.cellSize) {
@@ -217,52 +247,15 @@ class Renderer {
   }
 
   private getCellColor(age: number): string {
-    let r = 0, g = 0, b = 0;
-
     switch (this.colorMode) {
-      case "age": {
-        const hue = (age * 15) % 360;
-        [r, g, b] = this.hslToRgb(hue / 360, 0.7, 0.6);
-        break;
-      }
-      case "rainbow": {
-        const hue = (age * 12) % 360;
-        [r, g, b] = this.hslToRgb(hue / 360, 0.8, 0.55);
-        break;
-      }
+      case "age": return `hsl(${(age * 15) % 360}, 70%, 60%)`;
+      case "rainbow": return `hsl(${(age * 12) % 360}, 80%, 55%)`;
       case "heat": {
         const heat = Math.min(1, age / 20);
-        r = Math.floor(255 * heat);
-        g = Math.floor(180 * (1 - heat) * heat * 3);
-        b = Math.floor(80 * (1 - heat));
-        break;
+        return `rgb(${Math.floor(255 * heat)},${Math.floor(180 * (1 - heat) * heat * 3)},${Math.floor(80 * (1 - heat))})`;
       }
-      default:
-        r = 99; g = 102; b = 241;
+      default: return COLORS.accent;
     }
-    return `rgb(${r},${g},${b})`;
-  }
-
-  private hslToRgb(h: number, s: number, l: number): [number, number, number] {
-    let r: number, g: number, b: number;
-    if (s === 0) {
-      r = g = b = l;
-    } else {
-      const hue2rgb = (p: number, q: number, t: number) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1 / 6) return p + (q - p) * 6 * t;
-        if (t < 1 / 2) return q;
-        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-        return p;
-      };
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1 / 3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1 / 3);
-    }
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
   }
 
   getZoom() { return this.zoom; }
@@ -270,107 +263,77 @@ class Renderer {
 }
 
 // ============================================================================
-// DATA
-// ============================================================================
-
-const RULES: Record<Variant, RuleSet> = {
-  conway: { birth: [3], survive: [2, 3] },
-  highlife: { birth: [3, 6], survive: [2, 3] },
-  daynight: { birth: [3, 6, 7, 8], survive: [3, 4, 6, 7, 8] },
-  seeds: { birth: [2], survive: [] },
-  coral: { birth: [3], survive: [4, 5, 6, 7, 8] },
-  amoeba: { birth: [3, 5, 7], survive: [1, 3, 5, 8] }
-};
-
-const PATTERNS: Pattern[] = [
-  { name: "Blinker", description: "Period-2", matrix: [[0, 1, 0], [0, 1, 0], [0, 1, 0]] },
-  { name: "Glider", description: "Diagonal ship", matrix: [[0, 1, 0], [0, 0, 1], [1, 1, 1]] },
-  { name: "Block", description: "2×2 still", matrix: [[1, 1], [1, 1]] },
-  { name: "Toad", description: "Period-2", matrix: [[0, 1, 1, 1], [1, 1, 1, 0]] },
-  { name: "Pulsar", description: "Period-3", matrix: [[0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0]] },
-  { name: "LWSS", description: "Ship", matrix: [[0, 1, 0, 0, 1], [1, 0, 0, 0, 0], [1, 0, 0, 0, 1], [1, 1, 1, 1, 0]] }
-];
-
-// ============================================================================
 // STYLED COMPONENTS
 // ============================================================================
 
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
+const shimmer = keyframes`
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+`;
+
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+`;
+
 const Container = styled.div`
-  min-height: 100vh;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  background: #f9fafb;
-  padding: 1.5rem 1rem;
-  
-  @media (max-width: 768px) {
-    padding: 1rem 0.75rem;
-  }
-`;
-
-const MaxWidth = styled.div`
-  max-width: 900px;
-  margin: 0 auto;
-`;
-
-const Header = styled.header`
-  text-align: center;
-  margin-bottom: 2rem;
-`;
-
-const Title = styled.h1`
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 0.5rem 0;
-  
-  @media (max-width: 768px) {
-    font-size: 2rem;
-  }
-`;
-
-const Subtitle = styled.p`
-  font-size: 1rem;
-  color: #64748b;
-  margin: 0;
-`;
-
-const ViewButton = styled.button`
-  display: none;
-  
-  @media (max-width: 768px) {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    padding: 1.25rem;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
-    border: none;
-    border-radius: 1rem;
-    font-size: 1.125rem;
-    font-weight: 600;
-    cursor: pointer;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-  }
-`;
-
-const VideoWrapper = styled.div`
-  width: 100%;
-  position: relative;
-  background: linear-gradient(135deg, #1e293b, #0f172a);
-  border-radius: 12px;
+  height: 100%;
+  background: linear-gradient(135deg, ${COLORS.bg1} 0%, ${COLORS.bg2} 50%, ${COLORS.bg1} 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  gap: 1rem;
   overflow: hidden;
-  margin-bottom: 1.5rem;
-  border: 2px solid rgba(99, 102, 241, 0.2);
   
-  @media (max-width: 768px) {
-    display: none;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+                radial-gradient(circle at 70% 70%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
+    pointer-events: none;
   }
+`;
+
+const TopSection = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+  animation: ${fadeIn} 0.5s ease-out;
+`;
+
+const CanvasPanel = styled.div`
+  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid ${COLORS.borderAccent};
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  position: relative;
+  overflow: hidden;
   
-  @media (min-width: 769px) {
-    aspect-ratio: 4 / 3;
-    max-height: 70vh;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.35), transparent);
+    background-size: 200% 100%;
+    animation: ${shimmer} 3s linear infinite;
   }
 `;
 
@@ -379,403 +342,278 @@ const Canvas = styled.canvas`
   height: 100%;
   display: block;
   cursor: grab;
-  touch-action: none;
+  &:active { cursor: grabbing; }
+`;
+
+const StatsPanel = styled.div`
+  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid ${COLORS.borderAccent};
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+`;
+
+const PanelHeader = styled.div`
+  padding: 1rem 1.25rem;
+  background: rgba(0,0,0,0.28);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: ${COLORS.accentSoft};
+  svg { width: 16px; height: 16px; }
+`;
+
+const StatsContent = styled.div`
+  flex: 1;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
   
-  &:active {
-    cursor: grabbing;
-  }
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+  &::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.22); border-radius: 2px; }
 `;
 
-const Overlay = styled.div`
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  background: rgba(15, 23, 42, 0.9);
-  backdrop-filter: blur(8px);
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  color: white;
-  font-size: 0.75rem;
-  font-family: monospace;
-  z-index: 10;
-`;
-
-const OverlayRow = styled.div`
+const StatCard = styled.div`
+  background: rgba(0,0,0,0.28);
+  border-radius: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.08);
+  padding: 0.875rem;
   display: flex;
   justify-content: space-between;
-  gap: 1.5rem;
-  margin-bottom: 0.25rem;
+  align-items: center;
+  transition: all 0.3s ease;
   
-  &:last-child {
-    margin-bottom: 0;
-  }
-  
-  span:first-child {
-    color: rgba(255, 255, 255, 0.6);
-  }
-  
-  span:last-child {
-    font-weight: 700;
-    color: #60a5fa;
+  &:hover {
+    background: rgba(59, 130, 246, 0.06);
+    border-color: rgba(59, 130, 246, 0.12);
   }
 `;
 
-const Controls = styled.div`
-  position: absolute;
-  bottom: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+const StatLabel = styled.div`
   display: flex;
+  align-items: center;
   gap: 0.5rem;
-  background: rgba(15, 23, 42, 0.95);
-  padding: 0.6rem;
-  border-radius: 999px;
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  font-size: 0.8rem;
+  color: ${COLORS.textMuted};
+  svg { width: 14px; height: 14px; color: ${COLORS.accentSoft}; }
 `;
 
-const ControlBtn = styled.button<{ $primary?: boolean }>`
-  width: 40px;
-  height: 40px;
+const StatValue = styled.div<{ $color?: string }>`
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: ${p => p.$color || COLORS.textPrimary};
+`;
+
+const PulseIndicator = styled.div<{ $active: boolean }>`
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  border: none;
-  cursor: pointer;
-  background: ${p => p.$primary ? '#6366f1' : 'rgba(51, 65, 85, 0.8)'};
-  color: white;
+  background: ${p => p.$active ? COLORS.success : COLORS.warn};
+  animation: ${p => p.$active ? css`${pulse} 2s ease-in-out infinite` : 'none'};
+`;
+
+const BottomSection = styled.div`
+  height: 70px;
+  display: flex;
+  gap: 1rem;
+  animation: ${fadeIn} 0.6s ease-out;
+`;
+
+const ControlsCard = styled.div`
+  flex: 1;
+  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  border: 1px solid ${COLORS.borderAccent};
+  padding: 0 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s;
-  
-  &:hover {
-    transform: scale(1.05);
-  }
+  gap: 1rem;
 `;
 
-const Section = styled.div`
-  background: white;
-  border-radius: 1rem;
-  border: 1px solid #e2e8f0;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  
-  @media (max-width: 768px) {
-    padding: 1rem;
-  }
-`;
-
-const SectionTitle = styled.div`
+const ControlBtn = styled.button<{ $active?: boolean }>`
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 1rem;
-`;
-
-const FormGroup = styled.div`
-  margin-bottom: 1rem;
-  
-  &:last-child {
-    margin-bottom: 0;
-  }
-`;
-
-const Label = styled.label`
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #334155;
-  margin-bottom: 0.5rem;
-`;
-
-const Select = styled.select`
-  width: 100%;
-  padding: 0.75rem;
-  border-radius: 0.6rem;
-  border: 1px solid #cbd5e1;
-  background: #f9fafb;
-  color: #0f172a;
-  font-weight: 500;
-  cursor: pointer;
-  
-  &:focus {
-    outline: none;
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-  }
-`;
-
-const Row = styled.div`
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  flex-wrap: wrap;
-`;
-
-const Btn = styled.button<{ $active?: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.6rem;
-  font-weight: 500;
-  cursor: pointer;
-  background: ${p => p.$active ? '#cbd5e1' : '#fff'};
-  color: #0f172a;
-  border: 1px solid #e2e8f0;
-  transition: background 0.2s;
-  
-  &:hover {
-    background: #f1f5f9;
-  }
-`;
-
-const ZoomGroup = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  background: white;
-  border-radius: 0.6rem;
-  padding: 0.25rem;
-  border: 1px solid #e2e8f0;
-`;
-
-const ZoomBtn = styled.button`
-  padding: 0.5rem;
-  background: transparent;
-  border: none;
-  border-radius: 0.4rem;
-  cursor: pointer;
-  color: #334155;
-  
-  &:hover {
-    background: #f1f5f9;
-  }
-`;
-
-const Badge = styled.span`
-  padding: 0 0.75rem;
-  font-size: 0.875rem;
-  font-family: monospace;
+  padding: 0.625rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  background: ${p => p.$active ? 'rgba(59, 130, 246, 0.1)' : 'rgba(0,0,0,0.28)'};
+  color: ${p => p.$active ? COLORS.accentSoft : COLORS.textMuted};
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #64748b;
-  min-width: 48px;
-  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+  
+  &:hover {
+    transform: translateY(-2px);
+    background: rgba(59, 130, 246, 0.15);
+    color: ${COLORS.accentSoft};
+    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+  }
+  
+  svg { width: 16px; height: 16px; }
 `;
 
-const SliderLabel = styled.div`
-  font-size: 0.75rem;
-  color: #64748b;
-  margin-bottom: 0.25rem;
-  font-weight: 500;
+const Divider = styled.div`
+  width: 1px;
+  height: 32px;
+  background: rgba(59, 130, 246, 0.15);
 `;
 
-const Slider = styled.input`
+const DropdownContainer = styled.div`
+  position: relative;
+`;
+
+const DropdownMenu = styled.div<{ $show: boolean }>`
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(10,14,26,0.98) 0%, rgba(26,26,46,0.98) 100%);
+  backdrop-filter: blur(16px);
+  border-radius: 12px;
+  border: 1px solid ${COLORS.borderAccent};
+  padding: 0.5rem;
+  min-width: 160px;
+  opacity: ${p => p.$show ? 1 : 0};
+  visibility: ${p => p.$show ? 'visible' : 'hidden'};
+  transform: translateX(-50%) ${p => p.$show ? 'translateY(0)' : 'translateY(8px)'};
+  transition: all 0.2s ease;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+`;
+
+const DropdownItem = styled.button<{ $active?: boolean }>`
+  display: block;
   width: 100%;
-  height: 6px;
-  border-radius: 1rem;
-  outline: none;
-  appearance: none;
-  background: #cbd5e1;
-  accent-color: #6366f1;
+  padding: 0.625rem 0.875rem;
+  border: none;
+  border-radius: 8px;
+  background: ${p => p.$active ? 'rgba(59, 130, 246, 0.15)' : 'transparent'};
+  color: ${p => p.$active ? COLORS.accentSoft : COLORS.textMuted};
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  
+  &:hover {
+    background: rgba(59, 130, 246, 0.1);
+    color: ${COLORS.accentSoft};
+  }
 `;
 
 const PatternGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-  
-  @media (min-width: 640px) {
-    grid-template-columns: repeat(3, 1fr);
-  }
+  gap: 0.375rem;
 `;
 
-const PatternCard = styled.button`
-  padding: 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid #e2e8f0;
-  background: #f9fafb;
-  cursor: pointer;
-  text-align: left;
-  transition: all 0.2s;
-  
-  &:hover {
-    transform: translateY(-3px);
-    border-color: #6366f1;
-    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.15);
-  }
-`;
-
-const PatternName = styled.div`
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #0f172a;
-  margin-bottom: 0.25rem;
-`;
-
-const PatternDesc = styled.div`
-  font-size: 0.75rem;
-  color: #64748b;
-`;
-
-const Fullscreen = styled.div<{ $show: boolean }>`
-  position: fixed;
-  inset: 0;
-  background: #0a0e1a;
-  z-index: 10000;
-  display: ${p => p.$show ? 'flex' : 'none'};
-  flex-direction: column;
-`;
-
-const FSCanvas = styled.canvas`
-  width: 100%;
-  height: 100%;
-  cursor: grab;
-  touch-action: none;
-  
-  &:active {
-    cursor: grabbing;
-  }
-`;
-
-const FSOverlay = styled.div`
-  position: absolute;
-  top: calc(1rem + env(safe-area-inset-top));
-  left: 1rem;
-  background: rgba(15, 23, 42, 0.9);
-  backdrop-filter: blur(8px);
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(71, 85, 105, 0.5);
-  color: white;
-  font-size: 0.75rem;
-  font-family: monospace;
-`;
-
-const FSControls = styled.div`
-  position: absolute;
-  bottom: calc(1.5rem + env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 0.5rem;
-  background: rgba(15, 23, 42, 0.95);
-  padding: 0.75rem;
-  border-radius: 999px;
-  border: 1px solid rgba(71, 85, 105, 0.5);
-`;
-
-const FSBtn = styled.button<{ $primary?: boolean }>`
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  cursor: pointer;
-  background: ${p => p.$primary ? '#6366f1' : 'rgba(51, 65, 85, 0.8)'};
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-`;
-
-const ExitBtn = styled.button`
-  position: absolute;
-  top: calc(1rem + env(safe-area-inset-top));
-  right: 1rem;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(15, 23, 42, 0.9);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border: 1px solid rgba(71, 85, 105, 0.5);
-  
-  &:hover {
-    background: rgba(220, 38, 38, 0.9);
-  }
-`;
-
-const ZoomInd = styled.div`
-  position: absolute;
-  top: calc(1rem + env(safe-area-inset-top));
-  right: 5rem;
-  background: rgba(15, 23, 42, 0.9);
+const PatternBtn = styled.button`
   padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(71, 85, 105, 0.5);
-  color: white;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.3);
+  color: ${COLORS.textMuted};
   font-size: 0.75rem;
-  font-family: monospace;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  
+  &:hover {
+    background: rgba(139, 92, 246, 0.15);
+    color: ${COLORS.purple};
+  }
+`;
+
+const ZoomIndicator = styled.div`
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  color: ${COLORS.textMuted};
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
 `;
 
-const Hint = styled.div`
+const HintText = styled.div`
   position: absolute;
-  bottom: calc(5rem + env(safe-area-inset-bottom));
+  bottom: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.75rem;
-  text-align: center;
+  color: rgba(148, 163, 184, 0.4);
+  font-size: 0.7rem;
 `;
-interface LifeSimulationProps {
-  isDark?: boolean;
-  isRunning?: boolean;
-  speed?: number;
-}
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export default function LifeSimulation({
-  isDark = false,
-  isRunning = true,
-  speed = 1
-}: LifeSimulationProps) {
-
-  const desktopCanvasRef = useRef<HTMLCanvasElement>(null);
-  const fullscreenCanvasRef = useRef<HTMLCanvasElement>(null);
+export default function LifeSimulation({ isDark = true, isRunning = true, speed = 1 }: LifeSimulationProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const simRef = useRef<Simulation | null>(null);
-  const desktopRendererRef = useRef<Renderer | null>(null);
-  const fullscreenRendererRef = useRef<Renderer | null>(null);
+  const rendererRef = useRef<Renderer | null>(null);
   const animationRef = useRef<number>(0);
   const lastUpdateRef = useRef<number>(0);
 
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [generation, setGeneration] = useState(0);
   const [population, setPopulation] = useState(0);
-  const [cellSize, setCellSize] = useState(6);
+  const [cellSize] = useState(6);
   const [colorMode, setColorMode] = useState<ColorMode>("rainbow");
   const [variant, setVariant] = useState<Variant>("conway");
   const [showGrid, setShowGrid] = useState(false);
-  const [simSpeed, setSimSpeed] = useState(3);
   const [zoom, setZoom] = useState(1);
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 800 });
+
+  const [showVariantMenu, setShowVariantMenu] = useState(false);
+  const [showColorMenu, setShowColorMenu] = useState(false);
+  const [showPatternMenu, setShowPatternMenu] = useState(false);
 
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0 });
-  const panOffsetRef = useRef({ x: 0, y: 0 });
-  const touchStartDistanceRef = useRef<number>(0);
-  const lastZoomRef = useRef<number>(1);
 
-  const initSimulation = useCallback((canvas: HTMLCanvasElement) => {
+  useEffect(() => { setIsPlaying(isRunning); }, [isRunning]);
+
+  const initSimulation = useCallback(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return null;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
     const dpr = window.devicePixelRatio || 1;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    const rect = container.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
 
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.scale(dpr, dpr);
+    setCanvasDimensions({ width, height });
 
     const cols = Math.floor(width / cellSize);
     const rows = Math.floor(height / cellSize);
@@ -787,54 +625,26 @@ export default function LifeSimulation({
   }, [cellSize, variant]);
 
   useEffect(() => {
-    setIsPlaying(isRunning);
-  }, [isRunning]);
-
-  // Sync speed prop with internal simSpeed state
-  useEffect(() => {
-    setSimSpeed(speed);
-  }, [speed]);
-
-  // You can also use isDark to adjust colors/theme if needed
-  useEffect(() => {
-    if (isDark) {
-      // Apply dark theme colors to renderer if you have that capability
-      // For example:
-      // desktopRendererRef.current?.setTheme('dark');
-      // fullscreenRendererRef.current?.setTheme('dark');
-    } else {
-      // Apply light theme
-    }
-  }, [isDark]);
-
-  useEffect(() => {
-    const canvas = desktopCanvasRef.current;
-    if (!canvas) return;
-
-    const result = initSimulation(canvas);
+    const result = initSimulation();
     if (!result) return;
 
     simRef.current = result.sim;
-    desktopRendererRef.current = new Renderer(result.ctx, cellSize);
-    desktopRendererRef.current.setColorMode(colorMode);
-    desktopRendererRef.current.setShowGrid(showGrid);
+    rendererRef.current = new Renderer(result.ctx, cellSize);
+    rendererRef.current.setColorMode(colorMode);
+    rendererRef.current.setShowGrid(showGrid);
 
     setGeneration(result.sim.getGeneration());
     setPopulation(result.sim.getGrid().countPopulation());
-
-    if (desktopRendererRef.current) {
-      desktopRendererRef.current.render(result.sim.getGrid());
-    }
+    rendererRef.current.render(result.sim.getGrid());
 
     const handleResize = () => {
-      const result = initSimulation(canvas);
-      if (!result) return;
-      simRef.current = result.sim;
-      desktopRendererRef.current = new Renderer(result.ctx, cellSize);
-      desktopRendererRef.current.setColorMode(colorMode);
-      desktopRendererRef.current.setShowGrid(showGrid);
-      if (desktopRendererRef.current) {
-        desktopRendererRef.current.render(result.sim.getGrid());
+      const result = initSimulation();
+      if (result) {
+        simRef.current = result.sim;
+        rendererRef.current = new Renderer(result.ctx, cellSize);
+        rendererRef.current.setColorMode(colorMode);
+        rendererRef.current.setShowGrid(showGrid);
+        rendererRef.current.render(result.sim.getGrid());
       }
     };
 
@@ -843,55 +653,32 @@ export default function LifeSimulation({
   }, [initSimulation, cellSize, colorMode, showGrid]);
 
   useEffect(() => {
-    if (!isFullscreen) return;
-
-    const canvas = fullscreenCanvasRef.current;
-    if (!canvas) return;
-
-    const result = initSimulation(canvas);
-    if (!result) return;
-
-    simRef.current = result.sim;
-    fullscreenRendererRef.current = new Renderer(result.ctx, cellSize);
-    fullscreenRendererRef.current.setColorMode(colorMode);
-    fullscreenRendererRef.current.setShowGrid(showGrid);
-
-    if (fullscreenRendererRef.current) {
-      fullscreenRendererRef.current.render(result.sim.getGrid());
-    }
-  }, [isFullscreen, initSimulation, cellSize, colorMode, showGrid]);
-
-  useEffect(() => {
-    if (desktopRendererRef.current) {
-      desktopRendererRef.current.setColorMode(colorMode);
-    }
-    if (fullscreenRendererRef.current) {
-      fullscreenRendererRef.current.setColorMode(colorMode);
+    if (rendererRef.current) {
+      rendererRef.current.setColorMode(colorMode);
+      if (simRef.current) rendererRef.current.render(simRef.current.getGrid());
     }
   }, [colorMode]);
 
   useEffect(() => {
-    if (desktopRendererRef.current) {
-      desktopRendererRef.current.setShowGrid(showGrid);
-    }
-    if (fullscreenRendererRef.current) {
-      fullscreenRendererRef.current.setShowGrid(showGrid);
+    if (rendererRef.current) {
+      rendererRef.current.setShowGrid(showGrid);
+      if (simRef.current) rendererRef.current.render(simRef.current.getGrid());
     }
   }, [showGrid]);
 
   useEffect(() => {
     if (!isPlaying) {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-        animationRef.current = 0;
-      }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
       return;
     }
+
+    const baseInterval = 100;
+    const adjustedInterval = baseInterval / speed;
 
     const animate = (timestamp: number) => {
       const elapsed = timestamp - lastUpdateRef.current;
 
-      if (elapsed >= 100 / simSpeed) {
+      if (elapsed >= adjustedInterval) {
         if (simRef.current) {
           simRef.current.step();
           setGeneration(simRef.current.getGeneration());
@@ -900,360 +687,205 @@ export default function LifeSimulation({
         lastUpdateRef.current = timestamp;
       }
 
-      const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
-      if (renderer && simRef.current) {
-        renderer.render(simRef.current.getGrid());
+      if (rendererRef.current && simRef.current) {
+        rendererRef.current.render(simRef.current.getGrid());
       }
 
       animationRef.current = requestAnimationFrame(animate);
     };
 
     animationRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [isPlaying, simSpeed, isFullscreen]);
+    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
+  }, [isPlaying, speed]);
 
   const handleReset = () => {
     if (simRef.current) {
       simRef.current.reset();
       setGeneration(simRef.current.getGeneration());
       setPopulation(simRef.current.getGrid().countPopulation());
-
-      const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
-      if (renderer) {
-        renderer.render(simRef.current.getGrid());
-      }
+      if (rendererRef.current) rendererRef.current.render(simRef.current.getGrid());
     }
   };
 
   const handleLoadPattern = (pattern: Pattern) => {
     if (simRef.current) {
       const grid = simRef.current.getGrid();
-      const centerX = Math.floor(grid.getCols() / 2);
-      const centerY = Math.floor(grid.getRows() / 2);
-      simRef.current.loadPattern(pattern.matrix, centerX, centerY);
+      simRef.current.loadPattern(pattern.matrix, Math.floor(grid.getCols() / 2), Math.floor(grid.getRows() / 2));
       setGeneration(simRef.current.getGeneration());
       setPopulation(simRef.current.getGrid().countPopulation());
-
-      const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
-      if (renderer) {
-        renderer.render(simRef.current.getGrid());
-      }
+      if (rendererRef.current) rendererRef.current.render(simRef.current.getGrid());
     }
+    setShowPatternMenu(false);
+  };
+
+  const handleChangeVariant = (v: Variant) => {
+    setVariant(v);
+    setShowVariantMenu(false);
+    setTimeout(() => {
+      const result = initSimulation();
+      if (result) {
+        simRef.current = result.sim;
+        rendererRef.current = new Renderer(result.ctx, cellSize);
+        rendererRef.current.setColorMode(colorMode);
+        rendererRef.current.setShowGrid(showGrid);
+        setGeneration(result.sim.getGeneration());
+        setPopulation(result.sim.getGrid().countPopulation());
+        rendererRef.current.render(result.sim.getGrid());
+      }
+    }, 0);
   };
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(0.1, Math.min(5, zoom * delta));
+    const newZoom = Math.max(0.5, Math.min(4, zoom * delta));
     setZoom(newZoom);
-
-    const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
-    if (renderer) {
-      renderer.setZoom(newZoom);
-      if (simRef.current) {
-        renderer.render(simRef.current.getGrid());
-      }
-    }
-  }, [zoom, isFullscreen]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    setIsPanning(true);
-    const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
-    const pan = renderer?.getPan() || { x: 0, y: 0 };
-    panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-  }, [isFullscreen]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isPanning) return;
-
-    const newX = e.clientX - panStartRef.current.x;
-    const newY = e.clientY - panStartRef.current.y;
-    panOffsetRef.current = { x: newX, y: newY };
-
-    const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
-    if (renderer) {
-      renderer.setPan(newX, newY);
-      if (simRef.current) {
-        renderer.render(simRef.current.getGrid());
-      }
-    }
-  }, [isPanning, isFullscreen]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsPanning(false);
-  }, []);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      touchStartDistanceRef.current = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-      lastZoomRef.current = zoom;
-    } else if (e.touches.length === 1) {
-      setIsPanning(true);
-      const touch = e.touches[0];
-      const renderer = fullscreenRendererRef.current;
-      const pan = renderer?.getPan() || { x: 0, y: 0 };
-      panStartRef.current = { x: touch.clientX - pan.x, y: touch.clientY - pan.y };
+    if (rendererRef.current) {
+      rendererRef.current.setZoom(newZoom);
+      if (simRef.current) rendererRef.current.render(simRef.current.getGrid());
     }
   }, [zoom]);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsPanning(true);
+    const pan = rendererRef.current?.getPan() || { x: 0, y: 0 };
+    panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+  }, []);
 
-    if (e.touches.length === 2) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const distance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-
-      if (touchStartDistanceRef.current > 0) {
-        const scale = distance / touchStartDistanceRef.current;
-        const newZoom = Math.max(0.1, Math.min(5, lastZoomRef.current * scale));
-        setZoom(newZoom);
-
-        if (fullscreenRendererRef.current) {
-          fullscreenRendererRef.current.setZoom(newZoom);
-          if (simRef.current) {
-            fullscreenRendererRef.current.render(simRef.current.getGrid());
-          }
-        }
-      }
-    } else if (e.touches.length === 1 && isPanning) {
-      const touch = e.touches[0];
-      const newX = touch.clientX - panStartRef.current.x;
-      const newY = touch.clientY - panStartRef.current.y;
-      panOffsetRef.current = { x: newX, y: newY };
-
-      if (fullscreenRendererRef.current) {
-        fullscreenRendererRef.current.setPan(newX, newY);
-        if (simRef.current) {
-          fullscreenRendererRef.current.render(simRef.current.getGrid());
-        }
-      }
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning) return;
+    const newX = e.clientX - panStartRef.current.x;
+    const newY = e.clientY - panStartRef.current.y;
+    if (rendererRef.current) {
+      rendererRef.current.setPan(newX, newY);
+      if (simRef.current) rendererRef.current.render(simRef.current.getGrid());
     }
   }, [isPanning]);
 
-  const handleTouchEnd = useCallback(() => {
-    setIsPanning(false);
-    touchStartDistanceRef.current = 0;
-  }, []);
+  const handleMouseUp = useCallback(() => { setIsPanning(false); }, []);
 
   const resetView = () => {
     setZoom(1);
-    panOffsetRef.current = { x: 0, y: 0 };
-
-    const renderer = isFullscreen ? fullscreenRendererRef.current : desktopRendererRef.current;
-    if (renderer) {
-      renderer.setPan(0, 0);
-      renderer.setZoom(1);
-      if (simRef.current) {
-        renderer.render(simRef.current.getGrid());
-      }
+    if (rendererRef.current) {
+      rendererRef.current.setPan(0, 0);
+      rendererRef.current.setZoom(1);
+      if (simRef.current) rendererRef.current.render(simRef.current.getGrid());
     }
   };
 
   useEffect(() => {
-    const canvas = isFullscreen ? fullscreenCanvasRef.current : desktopCanvasRef.current;
+    const canvas = canvasRef.current;
     if (!canvas) return;
-
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [handleWheel, isFullscreen]);
+  }, [handleWheel]);
+
+  useEffect(() => {
+    const handleClick = () => { setShowVariantMenu(false); setShowColorMenu(false); setShowPatternMenu(false); };
+    if (showVariantMenu || showColorMenu || showPatternMenu) {
+      setTimeout(() => window.addEventListener('click', handleClick, { once: true }), 0);
+    }
+  }, [showVariantMenu, showColorMenu, showPatternMenu]);
 
   return (
-    <>
-      <Container>
-        <MaxWidth>
-          <Header>
-            <Title>Cellular Automata</Title>
-            <Subtitle>Configure and explore Conway's Game of Life</Subtitle>
-          </Header>
+    <Container>
+      <TopSection>
+        <CanvasPanel ref={containerRef}>
+          <Canvas
+            ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          />
+          {zoom !== 1 && <ZoomIndicator>{(zoom * 100).toFixed(0)}%</ZoomIndicator>}
+          <HintText>Scroll to zoom • Drag to pan</HintText>
+        </CanvasPanel>
 
-          <ViewButton onClick={() => { setIsFullscreen(true); setIsPlaying(true); }}>
-            <Maximize size={24} />
-            View Simulation
-          </ViewButton>
+        <StatsPanel>
+          <PanelHeader>
+            <Activity /> Live Statistics
+            <div style={{ marginLeft: 'auto' }}><PulseIndicator $active={isPlaying} /></div>
+          </PanelHeader>
+          <StatsContent>
+            <StatCard>
+              <StatLabel><Hash /> Generation</StatLabel>
+              <StatValue $color={COLORS.accentSoft}>{generation.toLocaleString()}</StatValue>
+            </StatCard>
+            <StatCard>
+              <StatLabel><Sparkles /> Population</StatLabel>
+              <StatValue $color={COLORS.success}>{population.toLocaleString()}</StatValue>
+            </StatCard>
+            <StatCard>
+              <StatLabel><Layers /> Rules</StatLabel>
+              <StatValue $color={COLORS.purple}>{VARIANT_LABELS[variant].split(' ')[0]}</StatValue>
+            </StatCard>
+            <StatCard>
+              <StatLabel><Palette /> Colors</StatLabel>
+              <StatValue>{COLOR_LABELS[colorMode]}</StatValue>
+            </StatCard>
+            <StatCard>
+              <StatLabel><Zap /> Speed</StatLabel>
+              <StatValue>{speed}×</StatValue>
+            </StatCard>
+            <StatCard>
+              <StatLabel><Timer /> Density</StatLabel>
+              <StatValue>{((population / (canvasDimensions.width * canvasDimensions.height / (cellSize * cellSize))) * 100).toFixed(1)}%</StatValue>
+            </StatCard>
+          </StatsContent>
+        </StatsPanel>
+      </TopSection>
 
-          <VideoWrapper>
-            <Canvas
-              ref={desktopCanvasRef}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-            />
+      <BottomSection>
+        <ControlsCard>
+          <ControlBtn onClick={handleReset}><Shuffle size={16} /> Randomize</ControlBtn>
+          <ControlBtn onClick={resetView}><RotateCcw size={16} /> Reset View</ControlBtn>
+          <ControlBtn $active={showGrid} onClick={() => setShowGrid(!showGrid)}><Grid3X3 size={16} /> Grid</ControlBtn>
+          
+          <Divider />
 
-            <Overlay>
-              <OverlayRow>
-                <span>Generation:</span>
-                <span>{generation}</span>
-              </OverlayRow>
-              <OverlayRow>
-                <span>Population:</span>
-                <span>{population}</span>
-              </OverlayRow>
-            </Overlay>
-
-            <Controls>
-              <ControlBtn $primary onClick={() => setIsPlaying(!isPlaying)}>
-                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-              </ControlBtn>
-              <ControlBtn onClick={handleReset}>
-                <RotateCcw size={18} />
-              </ControlBtn>
-              <ControlBtn onClick={() => setShowGrid(!showGrid)}>
-                <Grid3X3 size={18} />
-              </ControlBtn>
-              <ControlBtn onClick={resetView}>
-                <Maximize size={18} />
-              </ControlBtn>
-            </Controls>
-          </VideoWrapper>
-
-          <Section>
-            <SectionTitle>
-              <Settings size={20} />
-              Controls
-            </SectionTitle>
-
-            <FormGroup>
-              <Row>
-                <Btn onClick={handleReset}>
-                  <RotateCcw size={18} />
-                  Randomize
-                </Btn>
-                <ZoomGroup>
-                  <ZoomBtn onClick={() => setCellSize(Math.max(2, cellSize - 1))}>
-                    <ZoomOut size={16} />
-                  </ZoomBtn>
-                  <Badge>{cellSize}px</Badge>
-                  <ZoomBtn onClick={() => setCellSize(Math.min(20, cellSize + 1))}>
-                    <ZoomIn size={16} />
-                  </ZoomBtn>
-                </ZoomGroup>
-                <Btn $active={showGrid} onClick={() => setShowGrid(!showGrid)}>
-                  <Grid3X3 size={18} />
-                  Grid
-                </Btn>
-              </Row>
-            </FormGroup>
-
-            <FormGroup>
-              <SliderLabel>Speed: {simSpeed}x</SliderLabel>
-              <Slider
-                type="range"
-                min={1}
-                max={10}
-                value={simSpeed}
-                onChange={(e) => setSimSpeed(parseInt(e.target.value))}
-              />
-            </FormGroup>
-          </Section>
-
-          <Section>
-            <SectionTitle>
-              <Palette size={20} />
-              Visual Settings
-            </SectionTitle>
-
-            <FormGroup>
-              <Label>Color Mode</Label>
-              <Select value={colorMode} onChange={(e) => setColorMode(e.target.value as ColorMode)}>
-                <option value="none">Single Color</option>
-                <option value="age">Age Based</option>
-                <option value="rainbow">Rainbow</option>
-                <option value="heat">Heat Map</option>
-              </Select>
-            </FormGroup>
-
-            <FormGroup>
-              <Label>Rule Variant</Label>
-              <Select value={variant} onChange={(e) => setVariant(e.target.value as Variant)}>
-                <option value="conway">Conway's Life</option>
-                <option value="highlife">HighLife</option>
-                <option value="daynight">Day & Night</option>
-                <option value="seeds">Seeds</option>
-                <option value="coral">Coral</option>
-                <option value="amoeba">Amoeba</option>
-              </Select>
-            </FormGroup>
-          </Section>
-
-          <Section>
-            <SectionTitle>
-              <Shapes size={20} />
-              Patterns
-            </SectionTitle>
-
-            <PatternGrid>
-              {PATTERNS.map((p) => (
-                <PatternCard key={p.name} onClick={() => handleLoadPattern(p)}>
-                  <PatternName>{p.name}</PatternName>
-                  <PatternDesc>{p.description}</PatternDesc>
-                </PatternCard>
+          <DropdownContainer>
+            <ControlBtn $active={showVariantMenu} onClick={(e) => { e.stopPropagation(); setShowVariantMenu(!showVariantMenu); setShowColorMenu(false); setShowPatternMenu(false); }}>
+              <Layers size={16} /> {VARIANT_LABELS[variant].split(' ')[0]} <ChevronDown size={14} />
+            </ControlBtn>
+            <DropdownMenu $show={showVariantMenu}>
+              {(Object.keys(RULES) as Variant[]).map(v => (
+                <DropdownItem key={v} $active={variant === v} onClick={(e) => { e.stopPropagation(); handleChangeVariant(v); }}>
+                  {VARIANT_LABELS[v]}
+                </DropdownItem>
               ))}
-            </PatternGrid>
-          </Section>
-        </MaxWidth>
-      </Container>
+            </DropdownMenu>
+          </DropdownContainer>
 
-      <Fullscreen $show={isFullscreen}>
-        <FSCanvas
-          ref={fullscreenCanvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        />
+          <DropdownContainer>
+            <ControlBtn $active={showColorMenu} onClick={(e) => { e.stopPropagation(); setShowColorMenu(!showColorMenu); setShowVariantMenu(false); setShowPatternMenu(false); }}>
+              <Palette size={16} /> {COLOR_LABELS[colorMode]} <ChevronDown size={14} />
+            </ControlBtn>
+            <DropdownMenu $show={showColorMenu}>
+              {(Object.keys(COLOR_LABELS) as ColorMode[]).map(c => (
+                <DropdownItem key={c} $active={colorMode === c} onClick={(e) => { e.stopPropagation(); setColorMode(c); setShowColorMenu(false); }}>
+                  {COLOR_LABELS[c]}
+                </DropdownItem>
+              ))}
+            </DropdownMenu>
+          </DropdownContainer>
 
-        <FSOverlay>
-          <OverlayRow>
-            <span>Generation:</span>
-            <span>{generation}</span>
-          </OverlayRow>
-          <OverlayRow>
-            <span>Population:</span>
-            <span>{population}</span>
-          </OverlayRow>
-        </FSOverlay>
-
-        <ZoomInd>{(zoom * 100).toFixed(0)}%</ZoomInd>
-
-        <Hint>Pinch or scroll to zoom • Drag to pan</Hint>
-
-        <FSControls>
-          <FSBtn $primary onClick={() => setIsPlaying(!isPlaying)}>
-            {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-          </FSBtn>
-          <FSBtn onClick={handleReset}>
-            <RotateCcw size={20} />
-          </FSBtn>
-          <FSBtn onClick={() => setShowGrid(!showGrid)}>
-            <Grid3X3 size={20} />
-          </FSBtn>
-          <FSBtn onClick={resetView}>
-            <Maximize size={20} />
-          </FSBtn>
-        </FSControls>
-
-        <ExitBtn onClick={() => { setIsFullscreen(false); setIsPlaying(false); }}>
-          <X size={20} />
-        </ExitBtn>
-      </Fullscreen>
-    </>
+          <DropdownContainer>
+            <ControlBtn $active={showPatternMenu} onClick={(e) => { e.stopPropagation(); setShowPatternMenu(!showPatternMenu); setShowVariantMenu(false); setShowColorMenu(false); }}>
+              <Sparkles size={16} /> Patterns <ChevronDown size={14} />
+            </ControlBtn>
+            <DropdownMenu $show={showPatternMenu} style={{ minWidth: '200px' }}>
+              <PatternGrid>
+                {PATTERNS.map(p => (
+                  <PatternBtn key={p.name} onClick={(e) => { e.stopPropagation(); handleLoadPattern(p); }}>
+                    {p.name}
+                  </PatternBtn>
+                ))}
+              </PatternGrid>
+            </DropdownMenu>
+          </DropdownContainer>
+        </ControlsCard>
+      </BottomSection>
+    </Container>
   );
 }

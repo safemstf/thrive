@@ -1038,7 +1038,7 @@ export function Header({
                 onClick={closeRightSidebar}
               >
                 <Brush size={20} />
-                Thrive
+                Assessments
               </NavLinkItem>
 
               <NavLinkItem
@@ -1047,7 +1047,7 @@ export function Header({
                 onClick={closeRightSidebar}
               >
                 <Code size={20} />
-                The Matrix
+                Simulations
               </NavLinkItem>
 
               <NavLinkItem

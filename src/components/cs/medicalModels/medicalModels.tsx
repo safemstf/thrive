@@ -1,1680 +1,1079 @@
 // src/components/cs/medicalModels/medicalModels.tsx
 // AI-Powered Clinical Decision Support for Acute Vascular Surgery
 import React, { useState, useEffect } from 'react';
+import styled, { keyframes } from 'styled-components';
+import { Activity, AlertTriangle, Heart, Droplets, Clock, ChevronDown, Stethoscope, Syringe, Brain } from 'lucide-react';
 
 interface MedicalModelsDemoProps {
-    isDark: boolean;
-    isRunning: boolean;
-    speed: number;
+  isDark?: boolean;
+  isRunning?: boolean;
+  speed?: number;
 }
 
 type ModelType = 'predictive' | 'classification' | 'simulation';
 
-const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark, isRunning, speed }) => {
-    const [activeTab, setActiveTab] = useState<ModelType>('predictive');
-    const [showAIInsights, setShowAIInsights] = useState(true);
+// ============================================================================
+// STYLED COMPONENTS
+// ============================================================================
 
-    // Predictive Model State
-    const [patientData, setPatientData] = useState({
-        systolicBP: 95,
-        diastolicBP: 60,
-        heartRate: 115,
-        hemoglobin: 10.5,
-        lactate: 3.5,
-        wbc: 14.2,
-        creatineKinase: 850,
-        hoursSinceInjury: 4,
-        hasVascularInjury: true,
-        hasFracture: true,
-        hasLimbIschemia: true,
-        hasCatheter: true,
-        hasOpenWound: false
-    });
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
 
-    // Classification Model State
-    const [imagingData, setImagingData] = useState<{
-        modality: 'X-ray' | 'CT Angiography' | 'Doppler Ultrasound' | 'Angiogram';
-        vessel: string;
-        injuryType: 'Intimal Injury' | 'Laceration' | 'Transection' | 'Thrombosis' | 'Pseudoaneurysm';
-        occlusion: number;
-        hasCollateral: boolean;
-    }>({
-        modality: 'CT Angiography',
-        vessel: 'Femoral Artery',
-        injuryType: 'Laceration',
-        occlusion: 75,
-        hasCollateral: true
-    });
+const pulse = keyframes`
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+`;
 
-    // Simulation State
-    const [hemodynamics, setHemodynamics] = useState({
-        proximalBP: 120,
-        distalBP: 40,
-        compartmentPressure: 25,
-        timeToRevasc: 6
-    });
+const Container = styled.div`
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 600px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  overflow: auto;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+`;
 
-    const [simulationTime, setSimulationTime] = useState(0);
+const ScrollContent = styled.div`
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+`;
 
-    useEffect(() => {
-        if (isRunning && activeTab === 'simulation') {
-            const interval = setInterval(() => {
-                setSimulationTime(prev => (prev + speed * 2) % 360);
-            }, 50);
-            return () => clearInterval(interval);
-        }
-    }, [isRunning, speed, activeTab]);
+const TabBar = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  background: rgba(30, 41, 59, 0.5);
+  padding: 0.375rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+`;
 
-    // ========== CALCULATIONS ==========
+const Tab = styled.button<{ $active: boolean }>`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: ${p => p.$active ? 'rgba(99, 102, 241, 0.2)' : 'transparent'};
+  color: ${p => p.$active ? '#a5b4fc' : '#94a3b8'};
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  
+  &:hover {
+    background: ${p => p.$active ? 'rgba(99, 102, 241, 0.25)' : 'rgba(51, 65, 85, 0.5)'};
+    color: ${p => p.$active ? '#a5b4fc' : '#e2e8f0'};
+  }
+  
+  svg {
+    opacity: 0.8;
+  }
+`;
 
-    const calculateRisks = () => {
-        const shockIndex = patientData.heartRate / patientData.systolicBP;
-        const hemorrhageRisk = shockIndex > 1 ? 'CRITICAL' : shockIndex > 0.7 ? 'HIGH' : shockIndex > 0.5 ? 'MODERATE' : 'LOW';
+const Card = styled.div`
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  animation: ${fadeIn} 0.3s ease;
+`;
 
-        let infectionScore = 0;
-        if (patientData.hasCatheter) infectionScore += 25;
-        if (patientData.hasOpenWound) infectionScore += 30;
-        if (patientData.wbc > 12) infectionScore += 25;
-        if (patientData.hasVascularInjury) infectionScore += 20;
+const CardTitle = styled.h3`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0 0 1rem 0;
+  
+  svg {
+    color: #60a5fa;
+  }
+`;
 
-        let compartmentScore = 0;
-        if (patientData.hasLimbIschemia) compartmentScore += 40;
-        if (patientData.creatineKinase > 1000) compartmentScore += 30;
-        if (patientData.hasFracture) compartmentScore += 20;
-        if (patientData.hoursSinceInjury > 4) compartmentScore += 10;
+const Grid = styled.div<{ $cols?: number }>`
+  display: grid;
+  grid-template-columns: repeat(${p => p.$cols || 2}, 1fr);
+  gap: 1rem;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
 
-        let messScore = 0;
-        if (patientData.hasFracture) messScore += 3;
-        if (patientData.hasLimbIschemia) {
-            if (patientData.hoursSinceInjury < 6) messScore += 1;
-            else if (patientData.hoursSinceInjury < 12) messScore += 2;
-            else messScore += 3;
-        }
-        if (patientData.systolicBP < 90) messScore += 2;
+const MetricBox = styled.div<{ $color?: string }>`
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 12px;
+  padding: 1rem;
+  border-left: 3px solid ${p => p.$color || '#3b82f6'};
+`;
 
-        const limbThreat = patientData.hoursSinceInjury > 6 ? 'CRITICAL' :
-            patientData.hoursSinceInjury > 4 ? 'THREATENED' : 'AT RISK';
+const MetricLabel = styled.div`
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+`;
 
-        return {
-            shockIndex: shockIndex.toFixed(2),
-            hemorrhageRisk,
-            hemorrhageScore: shockIndex * 100,
-            infectionScore: Math.min(100, infectionScore),
-            compartmentScore: Math.min(100, compartmentScore),
-            messScore,
-            limbThreat,
-            criticalAlerts: [
-                patientData.systolicBP < 90 && { type: 'CRITICAL', msg: 'Hypotensive - Hemorrhagic Shock' },
-                shockIndex > 1 && { type: 'CRITICAL', msg: 'Shock Index >1.0 - Massive Hemorrhage' },
-                patientData.lactate > 4 && { type: 'URGENT', msg: 'Elevated Lactate - Tissue Hypoperfusion' },
-                patientData.hoursSinceInjury > 6 && { type: 'URGENT', msg: 'Prolonged Ischemia >6h - Amputation Risk' },
-                compartmentScore > 60 && { type: 'URGENT', msg: 'High Compartment Syndrome Risk - Measure Pressures' }
-            ].filter(Boolean)
-        };
+const MetricValue = styled.div<{ $color?: string }>`
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: ${p => p.$color || '#e2e8f0'};
+  font-family: 'JetBrains Mono', monospace;
+`;
+
+const MetricUnit = styled.span`
+  font-size: 0.875rem;
+  color: #64748b;
+  font-weight: 500;
+  margin-left: 0.25rem;
+`;
+
+const Badge = styled.span<{ $variant?: 'critical' | 'warning' | 'success' | 'info' }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  
+  ${p => {
+    switch (p.$variant) {
+      case 'critical':
+        return `background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);`;
+      case 'warning':
+        return `background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);`;
+      case 'success':
+        return `background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3);`;
+      default:
+        return `background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);`;
+    }
+  }}
+`;
+
+const AlertBox = styled.div<{ $critical?: boolean }>`
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border-radius: 10px;
+  background: ${p => p.$critical ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)'};
+  border: 1px solid ${p => p.$critical ? 'rgba(239, 68, 68, 0.25)' : 'rgba(245, 158, 11, 0.25)'};
+  margin-bottom: 0.5rem;
+  animation: ${fadeIn} 0.3s ease;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const AlertIcon = styled.div<{ $critical?: boolean }>`
+  color: ${p => p.$critical ? '#f87171' : '#fbbf24'};
+  animation: ${pulse} 2s ease-in-out infinite;
+`;
+
+const AlertContent = styled.div`
+  flex: 1;
+`;
+
+const AlertTitle = styled.div<{ $critical?: boolean }>`
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: ${p => p.$critical ? '#f87171' : '#fbbf24'};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+`;
+
+const AlertMessage = styled.div`
+  font-size: 0.8rem;
+  color: #e2e8f0;
+  line-height: 1.4;
+`;
+
+const SliderGroup = styled.div`
+  margin-bottom: 1rem;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const SliderHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+`;
+
+const SliderLabel = styled.label`
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #94a3b8;
+`;
+
+const SliderValue = styled.span<{ $warning?: boolean; $critical?: boolean }>`
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: ${p => p.$critical ? '#f87171' : p.$warning ? '#fbbf24' : '#e2e8f0'};
+`;
+
+const Slider = styled.input`
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+  appearance: none;
+  background: #334155;
+  cursor: pointer;
+  
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+    transition: transform 0.2s ease;
+    
+    &:hover {
+      transform: scale(1.1);
+    }
+  }
+`;
+
+const SliderHints = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.25rem;
+  font-size: 0.65rem;
+  color: #64748b;
+`;
+
+const CheckboxGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem;
+`;
+
+const Checkbox = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: rgba(99, 102, 241, 0.2);
+  }
+  
+  input {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #6366f1;
+  }
+  
+  span {
+    font-size: 0.8rem;
+    color: #cbd5e1;
+  }
+`;
+
+const GaugeContainer = styled.div`
+  margin-bottom: 0.75rem;
+`;
+
+const GaugeBar = styled.div`
+  height: 8px;
+  background: #1e293b;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.375rem;
+`;
+
+const GaugeFill = styled.div<{ $width: number; $color: string }>`
+  height: 100%;
+  width: ${p => p.$width}%;
+  background: ${p => p.$color};
+  border-radius: 4px;
+  transition: width 0.3s ease;
+`;
+
+const GaugeLabel = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+`;
+
+const Select = styled.select`
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  
+  &:focus {
+    outline: none;
+    border-color: #6366f1;
+  }
+  
+  option {
+    background: #1e293b;
+  }
+`;
+
+const TwoColumn = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const GradeCircle = styled.div<{ $color: string }>`
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: ${p => p.$color};
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  box-shadow: 0 8px 32px ${p => p.$color}40;
+`;
+
+const GradeNumber = styled.div`
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 800;
+`;
+
+const GradeUrgency = styled.div`
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+`;
+
+const ResultCard = styled.div`
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const ResultLabel = styled.div`
+  font-size: 0.7rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.375rem;
+`;
+
+const ResultValue = styled.div<{ $color?: string }>`
+  font-size: 0.9rem;
+  color: ${p => p.$color || '#e2e8f0'};
+  font-weight: 600;
+  line-height: 1.5;
+`;
+
+const GradeScale = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+`;
+
+const GradeSegment = styled.div<{ $color: string; $active: boolean }>`
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  background: ${p => p.$color};
+  border-radius: 6px;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-align: center;
+  opacity: ${p => p.$active ? 1 : 0.3};
+  transition: opacity 0.3s ease;
+  white-space: pre-line;
+`;
+
+const SimulationSVG = styled.svg`
+  width: 100%;
+  height: 200px;
+  display: block;
+  margin: 1rem 0;
+`;
+
+const PerfGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+`;
+
+const PerfCard = styled.div<{ $borderColor?: string }>`
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 10px;
+  padding: 1rem;
+  border-left: 3px solid ${p => p.$borderColor || '#3b82f6'};
+`;
+
+const PatientBox = styled.div<{ $urgent?: boolean }>`
+  background: ${p => p.$urgent ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)'};
+  border: 1px solid ${p => p.$urgent ? 'rgba(239, 68, 68, 0.25)' : 'rgba(34, 197, 94, 0.25)'};
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+`;
+
+const PatientTitle = styled.h4`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0 0 0.75rem 0;
+`;
+
+const PatientText = styled.p`
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin: 0;
+`;
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, isRunning = true, speed = 1 }) => {
+  const [activeTab, setActiveTab] = useState<ModelType>('predictive');
+  
+  // Predictive Model State
+  const [patientData, setPatientData] = useState({
+    systolicBP: 95,
+    diastolicBP: 60,
+    heartRate: 115,
+    hemoglobin: 10.5,
+    lactate: 3.5,
+    wbc: 14.2,
+    creatineKinase: 850,
+    hoursSinceInjury: 4,
+    hasVascularInjury: true,
+    hasFracture: true,
+    hasLimbIschemia: true,
+    hasCatheter: true,
+    hasOpenWound: false
+  });
+
+  // Classification State
+  const [imagingData, setImagingData] = useState({
+    modality: 'CT Angiography',
+    vessel: 'Femoral Artery',
+    injuryType: 'Laceration' as 'Intimal Injury' | 'Laceration' | 'Transection' | 'Thrombosis' | 'Pseudoaneurysm',
+    occlusion: 75,
+    hasCollateral: true
+  });
+
+  // Simulation State
+  const [hemodynamics, setHemodynamics] = useState({
+    proximalBP: 120,
+    distalBP: 40,
+    compartmentPressure: 25,
+    timeToRevasc: 6
+  });
+
+  const [simulationTime, setSimulationTime] = useState(0);
+
+  useEffect(() => {
+    if (isRunning && activeTab === 'simulation') {
+      const interval = setInterval(() => {
+        setSimulationTime(prev => (prev + speed * 2) % 360);
+      }, 50);
+      return () => clearInterval(interval);
+    }
+  }, [isRunning, speed, activeTab]);
+
+  // Calculations
+  const calculateRisks = () => {
+    const shockIndex = patientData.heartRate / patientData.systolicBP;
+    const hemorrhageRisk = shockIndex > 1 ? 'CRITICAL' : shockIndex > 0.7 ? 'HIGH' : shockIndex > 0.5 ? 'MODERATE' : 'LOW';
+
+    let infectionScore = 0;
+    if (patientData.hasCatheter) infectionScore += 25;
+    if (patientData.hasOpenWound) infectionScore += 30;
+    if (patientData.wbc > 12) infectionScore += 25;
+    if (patientData.hasVascularInjury) infectionScore += 20;
+
+    let compartmentScore = 0;
+    if (patientData.hasLimbIschemia) compartmentScore += 40;
+    if (patientData.creatineKinase > 1000) compartmentScore += 30;
+    if (patientData.hasFracture) compartmentScore += 20;
+    if (patientData.hoursSinceInjury > 4) compartmentScore += 10;
+
+    let messScore = 0;
+    if (patientData.hasFracture) messScore += 3;
+    if (patientData.hasLimbIschemia) {
+      if (patientData.hoursSinceInjury < 6) messScore += 1;
+      else if (patientData.hoursSinceInjury < 12) messScore += 2;
+      else messScore += 3;
+    }
+    if (patientData.systolicBP < 90) messScore += 2;
+
+    const limbThreat = patientData.hoursSinceInjury > 6 ? 'CRITICAL' :
+      patientData.hoursSinceInjury > 4 ? 'THREATENED' : 'AT RISK';
+
+    return {
+      shockIndex: shockIndex.toFixed(2),
+      hemorrhageRisk,
+      hemorrhageScore: shockIndex * 100,
+      infectionScore: Math.min(100, infectionScore),
+      compartmentScore: Math.min(100, compartmentScore),
+      messScore,
+      limbThreat,
+      criticalAlerts: [
+        patientData.systolicBP < 90 && { type: 'CRITICAL', msg: 'Hypotensive - Hemorrhagic Shock' },
+        shockIndex > 1 && { type: 'CRITICAL', msg: 'Shock Index >1.0 - Massive Hemorrhage' },
+        patientData.lactate > 4 && { type: 'URGENT', msg: 'Elevated Lactate - Tissue Hypoperfusion' },
+        patientData.hoursSinceInjury > 6 && { type: 'URGENT', msg: 'Prolonged Ischemia >6h - Amputation Risk' },
+        compartmentScore > 60 && { type: 'URGENT', msg: 'High Compartment Syndrome Risk' }
+      ].filter(Boolean) as { type: string; msg: string }[]
     };
+  };
 
-    const classifyInjury = (injuryType: string, occlusion: number) => {
-        let grade, urgency, color, needsSurgery, description, recommendation;
+  const classifyInjury = () => {
+    const { injuryType, occlusion } = imagingData;
+    
+    if (injuryType === 'Transection') {
+      return { grade: 5, urgency: 'STAT', color: '#dc2626', needsSurgery: true,
+        description: 'Complete transection with tissue loss',
+        recommendation: 'IMMEDIATE operative repair - Life/limb threatening' };
+    } else if (injuryType === 'Laceration' || occlusion > 75) {
+      return { grade: 4, urgency: 'Emergent', color: '#ef4444', needsSurgery: true,
+        description: 'Severe occlusion or active bleeding',
+        recommendation: 'Emergent OR within 2 hours - Vascular repair required' };
+    } else if (injuryType === 'Pseudoaneurysm' || occlusion > 50) {
+      return { grade: 3, urgency: 'Urgent', color: '#f59e0b', needsSurgery: true,
+        description: 'Pseudoaneurysm or significant stenosis',
+        recommendation: 'Urgent repair within 6-12 hours' };
+    } else if (occlusion > 25) {
+      return { grade: 2, urgency: 'Scheduled', color: '#3b82f6', needsSurgery: false,
+        description: 'Intimal injury with moderate stenosis',
+        recommendation: 'Close monitoring, possible intervention within 24h' };
+    } else {
+      return { grade: 1, urgency: 'Routine', color: '#22c55e', needsSurgery: false,
+        description: 'Minor intimal irregularity',
+        recommendation: 'Observation and serial imaging' };
+    }
+  };
 
-        if (injuryType === 'Transection') {
-            grade = 5;
-            urgency = 'STAT';
-            color = '#dc2626';
-            needsSurgery = true;
-            description = 'Complete transection with tissue loss';
-            recommendation = 'IMMEDIATE operative repair - Life/limb threatening';
-        } else if (injuryType === 'Laceration' || occlusion > 75) {
-            grade = 4;
-            urgency = 'Emergent';
-            color = '#ef4444';
-            needsSurgery = true;
-            description = 'Severe occlusion or active bleeding';
-            recommendation = 'Emergent OR within 2 hours - Vascular repair required';
-        } else if (injuryType === 'Pseudoaneurysm' || occlusion > 50) {
-            grade = 3;
-            urgency = 'Urgent';
-            color = '#f59e0b';
-            needsSurgery = true;
-            description = 'Pseudoaneurysm or significant stenosis';
-            recommendation = 'Urgent repair within 6-12 hours - OR or endovascular';
-        } else if (occlusion > 25) {
-            grade = 2;
-            urgency = 'Scheduled';
-            color = '#3b82f6';
-            needsSurgery = false;
-            description = 'Intimal injury with moderate stenosis';
-            recommendation = 'Close monitoring, possible intervention within 24h';
-        } else {
-            grade = 1;
-            urgency = 'Routine';
-            color = '#22c55e';
-            needsSurgery = false;
-            description = 'Minor intimal irregularity';
-            recommendation = 'Observation and serial imaging';
-        }
+  const calculatePerfusion = () => {
+    const perfPressure = hemodynamics.distalBP - hemodynamics.compartmentPressure;
+    const gradient = hemodynamics.proximalBP - hemodynamics.distalBP;
+    const compartmentSyndrome = perfPressure < 30;
+    const timeLeft = Math.max(0, 6 - hemodynamics.timeToRevasc);
 
-        return { grade, urgency, color, needsSurgery, description, recommendation };
-    };
+    let tissueStatus = 'Viable', statusColor = '#22c55e';
+    if (perfPressure < 30 || timeLeft < 2) {
+      tissueStatus = 'Critical';
+      statusColor = '#dc2626';
+    } else if (perfPressure < 40 || timeLeft < 4) {
+      tissueStatus = 'At Risk';
+      statusColor = '#f59e0b';
+    }
 
+    return { perfPressure, gradient, compartmentSyndrome, timeLeft, tissueStatus, statusColor,
+      needsFasciotomy: compartmentSyndrome || hemodynamics.compartmentPressure > 30 };
+  };
 
-    const calculatePerfusion = () => {
-        const perfPressure = hemodynamics.distalBP - hemodynamics.compartmentPressure;
-        const gradient = hemodynamics.proximalBP - hemodynamics.distalBP;
-        const compartmentSyndrome = perfPressure < 30;
-        const timeLeft = Math.max(0, 6 - hemodynamics.timeToRevasc);
+  const risks = calculateRisks();
+  const injury = classifyInjury();
+  const perfusion = calculatePerfusion();
 
-        let tissueStatus = 'Viable', statusColor = '#22c55e';
-        if (perfPressure < 30 || timeLeft < 2) {
-            tissueStatus = 'Critical';
-            statusColor = '#dc2626';
-        } else if (perfPressure < 40 || timeLeft < 4) {
-            tissueStatus = 'At Risk';
-            statusColor = '#f59e0b';
-        }
+  const getVariant = (level: string): 'critical' | 'warning' | 'success' | 'info' => {
+    if (level.includes('CRITICAL')) return 'critical';
+    if (level.includes('HIGH') || level.includes('URGENT') || level.includes('THREATENED')) return 'warning';
+    if (level.includes('LOW') || level.includes('NORMAL') || level.includes('ACCEPTABLE')) return 'success';
+    return 'info';
+  };
 
-        return {
-            perfPressure,
-            gradient,
-            compartmentSyndrome,
-            timeLeft,
-            tissueStatus,
-            statusColor,
-            needsFasciotomy: compartmentSyndrome || hemodynamics.compartmentPressure > 30
-        };
-    };
+  // Render tabs
+  const renderPredictive = () => (
+    <>
+      {/* Alerts */}
+      {risks.criticalAlerts.length > 0 && (
+        <Card>
+          <CardTitle><AlertTriangle size={18} /> AI Clinical Alerts</CardTitle>
+          {risks.criticalAlerts.map((alert, i) => (
+            <AlertBox key={i} $critical={alert.type === 'CRITICAL'}>
+              <AlertIcon $critical={alert.type === 'CRITICAL'}>
+                <AlertTriangle size={18} />
+              </AlertIcon>
+              <AlertContent>
+                <AlertTitle $critical={alert.type === 'CRITICAL'}>{alert.type}</AlertTitle>
+                <AlertMessage>{alert.msg}</AlertMessage>
+              </AlertContent>
+            </AlertBox>
+          ))}
+        </Card>
+      )}
 
-    const risks = calculateRisks();
-    const injury = classifyInjury(imagingData.injuryType, imagingData.occlusion);
-    const perfusion = calculatePerfusion();
+      {/* Metrics */}
+      <Grid $cols={4}>
+        <MetricBox $color={risks.hemorrhageRisk === 'CRITICAL' ? '#ef4444' : risks.hemorrhageRisk === 'HIGH' ? '#f59e0b' : '#3b82f6'}>
+          <MetricLabel>Shock Index</MetricLabel>
+          <MetricValue>{risks.shockIndex}</MetricValue>
+          <Badge $variant={getVariant(risks.hemorrhageRisk)}>{risks.hemorrhageRisk}</Badge>
+        </MetricBox>
+        <MetricBox $color={risks.limbThreat === 'CRITICAL' ? '#ef4444' : '#f59e0b'}>
+          <MetricLabel>Limb Status</MetricLabel>
+          <MetricValue>{patientData.hoursSinceInjury}<MetricUnit>hrs</MetricUnit></MetricValue>
+          <Badge $variant={getVariant(risks.limbThreat)}>{risks.limbThreat}</Badge>
+        </MetricBox>
+        <MetricBox $color={patientData.hemoglobin < 10 ? '#ef4444' : '#22c55e'}>
+          <MetricLabel>Hemoglobin</MetricLabel>
+          <MetricValue>{patientData.hemoglobin}<MetricUnit>g/dL</MetricUnit></MetricValue>
+          <Badge $variant={patientData.hemoglobin < 10 ? 'warning' : 'success'}>{patientData.hemoglobin < 10 ? 'LOW' : 'NORMAL'}</Badge>
+        </MetricBox>
+        <MetricBox $color={risks.messScore >= 7 ? '#ef4444' : '#3b82f6'}>
+          <MetricLabel>MESS Score</MetricLabel>
+          <MetricValue>{risks.messScore}</MetricValue>
+          <Badge $variant={risks.messScore >= 7 ? 'critical' : 'success'}>{risks.messScore >= 7 ? 'HIGH RISK' : 'ACCEPTABLE'}</Badge>
+        </MetricBox>
+      </Grid>
 
-    // ========== RENDER HELPERS ==========
+      {/* Risk Gauges */}
+      <TwoColumn>
+        <Card>
+          <CardTitle><Heart size={18} /> Hemorrhagic Shock Risk</CardTitle>
+          <GaugeContainer>
+            <GaugeBar>
+              <GaugeFill 
+                $width={Math.min(100, risks.hemorrhageScore / 1.5)} 
+                $color={risks.hemorrhageScore > 90 ? '#ef4444' : risks.hemorrhageScore > 45 ? '#f59e0b' : '#22c55e'} 
+              />
+            </GaugeBar>
+            <GaugeLabel>
+              <span style={{ color: '#94a3b8' }}>Risk Score</span>
+              <span style={{ color: risks.hemorrhageScore > 90 ? '#f87171' : '#e2e8f0', fontWeight: 700 }}>{risks.hemorrhageScore.toFixed(0)}%</span>
+            </GaugeLabel>
+          </GaugeContainer>
+          <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.5 }}>
+            BP: {patientData.systolicBP}/{patientData.diastolicBP} mmHg<br/>
+            HR: {patientData.heartRate} bpm • Lactate: {patientData.lactate} mmol/L
+          </div>
+        </Card>
 
-    const RiskGauge = ({ value, max, label, critical = 60, warning = 30 }: any) => {
-        const percentage = (value / max) * 100;
-        const color = percentage > critical ? '#dc2626' : percentage > warning ? '#f59e0b' : '#22c55e';
+        <Card>
+          <CardTitle><Activity size={18} /> Compartment Syndrome Risk</CardTitle>
+          <GaugeContainer>
+            <GaugeBar>
+              <GaugeFill 
+                $width={risks.compartmentScore} 
+                $color={risks.compartmentScore > 60 ? '#ef4444' : risks.compartmentScore > 30 ? '#f59e0b' : '#22c55e'} 
+              />
+            </GaugeBar>
+            <GaugeLabel>
+              <span style={{ color: '#94a3b8' }}>Risk Score</span>
+              <span style={{ color: risks.compartmentScore > 60 ? '#f87171' : '#e2e8f0', fontWeight: 700 }}>{risks.compartmentScore}%</span>
+            </GaugeLabel>
+          </GaugeContainer>
+          <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.5 }}>
+            {patientData.hasLimbIschemia && '• Limb ischemia present\n'}
+            {patientData.hasFracture && '• Fracture present\n'}
+            Time since injury: {patientData.hoursSinceInjury}h
+          </div>
+        </Card>
+      </TwoColumn>
 
-        return (
-            <div style={styles.gaugeContainer}>
-                <div style={styles.gaugeLabel}>{label}</div>
-                <div style={styles.gaugeOuter}>
-                    <div style={{
-                        ...styles.gaugeFill,
-                        width: `${percentage}%`,
-                        backgroundColor: color
-                    }} />
-                </div>
-                <div style={{ ...styles.gaugeValue, color }}>{value.toFixed(0)}{max === 100 ? '%' : ''}</div>
-            </div>
-        );
-    };
+      {/* Controls */}
+      <Card>
+        <CardTitle><Stethoscope size={18} /> Patient Data Input</CardTitle>
+        
+        <Grid $cols={3}>
+          <SliderGroup>
+            <SliderHeader>
+              <SliderLabel>Systolic BP</SliderLabel>
+              <SliderValue $critical={patientData.systolicBP < 90}>{patientData.systolicBP} mmHg</SliderValue>
+            </SliderHeader>
+            <Slider type="range" min="60" max="180" step="5" value={patientData.systolicBP}
+              onChange={(e) => setPatientData({ ...patientData, systolicBP: +e.target.value })} />
+            <SliderHints><span>60</span><span style={{ color: '#f87171' }}>Critical: &lt;90</span><span>180</span></SliderHints>
+          </SliderGroup>
 
-    const StatusBadge = ({ status, type = 'info' }: any) => {
-        const colors = {
-            critical: { bg: '#fef2f2', border: '#dc2626', text: '#dc2626' },
-            urgent: { bg: '#fef3c7', border: '#f59e0b', text: '#f59e0b' },
-            warning: { bg: '#fef9c3', border: '#eab308', text: '#ca8a04' },
-            success: { bg: '#f0fdf4', border: '#22c55e', text: '#16a34a' },
-            info: { bg: '#eff6ff', border: '#3b82f6', text: '#2563eb' }
-        };
-        const style = colors[type as keyof typeof colors] || colors.info;
+          <SliderGroup>
+            <SliderHeader>
+              <SliderLabel>Heart Rate</SliderLabel>
+              <SliderValue $warning={patientData.heartRate > 110}>{patientData.heartRate} bpm</SliderValue>
+            </SliderHeader>
+            <Slider type="range" min="40" max="180" step="5" value={patientData.heartRate}
+              onChange={(e) => setPatientData({ ...patientData, heartRate: +e.target.value })} />
+            <SliderHints><span>40</span><span style={{ color: '#fbbf24' }}>Tachy: &gt;110</span><span>180</span></SliderHints>
+          </SliderGroup>
 
-        return (
-            <div style={{
-                padding: '4px 12px',
-                borderRadius: '12px',
-                backgroundColor: style.bg,
-                border: `1.5px solid ${style.border}`,
-                color: style.text,
-                fontSize: '12px',
-                fontWeight: '600',
-                display: 'inline-block'
-            }}>
-                {status}
-            </div>
-        );
-    };
+          <SliderGroup>
+            <SliderHeader>
+              <SliderLabel>Hemoglobin</SliderLabel>
+              <SliderValue $critical={patientData.hemoglobin < 10}>{patientData.hemoglobin} g/dL</SliderValue>
+            </SliderHeader>
+            <Slider type="range" min="5" max="18" step="0.5" value={patientData.hemoglobin}
+              onChange={(e) => setPatientData({ ...patientData, hemoglobin: +e.target.value })} />
+            <SliderHints><span>5</span><span style={{ color: '#f87171' }}>Anemia: &lt;10</span><span>18</span></SliderHints>
+          </SliderGroup>
 
-    const MetricCard = ({ icon, label, value, unit, status, trend }: any) => (
-        <div style={styles.metricCard}>
-            <div style={styles.metricIcon}>{icon}</div>
-            <div style={styles.metricLabel}>{label}</div>
-            <div style={styles.metricValue}>
-                {value} <span style={styles.metricUnit}>{unit}</span>
-            </div>
-            {status && <StatusBadge status={status} type={
-                status.includes('CRITICAL') ? 'critical' :
-                    status.includes('HIGH') || status.includes('URGENT') ? 'urgent' :
-                        status.includes('MODERATE') || status.includes('AT RISK') ? 'warning' : 'success'
-            } />}
+          <SliderGroup>
+            <SliderHeader>
+              <SliderLabel>Lactate</SliderLabel>
+              <SliderValue $critical={patientData.lactate > 4} $warning={patientData.lactate > 2}>{patientData.lactate} mmol/L</SliderValue>
+            </SliderHeader>
+            <Slider type="range" min="0.5" max="10" step="0.5" value={patientData.lactate}
+              onChange={(e) => setPatientData({ ...patientData, lactate: +e.target.value })} />
+            <SliderHints><span>0.5</span><span style={{ color: '#f87171' }}>Critical: &gt;4</span><span>10</span></SliderHints>
+          </SliderGroup>
+
+          <SliderGroup>
+            <SliderHeader>
+              <SliderLabel>Hours Since Injury</SliderLabel>
+              <SliderValue $critical={patientData.hoursSinceInjury > 6} $warning={patientData.hoursSinceInjury > 4}>{patientData.hoursSinceInjury}h</SliderValue>
+            </SliderHeader>
+            <Slider type="range" min="0" max="12" step="0.5" value={patientData.hoursSinceInjury}
+              onChange={(e) => setPatientData({ ...patientData, hoursSinceInjury: +e.target.value })} />
+            <SliderHints><span>0</span><span style={{ color: '#4ade80' }}>Golden: 0-6h</span><span>12</span></SliderHints>
+          </SliderGroup>
+
+          <SliderGroup>
+            <SliderHeader>
+              <SliderLabel>Creatine Kinase</SliderLabel>
+              <SliderValue $critical={patientData.creatineKinase > 1000}>{patientData.creatineKinase} U/L</SliderValue>
+            </SliderHeader>
+            <Slider type="range" min="50" max="5000" step="50" value={patientData.creatineKinase}
+              onChange={(e) => setPatientData({ ...patientData, creatineKinase: +e.target.value })} />
+            <SliderHints><span>50</span><span style={{ color: '#f87171' }}>Rhabdo: &gt;1000</span><span>5000</span></SliderHints>
+          </SliderGroup>
+        </Grid>
+
+        <div style={{ marginTop: '1rem' }}>
+          <SliderLabel style={{ marginBottom: '0.75rem', display: 'block' }}>Clinical Findings</SliderLabel>
+          <CheckboxGrid>
+            {[
+              { key: 'hasVascularInjury', label: 'Vascular injury on CT' },
+              { key: 'hasFracture', label: 'Fracture on X-ray' },
+              { key: 'hasLimbIschemia', label: 'Limb ischemia (6 Ps)' },
+              { key: 'hasCatheter', label: 'Foley catheter' },
+              { key: 'hasOpenWound', label: 'Open wound' }
+            ].map(item => (
+              <Checkbox key={item.key}>
+                <input type="checkbox" checked={patientData[item.key as keyof typeof patientData] as boolean}
+                  onChange={(e) => setPatientData({ ...patientData, [item.key]: e.target.checked })} />
+                <span>{item.label}</span>
+              </Checkbox>
+            ))}
+          </CheckboxGrid>
         </div>
-    );
+      </Card>
+    </>
+  );
 
-    // ========== TAB CONTENT ==========
+  const renderClassification = () => (
+    <>
+      <TwoColumn>
+        <Card>
+          <CardTitle><Stethoscope size={18} /> Imaging Findings</CardTitle>
+          
+          <SliderGroup>
+            <SliderLabel>Imaging Modality</SliderLabel>
+            <Select value={imagingData.modality} onChange={(e) => setImagingData({ ...imagingData, modality: e.target.value })}>
+              <option>X-ray</option>
+              <option>CT Angiography</option>
+              <option>Doppler Ultrasound</option>
+              <option>Angiogram</option>
+            </Select>
+          </SliderGroup>
 
-    const renderPredictive = () => (
-        <div style={styles.tabContent}>
-            {/* AI Insights Panel */}
-            {showAIInsights && (
-                <div style={styles.aiPanel}>
-                    <div style={styles.aiHeader}>
-                        <div style={styles.aiTitle}>
-                            <span style={styles.aiIcon}>🤖</span>
-                            AI Clinical Decision Support
-                        </div>
-                        <button
-                            onClick={() => setShowAIInsights(false)}
-                            style={styles.closeBtn}
-                        >×</button>
-                    </div>
+          <SliderGroup>
+            <SliderLabel>Vessel Involved</SliderLabel>
+            <Select value={imagingData.vessel} onChange={(e) => setImagingData({ ...imagingData, vessel: e.target.value })}>
+              <option>Femoral Artery</option>
+              <option>Popliteal Artery</option>
+              <option>Tibial Arteries</option>
+              <option>Brachial Artery</option>
+              <option>Subclavian Artery</option>
+            </Select>
+          </SliderGroup>
 
-                    {risks.criticalAlerts.length > 0 ? (
-                        <div style={styles.alertsContainer}>
-                            {(risks.criticalAlerts as any[]).map((alert: any, i: number) => (
-                                <div key={i} style={{
-                                    ...styles.alertCard,
-                                    borderLeft: `4px solid ${alert.type === 'CRITICAL' ? '#dc2626' : '#f59e0b'}`
-                                }}>
-                                    <div style={styles.alertType}>
-                                        {alert.type === 'CRITICAL' ? '🚨' : '⚠️'} {alert.type}
-                                    </div>
-                                    <div style={styles.alertMsg}>{alert.msg}</div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div style={styles.aiSuccess}>
-                            ✓ No critical alerts detected. Continue monitoring.
-                        </div>
-                    )}
-                </div>
-            )}
+          <SliderGroup>
+            <SliderLabel>Injury Pattern</SliderLabel>
+            <Select value={imagingData.injuryType} onChange={(e) => setImagingData({ ...imagingData, injuryType: e.target.value as any })}>
+              <option>Intimal Injury</option>
+              <option>Laceration</option>
+              <option>Transection</option>
+              <option>Thrombosis</option>
+              <option>Pseudoaneurysm</option>
+            </Select>
+          </SliderGroup>
 
-            {/* Patient Overview */}
-            <div style={styles.sectionTitle}>Patient Status Overview</div>
-            <div style={styles.metricsGrid}>
-                <MetricCard
-                    icon="❤️"
-                    label="Shock Index"
-                    value={risks.shockIndex}
-                    status={risks.hemorrhageRisk}
-                />
-                <MetricCard
-                    icon="🦵"
-                    label="Limb Status"
-                    value={patientData.hoursSinceInjury}
-                    unit="hrs"
-                    status={risks.limbThreat}
-                />
-                <MetricCard
-                    icon="🩸"
-                    label="Hemoglobin"
-                    value={patientData.hemoglobin}
-                    unit="g/dL"
-                    status={patientData.hemoglobin < 10 ? 'LOW' : 'NORMAL'}
-                />
-                <MetricCard
-                    icon="📊"
-                    label="MESS Score"
-                    value={risks.messScore}
-                    status={risks.messScore >= 7 ? 'HIGH RISK' : 'ACCEPTABLE'}
-                />
+          <SliderGroup>
+            <SliderHeader>
+              <SliderLabel>Vessel Occlusion</SliderLabel>
+              <SliderValue $critical={imagingData.occlusion > 75} $warning={imagingData.occlusion > 50}>{imagingData.occlusion}%</SliderValue>
+            </SliderHeader>
+            <Slider type="range" min="0" max="100" step="5" value={imagingData.occlusion}
+              onChange={(e) => setImagingData({ ...imagingData, occlusion: +e.target.value })} />
+          </SliderGroup>
+
+          <Checkbox>
+            <input type="checkbox" checked={imagingData.hasCollateral}
+              onChange={(e) => setImagingData({ ...imagingData, hasCollateral: e.target.checked })} />
+            <span>Collateral flow visualized</span>
+          </Checkbox>
+        </Card>
+
+        <Card>
+          <CardTitle><Brain size={18} /> AI Classification Result</CardTitle>
+          
+          <GradeCircle $color={injury.color}>
+            <GradeNumber>GRADE {injury.grade}</GradeNumber>
+            <GradeUrgency>{injury.urgency}</GradeUrgency>
+          </GradeCircle>
+
+          <ResultCard>
+            <ResultLabel>Injury Classification</ResultLabel>
+            <ResultValue>{injury.description}</ResultValue>
+          </ResultCard>
+
+          <ResultCard>
+            <ResultLabel>Management Recommendation</ResultLabel>
+            <ResultValue>{injury.recommendation}</ResultValue>
+          </ResultCard>
+
+          <ResultCard>
+            <ResultLabel>Operative Repair Required</ResultLabel>
+            <ResultValue $color={injury.needsSurgery ? '#f87171' : '#4ade80'}>
+              {injury.needsSurgery ? '✓ YES - Schedule OR' : '✗ No - Medical management'}
+            </ResultValue>
+          </ResultCard>
+
+          {imagingData.hasCollateral && (
+            <div style={{ padding: '0.75rem', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '8px', border: '1px solid rgba(34, 197, 94, 0.2)', fontSize: '0.8rem', color: '#4ade80' }}>
+              ✓ Collateral flow present — Better prognosis
             </div>
+          )}
+        </Card>
+      </TwoColumn>
 
-            {/* Risk Assessment */}
-            <div style={styles.sectionTitle}>AI Risk Stratification</div>
-            <div style={styles.riskGrid}>
-                <div style={styles.riskCard}>
-                    <div style={styles.riskHeader}>
-                        <span style={styles.riskTitle}>Hemorrhagic Shock Risk</span>
-                        <StatusBadge status={risks.hemorrhageRisk} type={
-                            risks.hemorrhageRisk === 'CRITICAL' ? 'critical' :
-                                risks.hemorrhageRisk === 'HIGH' ? 'urgent' : 'warning'
-                        } />
-                    </div>
-                    <RiskGauge value={risks.hemorrhageScore} max={150} label="Risk Score" />
-                    <div style={styles.riskDetail}>
-                        <strong>Clinical Correlation:</strong><br />
-                        BP: {patientData.systolicBP}/{patientData.diastolicBP} mmHg<br />
-                        HR: {patientData.heartRate} bpm<br />
-                        Lactate: {patientData.lactate} mmol/L
-                    </div>
-                </div>
+      <Card>
+        <CardTitle>SVS Injury Grading Reference</CardTitle>
+        <GradeScale>
+          {[
+            { g: 1, c: '#22c55e', l: 'Grade I\nMinor' },
+            { g: 2, c: '#3b82f6', l: 'Grade II\nModerate' },
+            { g: 3, c: '#f59e0b', l: 'Grade III\nSevere' },
+            { g: 4, c: '#ef4444', l: 'Grade IV\nCritical' },
+            { g: 5, c: '#dc2626', l: 'Grade V\nLife-Threat' }
+          ].map(item => (
+            <GradeSegment key={item.g} $color={item.c} $active={item.g === injury.grade}>
+              {item.l}
+            </GradeSegment>
+          ))}
+        </GradeScale>
+      </Card>
+    </>
+  );
 
-                <div style={styles.riskCard}>
-                    <div style={styles.riskHeader}>
-                        <span style={styles.riskTitle}>Infection Risk</span>
-                        <StatusBadge status={
-                            risks.infectionScore > 60 ? 'HIGH' :
-                                risks.infectionScore > 30 ? 'MODERATE' : 'LOW'
-                        } type={
-                            risks.infectionScore > 60 ? 'urgent' :
-                                risks.infectionScore > 30 ? 'warning' : 'success'
-                        } />
-                    </div>
-                    <RiskGauge value={risks.infectionScore} max={100} label="Risk Score %" />
-                    <div style={styles.riskDetail}>
-                        <strong>Risk Factors:</strong><br />
-                        {patientData.hasCatheter && '• Foley catheter (UTI risk)\n'}
-                        {patientData.hasOpenWound && '• Open wound\n'}
-                        {patientData.wbc > 12 && '• Elevated WBC\n'}
-                        {!patientData.hasCatheter && !patientData.hasOpenWound && '• No major risk factors'}
-                    </div>
-                </div>
-
-                <div style={styles.riskCard}>
-                    <div style={styles.riskHeader}>
-                        <span style={styles.riskTitle}>Compartment Syndrome</span>
-                        <StatusBadge status={
-                            risks.compartmentScore > 60 ? 'HIGH' :
-                                risks.compartmentScore > 30 ? 'MODERATE' : 'LOW'
-                        } type={
-                            risks.compartmentScore > 60 ? 'critical' :
-                                risks.compartmentScore > 30 ? 'warning' : 'success'
-                        } />
-                    </div>
-                    <RiskGauge value={risks.compartmentScore} max={100} label="Risk Score %" />
-                    <div style={styles.riskDetail}>
-                        <strong>Clinical Indicators:</strong><br />
-                        {patientData.hasLimbIschemia && '• Limb ischemia present\n'}
-                        {patientData.hasFracture && '• Fracture present\n'}
-                        {patientData.creatineKinase > 1000 && '• Elevated CK\n'}
-                        Time since injury: {patientData.hoursSinceInjury}h
-                    </div>
-                </div>
-            </div>
-
-            {/* Interactive Controls - Organized by Data Source */}
-            <div style={styles.controlsSection}>
-                <div style={styles.sectionTitle}>Patient Data Input</div>
-
-                {/* VITALS SECTION */}
-                <div style={styles.dataSourceSection}>
-                    <div style={styles.dataSourceHeader}>
-                        <span style={styles.dataSourceIcon}>❤️</span>
-                        <span style={styles.dataSourceTitle}>Vital Signs</span>
-                    </div>
-
-                    <div style={styles.sliderGrid}>
-                        <div style={styles.sliderControl}>
-                            <div style={styles.sliderTop}>
-                                <label style={styles.sliderLabel}>Systolic Blood Pressure</label>
-                                <span style={{
-                                    ...styles.sliderValue,
-                                    color: patientData.systolicBP < 90 ? '#dc2626' : '#0f172a'
-                                }}>
-                                    {patientData.systolicBP} mmHg
-                                </span>
-                            </div>
-                            <input
-                                type="range"
-                                min="60"
-                                max="180"
-                                step="5"
-                                value={patientData.systolicBP}
-                                onChange={(e) => setPatientData({ ...patientData, systolicBP: +e.target.value })}
-                                style={styles.slider}
-                            />
-                            <div style={styles.sliderRange}>
-                                <span>60</span>
-                                <span style={{ color: '#dc2626', fontSize: '11px' }}>Critical: &lt;90</span>
-                                <span>180</span>
-                            </div>
-                        </div>
-
-                        <div style={styles.sliderControl}>
-                            <div style={styles.sliderTop}>
-                                <label style={styles.sliderLabel}>Diastolic Blood Pressure</label>
-                                <span style={styles.sliderValue}>{patientData.diastolicBP} mmHg</span>
-                            </div>
-                            <input
-                                type="range"
-                                min="40"
-                                max="120"
-                                step="5"
-                                value={patientData.diastolicBP}
-                                onChange={(e) => setPatientData({ ...patientData, diastolicBP: +e.target.value })}
-                                style={styles.slider}
-                            />
-                            <div style={styles.sliderRange}>
-                                <span>40</span>
-                                <span>120</span>
-                            </div>
-                        </div>
-
-                        <div style={styles.sliderControl}>
-                            <div style={styles.sliderTop}>
-                                <label style={styles.sliderLabel}>Heart Rate</label>
-                                <span style={{
-                                    ...styles.sliderValue,
-                                    color: patientData.heartRate > 110 ? '#dc2626' : '#0f172a'
-                                }}>
-                                    {patientData.heartRate} bpm
-                                </span>
-                            </div>
-                            <input
-                                type="range"
-                                min="40"
-                                max="180"
-                                step="5"
-                                value={patientData.heartRate}
-                                onChange={(e) => setPatientData({ ...patientData, heartRate: +e.target.value })}
-                                style={styles.slider}
-                            />
-                            <div style={styles.sliderRange}>
-                                <span>40</span>
-                                <span style={{ color: '#dc2626', fontSize: '11px' }}>Tachycardia: &gt;110</span>
-                                <span>180</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* BLOOD LABS SECTION */}
-                <div style={styles.dataSourceSection}>
-                    <div style={styles.dataSourceHeader}>
-                        <span style={styles.dataSourceIcon}>🧪</span>
-                        <span style={styles.dataSourceTitle}>Blood Laboratory Values</span>
-                    </div>
-
-                    <div style={styles.sliderGrid}>
-                        <div style={styles.sliderControl}>
-                            <div style={styles.sliderTop}>
-                                <label style={styles.sliderLabel}>Hemoglobin</label>
-                                <span style={{
-                                    ...styles.sliderValue,
-                                    color: patientData.hemoglobin < 10 ? '#dc2626' : '#0f172a'
-                                }}>
-                                    {patientData.hemoglobin} g/dL
-                                </span>
-                            </div>
-                            <input
-                                type="range"
-                                min="5"
-                                max="18"
-                                step="0.5"
-                                value={patientData.hemoglobin}
-                                onChange={(e) => setPatientData({ ...patientData, hemoglobin: +e.target.value })}
-                                style={styles.slider}
-                            />
-                            <div style={styles.sliderRange}>
-                                <span>5</span>
-                                <span style={{ color: '#dc2626', fontSize: '11px' }}>Anemia: &lt;10</span>
-                                <span>18</span>
-                            </div>
-                        </div>
-
-                        <div style={styles.sliderControl}>
-                            <div style={styles.sliderTop}>
-                                <label style={styles.sliderLabel}>White Blood Cell Count</label>
-                                <span style={{
-                                    ...styles.sliderValue,
-                                    color: patientData.wbc > 12 ? '#f59e0b' : '#0f172a'
-                                }}>
-                                    {patientData.wbc} ×10³/μL
-                                </span>
-                            </div>
-                            <input
-                                type="range"
-                                min="3"
-                                max="25"
-                                step="0.5"
-                                value={patientData.wbc}
-                                onChange={(e) => setPatientData({ ...patientData, wbc: +e.target.value })}
-                                style={styles.slider}
-                            />
-                            <div style={styles.sliderRange}>
-                                <span>3</span>
-                                <span style={{ color: '#f59e0b', fontSize: '11px' }}>Elevated: &gt;12</span>
-                                <span>25</span>
-                            </div>
-                        </div>
-
-                        <div style={styles.sliderControl}>
-                            <div style={styles.sliderTop}>
-                                <label style={styles.sliderLabel}>Lactate</label>
-                                <span style={{
-                                    ...styles.sliderValue,
-                                    color: patientData.lactate > 4 ? '#dc2626' : patientData.lactate > 2 ? '#f59e0b' : '#0f172a'
-                                }}>
-                                    {patientData.lactate} mmol/L
-                                </span>
-                            </div>
-                            <input
-                                type="range"
-                                min="0.5"
-                                max="10"
-                                step="0.5"
-                                value={patientData.lactate}
-                                onChange={(e) => setPatientData({ ...patientData, lactate: +e.target.value })}
-                                style={styles.slider}
-                            />
-                            <div style={styles.sliderRange}>
-                                <span>0.5</span>
-                                <span style={{ color: '#dc2626', fontSize: '11px' }}>Critical: &gt;4</span>
-                                <span>10</span>
-                            </div>
-                        </div>
-
-                        <div style={styles.sliderControl}>
-                            <div style={styles.sliderTop}>
-                                <label style={styles.sliderLabel}>Creatine Kinase (Rhabdomyolysis Marker)</label>
-                                <span style={{
-                                    ...styles.sliderValue,
-                                    color: patientData.creatineKinase > 1000 ? '#dc2626' : '#0f172a'
-                                }}>
-                                    {patientData.creatineKinase} U/L
-                                </span>
-                            </div>
-                            <input
-                                type="range"
-                                min="50"
-                                max="5000"
-                                step="50"
-                                value={patientData.creatineKinase}
-                                onChange={(e) => setPatientData({ ...patientData, creatineKinase: +e.target.value })}
-                                style={styles.slider}
-                            />
-                            <div style={styles.sliderRange}>
-                                <span>50</span>
-                                <span style={{ color: '#dc2626', fontSize: '11px' }}>Rhabdo: &gt;1000</span>
-                                <span>5000</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* IMAGING & CLINICAL FINDINGS SECTION */}
-                <div style={styles.dataSourceSection}>
-                    <div style={styles.dataSourceHeader}>
-                        <span style={styles.dataSourceIcon}>🔍</span>
-                        <span style={styles.dataSourceTitle}>Imaging & Clinical Findings</span>
-                    </div>
-
-                    <div style={styles.sliderControl}>
-                        <div style={styles.sliderTop}>
-                            <label style={styles.sliderLabel}>Hours Since Injury (Golden Window)</label>
-                            <span style={{
-                                ...styles.sliderValue,
-                                color: patientData.hoursSinceInjury > 6 ? '#dc2626' : patientData.hoursSinceInjury > 4 ? '#f59e0b' : '#22c55e'
-                            }}>
-                                {patientData.hoursSinceInjury} hours
-                            </span>
-                        </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="12"
-                            step="0.5"
-                            value={patientData.hoursSinceInjury}
-                            onChange={(e) => setPatientData({ ...patientData, hoursSinceInjury: +e.target.value })}
-                            style={styles.slider}
-                        />
-                        <div style={styles.sliderRange}>
-                            <span>0</span>
-                            <span style={{ color: '#22c55e', fontSize: '11px' }}>Golden: 0-6h</span>
-                            <span style={{ color: '#dc2626', fontSize: '11px' }}>Critical: &gt;6h</span>
-                            <span>12</span>
-                        </div>
-                    </div>
-
-                    <div style={styles.checkboxGrid}>
-                        {[
-                            { key: 'hasVascularInjury', label: '🩸 Vascular injury on CT angiography', icon: '🔴' },
-                            { key: 'hasFracture', label: '🦴 Fracture on X-ray', icon: '🟡' },
-                            { key: 'hasLimbIschemia', label: '🦵 Limb ischemia (6 P\'s present)', icon: '🔴' },
-                            { key: 'hasCatheter', label: '💉 Foley catheter placed (UTI risk)', icon: '🟡' },
-                            { key: 'hasOpenWound', label: '🩹 Open wound/compound fracture', icon: '🔴' }
-                        ].map(item => (
-                            <label key={item.key} style={styles.checkboxCard}>
-                                <input
-                                    type="checkbox"
-                                    checked={patientData[item.key as keyof typeof patientData] as boolean}
-                                    onChange={(e) => setPatientData({ ...patientData, [item.key]: e.target.checked })}
-                                    style={styles.checkboxInput}
-                                />
-                                <span style={styles.checkboxText}>{item.label}</span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderClassification = () => (
-        <div style={styles.tabContent}>
-            <div style={styles.sectionTitle}>Vascular Injury Classification System</div>
-
-            <div style={styles.twoColumn}>
-                <div style={styles.classInputs}>
-                    <div style={styles.inputCard}>
-                        <h3 style={styles.inputCardTitle}>Imaging Findings</h3>
-
-                        <div style={styles.controlGroup}>
-                            <label style={styles.controlLabel}>Imaging Modality</label>
-                            <select
-                                value={imagingData.modality}
-                                onChange={(e) => setImagingData({ ...imagingData, modality: e.target.value as any })}
-                                style={styles.select}
-                            >
-                                <option>X-ray</option>
-                                <option>CT Angiography</option>
-                                <option>Doppler Ultrasound</option>
-                                <option>Angiogram</option>
-                            </select>
-                            <div style={styles.helperText}>
-                                {imagingData.modality === 'CT Angiography' && '✓ Gold standard for trauma vascular imaging'}
-                                {imagingData.modality === 'Angiogram' && '✓ Definitive diagnosis + potential intervention'}
-                                {imagingData.modality === 'X-ray' && 'ℹ Limited vascular detail, shows fractures'}
-                                {imagingData.modality === 'Doppler Ultrasound' && 'ℹ Bedside assessment, good for follow-up'}
-                            </div>
-                        </div>
-
-                        <div style={styles.controlGroup}>
-                            <label style={styles.controlLabel}>Vessel Involved</label>
-                            <select
-                                value={imagingData.vessel}
-                                onChange={(e) => setImagingData({ ...imagingData, vessel: e.target.value })}
-                                style={styles.select}
-                            >
-                                <option>Femoral Artery</option>
-                                <option>Popliteal Artery</option>
-                                <option>Tibial Arteries</option>
-                                <option>Brachial Artery</option>
-                                <option>Subclavian Artery</option>
-                            </select>
-                        </div>
-
-                        <div style={styles.controlGroup}>
-                            <label style={styles.controlLabel}>Injury Pattern</label>
-                            <select
-                                value={imagingData.injuryType}
-                                onChange={(e) => setImagingData({ ...imagingData, injuryType: e.target.value as any })}
-                                style={styles.select}
-                            >
-                                <option>Intimal Injury</option>
-                                <option>Laceration</option>
-                                <option>Transection</option>
-                                <option>Thrombosis</option>
-                                <option>Pseudoaneurysm</option>
-                            </select>
-                        </div>
-
-                        <div style={styles.controlGroup}>
-                            <label style={styles.controlLabel}>
-                                Vessel Occlusion: {imagingData.occlusion}%
-                            </label>
-                            <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                step="5"
-                                value={imagingData.occlusion}
-                                onChange={(e) => setImagingData({ ...imagingData, occlusion: +e.target.value })}
-                                style={styles.slider}
-                            />
-                            <div style={styles.occlusionBar}>
-                                <div style={{
-                                    ...styles.occlusionFill,
-                                    width: `${imagingData.occlusion}%`,
-                                    backgroundColor:
-                                        imagingData.occlusion > 75 ? '#dc2626' :
-                                            imagingData.occlusion > 50 ? '#f59e0b' :
-                                                imagingData.occlusion > 25 ? '#3b82f6' : '#22c55e'
-                                }} />
-                            </div>
-                        </div>
-
-                        <label style={styles.checkbox}>
-                            <input
-                                type="checkbox"
-                                checked={imagingData.hasCollateral}
-                                onChange={(e) => setImagingData({ ...imagingData, hasCollateral: e.target.checked })}
-                            />
-                            <span>Collateral flow visualized</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div style={styles.classOutput}>
-                    <div style={{
-                        ...styles.gradeCircle,
-                        backgroundColor: injury.color
-                    }}>
-                        <div style={styles.gradeNumber}>GRADE {injury.grade}</div>
-                        <div style={styles.gradeUrgency}>{injury.urgency}</div>
-                    </div>
-
-                    <div style={styles.classificationCard}>
-                        <div style={styles.classLabel}>Injury Classification</div>
-                        <div style={styles.classValue}>{injury.description}</div>
-                    </div>
-
-                    <div style={styles.classificationCard}>
-                        <div style={styles.classLabel}>Management Recommendation</div>
-                        <div style={styles.classValue}>{injury.recommendation}</div>
-                    </div>
-
-                    <div style={styles.classificationCard}>
-                        <div style={styles.classLabel}>Operative Repair Required</div>
-                        <div style={{
-                            ...styles.classValue,
-                            color: injury.needsSurgery ? '#dc2626' : '#22c55e',
-                            fontWeight: 'bold'
-                        }}>
-                            {injury.needsSurgery ? '✓ YES - Schedule OR' : '✗ No - Medical management'}
-                        </div>
-                    </div>
-
-                    {imagingData.hasCollateral && (
-                        <div style={styles.collateralNote}>
-                            <strong>✓ Collateral flow present</strong><br />
-                            Better prognosis, improved tissue perfusion despite injury
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Visual Grading Scale */}
-            <div style={styles.gradingScale}>
-                <div style={styles.sectionTitle}>SVS Injury Grading Reference</div>
-                <div style={styles.gradeBar}>
-                    {[
-                        { g: 1, c: '#22c55e', l: 'Grade I\nMinor' },
-                        { g: 2, c: '#3b82f6', l: 'Grade II\nModerate' },
-                        { g: 3, c: '#f59e0b', l: 'Grade III\nSevere' },
-                        { g: 4, c: '#ef4444', l: 'Grade IV\nCritical' },
-                        { g: 5, c: '#dc2626', l: 'Grade V\nLife-Threatening' }
-                    ].map(item => (
-                        <div
-                            key={item.g}
-                            style={{
-                                ...styles.gradeSegment,
-                                backgroundColor: item.c,
-                                opacity: item.g === injury.grade ? 1 : 0.3
-                            }}
-                        >
-                            {item.l}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderSimulation = () => {
-        const pulse = Math.sin(simulationTime / 30) * 0.3 + 1;
-
-        return (
-            <div style={styles.tabContent}>
-                <div style={styles.sectionTitle}>Hemodynamic Simulation - Patient Education Tool</div>
-
-                {/* Controls */}
-                <div style={styles.simControls}>
-                    <div style={styles.controlGroup}>
-                        <label style={styles.controlLabel}>
-                            Proximal BP: {hemodynamics.proximalBP} mmHg
-                        </label>
-                        <input
-                            type="range"
-                            min="60"
-                            max="180"
-                            step="5"
-                            value={hemodynamics.proximalBP}
-                            onChange={(e) => setHemodynamics({ ...hemodynamics, proximalBP: +e.target.value })}
-                            style={styles.slider}
-                        />
-                    </div>
-
-                    <div style={styles.controlGroup}>
-                        <label style={styles.controlLabel}>
-                            Distal BP: {hemodynamics.distalBP} mmHg
-                        </label>
-                        <input
-                            type="range"
-                            min="0"
-                            max="120"
-                            step="5"
-                            value={hemodynamics.distalBP}
-                            onChange={(e) => setHemodynamics({ ...hemodynamics, distalBP: +e.target.value })}
-                            style={styles.slider}
-                        />
-                    </div>
-
-                    <div style={styles.controlGroup}>
-                        <label style={styles.controlLabel}>
-                            Compartment Pressure: {hemodynamics.compartmentPressure} mmHg
-                        </label>
-                        <input
-                            type="range"
-                            min="0"
-                            max="60"
-                            step="5"
-                            value={hemodynamics.compartmentPressure}
-                            onChange={(e) => setHemodynamics({ ...hemodynamics, compartmentPressure: +e.target.value })}
-                            style={styles.slider}
-                        />
-                    </div>
-
-                    <div style={styles.controlGroup}>
-                        <label style={styles.controlLabel}>
-                            Time to Revascularization: {hemodynamics.timeToRevasc} hours
-                        </label>
-                        <input
-                            type="range"
-                            min="0"
-                            max="12"
-                            step="0.5"
-                            value={hemodynamics.timeToRevasc}
-                            onChange={(e) => setHemodynamics({ ...hemodynamics, timeToRevasc: +e.target.value })}
-                            style={styles.slider}
-                        />
-                    </div>
-                </div>
-
-                {/* Visualization */}
-                <div style={styles.visualization}>
-                    <svg width="100%" height="300" viewBox="0 0 900 300" style={styles.svg}>
-                        {/* Proximal vessel */}
-                        <line x1="50" y1="150" x2="250" y2="150" stroke="#ef4444" strokeWidth="25" opacity="0.8" />
-                        <text x="150" y="130" textAnchor="middle" fill="#1e293b" fontSize="14" fontWeight="bold">
-                            {hemodynamics.proximalBP} mmHg
-                        </text>
-
-                        {/* Injury */}
-                        <circle cx="300" cy="150" r="35" fill="#f59e0b" opacity="0.9" />
-                        <text x="300" y="155" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
-                            INJURY
-                        </text>
-
-                        {/* Distal vessel */}
-                        <line
-                            x1="350"
-                            y1="150"
-                            x2="550"
-                            y2="150"
-                            stroke="#ef4444"
-                            strokeWidth={12 + (hemodynamics.distalBP / hemodynamics.proximalBP) * 13}
-                            opacity={0.3 + (hemodynamics.distalBP / hemodynamics.proximalBP) * 0.5}
-                        />
-                        <text x="450" y="130" textAnchor="middle" fill="#1e293b" fontSize="14" fontWeight="bold">
-                            {hemodynamics.distalBP} mmHg
-                        </text>
-
-                        {/* Tissue compartment */}
-                        <rect x="600" y="90" width="250" height="120" fill="#94a3b8" opacity="0.2" rx="8" />
-                        <text x="725" y="120" textAnchor="middle" fill="#1e293b" fontSize="12" fontWeight="600">
-                            TISSUE COMPARTMENT
-                        </text>
-                        <text x="725" y="145" textAnchor="middle" fill="#1e293b" fontSize="18" fontWeight="bold">
-                            {hemodynamics.compartmentPressure} mmHg
-                        </text>
-                        <text x="725" y="170" textAnchor="middle" fill={perfusion.statusColor} fontSize="13" fontWeight="bold">
-                            {perfusion.compartmentSyndrome ? '⚠️ COMPARTMENT SYNDROME' : '✓ Normal Pressure'}
-                        </text>
-
-                        {/* Blood particles */}
-                        {isRunning && [...Array(15)].map((_, i) => {
-                            const x = ((simulationTime * 5 + i * 60) % 600) + 50;
-                            const opacity = x < 350 ? 0.7 : 0.3 + (hemodynamics.distalBP / hemodynamics.proximalBP) * 0.4;
-                            const r = x < 350 ? 3.5 * pulse : 2.5 * (hemodynamics.distalBP / hemodynamics.proximalBP) * pulse;
-
-                            return (
-                                <circle
-                                    key={i}
-                                    cx={x}
-                                    cy={150 + (Math.random() - 0.5) * 15}
-                                    r={r}
-                                    fill="#dc2626"
-                                    opacity={opacity}
-                                />
-                            );
-                        })}
-
-                        {/* Annotations */}
-                        <text x="300" y="220" textAnchor="middle" fill="#3b82f6" fontSize="13" fontWeight="600">
-                            Pressure Drop: {perfusion.gradient} mmHg
-                        </text>
-                        <text x="725" y="220" textAnchor="middle" fill="#8b5cf6" fontSize="13" fontWeight="600">
-                            Perfusion Pressure: {perfusion.perfPressure} mmHg
-                        </text>
-                    </svg>
-                </div>
-
-                {/* Metrics */}
-                <div style={styles.perfMetrics}>
-                    <div style={{ ...styles.perfCard, borderLeft: `4px solid ${perfusion.statusColor}` }}>
-                        <div style={styles.perfLabel}>Tissue Status</div>
-                        <div style={{ ...styles.perfValue, color: perfusion.statusColor }}>
-                            {perfusion.tissueStatus}
-                        </div>
-                    </div>
-
-                    <div style={styles.perfCard}>
-                        <div style={styles.perfLabel}>Perfusion Pressure</div>
-                        <div style={styles.perfValue}>
-                            {perfusion.perfPressure} mmHg
-                        </div>
-                        <div style={styles.perfNote}>
-                            {perfusion.compartmentSyndrome ? 'CRITICAL - Below 30 mmHg threshold' : 'Adequate perfusion'}
-                        </div>
-                    </div>
-
-                    <div style={styles.perfCard}>
-                        <div style={styles.perfLabel}>Time to Irreversible Damage</div>
-                        <div style={{
-                            ...styles.perfValue,
-                            color: perfusion.timeLeft < 2 ? '#dc2626' : perfusion.timeLeft < 4 ? '#f59e0b' : '#22c55e'
-                        }}>
-                            {perfusion.timeLeft.toFixed(1)} hours
-                        </div>
-                        <div style={styles.perfNote}>
-                            {perfusion.timeLeft < 2 && 'URGENT - Immediate intervention required'}
-                        </div>
-                    </div>
-
-                    <div style={styles.perfCard}>
-                        <div style={styles.perfLabel}>Fasciotomy Indicated</div>
-                        <div style={{
-                            ...styles.perfValue,
-                            color: perfusion.needsFasciotomy ? '#dc2626' : '#22c55e'
-                        }}>
-                            {perfusion.needsFasciotomy ? 'YES' : 'NO'}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Patient Explanation */}
-                <div style={styles.patientExplanation}>
-                    <h3 style={styles.explanationTitle}>🗣️ Explaining to Patient:</h3>
-                    <div style={styles.explanationText}>
-                        <p>
-                            <strong>What's happening:</strong> Your injury has partially blocked blood flow to your limb.
-                            The pressure inside your muscle compartment is currently {hemodynamics.compartmentPressure} mmHg.
-                        </p>
-
-                        {perfusion.compartmentSyndrome ? (
-                            <div style={styles.urgentExplanation}>
-                                <strong>⚠️ Why we need to act now:</strong><br />
-                                When the pressure in your muscle compartment gets too high, it squeezes your blood vessels
-                                like a tourniquet. Your perfusion pressure is only {perfusion.perfPressure} mmHg - below the
-                                critical 30 mmHg threshold. Without surgery to release this pressure (fasciotomy), the tissue
-                                will start dying within {perfusion.timeLeft.toFixed(1)} hours.
-                            </div>
-                        ) : (
-                            <p style={styles.goodNews}>
-                                <strong>✓ Good news:</strong> Your perfusion pressure is adequate at {perfusion.perfPressure} mmHg,
-                                meaning blood is still reaching your tissue. We'll monitor you closely and can intervene quickly
-                                if things change.
-                            </p>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    // ========== MAIN RENDER ==========
+  const renderSimulation = () => {
+    const pulse = Math.sin(simulationTime / 30) * 0.3 + 1;
 
     return (
-        <div style={styles.container}>
-            {/* Header */}
-            <div style={styles.header}>
-                <div style={styles.headerTop}>
-                    <div>
-                        <h1 style={styles.mainTitle}>AI-Powered Clinical Decision Support</h1>
-                        <p style={styles.subtitle}>Acute Vascular Surgery • Multi-Modal Assessment & Real-Time Guidance</p>
-                    </div>
-                    <div style={styles.aiLogo}>
-                        <span style={styles.aiLogoText}>AI</span>
-                    </div>
-                </div>
-            </div>
+      <>
+        <Card>
+          <CardTitle><Syringe size={18} /> Hemodynamic Parameters</CardTitle>
+          <Grid $cols={4}>
+            <SliderGroup>
+              <SliderHeader>
+                <SliderLabel>Proximal BP</SliderLabel>
+                <SliderValue>{hemodynamics.proximalBP} mmHg</SliderValue>
+              </SliderHeader>
+              <Slider type="range" min="60" max="180" step="5" value={hemodynamics.proximalBP}
+                onChange={(e) => setHemodynamics({ ...hemodynamics, proximalBP: +e.target.value })} />
+            </SliderGroup>
 
-            {/* Navigation Tabs */}
-            <div style={styles.tabs}>
-                {[
-                    { id: 'predictive', icon: '📊', title: 'Risk Prediction', desc: 'Multi-modal assessment' },
-                    { id: 'classification', icon: '🔍', title: 'Injury Classification', desc: 'Imaging-based grading' },
-                    { id: 'simulation', icon: '💉', title: 'Hemodynamics', desc: 'Patient education' }
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as ModelType)}
-                        style={{
-                            ...styles.tab,
-                            ...(activeTab === tab.id ? styles.tabActive : {})
-                        }}
-                    >
-                        <span style={styles.tabIcon}>{tab.icon}</span>
-                        <div style={styles.tabText}>
-                            <div style={styles.tabTitle}>{tab.title}</div>
-                            <div style={styles.tabDesc}>{tab.desc}</div>
-                        </div>
-                    </button>
-                ))}
-            </div>
+            <SliderGroup>
+              <SliderHeader>
+                <SliderLabel>Distal BP</SliderLabel>
+                <SliderValue $warning={hemodynamics.distalBP < 60}>{hemodynamics.distalBP} mmHg</SliderValue>
+              </SliderHeader>
+              <Slider type="range" min="0" max="120" step="5" value={hemodynamics.distalBP}
+                onChange={(e) => setHemodynamics({ ...hemodynamics, distalBP: +e.target.value })} />
+            </SliderGroup>
 
-            {/* Content */}
-            {activeTab === 'predictive' && renderPredictive()}
-            {activeTab === 'classification' && renderClassification()}
-            {activeTab === 'simulation' && renderSimulation()}
-        </div>
+            <SliderGroup>
+              <SliderHeader>
+                <SliderLabel>Compartment Pressure</SliderLabel>
+                <SliderValue $critical={hemodynamics.compartmentPressure > 30}>{hemodynamics.compartmentPressure} mmHg</SliderValue>
+              </SliderHeader>
+              <Slider type="range" min="0" max="60" step="5" value={hemodynamics.compartmentPressure}
+                onChange={(e) => setHemodynamics({ ...hemodynamics, compartmentPressure: +e.target.value })} />
+            </SliderGroup>
+
+            <SliderGroup>
+              <SliderHeader>
+                <SliderLabel>Time to Revasc</SliderLabel>
+                <SliderValue $critical={hemodynamics.timeToRevasc > 6}>{hemodynamics.timeToRevasc}h</SliderValue>
+              </SliderHeader>
+              <Slider type="range" min="0" max="12" step="0.5" value={hemodynamics.timeToRevasc}
+                onChange={(e) => setHemodynamics({ ...hemodynamics, timeToRevasc: +e.target.value })} />
+            </SliderGroup>
+          </Grid>
+        </Card>
+
+        <Card>
+          <CardTitle><Activity size={18} /> Blood Flow Visualization</CardTitle>
+          <SimulationSVG viewBox="0 0 800 200">
+            {/* Proximal vessel */}
+            <line x1="40" y1="100" x2="200" y2="100" stroke="#ef4444" strokeWidth="20" opacity="0.8" />
+            <text x="120" y="80" textAnchor="middle" fill="#94a3b8" fontSize="12" fontWeight="600">{hemodynamics.proximalBP} mmHg</text>
+
+            {/* Injury */}
+            <circle cx="250" cy="100" r="28" fill="#f59e0b" opacity="0.9" />
+            <text x="250" y="105" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">INJURY</text>
+
+            {/* Distal vessel */}
+            <line x1="300" y1="100" x2="480" y2="100" stroke="#ef4444"
+              strokeWidth={10 + (hemodynamics.distalBP / hemodynamics.proximalBP) * 10}
+              opacity={0.3 + (hemodynamics.distalBP / hemodynamics.proximalBP) * 0.5} />
+            <text x="390" y="80" textAnchor="middle" fill="#94a3b8" fontSize="12" fontWeight="600">{hemodynamics.distalBP} mmHg</text>
+
+            {/* Tissue compartment */}
+            <rect x="520" y="60" width="240" height="80" fill="#334155" opacity="0.3" rx="8" />
+            <text x="640" y="90" textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="600">TISSUE COMPARTMENT</text>
+            <text x="640" y="115" textAnchor="middle" fill="#e2e8f0" fontSize="16" fontWeight="700">{hemodynamics.compartmentPressure} mmHg</text>
+            <text x="640" y="135" textAnchor="middle" fill={perfusion.statusColor} fontSize="10" fontWeight="700">
+              {perfusion.compartmentSyndrome ? '⚠️ COMPARTMENT SYNDROME' : '✓ Normal'}
+            </text>
+
+            {/* Blood particles */}
+            {isRunning && [...Array(12)].map((_, i) => {
+              const x = ((simulationTime * 4 + i * 50) % 500) + 40;
+              const opacity = x < 300 ? 0.7 : 0.3 + (hemodynamics.distalBP / hemodynamics.proximalBP) * 0.4;
+              const r = x < 300 ? 3 * pulse : 2.5 * (hemodynamics.distalBP / hemodynamics.proximalBP) * pulse;
+              return <circle key={i} cx={x} cy={100 + (Math.random() - 0.5) * 12} r={r} fill="#dc2626" opacity={opacity} />;
+            })}
+
+            {/* Labels */}
+            <text x="250" y="165" textAnchor="middle" fill="#60a5fa" fontSize="11" fontWeight="600">Gradient: {perfusion.gradient} mmHg</text>
+            <text x="640" y="165" textAnchor="middle" fill="#a78bfa" fontSize="11" fontWeight="600">Perfusion: {perfusion.perfPressure} mmHg</text>
+          </SimulationSVG>
+        </Card>
+
+        <PerfGrid>
+          <PerfCard $borderColor={perfusion.statusColor}>
+            <MetricLabel>Tissue Status</MetricLabel>
+            <MetricValue $color={perfusion.statusColor}>{perfusion.tissueStatus}</MetricValue>
+          </PerfCard>
+          <PerfCard>
+            <MetricLabel>Perfusion Pressure</MetricLabel>
+            <MetricValue>{perfusion.perfPressure}<MetricUnit>mmHg</MetricUnit></MetricValue>
+            <div style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '0.25rem' }}>
+              {perfusion.compartmentSyndrome ? 'Below 30 mmHg threshold' : 'Adequate perfusion'}
+            </div>
+          </PerfCard>
+          <PerfCard $borderColor={perfusion.timeLeft < 2 ? '#ef4444' : perfusion.timeLeft < 4 ? '#f59e0b' : '#22c55e'}>
+            <MetricLabel>Time to Damage</MetricLabel>
+            <MetricValue $color={perfusion.timeLeft < 2 ? '#f87171' : perfusion.timeLeft < 4 ? '#fbbf24' : '#4ade80'}>
+              {perfusion.timeLeft.toFixed(1)}<MetricUnit>hrs</MetricUnit>
+            </MetricValue>
+          </PerfCard>
+          <PerfCard $borderColor={perfusion.needsFasciotomy ? '#ef4444' : '#22c55e'}>
+            <MetricLabel>Fasciotomy</MetricLabel>
+            <MetricValue $color={perfusion.needsFasciotomy ? '#f87171' : '#4ade80'}>
+              {perfusion.needsFasciotomy ? 'INDICATED' : 'NOT NEEDED'}
+            </MetricValue>
+          </PerfCard>
+        </PerfGrid>
+
+        <PatientBox $urgent={perfusion.compartmentSyndrome}>
+          <PatientTitle>
+            <Droplets size={18} style={{ color: perfusion.compartmentSyndrome ? '#f87171' : '#4ade80' }} />
+            Patient Education
+          </PatientTitle>
+          <PatientText>
+            {perfusion.compartmentSyndrome ? (
+              <>
+                <strong>⚠️ Why we need to act now:</strong> The pressure in your muscle compartment ({hemodynamics.compartmentPressure} mmHg) is squeezing your blood vessels.
+                Your perfusion pressure is only {perfusion.perfPressure} mmHg — below the critical 30 mmHg threshold.
+                Without surgery to release this pressure (fasciotomy), tissue damage will occur within {perfusion.timeLeft.toFixed(1)} hours.
+              </>
+            ) : (
+              <>
+                <strong>✓ Good news:</strong> Your perfusion pressure is adequate at {perfusion.perfPressure} mmHg, meaning blood is reaching your tissue.
+                We'll monitor you closely and can intervene quickly if things change.
+              </>
+            )}
+          </PatientText>
+        </PatientBox>
+      </>
     );
-};
+  };
 
-// ========== STYLES ==========
+  return (
+    <Container>
+      <ScrollContent>
+        <TabBar>
+          <Tab $active={activeTab === 'predictive'} onClick={() => setActiveTab('predictive')}>
+            <Activity size={18} /> Risk Prediction
+          </Tab>
+          <Tab $active={activeTab === 'classification'} onClick={() => setActiveTab('classification')}>
+            <Brain size={18} /> Injury Classification
+          </Tab>
+          <Tab $active={activeTab === 'simulation'} onClick={() => setActiveTab('simulation')}>
+            <Syringe size={18} /> Hemodynamics
+          </Tab>
+        </TabBar>
 
-const styles: { [key: string]: React.CSSProperties } = {
-    container: {
-        minHeight: '100vh',
-        backgroundColor: '#f1f5f9',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
-        padding: '0'
-    },
-    header: {
-        backgroundColor: 'white',
-        borderBottom: '1px solid #e2e8f0',
-        padding: '24px 32px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-    },
-    headerTop: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        maxWidth: '1400px',
-        margin: '0 auto'
-    },
-    mainTitle: {
-        fontSize: '28px',
-        fontWeight: '700',
-        color: '#0f172a',
-        margin: '0 0 6px 0',
-        letterSpacing: '-0.5px'
-    },
-    subtitle: {
-        fontSize: '14px',
-        color: '#64748b',
-        margin: 0,
-        fontWeight: '500'
-    },
-    aiLogo: {
-        width: '56px',
-        height: '56px',
-        borderRadius: '12px',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
-    },
-    aiLogoText: {
-        color: 'white',
-        fontSize: '20px',
-        fontWeight: '800',
-        letterSpacing: '1px'
-    },
-    tabs: {
-        backgroundColor: 'white',
-        borderBottom: '1px solid #e2e8f0',
-        display: 'flex',
-        gap: '4px',
-        padding: '16px 32px',
-        maxWidth: '1400px',
-        margin: '0 auto'
-    },
-    tab: {
-        flex: 1,
-        padding: '16px 20px',
-        border: 'none',
-        backgroundColor: 'transparent',
-        borderRadius: '8px',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        transition: 'all 0.2s',
-        outline: 'none'
-    },
-    tabActive: {
-        backgroundColor: '#eff6ff',
-        boxShadow: 'inset 0 0 0 2px #3b82f6'
-    },
-    tabIcon: {
-        fontSize: '24px'
-    },
-    tabText: {
-        textAlign: 'left'
-    },
-    tabTitle: {
-        fontSize: '15px',
-        fontWeight: '600',
-        color: '#1e293b',
-        marginBottom: '2px'
-    },
-    tabDesc: {
-        fontSize: '12px',
-        color: '#64748b'
-    },
-    tabContent: {
-        maxWidth: '1400px',
-        margin: '0 auto',
-        padding: '32px'
-    },
-    sectionTitle: {
-        fontSize: '18px',
-        fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: '20px',
-        letterSpacing: '-0.3px'
-    },
-    aiPanel: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '32px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        border: '2px solid #e0e7ff'
-    },
-    aiHeader: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px'
-    },
-    aiTitle: {
-        fontSize: '16px',
-        fontWeight: '700',
-        color: '#1e293b',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-    },
-    aiIcon: {
-        fontSize: '20px'
-    },
-    closeBtn: {
-        border: 'none',
-        background: 'none',
-        fontSize: '24px',
-        color: '#94a3b8',
-        cursor: 'pointer',
-        padding: '0',
-        width: '28px',
-        height: '28px',
-        lineHeight: '28px'
-    },
-    alertsContainer: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '12px'
-    },
-    alertCard: {
-        padding: '16px',
-        borderRadius: '8px',
-        backgroundColor: '#fef2f2'
-    },
-    alertType: {
-        fontSize: '13px',
-        fontWeight: '700',
-        color: '#dc2626',
-        marginBottom: '6px'
-    },
-    alertMsg: {
-        fontSize: '14px',
-        color: '#1e293b',
-        lineHeight: '1.5'
-    },
-    aiSuccess: {
-        padding: '16px',
-        backgroundColor: '#f0fdf4',
-        borderRadius: '8px',
-        color: '#16a34a',
-        fontSize: '14px',
-        fontWeight: '600'
-    },
-    metricsGrid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '16px',
-        marginBottom: '32px'
-    },
-    metricCard: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '20px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: '1px solid #e2e8f0'
-    },
-    metricIcon: {
-        fontSize: '28px',
-        marginBottom: '12px'
-    },
-    metricLabel: {
-        fontSize: '13px',
-        color: '#64748b',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-        marginBottom: '8px'
-    },
-    metricValue: {
-        fontSize: '32px',
-        fontWeight: '700',
-        color: '#0f172a',
-        marginBottom: '12px'
-    },
-    metricUnit: {
-        fontSize: '16px',
-        color: '#64748b',
-        fontWeight: '500'
-    },
-    riskGrid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-        gap: '20px',
-        marginBottom: '32px'
-    },
-    riskCard: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '24px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: '1px solid #e2e8f0'
-    },
-    riskHeader: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px'
-    },
-    riskTitle: {
-        fontSize: '15px',
-        fontWeight: '700',
-        color: '#1e293b'
-    },
-    riskDetail: {
-        fontSize: '13px',
-        color: '#475569',
-        lineHeight: '1.6',
-        marginTop: '16px',
-        padding: '12px',
-        backgroundColor: '#f8fafc',
-        borderRadius: '6px'
-    },
-    gaugeContainer: {
-        marginBottom: '16px'
-    },
-    gaugeLabel: {
-        fontSize: '12px',
-        color: '#64748b',
-        fontWeight: '600',
-        marginBottom: '8px',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px'
-    },
-    gaugeOuter: {
-        height: '10px',
-        backgroundColor: '#e2e8f0',
-        borderRadius: '5px',
-        overflow: 'hidden',
-        marginBottom: '6px'
-    },
-    gaugeFill: {
-        height: '100%',
-        borderRadius: '5px',
-        transition: 'all 0.3s ease'
-    },
-    gaugeValue: {
-        fontSize: '18px',
-        fontWeight: '700',
-        textAlign: 'right'
-    },
-    controlsSection: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '24px',
-        marginTop: '32px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: '1px solid #e2e8f0'
-    },
-    dataSourceSection: {
-        marginBottom: '32px',
-        paddingBottom: '24px',
-        borderBottom: '2px solid #f1f5f9'
-    },
-    dataSourceHeader: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        marginBottom: '24px'
-    },
-    dataSourceIcon: {
-        fontSize: '24px'
-    },
-    dataSourceTitle: {
-        fontSize: '16px',
-        fontWeight: '700',
-        color: '#1e293b',
-        letterSpacing: '-0.2px'
-    },
-    sliderGrid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-        gap: '24px'
-    },
-    sliderControl: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px'
-    },
-    sliderTop: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-    },
-    sliderLabel: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#475569'
-    },
-    sliderValue: {
-        fontSize: '16px',
-        fontWeight: '700',
-        color: '#0f172a'
-    },
-    sliderRange: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        fontSize: '11px',
-        color: '#94a3b8',
-        marginTop: '4px',
-        paddingLeft: '2px',
-        paddingRight: '2px'
-    },
-    checkboxCard: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '14px 16px',
-        borderRadius: '8px',
-        border: '2px solid #e2e8f0',
-        cursor: 'pointer',
-        fontSize: '14px',
-        fontWeight: '500',
-        color: '#475569',
-        transition: 'all 0.2s',
-        backgroundColor: 'white'
-    },
-    checkboxInput: {
-        width: '20px',
-        height: '20px',
-        cursor: 'pointer'
-    },
-    checkboxText: {
-        flex: 1
-    },
-    controlsGrid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '20px',
-        marginBottom: '24px'
-    },
-    controlGroup: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px'
-    },
-    controlLabel: {
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#475569'
-    },
-    select: {
-        padding: '10px 14px',
-        border: '1.5px solid #cbd5e1',
-        borderRadius: '8px',
-        fontSize: '14px',
-        fontWeight: '500',
-        outline: 'none',
-        backgroundColor: 'white',
-        cursor: 'pointer'
-    },
-    slider: {
-        width: '100%',
-        height: '6px',
-        borderRadius: '3px',
-        outline: 'none',
-        background: '#cbd5e1',
-        cursor: 'pointer'
-    },
-    checkboxGrid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '12px',
-        marginTop: '16px'
-    },
-    checkbox: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        padding: '12px',
-        borderRadius: '8px',
-        border: '1.5px solid #e2e8f0',
-        cursor: 'pointer',
-        fontSize: '14px',
-        fontWeight: '500',
-        color: '#475569',
-        transition: 'all 0.2s'
-    },
-    twoColumn: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '24px',
-        marginBottom: '32px'
-    },
-    classInputs: {},
-    inputCard: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '24px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: '1px solid #e2e8f0'
-    },
-    inputCardTitle: {
-        fontSize: '16px',
-        fontWeight: '700',
-        color: '#1e293b',
-        marginBottom: '20px'
-    },
-    helperText: {
-        fontSize: '12px',
-        color: '#64748b',
-        marginTop: '6px',
-        lineHeight: '1.4'
-    },
-    occlusionBar: {
-        height: '20px',
-        backgroundColor: '#e2e8f0',
-        borderRadius: '10px',
-        overflow: 'hidden',
-        marginTop: '8px'
-    },
-    occlusionFill: {
-        height: '100%',
-        transition: 'all 0.3s ease'
-    },
-    classOutput: {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '16px'
-    },
-    gradeCircle: {
-        width: '140px',
-        height: '140px',
-        borderRadius: '50%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        margin: '0 auto 20px',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
-    },
-    gradeNumber: {
-        color: 'white',
-        fontSize: '32px',
-        fontWeight: '800',
-        marginBottom: '4px'
-    },
-    gradeUrgency: {
-        color: 'white',
-        fontSize: '14px',
-        fontWeight: '700',
-        textTransform: 'uppercase',
-        letterSpacing: '1px'
-    },
-    classificationCard: {
-        backgroundColor: 'white',
-        padding: '20px',
-        borderRadius: '12px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: '1px solid #e2e8f0'
-    },
-    classLabel: {
-        fontSize: '12px',
-        color: '#64748b',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-        marginBottom: '8px'
-    },
-    classValue: {
-        fontSize: '15px',
-        color: '#1e293b',
-        fontWeight: '600',
-        lineHeight: '1.5'
-    },
-    collateralNote: {
-        padding: '16px',
-        backgroundColor: '#f0fdf4',
-        borderRadius: '8px',
-        border: '1.5px solid #22c55e',
-        fontSize: '13px',
-        color: '#166534',
-        lineHeight: '1.6'
-    },
-    gradingScale: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '24px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: '1px solid #e2e8f0'
-    },
-    gradeBar: {
-        display: 'flex',
-        gap: '8px',
-        marginTop: '16px'
-    },
-    gradeSegment: {
-        flex: 1,
-        padding: '20px 12px',
-        borderRadius: '8px',
-        color: 'white',
-        fontSize: '13px',
-        fontWeight: '700',
-        textAlign: 'center',
-        whiteSpace: 'pre-line',
-        transition: 'opacity 0.3s'
-    },
-    simControls: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '24px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: '1px solid #e2e8f0',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '20px'
-    },
-    visualization: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '32px',
-        marginBottom: '24px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: '1px solid #e2e8f0'
-    },
-    svg: {
-        display: 'block'
-    },
-    perfMetrics: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '16px',
-        marginBottom: '24px'
-    },
-    perfCard: {
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        padding: '20px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-        border: '1px solid #e2e8f0'
-    },
-    perfLabel: {
-        fontSize: '13px',
-        color: '#64748b',
-        fontWeight: '600',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-        marginBottom: '10px'
-    },
-    perfValue: {
-        fontSize: '28px',
-        fontWeight: '700',
-        color: '#0f172a',
-        marginBottom: '8px'
-    },
-    perfNote: {
-        fontSize: '12px',
-        color: '#64748b',
-        lineHeight: '1.4'
-    },
-    patientExplanation: {
-        backgroundColor: '#f0fdf4',
-        borderRadius: '12px',
-        padding: '24px',
-        border: '2px solid #22c55e'
-    },
-    explanationTitle: {
-        fontSize: '16px',
-        fontWeight: '700',
-        color: '#166534',
-        marginBottom: '16px'
-    },
-    explanationText: {
-        fontSize: '14px',
-        color: '#1e293b',
-        lineHeight: '1.7'
-    },
-    urgentExplanation: {
-        marginTop: '16px',
-        padding: '16px',
-        backgroundColor: '#fef2f2',
-        borderRadius: '8px',
-        border: '2px solid #ef4444',
-        color: '#991b1b',
-        lineHeight: '1.6'
-    },
-    goodNews: {
-        marginTop: '16px',
-        padding: '16px',
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        border: '2px solid #22c55e',
-        lineHeight: '1.6'
-    }
+        {activeTab === 'predictive' && renderPredictive()}
+        {activeTab === 'classification' && renderClassification()}
+        {activeTab === 'simulation' && renderSimulation()}
+      </ScrollContent>
+    </Container>
+  );
 };
 
 export default MedicalModelsDemo;
