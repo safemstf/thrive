@@ -509,6 +509,15 @@ interface DiseaseSimulationProps {
   isTheaterMode?: boolean;
 }
 
+
+
+interface DiseaseSimulationProps {
+  isDark?: boolean;
+  isRunning?: boolean;
+  speed?: number;
+  isTheaterMode?: boolean;
+}
+
 export default function DiseaseSimulation({
   isDark = false,
   isRunning: isRunningProp = false,
@@ -521,6 +530,16 @@ export default function DiseaseSimulation({
   const animationRef = useRef<number | null>(null);
   const networkConnections = useRef<Map<number, Set<number>>>(new Map());
   const ticksPerDay = 30;
+
+  // ===== timing refs & constants for fixed-step sim + capped render =====
+  const TARGET_FPS = 80;
+  const TARGET_FRAME_MS = 1000 / TARGET_FPS;
+  const SIM_TPS = 30; // logical ticks per second
+  const SIM_STEP_MS = 1000 / SIM_TPS;
+  const lastTimeRef = useRef<number | null>(null);
+  const accumulatorRef = useRef<number>(0);
+  const lastRenderRef = useRef<number | null>(null);
+  // ===================================================================
 
   // Pan & Zoom
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -564,7 +583,7 @@ export default function DiseaseSimulation({
     peakInfected: 0
   });
 
-  // FIXED PHYSICS WORLD - Add these two lines:
+  // FIXED PHYSICS WORLD
   const PHYSICS_WIDTH = 1200;
   const PHYSICS_HEIGHT = 1000;
 
@@ -661,7 +680,7 @@ export default function DiseaseSimulation({
   }, [population, initialInfected, disease, vaccination, vaccinationRate, simulationMode]);
 
   const updateStats = (agentList: Agent[]) => {
-    const counts = { S: 0, E: 0, I: 0, R: 0, D: 0, V: 0 };
+    const counts = { S: 0, E: 0, I: 0, R: 0, D: 0, V: 0 } as any;
     let newCases = 0;
 
     for (const a of agentList) {
@@ -786,7 +805,7 @@ export default function DiseaseSimulation({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear entire canvas
+    // Clear entire canvas once
     ctx.fillStyle = "#0a0e1a";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -794,12 +813,6 @@ export default function DiseaseSimulation({
     ctx.save();
     ctx.translate(panOffset.x, panOffset.y);
     ctx.scale(zoomLevel, zoomLevel);
-
-
-    // Clear entire canvas
-    ctx.fillStyle = "#0a0e1a";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
 
     // Draw network connections
     if ((simulationMode === 'regions' || simulationMode === 'households') && networkConnections.current.size > 0) {
@@ -845,7 +858,7 @@ export default function DiseaseSimulation({
     ctx.restore();
   }, [disease, simulationMode, panOffset, zoomLevel]);
 
-  // Touch/mouse handlers
+  // Touch/mouse handlers (unchanged)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const touch1 = e.touches[0];
@@ -912,17 +925,54 @@ export default function DiseaseSimulation({
     setSpeed(speedProp);
   }, [speedProp]);
 
-  // Animation loop
+  // ===== Animation loop (fixed-step simulation + capped render) =====
   useEffect(() => {
-    const animate = () => {
-      update();
-      const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
-      render(canvas);
-      if (isRunning) animationRef.current = requestAnimationFrame(animate);
+    const loop = (time: number) => {
+      if (!isRunning) return;
+
+      if (lastTimeRef.current === null) {
+        lastTimeRef.current = time;
+        lastRenderRef.current = time;
+      }
+
+      const delta = time - lastTimeRef.current;
+      lastTimeRef.current = time;
+      accumulatorRef.current += delta;
+
+      // Fixed simulation steps
+      let steps = 0;
+      while (accumulatorRef.current >= SIM_STEP_MS) {
+        update();
+        accumulatorRef.current -= SIM_STEP_MS;
+        steps++;
+        if (steps > 10) { accumulatorRef.current = 0; break; }
+      }
+
+      // Throttle rendering
+      if (lastRenderRef.current === null || time - lastRenderRef.current >= TARGET_FRAME_MS) {
+        lastRenderRef.current = time;
+        const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
+        render(canvas);
+      }
+
+      animationRef.current = requestAnimationFrame(loop);
     };
-    if (isRunning) animationRef.current = requestAnimationFrame(animate);
-    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
+
+    if (isRunning) {
+      lastTimeRef.current = null;
+      accumulatorRef.current = 0;
+      lastRenderRef.current = null;
+      animationRef.current = requestAnimationFrame(loop);
+    }
+
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      lastTimeRef.current = null;
+      accumulatorRef.current = 0;
+      lastRenderRef.current = null;
+    };
   }, [isRunning, update, render, isTheaterMode]);
+  // ================================================================
 
   // Canvas sizing
   useEffect(() => {
