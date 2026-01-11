@@ -20,7 +20,6 @@ interface ExtendedAuthContextType extends AuthContextType {
 const AuthContext = createContext<ExtendedAuthContextType | undefined>(undefined);
 
 // Helper to convert GSUser -> User (domain model)
-// Only map fields that exist on GSUser; add sensible defaults where needed.
 function gsUserToUser(gsUser: GSUser): User {
   return {
     id: gsUser.id,
@@ -28,9 +27,9 @@ function gsUserToUser(gsUser: GSUser): User {
     email: gsUser.email,
     name: gsUser.name,
     role: (gsUser.role as 'user' | 'admin') || 'user',
-    preferences: undefined, // GSUser doesn't include preferences; keep undefined
-    lastLogin: undefined, // not provided by GSUser
-    isActive: true, // default true (GSUser has no isActive)
+    preferences: undefined,
+    lastLogin: undefined,
+    isActive: true,
     createdAt: gsUser.createdAt ? new Date(gsUser.createdAt) : new Date(),
     updatedAt: gsUser.updatedAt ? new Date(gsUser.updatedAt) : new Date(),
     portfolios: undefined,
@@ -38,7 +37,6 @@ function gsUserToUser(gsUser: GSUser): User {
 }
 
 // Helper to convert Partial<User> -> Partial<GSUser>
-// Only map fields that GSUser accepts (id, email, username, name, role, createdAt, updatedAt).
 function userUpdatesToGsUserUpdates(updates: Partial<User>): Partial<GSUser> {
   const out: Partial<GSUser> = {};
 
@@ -48,7 +46,6 @@ function userUpdatesToGsUserUpdates(updates: Partial<User>): Partial<GSUser> {
   if (updates.name !== undefined) out.name = updates.name;
   if (updates.role !== undefined) out.role = updates.role as string;
 
-  // Convert Dates to ISO strings if present
   if (updates.createdAt instanceof Date) {
     out.createdAt = updates.createdAt.toISOString();
   } else if (typeof updates.createdAt === 'string') {
@@ -75,7 +72,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Determine which backend to use
   const determineBackend = useCallback(async (): Promise<AuthBackend> => {
-    // Try main server first
     try {
       const result = await api.health.testConnection();
       if (result.connected) {
@@ -86,7 +82,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[Auth] Main server unavailable');
     }
 
-    // Try Google Sheets
     try {
       const gsResult = await gsApi.health.testConnection();
       if (gsResult.connected) {
@@ -100,9 +95,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return 'none';
   }, []);
 
+  // verifyTokenAndLoadUser: tries GS verify first then main server verify (if present)
+  const verifyTokenAndLoadUser = useCallback(async (token: string): Promise<AuthBackend | 'none'> => {
+    if (!token) return 'none';
+
+    // Try Google Sheets verification first
+    try {
+      if (!token) throw new Error('No token provided for GS verify');
+      const gsUser = await gsApi.auth.verifyToken(token);
+      if (gsUser) {
+        console.debug('[Auth] Token verified by Google Sheets');
+        setUser(gsUserToUser(gsUser));
+        setAuthBackend('sheets');
+        return 'sheets';
+      }
+    } catch (err) {
+      console.debug('[Auth] GS token verify failed (or not GS token)');
+    }
+
+    // Try main server verification (if API supports it)
+    try {
+      if (typeof api.auth?.verifyToken === 'function') {
+        const mainUser = await api.auth.verifyToken(token);
+        if (mainUser) {
+          console.debug('[Auth] Token verified by main server');
+          setUser(mainUser);
+          setAuthBackend('main');
+          return 'main';
+        }
+      }
+    } catch (err) {
+      console.debug('[Auth] Main server token verify failed');
+    }
+
+    return 'none';
+  }, []);
+
   const checkAuth = useCallback(async () => {
     try {
-      // 🔓 BYPASS AUTH IN DEV MODE
+      // DEV bypass
       if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
         logDevMode('Using mock user data', 'AuthProvider');
         setUser(DEV_CONFIG.MOCK_USER);
@@ -111,45 +142,79 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Check if we have a token
-      const token = localStorage.getItem('auth-token') || localStorage.getItem('gs-auth-token');
-      if (!token) {
+      // IMPORTANT: prefer gs-auth-token first (so we don't accidentally try to use a server token for GS calls)
+      const gsToken = typeof window !== 'undefined' ? localStorage.getItem('gs-auth-token') : null;
+      const mainToken = typeof window !== 'undefined' ? localStorage.getItem('auth-token') : null;
+
+      if (!gsToken && !mainToken) {
+        // no token at all
         setUser(null);
         setLoading(false);
         return;
       }
 
-      // Determine which backend to use
+      // Try gs token first (if present), then fall back to main token if gs didn't validate
+      let verifiedBackend: AuthBackend | 'none' = 'none';
+
+      if (gsToken) {
+        console.debug('[Auth] Trying gs-auth-token for verification');
+        verifiedBackend = await verifyTokenAndLoadUser(gsToken);
+        // If gs token validated, we are done
+        if (verifiedBackend === 'sheets') {
+          setLoading(false);
+          return;
+        }
+        // else fallthrough to try mainToken (if exists)
+      }
+
+      if (mainToken) {
+        console.debug('[Auth] Trying auth-token (main) for verification');
+        verifiedBackend = await verifyTokenAndLoadUser(mainToken);
+        if (verifiedBackend !== 'none') {
+          setLoading(false);
+          return;
+        }
+      }
+
+      // If verification failed for both tokens, clear tokens and try backend discovery as a fallback
+      console.debug('[Auth] Token verification failed for both tokens (if present). Trying backend discovery as fallback.');
+
       const backend = await determineBackend();
       setAuthBackend(backend);
 
-      if (backend === 'none') {
-        console.warn('[Auth] No backend available');
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      // Get current user from appropriate backend
       if (backend === 'sheets') {
+        // If we detected sheets backend but have no valid gs token, we cannot fetch /me — clear tokens.
+        if (!gsToken) {
+          console.warn('[Auth] Sheets backend up but no valid gs-auth-token present — clearing tokens.');
+          localStorage.removeItem('gs-auth-token');
+          localStorage.removeItem('auth-token');
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         try {
           const gsUser = await gsApi.auth.getCurrentUser();
           setUser(gsUserToUser(gsUser));
-        } catch (error) {
-          console.error('[Auth] Failed to get user from Google Sheets:', error);
+          setAuthBackend('sheets');
+        } catch (err) {
+          console.error('[Auth] Failed to get user from Google Sheets after discovery:', err);
           localStorage.removeItem('gs-auth-token');
           localStorage.removeItem('auth-token');
           setUser(null);
         }
-      } else {
+      } else if (backend === 'main') {
         try {
           const currentUser = await api.auth.getCurrentUser();
           setUser(currentUser);
-        } catch (error) {
-          console.error('[Auth] Failed to get user from main server:', error);
+          setAuthBackend('main');
+        } catch (err) {
+          console.error('[Auth] Failed to get user from main server after discovery:', err);
           localStorage.removeItem('auth-token');
           setUser(null);
         }
+      } else {
+        setUser(null);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -159,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [determineBackend]);
+  }, [determineBackend, verifyTokenAndLoadUser]);
 
   useEffect(() => {
     checkAuth();
@@ -167,7 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (usernameOrEmail: string, password: string) => {
     try {
-      // 🔓 MOCK LOGIN IN DEV MODE
+      // DEV mock
       if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
         logDevMode('Mock login successful', 'AuthProvider');
         setUser(DEV_CONFIG.MOCK_USER);
@@ -179,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Determine backend if not set
+      // Ensure we know which backend to use
       let backend = authBackend;
       if (backend === 'none') {
         backend = await determineBackend();
@@ -191,32 +256,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (backend === 'sheets') {
-        // Use Google Sheets
         const response = await gsApi.auth.login({
           usernameOrEmail,
           password
         });
 
-        if (response.user) {
+        if (response?.user && response?.token) {
+          // gsApi.login stores tokens (gs-auth-token + auth-token) internally
           setUser(gsUserToUser(response.user));
+          setAuthBackend('sheets');
 
           const searchParams = new URLSearchParams(window.location.search);
           const redirect = searchParams.get('redirect') || '/dashboard';
           router.push(redirect);
+          return;
+        } else if (response?.user) {
+          // older responses may not include token if gsApi didn't persist it — but gsApi.login should set it
+          setUser(gsUserToUser(response.user));
+          setAuthBackend('sheets');
+          router.push('/dashboard');
+          return;
+        } else {
+          throw new Error('Google Sheets login failed');
         }
       } else {
-        // Use main server
         const response = await api.auth.login({
           email: usernameOrEmail,
           password
         });
 
-        if (response.user) {
+        if (response?.user && response?.token) {
+          // store token in canonical place if the client exposes helper
+          if (typeof (api as any).setAuthToken === 'function') {
+            try {
+              (api as any).setAuthToken(response.token);
+            } catch {
+              // ignore if not supported
+            }
+          }
           setUser(response.user);
+          setAuthBackend('main');
 
           const searchParams = new URLSearchParams(window.location.search);
           const redirect = searchParams.get('redirect') || '/dashboard';
           router.push(redirect);
+          return;
+        } else {
+          throw new Error('Main server login failed');
         }
       }
     } catch (error) {
@@ -227,7 +313,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (credentials: SignupCredentials) => {
     try {
-      // 🔓 MOCK SIGNUP IN DEV MODE
       if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
         logDevMode('Mock signup successful', 'AuthProvider');
         setUser(DEV_CONFIG.MOCK_USER);
@@ -236,7 +321,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Determine backend if not set
       let backend = authBackend;
       if (backend === 'none') {
         backend = await determineBackend();
@@ -248,7 +332,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (backend === 'sheets') {
-        // Use Google Sheets
         const response = await gsApi.auth.signup({
           email: credentials.email,
           password: credentials.password,
@@ -257,17 +340,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           role: credentials.role
         });
 
-        if (response.user) {
+        if (response?.user) {
           setUser(gsUserToUser(response.user));
+          setAuthBackend('sheets');
           router.push('/dashboard');
+          return;
+        } else {
+          throw new Error('Google Sheets signup failed');
         }
       } else {
-        // Use main server
         const response = await api.auth.signup(credentials);
 
-        if (response.user) {
+        if (response?.user && response?.token) {
+          if (typeof (api as any).setAuthToken === 'function') {
+            try {
+              (api as any).setAuthToken(response.token);
+            } catch {
+              // ignore
+            }
+          }
           setUser(response.user);
+          setAuthBackend('main');
           router.push('/dashboard');
+          return;
+        } else {
+          throw new Error('Main server signup failed');
         }
       }
     } catch (error) {
@@ -278,7 +375,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      // 🔓 MOCK LOGOUT IN DEV MODE
       if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
         logDevMode('Mock logout', 'AuthProvider');
         setUser(null);
@@ -294,7 +390,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear all tokens
       localStorage.removeItem('auth-token');
       localStorage.removeItem('gs-auth-token');
       setUser(null);
@@ -305,7 +400,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateUser = async (updates: Partial<User>) => {
     try {
-      // 🔓 MOCK UPDATE IN DEV MODE
       if (DEV_CONFIG.ENABLE_AUTH_BYPASS) {
         logDevMode('Mock user update', 'AuthProvider');
         setUser(prev => prev ? { ...prev, ...updates } : null);
@@ -313,7 +407,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (authBackend === 'sheets') {
-        // Map domain Partial<User> -> transport Partial<GSUser>
         const gsUpdates = userUpdatesToGsUserUpdates(updates);
         const updatedGsUser = await gsApi.auth.updateProfile(gsUpdates);
         setUser(gsUserToUser(updatedGsUser));
@@ -352,7 +445,7 @@ export const useAuth = () => {
   return context;
 };
 
-// NEW: Hook to check which auth backend is being used
+// Hook to check which auth backend is being used
 export const useAuthBackend = () => {
   const { authBackend, usingFallback } = useAuth();
   return { authBackend, usingFallback };
