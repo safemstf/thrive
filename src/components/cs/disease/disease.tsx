@@ -95,7 +95,6 @@ const DrawerContent = styled.div`
   padding: 1.5rem;
   min-height: 0;
   
-  /* Ensure proper scrolling */
   -webkit-overflow-scrolling: touch;
   
   &::-webkit-scrollbar {
@@ -509,15 +508,6 @@ interface DiseaseSimulationProps {
   isTheaterMode?: boolean;
 }
 
-
-
-interface DiseaseSimulationProps {
-  isDark?: boolean;
-  isRunning?: boolean;
-  speed?: number;
-  isTheaterMode?: boolean;
-}
-
 export default function DiseaseSimulation({
   isDark = false,
   isRunning: isRunningProp = false,
@@ -531,17 +521,26 @@ export default function DiseaseSimulation({
   const networkConnections = useRef<Map<number, Set<number>>>(new Map());
   const ticksPerDay = 30;
 
-  // ===== timing refs & constants for fixed-step sim + capped render =====
-  const TARGET_FPS = 80;
+  // ===== PERFORMANCE FIX: Use refs for values that change every tick =====
+  const tickCountRef = useRef(0);
+  const statsRef = useRef({
+    S: 0, E: 0, I: 0, R: 0, D: 0, V: 0,
+    rt: 0, day: 0, newCases: 0, totalCases: 0, peakInfected: 0
+  });
+  const historyRef = useRef<any[]>([]);
+
+  // ===== Timing refs for fixed-step sim + capped render =====
+  const TARGET_FPS = 60;
   const TARGET_FRAME_MS = 1000 / TARGET_FPS;
-  const SIM_TPS = 30; // logical ticks per second
+  const SIM_TPS = 30;
   const SIM_STEP_MS = 1000 / SIM_TPS;
   const lastTimeRef = useRef<number | null>(null);
   const accumulatorRef = useRef<number>(0);
   const lastRenderRef = useRef<number | null>(null);
-  // ===================================================================
 
-  // Pan & Zoom
+  // Pan & Zoom refs (avoid state where possible in hot path)
+  const panOffsetRef = useRef({ x: 0, y: 0 });
+  const zoomLevelRef = useRef(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [zoomLevel, setZoomLevel] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
@@ -549,7 +548,7 @@ export default function DiseaseSimulation({
   const touchStartDistanceRef = useRef<number>(0);
   const lastZoomRef = useRef<number>(1);
 
-  // State
+  // UI State (these are fine as useState - they don't change every frame)
   const [drawerExpanded, setDrawerExpanded] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
@@ -567,31 +566,40 @@ export default function DiseaseSimulation({
   const [initialInfected, setInitialInfected] = useState(3);
   const [vaccinationRate, setVaccinationRate] = useState(0);
 
-  // Interventions
+  // Interventions - use refs to avoid callback recreation
   const [socialDistancing, setSocialDistancing] = useState(false);
   const [vaccination, setVaccination] = useState(false);
   const [quarantine, setQuarantine] = useState(false);
   const [maskWearing, setMaskWearing] = useState(false);
+  
+  // Refs for intervention values (read in update loop)
+  const socialDistancingRef = useRef(false);
+  const quarantineRef = useRef(false);
+  const maskWearingRef = useRef(false);
+  const speedRef = useRef(1);
+  const isRunningRef = useRef(false);
+  const diseaseRef = useRef(disease);
 
-  // Statistics
+  // Keep refs in sync with state
+  useEffect(() => { socialDistancingRef.current = socialDistancing; }, [socialDistancing]);
+  useEffect(() => { quarantineRef.current = quarantine; }, [quarantine]);
+  useEffect(() => { maskWearingRef.current = maskWearing; }, [maskWearing]);
+  useEffect(() => { speedRef.current = speed; }, [speed]);
+  useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
+  useEffect(() => { diseaseRef.current = disease; }, [disease]);
+
+  // Statistics state (for UI display only)
   const [stats, setStats] = useState({
     S: 0, E: 0, I: 0, R: 0, D: 0, V: 0,
-    rt: 0,
-    day: 0,
-    newCases: 0,
-    totalCases: 0,
-    peakInfected: 0
+    rt: 0, day: 0, newCases: 0, totalCases: 0, peakInfected: 0
   });
 
   // FIXED PHYSICS WORLD
   const PHYSICS_WIDTH = 1200;
   const PHYSICS_HEIGHT = 1000;
 
-  const canvasWidth = PHYSICS_WIDTH;
-  const canvasHeight = PHYSICS_HEIGHT;
-
   // Generate spatial network
-  const generateSpatialNetwork = (agents: Agent[], width: number, height: number) => {
+  const generateSpatialNetwork = (agentList: Agent[], width: number, height: number) => {
     const connections = new Map<number, Set<number>>();
     const numClusters = 6;
     const clusters: { x: number; y: number; members: number[] }[] = [];
@@ -600,7 +608,7 @@ export default function DiseaseSimulation({
       clusters.push({ x: Math.random() * width, y: Math.random() * height, members: [] });
     }
 
-    agents.forEach((agent, idx) => {
+    agentList.forEach((agent, idx) => {
       const distances = clusters.map(c => Math.sqrt((agent.x - c.x) ** 2 + (agent.y - c.y) ** 2));
       const closest = distances.indexOf(Math.min(...distances));
       clusters[closest].members.push(idx);
@@ -624,6 +632,34 @@ export default function DiseaseSimulation({
 
     return connections;
   };
+
+  // Update stats using refs (no state dependency)
+  const updateStats = useCallback((agentList: Agent[]) => {
+    const counts = { S: 0, E: 0, I: 0, R: 0, D: 0, V: 0 } as any;
+    let newCases = 0;
+    const currentTick = tickCountRef.current;
+
+    for (const a of agentList) {
+      counts[a.state]++;
+      if (a.infectionTime === currentTick) newCases++;
+    }
+
+    const totalCases = counts.I + counts.R + counts.D;
+    const peakInfected = Math.max(statsRef.current.peakInfected, counts.I);
+    const d = diseaseRef.current;
+    const rt = counts.I > 0 ? (newCases / counts.I) * d.infectiousDays.mean : 0;
+
+    const newStats = {
+      ...counts,
+      rt,
+      day: Math.floor(currentTick / ticksPerDay),
+      newCases,
+      totalCases,
+      peakInfected
+    };
+
+    statsRef.current = newStats;
+  }, []);
 
   // Initialize agents
   const initAgents = useCallback(() => {
@@ -674,57 +710,45 @@ export default function DiseaseSimulation({
     }
 
     agents.current = newAgents;
+    historyRef.current = [];
+    tickCountRef.current = 0;
+    statsRef.current = { S: 0, E: 0, I: 0, R: 0, D: 0, V: 0, rt: 0, day: 0, newCases: 0, totalCases: 0, peakInfected: 0 };
+    
+    updateStats(newAgents);
+    
+    // Sync to UI state
     setHistory([]);
     setTickCount(0);
-    updateStats(newAgents);
-  }, [population, initialInfected, disease, vaccination, vaccinationRate, simulationMode]);
+    setStats(statsRef.current);
+  }, [population, initialInfected, disease, vaccination, vaccinationRate, simulationMode, updateStats]);
 
-  const updateStats = (agentList: Agent[]) => {
-    const counts = { S: 0, E: 0, I: 0, R: 0, D: 0, V: 0 } as any;
-    let newCases = 0;
-
-    for (const a of agentList) {
-      counts[a.state]++;
-      if (a.infectionTime === tickCount) newCases++;
-    }
-
-    const totalCases = counts.I + counts.R + counts.D;
-    const peakInfected = Math.max(stats.peakInfected, counts.I);
-    const rt = counts.I > 0 ? (newCases / counts.I) * disease.infectiousDays.mean : 0;
-
-    setStats({
-      ...counts,
-      rt,
-      day: Math.floor(tickCount / ticksPerDay),
-      newCases,
-      totalCases,
-      peakInfected
-    });
-  };
-
+  // ===== CORE UPDATE FUNCTION - NO STATE DEPENDENCIES =====
   const update = useCallback(() => {
-    if (!isRunning) return;
+    if (!isRunningRef.current) return;
 
-    // Use FIXED physics boundaries
     const width = PHYSICS_WIDTH;
     const height = PHYSICS_HEIGHT;
+    const currentTick = tickCountRef.current;
+    const d = diseaseRef.current;
 
-    const maskEffect = maskWearing ? (1 - (disease.interventions.masks?.efficacy || 0)) : 1;
-    const distanceEffect = socialDistancing ? (1 - (disease.interventions.distancing?.efficacy || 0)) : 1;
-    const effectiveTransmissionProb = disease.transmissionProb * maskEffect * distanceEffect;
-    const speedMultiplier = socialDistancing ? 0.5 : 1.0;
+    const maskEffect = maskWearingRef.current ? (1 - (d.interventions.masks?.efficacy || 0)) : 1;
+    const distanceEffect = socialDistancingRef.current ? (1 - (d.interventions.distancing?.efficacy || 0)) : 1;
+    const effectiveTransmissionProb = d.transmissionProb * maskEffect * distanceEffect;
+    const speedMultiplier = socialDistancingRef.current ? 0.5 : 1.0;
+    const currentSpeed = speedRef.current;
 
+    // Movement
     for (const agent of agents.current) {
-      if (!quarantine || agent.state !== "I") {
-        const mobility = speedMultiplier * speed;
+      if (!quarantineRef.current || agent.state !== "I") {
+        const mobility = speedMultiplier * currentSpeed;
         agent.vx += (Math.random() - 0.5) * 0.5 * mobility;
         agent.vy += (Math.random() - 0.5) * 0.5 * mobility;
 
         const maxSpeed = 3 * mobility;
-        const currentSpeed = Math.sqrt(agent.vx * agent.vx + agent.vy * agent.vy);
-        if (currentSpeed > maxSpeed) {
-          agent.vx = (agent.vx / currentSpeed) * maxSpeed;
-          agent.vy = (agent.vy / currentSpeed) * maxSpeed;
+        const agentSpeed = Math.sqrt(agent.vx * agent.vx + agent.vy * agent.vy);
+        if (agentSpeed > maxSpeed) {
+          agent.vx = (agent.vx / agentSpeed) * maxSpeed;
+          agent.vy = (agent.vy / agentSpeed) * maxSpeed;
         }
 
         agent.x += agent.vx;
@@ -740,16 +764,17 @@ export default function DiseaseSimulation({
         }
       }
 
+      // State transitions
       if (agent.state === "E" && agent.exposedTimer) {
         agent.exposedTimer--;
         if (agent.exposedTimer <= 0) {
           agent.state = "I";
-          agent.timer = Math.floor(disease.infectiousDays.mean * ticksPerDay);
+          agent.timer = Math.floor(d.infectiousDays.mean * ticksPerDay);
         }
       } else if (agent.state === "I") {
         agent.timer--;
         if (agent.timer <= 0) {
-          if (Math.random() < disease.cfr) {
+          if (Math.random() < d.cfr) {
             agent.state = "D";
             agent.vx = 0;
             agent.vy = 0;
@@ -762,7 +787,8 @@ export default function DiseaseSimulation({
     }
 
     // Transmission
-    for (const infected of agents.current.filter(a => a.state === "I")) {
+    const infectedAgents = agents.current.filter(a => a.state === "I");
+    for (const infected of infectedAgents) {
       for (const susceptible of agents.current) {
         if (susceptible.state !== "S" && susceptible.state !== "V") continue;
 
@@ -770,14 +796,14 @@ export default function DiseaseSimulation({
         const dy = infected.y - susceptible.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance < disease.transmissionRadius) {
-          let transmissionChance = effectiveTransmissionProb * (1 - distance / disease.transmissionRadius);
+        if (distance < d.transmissionRadius) {
+          let transmissionChance = effectiveTransmissionProb * (1 - distance / d.transmissionRadius);
           if (susceptible.immunity > 0) transmissionChance *= (1 - susceptible.immunity);
 
           if (Math.random() < transmissionChance) {
             susceptible.state = "E";
-            susceptible.exposedTimer = Math.floor(disease.incubationDays.mean * ticksPerDay);
-            susceptible.infectionTime = tickCount;
+            susceptible.exposedTimer = Math.floor(d.incubationDays.mean * ticksPerDay);
+            susceptible.infectionTime = currentTick;
           }
         }
       }
@@ -785,39 +811,39 @@ export default function DiseaseSimulation({
 
     updateStats(agents.current);
 
-    if (tickCount % 5 === 0) {
-      setHistory(prev => [...prev.slice(-200), {
-        t: tickCount,
-        S: stats.S,
-        E: stats.E,
-        I: stats.I,
-        R: stats.R,
-        D: stats.D,
-        V: stats.V
-      }]);
+    // Record history every 5 ticks
+    if (currentTick % 5 === 0) {
+      const s = statsRef.current;
+      historyRef.current = [...historyRef.current.slice(-200), {
+        t: currentTick,
+        S: s.S, E: s.E, I: s.I, R: s.R, D: s.D, V: s.V
+      }];
     }
 
-    setTickCount(prev => prev + 1);
-  }, [isRunning, speed, disease, socialDistancing, maskWearing, quarantine, tickCount, stats]);
+    tickCountRef.current++;
+  }, [updateStats]); // Only depends on updateStats which is stable
 
+  // Render function - reads from refs
   const render = useCallback((canvas: HTMLCanvasElement | null) => {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear entire canvas once
+    const d = diseaseRef.current;
+    const pan = panOffsetRef.current;
+    const zoom = zoomLevelRef.current;
+
     ctx.fillStyle = "#0a0e1a";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Save state and apply transforms
     ctx.save();
-    ctx.translate(panOffset.x, panOffset.y);
-    ctx.scale(zoomLevel, zoomLevel);
+    ctx.translate(pan.x, pan.y);
+    ctx.scale(zoom, zoom);
 
     // Draw network connections
     if ((simulationMode === 'regions' || simulationMode === 'households') && networkConnections.current.size > 0) {
       ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)';
-      ctx.lineWidth = 1 / zoomLevel;
+      ctx.lineWidth = 1 / zoom;
       networkConnections.current.forEach((connections, fromId) => {
         const fromAgent = agents.current[fromId];
         if (!fromAgent) return;
@@ -844,7 +870,7 @@ export default function DiseaseSimulation({
       switch (a.state) {
         case 'S': color = '#3b82f6'; break;
         case 'E': color = '#fbbf24'; size += 0.5; break;
-        case 'I': color = disease.color; size += 1; break;
+        case 'I': color = d.color; size += 1; break;
         case 'R': color = '#22c55e'; break;
         case 'V': color = '#8b5cf6'; break;
       }
@@ -856,21 +882,21 @@ export default function DiseaseSimulation({
     }
 
     ctx.restore();
-  }, [disease, simulationMode, panOffset, zoomLevel]);
+  }, [simulationMode]);
 
-  // Touch/mouse handlers (unchanged)
+  // Touch/mouse handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
       touchStartDistanceRef.current = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
-      lastZoomRef.current = zoomLevel;
+      lastZoomRef.current = zoomLevelRef.current;
     } else if (e.touches.length === 1) {
       setIsPanning(true);
       const touch = e.touches[0];
-      panStartRef.current = { x: touch.clientX - panOffset.x, y: touch.clientY - panOffset.y };
+      panStartRef.current = { x: touch.clientX - panOffsetRef.current.x, y: touch.clientY - panOffsetRef.current.y };
     }
-  }, [panOffset, zoomLevel]);
+  }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
@@ -880,11 +906,15 @@ export default function DiseaseSimulation({
       const distance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
       if (touchStartDistanceRef.current > 0) {
         const scale = distance / touchStartDistanceRef.current;
-        setZoomLevel(Math.max(0.5, Math.min(3, lastZoomRef.current * scale)));
+        const newZoom = Math.max(0.5, Math.min(3, lastZoomRef.current * scale));
+        zoomLevelRef.current = newZoom;
+        setZoomLevel(newZoom);
       }
     } else if (e.touches.length === 1 && isPanning) {
       const touch = e.touches[0];
-      setPanOffset({ x: touch.clientX - panStartRef.current.x, y: touch.clientY - panStartRef.current.y });
+      const newPan = { x: touch.clientX - panStartRef.current.x, y: touch.clientY - panStartRef.current.y };
+      panOffsetRef.current = newPan;
+      setPanOffset(newPan);
     }
   }, [isPanning]);
 
@@ -895,12 +925,14 @@ export default function DiseaseSimulation({
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsPanning(true);
-    panStartRef.current = { x: e.clientX - panOffset.x, y: e.clientY - panOffset.y };
-  }, [panOffset]);
+    panStartRef.current = { x: e.clientX - panOffsetRef.current.x, y: e.clientY - panOffsetRef.current.y };
+  }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isPanning) return;
-    setPanOffset({ x: e.clientX - panStartRef.current.x, y: e.clientY - panStartRef.current.y });
+    const newPan = { x: e.clientX - panStartRef.current.x, y: e.clientY - panStartRef.current.y };
+    panOffsetRef.current = newPan;
+    setPanOffset(newPan);
   }, [isPanning]);
 
   const handleMouseUp = useCallback(() => setIsPanning(false), []);
@@ -908,13 +940,17 @@ export default function DiseaseSimulation({
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoomLevel(prev => Math.max(0.5, Math.min(3, prev * delta)));
+    const newZoom = Math.max(0.5, Math.min(3, zoomLevelRef.current * delta));
+    zoomLevelRef.current = newZoom;
+    setZoomLevel(newZoom);
   }, []);
 
-  const resetView = () => {
+  const resetView = useCallback(() => {
+    panOffsetRef.current = { x: 0, y: 0 };
+    zoomLevelRef.current = 1;
     setPanOffset({ x: 0, y: 0 });
     setZoomLevel(1);
-  };
+  }, []);
 
   // Sync props
   useEffect(() => {
@@ -925,10 +961,15 @@ export default function DiseaseSimulation({
     setSpeed(speedProp);
   }, [speedProp]);
 
-  // ===== Animation loop (fixed-step simulation + capped render) =====
+  // ===== ANIMATION LOOP - Fixed step simulation + capped render =====
   useEffect(() => {
+    let frameId: number;
+    
     const loop = (time: number) => {
-      if (!isRunning) return;
+      if (!isRunningRef.current) {
+        frameId = requestAnimationFrame(loop);
+        return;
+      }
 
       if (lastTimeRef.current === null) {
         lastTimeRef.current = time;
@@ -953,31 +994,31 @@ export default function DiseaseSimulation({
         lastRenderRef.current = time;
         const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
         render(canvas);
+        
+        // Sync UI state periodically (every render, not every tick)
+        setStats({ ...statsRef.current });
+        setTickCount(tickCountRef.current);
+        setHistory([...historyRef.current]);
       }
 
-      animationRef.current = requestAnimationFrame(loop);
+      frameId = requestAnimationFrame(loop);
     };
 
-    if (isRunning) {
-      lastTimeRef.current = null;
-      accumulatorRef.current = 0;
-      lastRenderRef.current = null;
-      animationRef.current = requestAnimationFrame(loop);
-    }
+    frameId = requestAnimationFrame(loop);
 
     return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      cancelAnimationFrame(frameId);
       lastTimeRef.current = null;
       accumulatorRef.current = 0;
       lastRenderRef.current = null;
     };
-  }, [isRunning, update, render, isTheaterMode]);
-  // ================================================================
+  }, [update, render, isTheaterMode]);
 
   // Canvas sizing
   useEffect(() => {
     const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
     if (!canvas) return;
+    
     const updateSize = () => {
       const container = canvas.parentElement;
       if (!container) return;
@@ -993,12 +1034,14 @@ export default function DiseaseSimulation({
     updateSize();
     window.addEventListener('resize', updateSize);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
+    
     return () => {
       window.removeEventListener('resize', updateSize);
       canvas.removeEventListener('wheel', handleWheel);
     };
   }, [isTheaterMode, handleWheel]);
 
+  // Initialize on param changes
   useEffect(() => {
     initAgents();
     setTimeout(() => {
@@ -1007,25 +1050,23 @@ export default function DiseaseSimulation({
     }, 50);
   }, [population, initialInfected, selectedDisease, simulationMode]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setIsRunning(false);
-    setTickCount(0);
-    setHistory([]);
     initAgents();
     resetView();
-  };
+  }, [initAgents, resetView]);
 
-  const enterMobileFullscreen = () => {
+  const enterMobileFullscreen = useCallback(() => {
     setIsMobileFullscreen(true);
     setIsRunning(true);
     resetView();
-  };
+  }, [resetView]);
 
-  const exitMobileFullscreen = () => {
+  const exitMobileFullscreen = useCallback(() => {
     setIsMobileFullscreen(false);
     setIsRunning(false);
     resetView();
-  };
+  }, [resetView]);
 
   const chartData = useMemo(() => ({
     labels: history.map(d => `Day ${Math.floor(d.t / ticksPerDay)}`),

@@ -1,4 +1,4 @@
-// src/components/misc/taskbar.logic.tsx - HODA REMOVED
+// src/components/misc/taskbar.logic.tsx
 
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { usePathname } from 'next/navigation';

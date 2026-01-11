@@ -1,4 +1,4 @@
-// app/login/page.tsx - Enhanced UI/UX with Scroll Effects
+// app/login/page.tsx - With Google Sheets Fallback
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import styled, { keyframes } from 'styled-components';
 import { useAuth } from '@/providers/authProvider';
-import { Eye, EyeOff, Loader2, AlertCircle, ChevronLeft, User, Mail, Lock, RefreshCw, Sparkles, Zap, Shield } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, ChevronLeft, User, Mail, Lock, RefreshCw, Sparkles, Zap, Shield, Cloud, Database } from 'lucide-react';
 
 // Import everything from the central hub!
 import {
@@ -21,8 +21,9 @@ import {
   TabButton
 } from '@/styles/styled-components';
 
-// API hub
+// API clients
 import api from '@/lib/api-client';
+import { gsApi } from '@/lib/api/google-sheets-api-client';
 
 /* ===== Animations ===== */
 const fadeIn = keyframes`
@@ -446,6 +447,41 @@ const BackLink = styled(Link)`
   }
 `;
 
+/* ===== Backend Status Badge ===== */
+const BackendBadge = styled.div<{ $type: 'main' | 'fallback' | 'checking' }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  
+  ${({ $type }) => {
+    switch ($type) {
+      case 'main':
+        return `
+          background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+          color: #166534;
+          border: 1px solid #86efac;
+        `;
+      case 'fallback':
+        return `
+          background: linear-gradient(135deg, #fef3c7, #fde68a);
+          color: #92400e;
+          border: 1px solid #fcd34d;
+        `;
+      case 'checking':
+        return `
+          background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+          color: #3730a3;
+          border: 1px solid #a5b4fc;
+        `;
+    }
+  }}
+`;
+
 /* ===== Overlay Components ===== */
 const overlayFadeIn = keyframes`
   from { opacity: 0; }
@@ -573,9 +609,12 @@ export default function LoginPage() {
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const brandRef = useRef<HTMLDivElement>(null);
 
+  // Backend status
   const [loginAvailable, setLoginAvailable] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
   const [offlineReason, setOfflineReason] = useState<string | null>(null);
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [backendType, setBackendType] = useState<'main' | 'fallback' | 'checking'>('checking');
 
   const [formData, setFormData] = useState({
     username: '',
@@ -589,7 +628,6 @@ export default function LoginPage() {
   useEffect(() => {
     if (leftPanelRef.current) {
       const offset = scrollY * 0.5;
-      const bgPattern = leftPanelRef.current.querySelector('::before') as any;
       leftPanelRef.current.style.transform = `translateY(${offset * 0.1}px)`;
     }
     
@@ -605,23 +643,46 @@ export default function LoginPage() {
     }
   }, [user, router]);
 
+  // Check connection - tries main server first, then Google Sheets fallback
   const checkConnection = useCallback(async () => {
     setChecking(true);
     setOfflineReason(null);
+    setBackendType('checking');
+    
+    // Try main server first
     try {
       const res = await api.health.testConnection();
-      if (res && (res as any).connected) {
+      if (res && res.connected) {
         setLoginAvailable(true);
-      } else {
-        setLoginAvailable(false);
-        setOfflineReason((res as any).error || 'Server unreachable');
+        setUsingFallback(false);
+        setBackendType('main');
+        setChecking(false);
+        console.log('[Auth] Using main server');
+        return;
       }
-    } catch (err: any) {
-      setLoginAvailable(false);
-      setOfflineReason(err?.message || 'Network error occurred');
-    } finally {
-      setChecking(false);
+    } catch (err) {
+      console.log('[Auth] Main server unavailable, trying fallback...');
     }
+    
+    // Try Google Sheets fallback
+    try {
+      const gsRes = await gsApi.health.testConnection();
+      if (gsRes.connected) {
+        setLoginAvailable(true);
+        setUsingFallback(true);
+        setBackendType('fallback');
+        setChecking(false);
+        console.log('[Auth] Using Google Sheets fallback');
+        return;
+      }
+    } catch (err) {
+      console.log('[Auth] Google Sheets fallback also unavailable');
+    }
+    
+    // Both failed
+    setLoginAvailable(false);
+    setOfflineReason('All servers unavailable. Please try again later.');
+    setChecking(false);
   }, []);
 
   useEffect(() => {
@@ -648,6 +709,7 @@ export default function LoginPage() {
 
     try {
       if (activeTab === 'register') {
+        // Validation
         if (!formData.username || !formData.name || !formData.email || !formData.password) {
           throw new Error('Please fill in all fields');
         }
@@ -658,23 +720,58 @@ export default function LoginPage() {
           throw new Error('Password must be at least 6 characters');
         }
 
-        await signup({
-          username: formData.username,
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          role: 'user'
-        });
+        if (usingFallback) {
+          // Use Google Sheets API
+          const result = await gsApi.auth.signup({
+            username: formData.username,
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+            role: 'user'
+          });
+          
+          setSuccess('Registration successful! Redirecting...');
+          
+          // Store token and redirect
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 1000);
+        } else {
+          // Use main server
+          await signup({
+            username: formData.username,
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+            role: 'user'
+          });
 
-        setSuccess('Registration successful! Logging you in...');
-        
-        setTimeout(async () => {
+          setSuccess('Registration successful! Logging you in...');
+          
+          setTimeout(async () => {
+            await login(formData.email, formData.password);
+            router.push('/dashboard');
+          }, 1000);
+        }
+      } else {
+        // Login
+        if (usingFallback) {
+          // Use Google Sheets API
+          const result = await gsApi.auth.login({
+            usernameOrEmail: formData.email,
+            password: formData.password
+          });
+          
+          setSuccess('Login successful! Redirecting...');
+          
+          setTimeout(() => {
+            router.push('/dashboard');
+          }, 500);
+        } else {
+          // Use main server
           await login(formData.email, formData.password);
           router.push('/dashboard');
-        }, 1000);
-      } else {
-        await login(formData.email, formData.password);
-        router.push('/dashboard');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
@@ -734,6 +831,28 @@ export default function LoginPage() {
       <RightPanel>
         <FormCard $padding="lg">
           <CardHeader>
+            {/* Backend Status Badge */}
+            {loginAvailable && (
+              <BackendBadge $type={backendType}>
+                {backendType === 'main' ? (
+                  <>
+                    <Database size={14} />
+                    Connected to Server
+                  </>
+                ) : backendType === 'fallback' ? (
+                  <>
+                    <Cloud size={14} />
+                    Using Cloud Backup
+                  </>
+                ) : (
+                  <>
+                    <LoadingSpinner size={14} />
+                    Checking connection...
+                  </>
+                )}
+              </BackendBadge>
+            )}
+            
             <Title>{activeTab === 'login' ? 'Welcome Back' : 'Create Account'}</Title>
             <Subtitle>
               {activeTab === 'login' 
@@ -893,7 +1012,8 @@ export default function LoginPage() {
         </FormCard>
       </RightPanel>
 
-      {loginAvailable !== true && (
+      {/* Only show overlay if BOTH backends are down */}
+      {loginAvailable === false && (
         <Overlay role="alertdialog" aria-modal="true">
           <OverlayCard>
             <OverlayIconWrapper>
