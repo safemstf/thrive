@@ -21,6 +21,12 @@ const TEAM_MEMBERS = [
     vanity: 'dev-gurung-a8b863136',
     profileUrl: 'https://www.linkedin.com/in/dev-gurung-a8b863136/',
   },
+
+  {
+    name: 'Alan Mathew',
+    vanity: 'alan-mathew-992863184',
+    profileUrl: 'https://www.linkedin.com/in/alan-mathew-992863184/',
+  },
 ];
 
 function useMatrixSafe() {
