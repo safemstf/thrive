@@ -65,6 +65,12 @@ const MedicalModelsDemo = dynamic(() => import('@/components/cs/medicalModels/me
 
 });
 
+const AgarioDemo = dynamic(() => import('@/components/cs/agario/agario'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading agario Simulation...</SimulationLoader>
+
+});
+
 // Types
 type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'three-body' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks';
 type TabType = 'simulations' | 'algorithms';
@@ -264,7 +270,7 @@ const ItemCard = styled.div<{
   cursor: ${({ $comingSoon }) => ($comingSoon ? 'default' : 'pointer')};
   opacity: ${({ $comingSoon }) => ($comingSoon ? 0.6 : 1)};
   box-shadow: ${({ $active, $color }) =>
-    $active 
+    $active
       ? `0 8px 32px ${$color || '#3b82f6'}25, 0 0 0 1px ${$color || '#3b82f6'}20`
       : '0 4px 16px rgba(15,23,42,0.05)'};
   backdrop-filter: blur(8px);
@@ -300,9 +306,9 @@ const ItemCard = styled.div<{
   &:hover {
     transform: ${({ $comingSoon }) => ($comingSoon ? 'none' : 'translateY(-4px)')};
     box-shadow: ${({ $comingSoon, $color }) =>
-      $comingSoon 
-        ? '0 4px 16px rgba(15,23,42,0.05)' 
-        : `0 12px 40px ${$color || '#3b82f6'}18`};
+    $comingSoon
+      ? '0 4px 16px rgba(15,23,42,0.05)'
+      : `0 12px 40px ${$color || '#3b82f6'}18`};
     border-color: ${({ $comingSoon, $color }) => ($comingSoon ? 'rgba(148,163,184,0.18)' : ($color || '#3b82f6'))};
     
     &::before {
@@ -871,7 +877,7 @@ const allItems: SimulationItem[] = [
     icon: <Zap size={22} />,
     color: '#10b981',
     description: 'Spatial Lotka–Volterra population dynamics',
-    comingSoon: true,
+    comingSoon: false,
     category: 'simulations'
   },
   {
@@ -1134,7 +1140,7 @@ export default function SimulationsPage() {
       case 'amdahl':
         return <AmdahlsLawSimulator isRunning={isRunning} speed={speed} isDark={false} />;
       case 'wireless':
-        return <NetworkProtocolSimulation/>;
+        return <NetworkProtocolSimulation />;
       case 'permutations-visual':
         return <PermutationSimulation isRunning={isRunning} speed={speed} isDark={false} />;
       case 'nbody':
@@ -1143,7 +1149,8 @@ export default function SimulationsPage() {
         return <PhylogeneticTreeBuilder isRunning={isRunning} speed={speed} />;
       case 'Shortest-Path-Networks':
         return <ShortestPathAlgorithmDemo isRunning={isRunning} speed={speed} />;
-
+      case 'predprey':
+        return <AgarioDemo isRunning={isRunning} speed={speed} />;
       default:
         return (
           <PlaceholderContent>
@@ -1211,7 +1218,7 @@ export default function SimulationsPage() {
                       <Check strokeWidth={3} />
                     </SelectionIndicator>
                   )}
-                  
+
                   {/* Coming soon badge - the only badge we keep */}
                   {item.comingSoon && (
                     <ComingSoonBadge>Coming Soon</ComingSoonBadge>
