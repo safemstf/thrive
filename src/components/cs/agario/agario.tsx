@@ -348,9 +348,9 @@ export default function AgarioDemo({
 
     // Create baby near parent
     const angle = Math.random() * Math.PI * 2;
-    const distance = 60 + Math.random() * 40;
-    const bx = parent.x + Math.cos(angle) * distance;
-    const by = parent.y + Math.sin(angle) * distance;
+    const dist = 60 + Math.random() * 40;
+    const bx = parent.x + Math.cos(angle) * dist;
+    const by = parent.y + Math.sin(angle) * dist;
 
     const baby = createBlob(babyGenome, parent.generation + 1, parent.id, bx, by);
     baby.mass = 25;
@@ -363,7 +363,9 @@ export default function AgarioDemo({
     blobsRef.current.push(baby);
     totalBirthsRef.current++;
 
-    console.log(`👶 Blob #${baby.id} born to parent #${parent.id} (${parent.birthsGiven} children, lineage ${baby.familyLineage})`);
+    // Neural network gets bonus for successful reproduction
+    parent.genome.fitness += 50;
+
     return true;
   }, [createBlob]);
 
@@ -601,36 +603,12 @@ export default function AgarioDemo({
     const wallDist = Math.min(blob.x, blob.y, WORLD_WIDTH - blob.x, WORLD_HEIGHT - blob.y);
     inputs[11] = Math.max(0, 1 - wallDist / 150);
 
-    // Zone awareness
-    const zone = getZoneAt(blob.x, blob.y);
-    inputs[12] = zone === 'safe' ? 0.5 : zone === 'danger' ? -0.5 : 0;
+    inputs[12] = Math.min(1, blob.idleTicks / 200); // Normalized idle time (0-1)
 
-    // Log grabbing
-    inputs[13] = blob.grabbedLog !== undefined ? 1 : 0;
-
-    // Nearby log
-    let nearestLog = Infinity;
-    for (const log of logsRef.current) {
-      if (log.grabbedBy !== undefined && log.grabbedBy !== blob.id) continue;
-      const dist = distance(blob.x, blob.y, log.x, log.y);
-      if (dist < nearestLog) nearestLog = dist;
-    }
-    inputs[14] = nearestLog < 100 ? (1 - nearestLog / 100) : 0;
-
-    // Family nearby
-    let familyNearby = 0;
-    for (const other of blobsRef.current) {
-      if (other.id === blob.id) continue;
-      if (other.familyLineage === blob.familyLineage) {
-        const dist = distance(blob.x, blob.y, other.x, other.y);
-        if (dist < VISION_RANGE) {
-          familyNearby = Math.max(familyNearby, 1 - dist / VISION_RANGE);
-        }
-      }
-    }
-    inputs[15] = familyNearby;
-
-    inputs[16] = Math.min(1, blob.idleTicks / 200); // Normalized idle time (0-1)
+    const currentTick = tickCountRef.current;
+    const reproductionCooldown = (currentTick - blob.lastReproductionTick) / REPRODUCTION_COOLDOWN;
+    const reproductionReady = Math.min(1, reproductionCooldown);
+    inputs[13] = reproductionReady;
 
     return inputs;
   }, [getNearbyFood, getZoneAt, distance]);
@@ -697,30 +675,28 @@ export default function AgarioDemo({
         inputs = blob.cachedVision;
       }
 
+
       const outputs = blob.genome.activate(inputs);
 
-      // Apply outputs
       const acceleration = Math.tanh(outputs[0]) * 0.45;
       const rotation = Math.tanh(outputs[1]) * 0.2;
-      const grabSignal = Math.tanh(outputs[2]);
+      const reproduceSignal = Math.tanh(outputs[2]); // Reproduction output
 
-      // Grab/Drop log
-      if (grabSignal > 0.6 && blob.grabbedLog === undefined) {
-        for (const log of logsRef.current) {
-          if (log.grabbedBy !== undefined) continue;
-          const dist = distance(blob.x, blob.y, log.x, log.y);
-          if (dist < 50) {
-            log.grabbedBy = blob.id;
-            blob.grabbedLog = log.id;
-            blob.genome.fitness += 5;
-            break;
-          }
-        }
-      } else if (grabSignal < -0.6 && blob.grabbedLog !== undefined) {
-        const log = logsRef.current.find(l => l.id === blob.grabbedLog);
-        if (log) {
-          log.grabbedBy = undefined;
-          blob.grabbedLog = undefined;
+      // Neural network controlled reproduction
+      if (reproduceSignal > 0.7) { // Threshold for reproduction
+        // Check if blob is actually ready to reproduce
+        const currentTick = tickCountRef.current;
+        const canReproduce =
+          blob.age >= MIN_AGE_FOR_REPRODUCTION &&
+          blob.mass >= REPRODUCTION_MIN_MASS &&
+          (blob.kills > 0 || blob.foodEaten >= FOOD_FOR_REPRODUCTION) &&
+          (currentTick - blob.lastReproductionTick) > REPRODUCTION_COOLDOWN;
+
+        if (canReproduce) {
+          giveBirth(blob);
+        } else {
+          // Small penalty for trying to reproduce when not ready
+          blob.genome.fitness -= 1;
         }
       }
 
@@ -802,11 +778,6 @@ export default function AgarioDemo({
           blob.genome.fitness += STARVATION_DEATH_PENALTY;
           console.log(`💀 Blob #${blob.id} starved to death after ${blob.idleTicks} idle ticks`);
         }
-      }
-
-      // Natural reproduction attempt (2% chance per tick if conditions met)
-      if (blobsRef.current.length < MAX_POPULATION && Math.random() < 0.02) {
-        giveBirth(blob);
       }
     }
 
@@ -1063,7 +1034,12 @@ export default function AgarioDemo({
         y: inputYStart + i * inputSpacing,
         radius: nodeRadius,
         type: 'input',
-        label: i < 17 ? ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'M', 'Vx', 'Vy', 'Wall', 'Zone', 'Grab', 'Log', 'Fam', 'Idle'][i] : `I${i}`,
+        // In createNeuralLayout function:
+        label: i < 14 ? [
+          'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW',  // 0-7: Vision
+          'M', 'Vx', 'Vy', 'Wall',                     // 8-11: Self-awareness
+          'Idle', 'RepReady'                           // 12-13: New states
+        ][i] : `I${i}`,
         activation: node.activation,
         isLocked: true,
         vx: 0,
@@ -1123,7 +1099,7 @@ export default function AgarioDemo({
         y: outputYStart + i * outputSpacing,
         radius: nodeRadius,
         type: 'output',
-        label: ['Acc', 'Rot', 'Grab'][i] || `O${i}`,
+        label: ['Acc', 'Rot', 'Reproduce'][i] || `O${i}`,
         activation: node.activation,
         isLocked: true,
         vx: 0,
@@ -2040,6 +2016,29 @@ export default function AgarioDemo({
       ctx.moveTo(blob.x, blob.y);
       ctx.lineTo(blob.x + Math.cos(angle) * radius * 0.8, blob.y + Math.sin(angle) * radius * 0.8);
       ctx.stroke();
+
+      // Reproduction readiness indicator
+      const currentTick = tickCountRef.current;
+      const canReproduce =
+        blob.age >= MIN_AGE_FOR_REPRODUCTION &&
+        blob.mass >= REPRODUCTION_MIN_MASS &&
+        (blob.kills > 0 || blob.foodEaten >= FOOD_FOR_REPRODUCTION) &&
+        (currentTick - blob.lastReproductionTick) > REPRODUCTION_COOLDOWN;
+
+      if (canReproduce) {
+        ctx.fillStyle = `rgba(147, 51, 234, 0.3)`;
+        ctx.beginPath();
+        ctx.arc(blob.x, blob.y, radius + 15, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (cam.zoom > 0.8) {
+          ctx.fillStyle = '#9333ea';
+          ctx.font = `bold ${8 / cam.zoom}px monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(`Ready!`, blob.x, blob.y + radius + 20);
+        }
+      }
 
       // Log indicator
       if (blob.grabbedLog !== undefined) {

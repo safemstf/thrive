@@ -6,24 +6,25 @@ const WORLD_WIDTH = 3000;
 const WORLD_HEIGHT = 3000;
 const INITIAL_BLOBS = 120;
 const MAX_POPULATION = 150;
-const MAX_FOOD = 3200;
+const MAX_FOOD = 2200;
 const FOOD_SPAWN_RATE = 200;
-const NUM_OBSTACLES = 10;
+const NUM_OBSTACLES = 50;
 const NUM_LOGS = 20;
 const VISION_RANGE = 100;
 const VISION_UPDATE_INTERVAL = 2;
 
 // Natural reproduction
-const REPRODUCTION_MIN_MASS = 90;
-const REPRODUCTION_COOLDOWN = 2000;
+const REPRODUCTION_MIN_MASS = 20;
+const REPRODUCTION_COOLDOWN = 200;
 const FOOD_FOR_REPRODUCTION = 20;
 const MIN_AGE_FOR_REPRODUCTION = 200;
+const REPRODUCTION_READY_THRESHOLD = 0.7; // Neural network threshold for reproduction
 
 // Survival pressure
 const MAX_OBSTACLES = 100;
 
 // Food clustering
-const CLUSTER_DISTANCE = 300;
+const CLUSTER_DISTANCE = 70;
 const MIN_CLUSTER_SIZE = 3;
 const CLUSTER_UPDATE_INTERVAL = 10;
 
@@ -41,7 +42,7 @@ const BASE_STARVATION_INTERVAL = 150;
 const SURVIVAL_PRESSURE_INCREASE = 0.001;
 
 // Neural IO sizes
-const INPUT_SIZE = 17;
+const INPUT_SIZE = 14;
 const OUTPUT_SIZE = 3;
 
 // Neural net visualization
@@ -107,4 +108,5 @@ export {
   OUTPUT_SIZE,
 
   NEURAL_NET_CONFIG,
+  REPRODUCTION_READY_THRESHOLD,
 };
