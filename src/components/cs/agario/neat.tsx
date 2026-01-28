@@ -1,4 +1,4 @@
-// src/components/cs/agario/neat.ts - SIMPLIFIED WORKING VERSION
+// src/components/cs/agario/neat.ts - ENHANCED VERSION
 
 export interface NeatConfig {
   mutationRate: number;
@@ -15,12 +15,15 @@ export enum NodeType {
   OUTPUT = 'OUTPUT'
 }
 
+// All possible activation functions
+export type ActivationFunction = 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu';
+
 export class NodeGene {
   id: number;
   type: NodeType;
-  activation: 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu';
+  activation: ActivationFunction;
   
-  constructor(id: number, type: NodeType, activation: 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu' = 'leaky_relu') {
+  constructor(id: number, type: NodeType, activation: ActivationFunction = 'leaky_relu') {
     this.id = id;
     this.type = type;
     this.activation = activation;
@@ -65,7 +68,7 @@ export class Genome {
     this.connections = new Map();
   }
   
-  private applyActivation(x: number, func: string): number {
+  private applyActivation(x: number, func: ActivationFunction): number {
     switch (func) {
       case 'sigmoid':
         return 1 / (1 + Math.exp(-x));
@@ -170,7 +173,12 @@ export class Genome {
     connection.enabled = false;
     
     const newNodeId = this.getNextNodeId();
-    const newNode = new NodeGene(newNodeId, NodeType.HIDDEN, 'leaky_relu');
+    
+    // Randomly select activation function for new hidden node
+    const activations: ActivationFunction[] = ['tanh', 'sigmoid', 'relu', 'leaky_relu'];
+    const randomActivation = activations[Math.floor(Math.random() * activations.length)];
+    
+    const newNode = new NodeGene(newNodeId, NodeType.HIDDEN, randomActivation);
     this.nodes.set(newNodeId, newNode);
     
     const conn1 = new ConnectionGene(innovationNum, connection.from, newNodeId, 1.0, true);
@@ -206,6 +214,20 @@ export class Genome {
           conn.weight += (Math.random() * 2 - 1) * size;
           conn.weight = Math.max(-4, Math.min(4, conn.weight));
         }
+      }
+    }
+  }
+  
+  // NEW: Mutate activation functions
+  mutateActivation(rate: number = 0.1): void {
+    const activations: ActivationFunction[] = ['tanh', 'sigmoid', 'relu', 'leaky_relu'];
+    
+    for (const [id, node] of this.nodes) {
+      if (node.type === NodeType.HIDDEN && Math.random() < rate) {
+        // Change to a different activation function
+        const current = node.activation;
+        const options = activations.filter(a => a !== current);
+        node.activation = options[Math.floor(Math.random() * options.length)];
       }
     }
   }
@@ -332,19 +354,11 @@ export class Neat {
   bestFitnessEver: number = 0;
   private nextSpeciesId: number = 0;
 
-  constructor(inputSize: number, outputSize: number, populationSize: number, config: Partial<NeatConfig> = {}) {
+  constructor(inputSize: number, outputSize: number, populationSize: number, config: NeatConfig) {
     this.inputSize = inputSize;
     this.outputSize = outputSize;
     this.populationSize = populationSize;
-    
-    this.config = {
-      mutationRate: config.mutationRate ?? 0.8,
-      elitism: config.elitism ?? 0.4,
-      mutationSize: config.mutationSize ?? 0.5,
-      addNodeRate: config.addNodeRate ?? 0.4,
-      addConnectionRate: config.addConnectionRate ?? 0.25,
-      compatibilityThreshold: config.compatibilityThreshold ?? 3.0,
-    };
+    this.config = config;
 
     this.population = [];
     for (let i = 0; i < populationSize; i++) {
@@ -389,6 +403,9 @@ export class Neat {
   
   mutate(genome: Genome): void {
     genome.mutateWeights(this.config.mutationRate, this.config.mutationSize);
+    
+    // Mutate activation functions (10% chance per hidden node)
+    genome.mutateActivation(0.1);
     
     // Add node
     if (Math.random() < this.config.addNodeRate) {
