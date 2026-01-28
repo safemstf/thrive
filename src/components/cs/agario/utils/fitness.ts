@@ -15,7 +15,7 @@ import { INPUT_SIZE, OUTPUT_SIZE } from '../config/agario.constants';
 
 const FITNESS_WEIGHTS = {
   // Survival
-  BASE_SURVIVAL_PER_AGE: 1 / 200,
+  BASE_SURVIVAL_PER_AGE: 1 / 2000,
   MAX_SURVIVAL_BONUS: 2,
 
   // Mass
@@ -34,7 +34,7 @@ const FITNESS_WEIGHTS = {
   FAMILY_SIZE_MULTIPLIER: 8,
 
   // Reproduction
-  BIRTH_REWARD: 80,
+  BIRTH_REWARD: 10,
 
   // Movement
   MOVEMENT_BONUS_MULTIPLIER: 200,

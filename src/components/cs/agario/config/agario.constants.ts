@@ -4,35 +4,35 @@ import { NeatConfig } from "../neat";
 
 const WORLD_WIDTH = 4000;
 const WORLD_HEIGHT = 2000;
-const INITIAL_BLOBS = 120;
-const MAX_POPULATION = 150;
-const MAX_FOOD = 1000;
-const FOOD_SPAWN_RATE = 100;
-const NUM_OBSTACLES = 50;
-const NUM_LOGS = 20;
-const VISION_RANGE = 100;
+const INITIAL_BLOBS = 70;
+const MAX_POPULATION = 200;
+const MAX_FOOD = 1900;
+const FOOD_SPAWN_RATE = 10;
+const NUM_OBSTACLES = INITIAL_BLOBS;
+const NUM_LOGS = 0;
+const VISION_RANGE = 210;
 const VISION_UPDATE_INTERVAL = 2;
 
 // Natural reproduction
 const REPRODUCTION_MIN_MASS = 20;
-const REPRODUCTION_COOLDOWN = 1000;
-const FOOD_FOR_REPRODUCTION = 20;
+const REPRODUCTION_COOLDOWN = 200;
+const FOOD_FOR_REPRODUCTION = 30;
 const MIN_AGE_FOR_REPRODUCTION = 200;
-const REPRODUCTION_READY_THRESHOLD = 0.7; // Neural network threshold for reproduction
+const REPRODUCTION_READY_THRESHOLD = 0.5; // Neural network threshold for reproduction
 
 // Survival pressure
-const MAX_OBSTACLES = 100;
+const MAX_OBSTACLES = 0;
 
 // Food clustering
 const CLUSTER_DISTANCE = 70;
-const MIN_CLUSTER_SIZE = 3;
+const MIN_CLUSTER_SIZE = 7;
 const CLUSTER_UPDATE_INTERVAL = 10;
 
-const STARVATION_RATE = 1.6;
+const STARVATION_RATE = 1.2;
 const MIN_MOVEMENT_THRESHOLD = 0.5;
 const IDLE_PENALTY_START = 20;
 const IDLE_FITNESS_PENALTY = 0.2;
-const MOVEMENT_REWARD_FACTOR = 0.03;
+const MOVEMENT_REWARD_FACTOR = 0.23;
 const STARVATION_DEATH_PENALTY = -30;
 
 // Increase the base starvation rate
@@ -65,7 +65,7 @@ const NEAT_CONFIG: NeatConfig = {
   mutationRate: 0.8,
   elitism: 0.3,
   mutationSize: 0.4,
-  addNodeRate: 0.25,
+  addNodeRate: 0.5,
   addConnectionRate: 0.5,
   compatibilityThreshold: 3.0
 };
