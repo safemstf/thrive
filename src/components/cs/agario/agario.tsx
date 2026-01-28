@@ -42,11 +42,11 @@ import {
   BlobInfo,
   NeuralNetControls,
   ControlButton,
-} from './agario.styles';
+} from './config/agario.styles';
 
 import {
   TerrainZone, ZoneType, Food, FoodCluster, Obstacle, Log, Blob, NeuralLayout, NeuralNode, NeuralConnection
-} from './agario.types';
+} from './config/agario.types';
 
 import {
   WORLD_WIDTH,
@@ -86,9 +86,51 @@ import {
 
   NEURAL_NET_CONFIG,
   NEAT_CONFIG
-} from './agario.constants';
+} from './config/agario.constants';
 
+import { calculatePopulationFitness, getTopBlobs } from './utils/fitness';
 
+import {
+  renderSimulation,
+  updateCamera,
+  getCameraTarget,
+  type Camera,
+  type RenderContext
+} from './utils/rendering';
+import { SelectedNodeInfo } from "./config/agario.types";
+
+import {
+  simulateBlob,
+  handleCollisions,
+  updateSurvivalPressure
+} from './utils/simulation';
+
+import { getVision } from './utils/vision';
+
+import {
+  createNeuralLayout,
+  applyPhysics
+} from './utils/neural-net-visualization';
+
+import {
+  createBlob,
+  giveBirth
+} from './utils/reproduction';
+
+import {
+  spawnFood,
+  clusterFood,
+  ageFood,
+  updateSpatialGrid,
+  getNearbyFood
+} from './utils/environment';
+
+import { HeaderSection } from "./components/HeaderSection";
+import { HUDComponent } from "./components/HUDComponent";
+import { LeaderboardComponent } from "./components/LeaderboardComponent";
+import { NeuralNetModalComponent } from "./components/NeuralNetModal";
+import { StatsDrawerComponent } from "./components/StatsDrawerComponent";
+import { ViewportControlsComponent } from "./components/ViewportControlsComponent";
 
 // ===================== PROPS INTERFACE =====================
 
@@ -121,13 +163,16 @@ export default function AgarioDemo({
   const totalDeathsRef = useRef(0);
   const totalBirthsRef = useRef(0);
   const survivalPressureRef = useRef(0);
+  const [showWeights, setShowWeights] = useState<boolean>(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [selectedNodeInfo, setSelectedNodeInfo] = useState<SelectedNodeInfo | null>(null);
 
   // Spatial grid for performance
   const GRID_SIZE = 100;
   const spatialGridRef = useRef<Map<string, Food[]>>(new Map());
 
   // Camera
-  const cameraRef = useRef({ x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, zoom: 0.9 });
+  const cameraRef = useRef<Camera>({ x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, zoom: 0.9 });
   const [zoom, setZoom] = useState(0.9);
   const [followBest, setFollowBest] = useState(false);
 
@@ -184,263 +229,68 @@ export default function AgarioDemo({
 
   // ===================== HELPER FUNCTIONS =====================
 
-  const randomColor = useCallback(() => {
-    const hue = Math.random() * 360;
-    return `hsl(${hue}, 70%, 55%)`;
-  }, []);
-
-  const distance = useCallback((x1: number, y1: number, x2: number, y2: number) => {
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    return Math.sqrt(dx * dx + dy * dy);
-  }, []);
-
-  const getZoneAt = useCallback((x: number, y: number): ZoneType => {
+  const getZoneAt = useCallback((x: number, y: number): string => {  // Return string instead of ZoneType
     for (const zone of terrainZonesRef.current) {
       if (x >= zone.x && x < zone.x + zone.width &&
         y >= zone.y && y < zone.y + zone.height) {
-        return zone.type;
+        return zone.type;  // Already a string
       }
     }
     return 'neutral';
   }, []);
 
-  // Spatial grid helpers
-  const getGridKey = useCallback((x: number, y: number): string => {
-    const gx = Math.floor(x / GRID_SIZE);
-    const gy = Math.floor(y / GRID_SIZE);
-    return `${gx},${gy}`;
-  }, []);
-
-  const updateSpatialGrid = useCallback(() => {
-    spatialGridRef.current.clear();
-
-    for (const food of foodRef.current) {
-      const key = getGridKey(food.x, food.y);
-      if (!spatialGridRef.current.has(key)) {
-        spatialGridRef.current.set(key, []);
-      }
-      spatialGridRef.current.get(key)!.push(food);
-    }
-  }, [getGridKey]);
-
-  const getNearbyFood = useCallback((x: number, y: number, range: number): Food[] => {
-    const nearby: Food[] = [];
-    const cellRange = Math.ceil(range / GRID_SIZE);
-    const centerX = Math.floor(x / GRID_SIZE);
-    const centerY = Math.floor(y / GRID_SIZE);
-
-    for (let dx = -cellRange; dx <= cellRange; dx++) {
-      for (let dy = -cellRange; dy <= cellRange; dy++) {
-        const key = `${centerX + dx},${centerY + dy}`;
-        const cellFood = spatialGridRef.current.get(key);
-        if (cellFood) {
-          nearby.push(...cellFood);
-        }
-      }
-    }
-
-    return nearby;
-  }, []);
-
-  // ===================== FOOD CLUSTERING (LOD SYSTEM) =====================
-
-  const clusterFood = useCallback(() => {
-    const clusters: FoodCluster[] = [];
-    const processed = new Set<Food>();
-
-    for (const food of foodRef.current) {
-      if (processed.has(food)) continue;
-
-      const nearby: Food[] = [food];
-      processed.add(food);
-
-      for (const other of foodRef.current) {
-        if (processed.has(other)) continue;
-
-        const dist = distance(food.x, food.y, other.x, other.y);
-        if (dist < CLUSTER_DISTANCE) {
-          nearby.push(other);
-          processed.add(other);
-        }
-      }
-
-      if (nearby.length >= MIN_CLUSTER_SIZE) {
-        const totalMass = nearby.reduce((sum, f) => sum + f.mass, 0);
-        const centerX = nearby.reduce((sum, f) => sum + f.x, 0) / nearby.length;
-        const centerY = nearby.reduce((sum, f) => sum + f.y, 0) / nearby.length;
-
-        clusters.push({
-          x: centerX,
-          y: centerY,
-          totalMass,
-          count: nearby.length,
-          radius: Math.sqrt(totalMass) * 3,
-          foods: nearby
-        });
-      } else {
-        for (const f of nearby) {
-          processed.delete(f);
-        }
-      }
-    }
-
-    foodClustersRef.current = clusters;
-  }, [distance]);
-
-  // ===================== NATURAL REPRODUCTION SYSTEM =====================
-
-  const createBlob = useCallback((genome: Genome, generation: number, parentId?: number, x?: number, y?: number): Blob => {
-    const blobX = x ?? Math.random() * WORLD_WIDTH;
-    const blobY = y ?? Math.random() * WORLD_HEIGHT;
-
-    const parent = parentId !== undefined ? blobsRef.current.find(b => b.id === parentId) : undefined;
-
-    const blob: Blob = {
-      id: nextBlobIdRef.current++,
-      x: blobX,
-      y: blobY,
-      vx: 0,
-      vy: 0,
-      mass: 30,
-      color: parent?.color ?? randomColor(),
-      genome,
-      generation,
-      kills: 0,
-      age: 0,
-      foodEaten: 0,
-      distanceTraveled: 0,
-      lastX: blobX,
-      lastY: blobY,
-      idleTicks: 0,
-      visionUpdateCounter: 0,
-      parentId,
-      childrenIds: [],
-      familyLineage: parent?.familyLineage ?? nextBlobIdRef.current - 1,
-      lastReproductionTick: 0,
-      birthsGiven: 0
-    };
-
-    if (parent) {
-      parent.childrenIds.push(blob.id);
-    }
-
-    return blob;
-  }, [randomColor]);
-
-  const giveBirth = useCallback((parent: Blob) => {
-    if (blobsRef.current.length >= MAX_POPULATION) return false;
-
-    // Check reproduction conditions
-    const currentTick = tickCountRef.current;
-    const canReproduce =
-      parent.age >= MIN_AGE_FOR_REPRODUCTION &&
-      parent.mass >= REPRODUCTION_MIN_MASS &&
-      (parent.kills > 0 || parent.foodEaten >= FOOD_FOR_REPRODUCTION) &&
-      (currentTick - parent.lastReproductionTick) > REPRODUCTION_COOLDOWN;
-
-    if (!canReproduce) return false;
-
-    // Create baby genome with mutations
-    const babyGenome = parent.genome.clone();
-    neatRef.current!.mutate(babyGenome);
-    babyGenome.fitness = 0;
-
-    // Create baby near parent
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 60 + Math.random() * 40;
-    const bx = parent.x + Math.cos(angle) * dist;
-    const by = parent.y + Math.sin(angle) * dist;
-
-    const baby = createBlob(babyGenome, parent.generation + 1, parent.id, bx, by);
-    baby.mass = 25;
-
-    // Parent loses mass for reproduction
-    parent.mass = Math.max(30, parent.mass * 0.7);
-    parent.lastReproductionTick = currentTick;
-    parent.birthsGiven++;
-
-    blobsRef.current.push(baby);
-    totalBirthsRef.current++;
-
-    // Neural network gets bonus for successful reproduction
-    parent.genome.fitness += 50;
-
-    return true;
-  }, [createBlob]);
-
   // ===================== INITIALIZATION =====================
-
-  const initNEAT = useCallback(() => {
+  const initSimulation = useCallback(() => {
+    // 1. Initialize NEAT
     neatRef.current = new Neat(INPUT_SIZE, OUTPUT_SIZE, INITIAL_BLOBS, NEAT_CONFIG);
-  }, []);
 
-  const spawnFood = useCallback((count: number = FOOD_SPAWN_RATE) => {
-    for (let i = 0; i < count && foodRef.current.length < MAX_FOOD; i++) {
-      let x = Math.random() * WORLD_WIDTH;
-      let y = Math.random() * WORLD_HEIGHT;
+    // 2. Initialize terrain zones
+    terrainZonesRef.current = [
+      { x: 200, y: 200, width: 300, height: 300, type: 'safe' },
+      { x: 800, y: 400, width: 400, height: 400, type: 'safe' },
+      { x: 400, y: 800, width: 300, height: 300, type: 'danger' },
+      { x: 1000, y: 100, width: 400, height: 400, type: 'danger' }
+    ];
 
-      const zone = getZoneAt(x, y);
-      if (zone === 'danger' && Math.random() < 0.7) {
-        x = Math.random() * WORLD_WIDTH;
-        y = Math.random() * WORLD_HEIGHT;
-      }
-
-      foodRef.current.push({
-        x, y,
-        mass: 2 + Math.random() * 2,
-        age: 0
-      });
-    }
-  }, [getZoneAt]);
-
-  const initTerrainZones = useCallback(() => {
-    terrainZonesRef.current = [];
-
-    // Create safe zones
-    for (let i = 0; i < 3; i++) {
-      terrainZonesRef.current.push({
-        x: Math.random() * (WORLD_WIDTH - 600),
-        y: Math.random() * (WORLD_HEIGHT - 600),
-        width: 300 + Math.random() * 300,
-        height: 300 + Math.random() * 300,
-        type: 'safe'
-      });
+    // 3. Initialize blobs with proper IDs
+    blobsRef.current = [];
+    for (const genome of neatRef.current.population) {
+      const blob = createBlob(
+        genome,
+        1,
+        undefined,
+        Math.random() * WORLD_WIDTH,
+        Math.random() * WORLD_HEIGHT,
+        undefined,
+        undefined,
+        () => nextBlobIdRef.current++  // Use the ID generator
+      );
+      blobsRef.current.push(blob);
     }
 
-    // Create danger zones
-    for (let i = 0; i < 2; i++) {
-      terrainZonesRef.current.push({
-        x: Math.random() * (WORLD_WIDTH - 600),
-        y: Math.random() * (WORLD_HEIGHT - 600),
-        width: 400 + Math.random() * 400,
-        height: 400 + Math.random() * 400,
-        type: 'danger'
-      });
-    }
-  }, []);
+    // 4. Initialize food
+    foodRef.current = spawnFood(
+      [],
+      MAX_FOOD,
+      MAX_FOOD,
+      WORLD_WIDTH,
+      WORLD_HEIGHT,
+      getZoneAt
+    );
 
-  const initObstacles = useCallback(() => {
+    // 5. Initialize obstacles
     obstaclesRef.current = [];
-
-    for (let i = 0; i < NUM_OBSTACLES; i++) {
-      const x = 100 + Math.random() * (WORLD_WIDTH - 200);
-      const y = 100 + Math.random() * (WORLD_HEIGHT - 200);
-      const zone = getZoneAt(x, y);
-
-      if (zone === 'safe' && Math.random() < 0.6) continue;
-
+    for (let i = 0; i < 20; i++) {
       obstaclesRef.current.push({
-        x, y,
+        x: Math.random() * WORLD_WIDTH,
+        y: Math.random() * WORLD_HEIGHT,
         radius: 20 + Math.random() * 20
       });
     }
-  }, [getZoneAt]);
 
-  const initLogs = useCallback(() => {
+    // 6. Initialize logs
     logsRef.current = [];
-
-    for (let i = 0; i < NUM_LOGS; i++) {
+    for (let i = 0; i < 10; i++) {
       logsRef.current.push({
         id: nextLogIdRef.current++,
         x: Math.random() * WORLD_WIDTH,
@@ -450,34 +300,17 @@ export default function AgarioDemo({
         rotation: Math.random() * Math.PI * 2
       });
     }
-  }, []);
 
-  const initSimulation = useCallback(() => {
-    initNEAT();
-    initTerrainZones();
-
-    blobsRef.current = [];
-    foodRef.current = [];
-    nextBlobIdRef.current = 0;
-    nextLogIdRef.current = 0;
+    // 7. Reset counters
     tickCountRef.current = 0;
     totalDeathsRef.current = 0;
     totalBirthsRef.current = 0;
     survivalPressureRef.current = 0;
 
-    // Create initial blobs from NEAT population
-    for (const genome of neatRef.current!.population) {
-      blobsRef.current.push(createBlob(genome, 1));
-    }
+    // 8. Initialize spatial grid
+    spatialGridRef.current = updateSpatialGrid(foodRef.current, GRID_SIZE);
 
-    // Spawn initial food
-    for (let i = 0; i < MAX_FOOD; i++) {
-      spawnFood(1);
-    }
-
-    initObstacles();
-    initLogs();
-
+    // 9. Update stats
     setStats({
       generation: 1,
       totalKills: 0,
@@ -497,121 +330,8 @@ export default function AgarioDemo({
     });
 
     setSelectedBlob(null);
-
     console.log(`🚀 Initialized: ${blobsRef.current.length} blobs, ${foodRef.current.length} food`);
-  }, [initNEAT, createBlob, initObstacles, initLogs, initTerrainZones, spawnFood]);
-
-  // ===================== VISION SYSTEM =====================
-
-  const getVision = useCallback((blob: Blob): number[] => {
-    const inputs = new Array(INPUT_SIZE).fill(0);
-    const angles = [0, 45, 90, 135, 180, 225, 270, 315];
-
-    angles.forEach((angle, i) => {
-      const rad = (angle * Math.PI) / 180;
-      const dx = Math.cos(rad);
-      const dy = Math.sin(rad);
-
-      let bestSignal = 0;
-      let closestDist = VISION_RANGE;
-
-      // Check food
-      const nearbyFood = getNearbyFood(blob.x, blob.y, VISION_RANGE);
-      for (const f of nearbyFood) {
-        const fdx = f.x - blob.x;
-        const fdy = f.y - blob.y;
-        const dist = Math.sqrt(fdx * fdx + fdy * fdy);
-        if (dist > VISION_RANGE) continue;
-
-        const dot = fdx * dx + fdy * dy;
-        if (dot > 0) {
-          const cosAngle = dot / (dist + 0.001);
-          if (cosAngle > 0.7 && dist < closestDist) {
-            closestDist = dist;
-            bestSignal = 0.5 * (1 - dist / VISION_RANGE);
-          }
-        }
-      }
-
-      // Check obstacles
-      for (const obs of obstaclesRef.current) {
-        const odx = obs.x - blob.x;
-        const ody = obs.y - blob.y;
-        const dist = Math.sqrt(odx * odx + ody * ody);
-        const effectiveDist = dist - obs.radius;
-        if (effectiveDist > VISION_RANGE) continue;
-
-        const dot = odx * dx + ody * dy;
-        if (dot > 0) {
-          const cosAngle = dot / (dist + 0.001);
-          if (cosAngle > 0.6 && effectiveDist < closestDist) {
-            closestDist = Math.max(0, effectiveDist);
-            bestSignal = -1.0 * (1 - closestDist / VISION_RANGE);
-          }
-        }
-      }
-      // Check other blobs
-      if (Math.abs(bestSignal) < 0.5) {
-        for (const other of blobsRef.current) {
-          if (other.id === blob.id) continue;
-
-          const bdx = other.x - blob.x;
-          const bdy = other.y - blob.y;
-          const dist = Math.sqrt(bdx * bdx + bdy * bdy);
-          if (dist > VISION_RANGE) continue;
-
-          const dot = bdx * dx + bdy * dy;
-          if (dot > 0) {
-            const cosAngle = dot / (dist + 0.001);
-            if (cosAngle > 0.6 && dist < closestDist) {
-              closestDist = dist;
-
-              const isFamily = other.familyLineage === blob.familyLineage;
-              const massRatio = other.mass / blob.mass;
-
-              if (isFamily) {
-                bestSignal = 0.3 * (1 - dist / VISION_RANGE);
-              } else if (massRatio < 0.87) {  // I'm > 1.15× their size
-                // Encode how much bigger I am in the signal strength
-                const advantage = (1 / massRatio) - 1;  // 0 to ~inf
-                const advantageFactor = Math.min(1, advantage * 0.5); // Cap at 1
-                bestSignal = (0.5 + advantageFactor * 0.4) * (1 - dist / VISION_RANGE);
-              } else if (massRatio > 1.15) {  // They're > 1.15× my size
-                // Encode how much bigger they are
-                const threat = massRatio - 1;  // 0 to ~inf
-                const threatFactor = Math.min(1, threat * 0.3); // Cap at 1
-                bestSignal = -(0.5 + threatFactor * 0.3) * (1 - dist / VISION_RANGE);
-              } else {
-                // Similar size - encode the small difference
-                const sizeDiff = (massRatio - 1) * 5; // Amplify small differences
-                bestSignal = sizeDiff * 0.1 * (1 - dist / VISION_RANGE);
-              }
-            }
-          }
-        }
-      }
-
-      inputs[i] = bestSignal;
-    });
-
-    // Self-awareness
-    inputs[8] = Math.min(blob.mass / 100, 1) - 0.3;
-    inputs[9] = blob.vx / 5;
-    inputs[10] = blob.vy / 5;
-
-    // Wall proximity
-    const wallDist = Math.min(blob.x, blob.y, WORLD_WIDTH - blob.x, WORLD_HEIGHT - blob.y);
-    inputs[11] = Math.max(0, 1 - wallDist / 150);
-
-    inputs[12] = Math.min(1, blob.idleTicks / 200); // Normalized idle time (0-1)
-
-    const currentTick = tickCountRef.current;
-    const reproductionCooldown = (currentTick - blob.lastReproductionTick) / REPRODUCTION_COOLDOWN;
-    const reproductionReady = Math.min(1, reproductionCooldown);
-    inputs[13] = reproductionReady;
-
-    return inputs;
-  }, [getNearbyFood, getZoneAt, distance]);
+  }, [createBlob, spawnFood, getZoneAt, updateSpatialGrid]);
 
   // ===================== UPDATE LOOP =====================
 
@@ -621,344 +341,130 @@ export default function AgarioDemo({
     tickCountRef.current++;
     const tick = tickCountRef.current;
 
-    // Update spatial grid every 5 frames
+    // Update spatial grid
     if (tick % 5 === 0) {
-      updateSpatialGrid();
+      spatialGridRef.current = updateSpatialGrid(foodRef.current, GRID_SIZE);
     }
 
-    // Update food clusters every 10 frames
+    // Update food clusters
     if (tick % CLUSTER_UPDATE_INTERVAL === 0) {
-      clusterFood();
+      foodClustersRef.current = clusterFood(foodRef.current);
     }
 
     // Spawn food
-    spawnFood();
+    foodRef.current = spawnFood(
+      foodRef.current,
+      FOOD_SPAWN_RATE,
+      MAX_FOOD,
+      WORLD_WIDTH,
+      WORLD_HEIGHT,
+      getZoneAt
+    );
 
     // Age food
-    for (let i = foodRef.current.length - 1; i >= 0; i--) {
-      foodRef.current[i].age++;
-      if (foodRef.current[i].age > 5000) {
-        foodRef.current.splice(i, 1);
-      }
-    }
+    foodRef.current = ageFood(foodRef.current);
 
-    // Increase survival pressure slowly
+    // Update survival pressure
     if (tick % 200 === 0) {
       survivalPressureRef.current += SURVIVAL_PRESSURE_INCREASE;
-
-      if (obstaclesRef.current.length < MAX_OBSTACLES && Math.random() < survivalPressureRef.current * 0.5) {
-        obstaclesRef.current.push({
-          x: Math.random() * WORLD_WIDTH,
-          y: Math.random() * WORLD_HEIGHT,
-          radius: 15 + Math.random() * 20
-        });
-      }
+      obstaclesRef.current = updateSurvivalPressure(
+        obstaclesRef.current,
+        survivalPressureRef.current
+      );
     }
 
-    const blobsToRemove: Set<number> = new Set();
-    let killsThisTick = 0;
+    // Create a wrapper for giveBirth that matches the expected signature
+    const giveBirthWrapper = (parent: Blob): boolean => {
+      const result = giveBirth(
+        parent,
+        blobsRef.current,
+        (genome: Genome) => {
+          if (neatRef.current) {
+            const mutated = genome.clone();
+            neatRef.current.mutate(mutated);
+            return mutated;
+          }
+          return genome;
+        },
+        (genome: Genome, generation: number, parentId?: number, x?: number, y?: number, color?: string, familyLineage?: number) => {
+          return createBlob(
+            genome,
+            generation,
+            parentId,
+            x,
+            y,
+            color,
+            familyLineage,
+            () => nextBlobIdRef.current++  // Pass ID generator
+          );
+        },
+        tick  // Pass current simulation tick
+      );
+
+      if (result.success) {
+        // Update the blobs array
+        blobsRef.current = result.updatedBlobs!;
+        totalBirthsRef.current++;
+
+        // Ensure nextBlobIdRef is ahead of the new baby's ID
+        if (result.baby) {
+          nextBlobIdRef.current = Math.max(nextBlobIdRef.current, result.baby.id + 1);
+        }
+        return true;
+      }
+
+      return false;
+    };
 
     // Update each blob
     for (const blob of blobsRef.current) {
-      if (blobsToRemove.has(blob.id)) continue;
-
-      blob.age++;
-      blob.visionUpdateCounter++;
-
-      // Neural network decision
-      let inputs: number[];
-      if (!blob.cachedVision || blob.visionUpdateCounter >= VISION_UPDATE_INTERVAL) {
-        inputs = getVision(blob);
-        blob.cachedVision = inputs;
-        blob.visionUpdateCounter = 0;
-      } else {
-        inputs = blob.cachedVision;
-      }
-
-
-      const outputs = blob.genome.activate(inputs);
-
-      const acceleration = Math.tanh(outputs[0]) * 0.45;
-      const rotation = Math.tanh(outputs[1]) * 0.2;
-      const reproduceSignal = Math.tanh(outputs[2]); // Reproduction output
-
-      // Neural network controlled reproduction
-      if (reproduceSignal > 0.7) { // Threshold for reproduction
-        // Check if blob is actually ready to reproduce
-        const currentTick = tickCountRef.current;
-        const canReproduce =
-          blob.age >= MIN_AGE_FOR_REPRODUCTION &&
-          blob.mass >= REPRODUCTION_MIN_MASS &&
-          (blob.kills > 0 || blob.foodEaten >= FOOD_FOR_REPRODUCTION) &&
-          (currentTick - blob.lastReproductionTick) > REPRODUCTION_COOLDOWN;
-
-        if (canReproduce) {
-          giveBirth(blob);
-        } else {
-          // Small penalty for trying to reproduce when not ready
-          blob.genome.fitness -= 1;
-        }
-      }
-
-      // Move grabbed log
-      if (blob.grabbedLog !== undefined) {
-        const log = logsRef.current.find(l => l.id === blob.grabbedLog);
-        if (log) {
-          log.x = blob.x;
-          log.y = blob.y;
-        }
-      }
-
-      const currentAngle = Math.atan2(blob.vy, blob.vx) || Math.random() * Math.PI * 2;
-      const newAngle = currentAngle + rotation;
-
-      blob.vx += Math.cos(newAngle) * acceleration;
-      blob.vy += Math.sin(newAngle) * acceleration;
-
-      // Friction
-      blob.vx *= 0.95;
-      blob.vy *= 0.95;
-
-      // Speed limit
-      const speed = Math.sqrt(blob.vx * blob.vx + blob.vy * blob.vy);
-      const maxSpeed = 5 / Math.sqrt(blob.mass / 30);
-      if (speed > maxSpeed) {
-        blob.vx = (blob.vx / speed) * maxSpeed;
-        blob.vy = (blob.vy / speed) * maxSpeed;
-      }
-
-      // Move
-      blob.x += blob.vx;
-      blob.y += blob.vy;
-
-      // Wrap around
-      if (blob.x < 0) blob.x += WORLD_WIDTH;
-      if (blob.x > WORLD_WIDTH) blob.x -= WORLD_WIDTH;
-      if (blob.y < 0) blob.y += WORLD_HEIGHT;
-      if (blob.y > WORLD_HEIGHT) blob.y -= WORLD_HEIGHT;
-
-      // Track movement
-      const distMoved = distance(blob.x, blob.y, blob.lastX, blob.lastY);
-      if (distMoved < WORLD_WIDTH / 2) {
-        blob.distanceTraveled += distMoved;
-
-        if (distMoved < MIN_MOVEMENT_THRESHOLD) {
-          blob.idleTicks++;
-          // Start penalizing sooner and more severely
-          if (blob.idleTicks > IDLE_PENALTY_START) {
-            blob.genome.fitness -= IDLE_FITNESS_PENALTY;
-            // Apply gradual starvation when idle
-            if (tick % 10 === 0) {
-              const idleStarvation = (blob.idleTicks - IDLE_PENALTY_START) * 0.1;
-              blob.mass = Math.max(20, blob.mass - idleStarvation);
-            }
-          }
-        } else {
-          blob.idleTicks = 0;
-          // Reward movement more
-          blob.genome.fitness += distMoved * MOVEMENT_REWARD_FACTOR;
-        }
-      }
-      blob.lastX = blob.x;
-      blob.lastY = blob.y;
-
-      // Starvation
-      if (tick % BASE_STARVATION_INTERVAL === 0) {
-        // Base starvation - everyone loses mass
-        const baseMassLoss = STARVATION_RATE;
-        blob.mass = Math.max(15, blob.mass - baseMassLoss);
-
-        // // Additional penalty for low movement
-        // if (blob.idleTicks > 50) {
-        //   blob.mass = Math.max(15, blob.mass - (blob.idleTicks / 10));
-        // }
-
-        if (blob.mass <= 7) {
-          blobsToRemove.add(blob.id);
-          blob.genome.fitness += STARVATION_DEATH_PENALTY;
-          console.log(`💀 Blob #${blob.id} starved to death after ${blob.idleTicks} idle ticks`);
-        }
-      }
+      simulateBlob(
+        blob,
+        blobsRef.current,
+        foodRef.current,
+        obstaclesRef.current,
+        logsRef.current,
+        tick,
+        spatialGridRef.current,
+        (blob: Blob) => getVision(
+          blob,
+          blobsRef.current,
+          foodRef.current,
+          obstaclesRef.current,
+          (x: number, y: number, range: number) => getNearbyFood(x, y, range, spatialGridRef.current, GRID_SIZE),
+          tick,
+          WORLD_WIDTH,
+          WORLD_HEIGHT
+        ),
+        giveBirthWrapper  // Use the wrapper, not the original
+      );
     }
 
-    // Obstacle collisions
+    const deadBlobs = new Set<number>();
     for (const blob of blobsRef.current) {
-      if (blobsToRemove.has(blob.id)) continue;
-
-      const blobRadius = Math.sqrt(blob.mass) * 2.5;
-
-      for (const obs of obstaclesRef.current) {
-        const dist = distance(blob.x, blob.y, obs.x, obs.y);
-
-        if (dist < blobRadius + obs.radius) {
-          // Drop food pellets
-          const pelletCount = Math.floor(blob.mass / 3);
-          for (let p = 0; p < pelletCount; p++) {
-            const angle = (Math.PI * 2 * p) / pelletCount;
-            const spread = 15 + Math.random() * 25;
-            foodRef.current.push({
-              x: blob.x + Math.cos(angle) * spread,
-              y: blob.y + Math.sin(angle) * spread,
-              mass: 2.5,
-              age: 0
-            });
-          }
-
-          blob.genome.fitness -= 40;
-          blobsToRemove.add(blob.id);
-          totalDeathsRef.current++;
-          break;
-        }
+      if (blob.shouldRemove) {
+        deadBlobs.add(blob.id);
+        totalDeathsRef.current++;
       }
     }
+    // Handle collisions
+    const collisionResult = handleCollisions(
+      blobsRef.current,
+      obstaclesRef.current,
+      foodRef.current,
+      totalDeathsRef
+    );
 
-    // Food eating
-    for (let i = foodRef.current.length - 1; i >= 0; i--) {
-      const f = foodRef.current[i];
 
-      for (const blob of blobsRef.current) {
-        if (blobsToRemove.has(blob.id)) continue;
+    blobsRef.current = collisionResult.updatedBlobs;
+    foodRef.current = collisionResult.updatedFood;
 
-        const blobRadius = Math.sqrt(blob.mass) * 2.5;
-        const dist = distance(blob.x, blob.y, f.x, f.y);
+    // Remove dead blobs (from both simulateBlob and collisions)
+    const allDeadBlobs = new Set([...deadBlobs, ...collisionResult.deadBlobIds || []]);
+    blobsRef.current = blobsRef.current.filter(b => !allDeadBlobs.has(b.id));
 
-        if (dist < blobRadius) {
-          blob.mass += f.mass;
-          blob.foodEaten++;
-          blob.genome.fitness += 2;
-          foodRef.current.splice(i, 1);
-          break;
-        }
-      }
-    }
-
-    // Blob eating blob (NO FAMILY EATING)
-    for (const blob of blobsRef.current) {
-      if (blobsToRemove.has(blob.id)) continue;
-
-      const blobRadius = Math.sqrt(blob.mass) * 2.5;
-
-      for (const other of blobsRef.current) {
-        if (blob.id === other.id || blobsToRemove.has(other.id)) continue;
-
-        // // Don't eat family
-        // if (blob.familyLineage === other.familyLineage) continue;
-
-        if (blob.mass > other.mass * 1.15) {
-          const dist = distance(blob.x, blob.y, other.x, other.y);
-
-          if (dist < blobRadius * 0.8) {
-            // Eat!
-            blob.mass += other.mass * 0.7;
-            blob.kills++;
-            blob.genome.fitness += 35;
-            killsThisTick++;
-
-            // Drop some food
-            const pelletCount = Math.floor(other.mass / 6);
-            for (let p = 0; p < pelletCount; p++) {
-              const angle = Math.random() * Math.PI * 2;
-              const spread = 10 + Math.random() * 15;
-              foodRef.current.push({
-                x: other.x + Math.cos(angle) * spread,
-                y: other.y + Math.sin(angle) * spread,
-                mass: 2,
-                age: 0
-              });
-            }
-
-            other.genome.fitness -= 15;
-            blobsToRemove.add(other.id);
-            totalDeathsRef.current++;
-          }
-        }
-      }
-    }
-
-    // Remove dead blobs - NO REPLACEMENT FROM THIN AIR
-    blobsRef.current = blobsRef.current.filter(b => !blobsToRemove.has(b.id));
-
-    // Calculate fitness
-
-    for (const blob of blobsRef.current) {
-      blob.genome.fitness = 0;
-
-      // Base survival
-      blob.genome.fitness += Math.min(blob.age / 200, 2);
-
-      // Mass growth
-      if (blob.mass > 30) {
-        const massFactor = Math.log2(blob.mass / 30);
-        blob.genome.fitness += massFactor * 35;
-      }
-
-      // Kills
-      if (blob.kills > 0) {
-        blob.genome.fitness += blob.kills * 400;
-        if (blob.kills > 1) {
-          blob.genome.fitness += Math.pow(blob.kills, 1.5) * 40;
-        }
-      }
-
-      // Food eating
-      blob.genome.fitness += blob.foodEaten * 20;
-
-      // Family bonus
-      const familySize = blobsRef.current.filter(b => b.familyLineage === blob.familyLineage).length;
-      blob.genome.fitness += familySize * 8;
-
-      // Reproduction bonus
-      if (blob.birthsGiven > 0) {
-        blob.genome.fitness += blob.birthsGiven * 80;
-      }
-
-      // Movement efficiency and penalties
-      if (blob.age > 0) {
-        const movementRatio = blob.distanceTraveled / Math.max(blob.age, 1);
-        const explorationScore = movementRatio * 100;
-
-        // Severe penalty for low movement
-        if (movementRatio < 0.15) {
-          blob.genome.fitness *= 0.5; // 50% reduction for being stationary
-        } else if (movementRatio < 0.3) {
-          blob.genome.fitness *= 0.7; // 30% reduction for low movement
-        }
-
-        // Add movement-based bonus
-        const movementBonus = Math.min(50, movementRatio * 200);
-        blob.genome.fitness += movementBonus;
-
-        // Add exploration score
-        blob.genome.fitness += Math.min(explorationScore, 40);
-      }
-
-      // Idle ticks penalty
-      if (blob.idleTicks > 50) {
-        // Exponential penalty for long idle periods
-        const idlePenalty = Math.min(0.9, blob.idleTicks / 200);
-        blob.genome.fitness *= (1 - idlePenalty);
-      }
-
-      // Complexity bonus (smaller to avoid bloat)
-      const baseNodeCount = INPUT_SIZE + OUTPUT_SIZE;
-      const baseConnectionCount = INPUT_SIZE * OUTPUT_SIZE;
-      const extraNodes = blob.genome.nodes.size - baseNodeCount;
-      const extraConnections = blob.genome.connections.size - baseConnectionCount;
-
-      if (extraNodes > 0) blob.genome.fitness += extraNodes * 1;
-      if (extraConnections > 0) blob.genome.fitness += extraConnections * 0.3;
-
-      // Specialization bonus
-      const specializationScore =
-        (blob.kills > 0 ? 40 : 0) +
-        (blob.foodEaten > 15 ? 80 : 0) +
-        (blob.mass > 80 ? 150 : 0) +
-        (blob.childrenIds.length > 0 ? 120 : 0);
-      blob.genome.fitness += specializationScore;
-
-      // Cap fitness
-      blob.genome.fitness = Math.min(blob.genome.fitness, 10000);
-    }
+    // Calculate fitness using modular system
+    calculatePopulationFitness(blobsRef.current);
 
     // Update stats
     const avgMass = blobsRef.current.reduce((s, b) => s + b.mass, 0) / Math.max(blobsRef.current.length, 1);
@@ -975,6 +481,7 @@ export default function AgarioDemo({
 
     // Reproduction rate (births per 1000 ticks)
     const reproductionRate = totalBirthsRef.current / (tickCountRef.current / 1000);
+    const killsThisTick = collisionResult.kills || 0;
 
     setStats(prev => ({
       generation: maxGen,
@@ -993,225 +500,9 @@ export default function AgarioDemo({
       avgAge,
       reproductionRate
     }));
-  }, [getVision, spawnFood, createBlob, distance, getZoneAt, updateSpatialGrid, clusterFood, giveBirth]);
+  }, [getZoneAt, updateSurvivalPressure, calculatePopulationFitness, handleCollisions, simulateBlob, getVision, getNearbyFood, spawnFood, clusterFood, ageFood, updateSpatialGrid, giveBirth]);
 
-  // ===================== INTERACTIVE NEURAL NET VISUALIZATION =====================
-
-  // Update the createNeuralLayout function to use actual container dimensions
-  const createNeuralLayout = useCallback((genome: Genome, width: number, height: number): NeuralLayout => {
-    const nodes = new Map<number, NeuralNode>();
-    const connections: NeuralConnection[] = [];
-
-    // Categorize nodes
-    const inputNodes: number[] = [];
-    const hiddenNodes: number[] = [];
-    const outputNodes: number[] = [];
-
-    for (const [id, node] of genome.nodes) {
-      if (node.type === NodeType.INPUT) inputNodes.push(id);
-      else if (node.type === NodeType.HIDDEN) hiddenNodes.push(id);
-      else if (node.type === NodeType.OUTPUT) outputNodes.push(id);
-    }
-
-    inputNodes.sort((a, b) => a - b);
-    hiddenNodes.sort((a, b) => a - b);
-    outputNodes.sort((a, b) => a - b);
-
-    // Use actual container dimensions
-    const nodeRadius = Math.min(16, width * 0.015);
-
-    // Position input nodes (left side)
-    const inputX = width * 0.15;
-    const inputSpacing = Math.min(60, height / Math.max(inputNodes.length, 8));
-    const inputHeight = (inputNodes.length - 1) * inputSpacing;
-    const inputYStart = (height - inputHeight) / 2;
-
-    inputNodes.forEach((id, i) => {
-      const node = genome.nodes.get(id)!;
-      nodes.set(id, {
-        id,
-        x: inputX,
-        y: inputYStart + i * inputSpacing,
-        radius: nodeRadius,
-        type: 'input',
-        // In createNeuralLayout function:
-        label: i < 14 ? [
-          'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW',  // 0-7: Vision
-          'M', 'Vx', 'Vy', 'Wall',                     // 8-11: Self-awareness
-          'Idle', 'RepReady'                           // 12-13: New states
-        ][i] : `I${i}`,
-        activation: node.activation,
-        isLocked: true,
-        vx: 0,
-        vy: 0
-      });
-    });
-
-    // Position hidden nodes (center, in columns)
-    const hiddenColumnCount = Math.min(4, Math.max(1, Math.floor(hiddenNodes.length / 3)));
-    const columnWidth = (width * 0.7) / (hiddenColumnCount + 2);
-    const hiddenColumns: number[][] = Array(hiddenColumnCount).fill(null).map(() => []);
-
-    hiddenNodes.forEach((id, index) => {
-      const col = index % hiddenColumnCount;
-      hiddenColumns[col].push(id);
-    });
-
-    hiddenColumns.forEach((column, colIndex) => {
-      const colX = width * 0.25 + (colIndex + 1) * columnWidth;
-      const colSpacing = Math.min(70, height / Math.max(column.length, 6));
-      const colHeight = (column.length - 1) * colSpacing;
-      const colYStart = (height - colHeight) / 2;
-
-      column.forEach((id, rowIndex) => {
-        const node = genome.nodes.get(id)!;
-        const activationMap: Record<string, string> = {
-          'tanh': 'T', 'sigmoid': 'S', 'relu': 'R', 'leaky_relu': 'L'
-        };
-        const label = activationMap[node.activation] || 'H';
-
-        nodes.set(id, {
-          id,
-          x: colX + (Math.random() * 30 - 15), // Add some random spread
-          y: colYStart + rowIndex * colSpacing + (Math.random() * 20 - 10),
-          radius: nodeRadius * 1.3,
-          type: 'hidden',
-          label,
-          activation: node.activation,
-          isLocked: false,
-          vx: 0,
-          vy: 0
-        });
-      });
-    });
-
-    // Position output nodes (right side)
-    const outputX = width * 0.85;
-    const outputSpacing = Math.min(60, height / Math.max(outputNodes.length, 8));
-    const outputHeight = (outputNodes.length - 1) * outputSpacing;
-    const outputYStart = (height - outputHeight) / 2;
-
-    outputNodes.forEach((id, i) => {
-      const node = genome.nodes.get(id)!;
-      nodes.set(id, {
-        id,
-        x: outputX,
-        y: outputYStart + i * outputSpacing,
-        radius: nodeRadius,
-        type: 'output',
-        label: ['Acc', 'Rot', 'Reproduce'][i] || `O${i}`,
-        activation: node.activation,
-        isLocked: true,
-        vx: 0,
-        vy: 0
-      });
-    });
-
-    // Create connections
-    for (const conn of genome.connections.values()) {
-      if (conn.enabled) {
-        connections.push({
-          from: conn.from,
-          to: conn.to,
-          weight: conn.weight,
-          enabled: conn.enabled
-        });
-      }
-    }
-
-    return { nodes, connections };
-  }, []);
-
-
-  const applyPhysics = useCallback((layout: NeuralLayout, deltaTime: number = 1) => {
-    if (neuralNetMode === 'fixed') return layout;
-
-    const newNodes = new Map(layout.nodes);
-    const nodesArray = Array.from(newNodes.values());
-
-    // Apply spring forces for connections
-    for (const conn of layout.connections) {
-      const fromNode = newNodes.get(conn.from);
-      const toNode = newNodes.get(conn.to);
-
-      if (!fromNode || !toNode || fromNode.isLocked || toNode.isLocked) continue;
-
-      const dx = toNode.x - fromNode.x;
-      const dy = toNode.y - fromNode.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance > 0) {
-        const targetDistance = NEURAL_NET_CONFIG.minSpacing * 1.5;
-        const force = (distance - targetDistance) * NEURAL_NET_CONFIG.springStrength;
-
-        const fx = (dx / distance) * force;
-        const fy = (dy / distance) * force;
-
-        // Apply force to both nodes
-        fromNode.vx = (fromNode.vx || 0) + fx * deltaTime;
-        fromNode.vy = (fromNode.vy || 0) + fy * deltaTime;
-        toNode.vx = (toNode.vx || 0) - fx * deltaTime;
-        toNode.vy = (toNode.vy || 0) - fy * deltaTime;
-      }
-    }
-
-    // Apply repulsion between all nodes
-    for (let i = 0; i < nodesArray.length; i++) {
-      const nodeA = nodesArray[i];
-      if (nodeA.isLocked) continue;
-
-      for (let j = i + 1; j < nodesArray.length; j++) {
-        const nodeB = nodesArray[j];
-        if (nodeB.isLocked) continue;
-
-        const dx = nodeB.x - nodeA.x;
-        const dy = nodeB.y - nodeA.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const minDistance = nodeA.radius + nodeB.radius + 20;
-
-        if (distance < minDistance && distance > 0) {
-          const force = NEURAL_NET_CONFIG.repulsionStrength / (distance * distance);
-          const fx = (dx / distance) * force;
-          const fy = (dy / distance) * force;
-
-          nodeA.vx = (nodeA.vx || 0) - fx * deltaTime;
-          nodeA.vy = (nodeA.vy || 0) - fy * deltaTime;
-          nodeB.vx = (nodeB.vx || 0) + fx * deltaTime;
-          nodeB.vy = (nodeB.vy || 0) + fy * deltaTime;
-        }
-      }
-    }
-
-    // Update positions and apply damping
-    for (const node of nodesArray) {
-      if (node.isLocked || node.isDragging) {
-        node.vx = 0;
-        node.vy = 0;
-        continue;
-      }
-
-      node.vx = (node.vx || 0) * NEURAL_NET_CONFIG.damping;
-      node.vy = (node.vy || 0) * NEURAL_NET_CONFIG.damping;
-
-      // Limit velocity
-      const speed = Math.sqrt(node.vx * node.vx + node.vy * node.vy);
-      if (speed > NEURAL_NET_CONFIG.maxForce) {
-        node.vx = (node.vx / speed) * NEURAL_NET_CONFIG.maxForce;
-        node.vy = (node.vy / speed) * NEURAL_NET_CONFIG.maxForce;
-      }
-
-      // Update position
-      node.x += node.vx * deltaTime;
-      node.y += node.vy * deltaTime;
-
-      // Keep within bounds
-      const padding = 50;
-      node.x = Math.max(padding, Math.min(750, node.x));
-      node.y = Math.max(padding, Math.min(550, node.y));
-    }
-
-    return { ...layout, nodes: newNodes };
-  }, [neuralNetMode]);
+  // ===================== INTERACTIVE NEURAL NET VISUALIZATION =====================;
 
   const updateNodeActivations = useCallback((layout: NeuralLayout, inputs: number[], outputs: number[]) => {
     const newNodes = new Map(layout.nodes);
@@ -1505,6 +796,108 @@ export default function AgarioDemo({
     return Math.sqrt(dx * dx + dy * dy);
   }, []);
 
+  const handleToggleShowWeights = () => {
+    setShowWeights(!showWeights);
+  };
+
+  const handleExportNetwork = () => {
+    if (!selectedBlob) return;
+
+    const networkData = {
+      blobId: selectedBlob.id,
+      familyLineage: selectedBlob.familyLineage,
+      generation: selectedBlob.generation,
+      brain: selectedBlob.brain || selectedBlob.genome,
+      timestamp: new Date().toISOString(),
+    };
+
+    const dataStr = JSON.stringify(networkData, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+    const exportFileDefaultName = `blob-${selectedBlob.id}-network.json`;
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 0.1, 3.0));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+  };
+
+  const handleResetZoom = () => {
+    setZoomLevel(1.0);
+  };
+
+  const handleNeuralNetWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const zoomFactor = 0.001;
+    const newZoom = zoomLevel - (e.deltaY * zoomFactor);
+    setZoomLevel(Math.max(0.5, Math.min(3.0, newZoom)));
+  };
+
+  // Add these helper functions near your other helper functions (around line 100)
+
+  const calculateNodeCount = (blob: Blob): number => {
+    if (!blob.genome) return 0;
+
+    let count = 0;
+    // Count all nodes in the genome
+    count = blob.genome.nodes.size || 0;
+
+    // Fallback calculation if nodes size is 0
+    if (count === 0) {
+      count += INPUT_SIZE; // Input nodes
+      // Estimate hidden nodes based on typical network structure
+      count += 8; // Typical hidden nodes
+      count += OUTPUT_SIZE; // Output nodes
+    }
+
+    return count;
+  };
+
+  const calculateConnectionCount = (blob: Blob): number => {
+    if (!blob.genome) return 0;
+
+    // Get connections from genome
+    const connections = blob.genome.connections.size || 0;
+
+    // Fallback calculation if connections size is 0
+    if (connections === 0) {
+      // Simple estimation: input->hidden + hidden->output
+      return INPUT_SIZE * 8 + 8 * OUTPUT_SIZE; // Approximate
+    }
+
+    return connections;
+  };
+
+  const detectNodeAtPosition = (x: number, y: number, layout: NeuralLayout | null): SelectedNodeInfo | null => {
+    if (!layout) return null;
+
+    for (const node of layout.nodes.values()) {
+      const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
+      if (distance < node.radius) {
+        // Count connections for this node
+        const outgoingConnections = layout.connections.filter(conn => conn.from === node.id).length;
+        const incomingConnections = layout.connections.filter(conn => conn.to === node.id).length;
+        const totalConnections = outgoingConnections + incomingConnections;
+
+        return {
+          id: node.id,
+          layer: node.type as 'input' | 'hidden' | 'output',
+          activation: node.activationValue,
+          connections: totalConnections
+        };
+      }
+    }
+
+    return null;
+  };
+
   // Neural net mouse event handlers
   const handleNeuralNetMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!neuralLayout || !neuralNetCanvasRef.current) return;
@@ -1554,6 +947,25 @@ export default function AgarioDemo({
       if (distance < 15) {
         console.log(`Clicked on connection ${conn.from} -> ${conn.to}`);
         break;
+      }
+    }
+
+    if (e.button === 0 && !e.shiftKey) {
+      const canvas = neuralNetCanvasRef.current;
+      if (canvas && selectedBlob) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+
+        // Call a function to detect if a node was clicked
+        const clickedNode = detectNodeAtPosition(x, y, neuralLayout);
+        if (clickedNode) {
+          setSelectedNodeInfo(clickedNode);
+        } else {
+          setSelectedNodeInfo(null);
+        }
       }
     }
   }, [neuralLayout]);
@@ -1662,8 +1074,8 @@ export default function AgarioDemo({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [neuralLayout, neuralNetMode, draggingNodeId, applyPhysics]);
-
+  }, [neuralLayout, neuralNetMode, draggingNodeId, applyPhysics, showWeights]);
+  
   // Update neural layout when selected blob changes
   useEffect(() => {
     if (!selectedBlob || !neuralNetCanvasRef.current) return;
@@ -1784,15 +1196,32 @@ export default function AgarioDemo({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(dpr, dpr);
 
+    // Apply zoom transformation
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    ctx.scale(zoomLevel, zoomLevel);
+    ctx.translate(-width / 2, -height / 2);
+
     renderDynamicNeuralNet(ctx, neuralLayout, width, height);
-  }, [neuralLayout, renderDynamicNeuralNet]);
 
+    ctx.restore();
+  }, [neuralLayout, renderDynamicNeuralNet, zoomLevel]);
 
+  // cleanup function
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
   // ===================== RENDERING =====================
 
+  // Optimize render function
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -1800,277 +1229,37 @@ export default function AgarioDemo({
     const width = canvas.width / dpr;
     const height = canvas.height / dpr;
 
-    // Follow best blob
+    // Skip rendering if nothing changed (optional optimization)
+    if (!isRunningRef.current && !followBest) return;
+
+    // Camera following
     if (followBest && blobsRef.current.length > 0) {
-      const best = blobsRef.current.reduce((a, b) =>
-        a.genome.fitness > b.genome.fitness ? a : b
-      );
-      cameraRef.current.x += (best.x - cameraRef.current.x) * 0.08;
-      cameraRef.current.y += (best.y - cameraRef.current.y) * 0.08;
-    }
-
-    ctx.fillStyle = '#0a0e1a';
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.save();
-
-    const cam = cameraRef.current;
-    ctx.translate(width / 2, height / 2);
-    ctx.scale(cam.zoom, cam.zoom);
-    ctx.translate(-cam.x, -cam.y);
-
-    // Draw terrain zones
-    if (cam.zoom > 0.4) {
-      for (const zone of terrainZonesRef.current) {
-        ctx.fillStyle =
-          zone.type === 'safe' ? 'rgba(34, 197, 94, 0.06)' :
-            zone.type === 'danger' ? 'rgba(239, 68, 68, 0.06)' :
-              'rgba(100, 100, 100, 0.02)';
-
-        ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
-
-        if (cam.zoom > 0.6) {
-          ctx.strokeStyle =
-            zone.type === 'safe' ? 'rgba(34, 197, 94, 0.12)' :
-              zone.type === 'danger' ? 'rgba(239, 68, 68, 0.12)' :
-                'rgba(100, 100, 100, 0.08)';
-          ctx.lineWidth = 1 / cam.zoom;
-          ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
-        }
+      const target = getCameraTarget(blobsRef.current, 'best');
+      if (target) {
+        updateCamera(cameraRef.current, target, 0.08);
       }
     }
 
-    // Grid
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.08)';
-    ctx.lineWidth = 1 / cam.zoom;
-    for (let x = 0; x <= WORLD_WIDTH; x += 100) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, WORLD_HEIGHT);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= WORLD_HEIGHT; y += 100) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(WORLD_WIDTH, y);
-      ctx.stroke();
-    }
+    // Render using modular system
+    const renderCtx: RenderContext = {
+      ctx,
+      camera: cameraRef.current,
+      width,
+      height,
+      selectedBlobId: selectedBlob?.id,
+      currentTick: tickCountRef.current
+    };
 
-    // Border
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
-    ctx.lineWidth = 4 / cam.zoom;
-    ctx.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-
-    // Food - LOD System
-    const clusteredFoodIds = new Set<Food>();
-
-    for (const cluster of foodClustersRef.current) {
-      for (const f of cluster.foods) {
-        clusteredFoodIds.add(f);
-      }
-
-      const gradient = ctx.createRadialGradient(
-        cluster.x, cluster.y, 0,
-        cluster.x, cluster.y, cluster.radius
-      );
-      gradient.addColorStop(0, 'rgba(34, 197, 94, 0.9)');
-      gradient.addColorStop(0.7, 'rgba(34, 197, 94, 0.6)');
-      gradient.addColorStop(1, 'rgba(34, 197, 94, 0.2)');
-
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(cluster.x, cluster.y, cluster.radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(34, 197, 94, 0.3)';
-      ctx.lineWidth = 2 / cam.zoom;
-      ctx.stroke();
-
-      if (cam.zoom > 0.7) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.font = `bold ${Math.max(10, cluster.radius * 0.4) / cam.zoom}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`×${cluster.count}`, cluster.x, cluster.y);
-      }
-    }
-
-    // Individual food
-    for (const f of foodRef.current) {
-      if (clusteredFoodIds.has(f)) continue;
-
-      const alpha = Math.min(1, f.age / 30);
-      ctx.fillStyle = `rgba(34, 197, 94, ${alpha * 0.85})`;
-      ctx.beginPath();
-      ctx.arc(f.x, f.y, Math.sqrt(f.mass) * 2.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Logs
-    for (const log of logsRef.current) {
-      ctx.save();
-      ctx.translate(log.x, log.y);
-      ctx.rotate(log.rotation);
-
-      const gradient = ctx.createLinearGradient(-log.width / 2, 0, log.width / 2, 0);
-      gradient.addColorStop(0, '#8b4513');
-      gradient.addColorStop(0.3, '#a0522d');
-      gradient.addColorStop(0.7, '#8b4513');
-      gradient.addColorStop(1, '#654321');
-
-      ctx.fillStyle = gradient;
-      ctx.fillRect(-log.width / 2, -log.height / 2, log.width, log.height);
-
-      ctx.strokeStyle = 'rgba(101, 67, 33, 0.5)';
-      ctx.lineWidth = 1 / cam.zoom;
-      for (let i = 0; i < 3; i++) {
-        const y = -log.height / 2 + (log.height / 4) * (i + 1);
-        ctx.beginPath();
-        ctx.moveTo(-log.width / 2, y);
-        ctx.lineTo(log.width / 2, y);
-        ctx.stroke();
-      }
-
-      ctx.strokeStyle = '#654321';
-      ctx.lineWidth = 2 / cam.zoom;
-      ctx.strokeRect(-log.width / 2, -log.height / 2, log.width, log.height);
-
-      if (log.grabbedBy !== undefined) {
-        ctx.strokeStyle = '#fbbf24';
-        ctx.lineWidth = 3 / cam.zoom;
-        ctx.strokeRect(-log.width / 2 - 3, -log.height / 2 - 3, log.width + 6, log.height + 6);
-      }
-
-      ctx.restore();
-    }
-
-    // Obstacles
-    for (const obs of obstaclesRef.current) {
-      ctx.fillStyle = '#dc2626';
-      ctx.beginPath();
-      ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = '#991b1b';
-      ctx.lineWidth = 2 / cam.zoom;
-      ctx.stroke();
-
-      if (cam.zoom > 0.5) {
-        ctx.fillStyle = '#7f1d1d';
-        ctx.font = `bold ${Math.min(16, obs.radius) / cam.zoom}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('☠', obs.x, obs.y);
-      }
-    }
-
-    // Family connections
-    if (cam.zoom > 0.6) {
-      for (const blob of blobsRef.current) {
-        for (const childId of blob.childrenIds) {
-          const child = blobsRef.current.find(b => b.id === childId);
-          if (child) {
-            ctx.strokeStyle = 'rgba(251, 191, 36, 0.2)';
-            ctx.lineWidth = 1 / cam.zoom;
-            ctx.setLineDash([5 / cam.zoom, 5 / cam.zoom]);
-            ctx.beginPath();
-            ctx.moveTo(blob.x, blob.y);
-            ctx.lineTo(child.x, child.y);
-            ctx.stroke();
-            ctx.setLineDash([]);
-          }
-        }
-      }
-    }
-
-    // Blobs
-    for (const blob of blobsRef.current) {
-      const radius = Math.sqrt(blob.mass) * 2.5;
-
-      // Health indicator
-      const health = blob.mass / 100;
-      if (health < 0.5) {
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-        ctx.lineWidth = 3 / cam.zoom;
-        ctx.setLineDash([5 / cam.zoom, 5 / cam.zoom]);
-        ctx.beginPath();
-        ctx.arc(blob.x, blob.y, radius + 3, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      ctx.fillStyle = blob.color;
-      ctx.beginPath();
-      ctx.arc(blob.x, blob.y, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.lineWidth = 2 / cam.zoom;
-      ctx.stroke();
-
-      // Direction
-      const angle = Math.atan2(blob.vy, blob.vx);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.lineWidth = 3 / cam.zoom;
-      ctx.beginPath();
-      ctx.moveTo(blob.x, blob.y);
-      ctx.lineTo(blob.x + Math.cos(angle) * radius * 0.8, blob.y + Math.sin(angle) * radius * 0.8);
-      ctx.stroke();
-
-      // Reproduction readiness indicator
-      const currentTick = tickCountRef.current;
-      const canReproduce =
-        blob.age >= MIN_AGE_FOR_REPRODUCTION &&
-        blob.mass >= REPRODUCTION_MIN_MASS &&
-        (blob.kills > 0 || blob.foodEaten >= FOOD_FOR_REPRODUCTION) &&
-        (currentTick - blob.lastReproductionTick) > REPRODUCTION_COOLDOWN;
-
-      if (canReproduce) {
-        ctx.fillStyle = `rgba(147, 51, 234, 0.3)`;
-        ctx.beginPath();
-        ctx.arc(blob.x, blob.y, radius + 15, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (cam.zoom > 0.8) {
-          ctx.fillStyle = '#9333ea';
-          ctx.font = `bold ${8 / cam.zoom}px monospace`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText(`Ready!`, blob.x, blob.y + radius + 20);
-        }
-      }
-
-      // Log indicator
-      if (blob.grabbedLog !== undefined) {
-        ctx.fillStyle = 'rgba(139, 69, 19, 0.7)';
-        ctx.beginPath();
-        ctx.arc(blob.x, blob.y - radius - 8, 5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // ID
-      if (cam.zoom > 0.5) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.font = `bold ${11 / cam.zoom}px monospace`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`#${blob.id}`, blob.x, blob.y);
-      }
-
-      // Selection
-      if (selectedBlob?.id === blob.id) {
-        ctx.strokeStyle = '#6366f1';
-        ctx.lineWidth = 3 / cam.zoom;
-        ctx.setLineDash([5 / cam.zoom, 5 / cam.zoom]);
-        ctx.beginPath();
-        ctx.arc(blob.x, blob.y, radius + 8, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    }
-
-    ctx.restore();
-  }, [followBest, selectedBlob]);
+    renderSimulation(
+      blobsRef.current,
+      foodRef.current,
+      foodClustersRef.current,
+      obstaclesRef.current,
+      logsRef.current,
+      terrainZonesRef.current,
+      renderCtx
+    );
+  }, [followBest, selectedBlob, getCameraTarget, updateCamera, renderSimulation]);
 
   // ===================== EVENT HANDLERS =====================
 
@@ -2183,9 +1372,7 @@ export default function AgarioDemo({
 
   // ===================== RENDER JSX =====================
 
-  const topBlobs = [...blobsRef.current]
-    .sort((a, b) => b.genome.fitness - a.genome.fitness)
-    .slice(0, 12);
+  const topBlobs = getTopBlobs(blobsRef.current, 12);
 
   const handleResetLayout = useCallback(() => {
     if (selectedBlob && neuralNetCanvasRef.current) {
@@ -2236,12 +1423,11 @@ export default function AgarioDemo({
   return (
     <Container>
       <MaxWidthWrapper>
-        <Header>
-          <Title>🧬 Natural Selection Simulator</Title>
-          <Subtitle>
-            {stats.speciesCount} lineages • {stats.population} blobs • {stats.largestFamily} largest family
-          </Subtitle>
-        </Header>
+        <HeaderSection
+          speciesCount={stats.speciesCount}
+          population={stats.population}
+          largestFamily={stats.largestFamily}
+        />
 
         <VideoSection>
           <CanvasContainer>
@@ -2253,270 +1439,74 @@ export default function AgarioDemo({
               onMouseLeave={handleMouseUp}
             />
 
-            <HUD>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-                Generation {stats.generation}
-              </div>
-              <div style={{ display: 'grid', gap: '0.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ opacity: 0.7 }}>Population:</span>
-                  <span style={{ fontWeight: 600, color: '#3b82f6' }}>{stats.population}/{MAX_POPULATION}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ opacity: 0.7 }}>Food:</span>
-                  <span style={{ fontWeight: 600, color: '#22c55e' }}>{foodRef.current.length}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ opacity: 0.7 }}>Avg Mass:</span>
-                  <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.avgMass.toFixed(1)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ opacity: 0.7 }}>Avg Age:</span>
-                  <span style={{ fontWeight: 600, color: '#8b5cf6' }}>{stats.avgAge.toFixed(0)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ opacity: 0.7 }}>Reproduction Rate:</span>
-                  <span style={{ fontWeight: 600, color: '#10b981' }}>{stats.reproductionRate.toFixed(2)}/1000t</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ opacity: 0.7 }}>Births/Deaths:</span>
-                  <span style={{ fontWeight: 600, color: stats.totalBirths > stats.totalDeaths ? '#10b981' : '#ef4444' }}>
-                    {stats.totalBirths}/{stats.totalDeaths}
-                  </span>
-                </div>
-              </div>
-            </HUD>
+            <HUDComponent
+              generation={stats.generation}
+              population={stats.population}
+              maxPopulation={MAX_POPULATION}
+              foodCount={foodRef.current.length}
+              avgMass={stats.avgMass}
+              avgAge={stats.avgAge}
+              reproductionRate={stats.reproductionRate}
+              totalBirths={stats.totalBirths}
+              totalDeaths={stats.totalDeaths}
+            />
 
-            <LeaderboardHUD>
-              <div style={{ fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Trophy size={16} />
-                Top Survivors
-                <Users size={14} style={{ marginLeft: 'auto', opacity: 0.5 }} />
-              </div>
-              {topBlobs.map((blob, i) => {
-                const familySize = blobsRef.current.filter(b => b.familyLineage === blob.familyLineage).length;
-                const canReproduce = blob.age >= MIN_AGE_FOR_REPRODUCTION &&
-                  blob.mass >= REPRODUCTION_MIN_MASS &&
-                  (blob.kills > 0 || blob.foodEaten >= FOOD_FOR_REPRODUCTION);
+            <LeaderboardComponent
+              topBlobs={topBlobs}
+              selectedBlobId={selectedBlob?.id || null}
+              onSelectBlob={setSelectedBlob}
+              currentTick={tickCountRef.current}
 
-                return (
-                  <LeaderboardEntry
-                    key={blob.id}
-                    $rank={i}
-                    $selected={selectedBlob?.id === blob.id}
-                    onClick={() => setSelectedBlob(blob)}
-                  >
-                    <div className="rank">#{i + 1}</div>
-                    <div className="blob-color" style={{ background: blob.color }} />
-                    <div className="info">
-                      <div>#{blob.id} • <span className="mass">{blob.mass.toFixed(0)}</span>m</div>
-                      <div className="gen">
-                        Age: {blob.age} • {blob.childrenIds.length}👶 • {canReproduce ? '🎯' : '⏳'}
-                      </div>
-                    </div>
-                  </LeaderboardEntry>
-                );
-              })}
-            </LeaderboardHUD>
+            />
 
-            <ViewportControls>
-              <ViewportButton onClick={zoomIn} title="Zoom In">
-                <ZoomIn size={20} />
-              </ViewportButton>
-              <ViewportButton onClick={zoomOut} title="Zoom Out">
-                <ZoomOut size={20} />
-              </ViewportButton>
-              <ViewportButton onClick={resetCamera} title="Reset View">
-                <Maximize2 size={20} />
-              </ViewportButton>
-              <ViewportButton
-                $active={followBest}
-                onClick={() => setFollowBest(!followBest)}
-                title="Follow Best"
-              >
-                <Crosshair size={20} />
-              </ViewportButton>
-            </ViewportControls>
-
-            <ZoomIndicator>
-              {(zoom * 100).toFixed(0)}% {followBest && '• Following Best'}
-            </ZoomIndicator>
+            <ViewportControlsComponent
+              zoom={zoom}
+              followBest={followBest}
+              onZoomIn={zoomIn}
+              onZoomOut={zoomOut}
+              onResetCamera={resetCamera}
+              onToggleFollowBest={() => setFollowBest(!followBest)}
+            />
           </CanvasContainer>
         </VideoSection>
 
-        <ControlsDrawer $expanded={drawerExpanded}>
-          <DrawerHandle onClick={() => setDrawerExpanded(!drawerExpanded)}>
-            {drawerExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
-            <span>Ecosystem Statistics</span>
-          </DrawerHandle>
-
-          {drawerExpanded && (
-            <DrawerContent>
-              <Grid $columns={4}>
-                <StatCard $color="#3b82f6">
-                  <div className="label">Lineages</div>
-                  <div className="value">{stats.speciesCount}</div>
-                  <div className="change">Family dynasties</div>
-                </StatCard>
-
-                <StatCard $color="#10b981">
-                  <div className="label">Total Births</div>
-                  <div className="value">{stats.totalBirths}</div>
-                  <div className="change">Natural reproduction</div>
-                </StatCard>
-
-                <StatCard $color="#ef4444">
-                  <div className="label">Total Deaths</div>
-                  <div className="value">{stats.totalDeaths}</div>
-                  <div className="change">Natural selection</div>
-                </StatCard>
-
-                <StatCard $color="#fbbf24">
-                  <div className="label">Largest Family</div>
-                  <div className="value">{stats.largestFamily}</div>
-                  <div className="change">Successful lineage</div>
-                </StatCard>
-              </Grid>
-            </DrawerContent>
-          )}
-        </ControlsDrawer>
+        <StatsDrawerComponent
+          expanded={drawerExpanded}
+          onToggle={() => setDrawerExpanded(!drawerExpanded)}
+          speciesCount={stats.speciesCount}
+          totalBirths={stats.totalBirths}
+          totalDeaths={stats.totalDeaths}
+          largestFamily={stats.largestFamily}
+        />
       </MaxWidthWrapper>
 
-      {/* Neural Network Modal */}
       {selectedBlob && (
-        <NeuralNetModal onClick={() => setSelectedBlob(null)}>
-          <NeuralNetPanel onClick={(e) => e.stopPropagation()}>
-            <CloseButton onClick={() => setSelectedBlob(null)}>
-              <X size={20} />
-            </CloseButton>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-              <Brain size={24} color="#6366f6" />
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-                Interactive Neural Network - Blob #{selectedBlob.id} (Lineage {selectedBlob.familyLineage})
-              </h2>
-            </div>
-
-            <NeuralNetControls>
-              <ControlButton
-                $active={neuralNetMode === 'physics'}
-                onClick={() => setNeuralNetMode(neuralNetMode === 'physics' ? 'fixed' : 'physics')}
-                title="Toggle physics simulation"
-              >
-                {neuralNetMode === 'physics' ? <Move size={16} /> : <Lock size={16} />}
-                {neuralNetMode === 'physics' ? 'Physics Mode' : 'Fixed Mode'}
-              </ControlButton>
-
-              <ControlButton
-                $active={showActivations}
-                onClick={() => setShowActivations(!showActivations)}
-                title="Toggle activation values"
-              >
-                <Brain size={16} />
-                {showActivations ? 'Hide Activations' : 'Show Activations'}
-              </ControlButton>
-
-              <ControlButton
-                onClick={handleResetLayout}
-                title="Reset layout"
-              >
-                <RefreshCw size={16} />
-                Reset Layout
-              </ControlButton>
-
-              <ControlButton
-                onClick={logLayoutInfo}
-                title="Debug layout info"
-              >
-                <Brain size={16} />
-                Debug Info
-              </ControlButton>
-
-              <div style={{ marginLeft: 'auto', fontSize: '0.8rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span>Click & drag hidden nodes to move</span>
-                <span style={{ opacity: 0.5 }}>•</span>
-                <span>Shift+Click to lock/unlock</span>
-              </div>
-            </NeuralNetControls>
-
-            <BlobInfo>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                gap: '1rem',
-                alignItems: 'center'
-              }}>
-                <div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Generation</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#6366f6' }}>{selectedBlob.generation}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Family Size</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#22c55e' }}>
-                    {blobsRef.current.filter(b => b.familyLineage === selectedBlob.familyLineage).length}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Children</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#10b981' }}>{selectedBlob.childrenIds.length}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Age</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#8b5cf6' }}>{selectedBlob.age}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Mass</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#22c55e' }}>{selectedBlob.mass.toFixed(1)}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Food Eaten</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#10b981' }}>{selectedBlob.foodEaten}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Kills</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#ef4444' }}>{selectedBlob.kills}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Can Reproduce?</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 700, color: selectedBlob.age >= MIN_AGE_FOR_REPRODUCTION && selectedBlob.mass >= REPRODUCTION_MIN_MASS && (selectedBlob.kills > 0 || selectedBlob.foodEaten >= FOOD_FOR_REPRODUCTION) ? '#10b981' : '#ef4444' }}>
-                    {selectedBlob.age >= MIN_AGE_FOR_REPRODUCTION && selectedBlob.mass >= REPRODUCTION_MIN_MASS && (selectedBlob.kills > 0 || selectedBlob.foodEaten >= FOOD_FOR_REPRODUCTION) ? 'YES' : 'NO'}
-                  </div>
-                </div>
-              </div>
-            </BlobInfo>
-
-            <CanvasWrapper>
-              <NeuralNetCanvas
-                ref={neuralNetCanvasRef}
-                onMouseDown={handleNeuralNetMouseDown}
-                onMouseMove={handleNeuralNetMouseMove}
-                onMouseUp={handleNeuralNetMouseUp}
-                onMouseLeave={handleNeuralNetMouseUp}
-              />
-            </CanvasWrapper>
-
-            <div style={{
-              marginTop: '0.5rem',
-              padding: '0.75rem',
-              background: 'rgba(0, 0, 0, 0.3)',
-              borderRadius: '8px',
-              fontSize: '0.8rem',
-              color: '#94a3b8'
-            }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.5rem' }}>
-                <div>
-                  <strong style={{ color: '#fbbf24' }}>Natural Reproduction:</strong> Blobs reproduce only when they achieve enough food ({FOOD_FOR_REPRODUCTION}+) or get kills. No blobs from thin air!
-                </div>
-                <div>
-                  <strong style={{ color: '#22c55e' }}>Family Protection:</strong> Blobs won't attack their own family lineage. Cooperation is key!
-                </div>
-                <div>
-                  <strong style={{ color: '#3b82f6' }}>Interactive Network:</strong> Drag hidden nodes to rearrange. Shift+click to lock/unlock.
-                </div>
-              </div>
-            </div>
-          </NeuralNetPanel>
-        </NeuralNetModal>
+        <NeuralNetModalComponent
+          selectedBlob={selectedBlob}
+          familySize={blobsRef.current.filter(b => b.familyLineage === selectedBlob.familyLineage).length}
+          onClose={() => setSelectedBlob(null)}
+          neuralNetCanvasRef={neuralNetCanvasRef}
+          neuralNetMode={neuralNetMode}
+          showActivations={showActivations}
+          showWeights={showWeights} // Add this state
+          zoomLevel={zoomLevel} // Add this state
+          onToggleNeuralNetMode={() => setNeuralNetMode(neuralNetMode === 'physics' ? 'fixed' : 'physics')}
+          onToggleShowActivations={() => setShowActivations(!showActivations)}
+          onToggleShowWeights={() => setShowWeights(!showWeights)} // Add this handler
+          onResetLayout={handleResetLayout}
+          onLogLayoutInfo={logLayoutInfo}
+          onExportNetwork={handleExportNetwork} // Add this handler
+          onZoomIn={handleZoomIn} // Add this handler
+          onZoomOut={handleZoomOut} // Add this handler
+          onResetZoom={handleResetZoom} // Add this handler
+          onNeuralNetMouseDown={handleNeuralNetMouseDown}
+          onNeuralNetMouseMove={handleNeuralNetMouseMove}
+          onNeuralNetMouseUp={handleNeuralNetMouseUp}
+          onNeuralNetWheel={handleNeuralNetWheel} // Add this handler
+          neuralNodeCount={calculateNodeCount(selectedBlob)} // Add this function
+          neuralConnectionCount={calculateConnectionCount(selectedBlob)} // Add this function
+          selectedNodeInfo={selectedNodeInfo} // Add this state
+        />
       )}
     </Container>
   );

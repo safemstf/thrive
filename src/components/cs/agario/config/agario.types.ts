@@ -1,7 +1,7 @@
 
 // ===================== TYPES =====================
 
-import { Genome } from "./neat";
+import { Genome } from "../neat";
 
 type ZoneType = 'safe' | 'neutral' | 'danger';
 
@@ -46,6 +46,7 @@ interface Log {
 }
 
 interface Blob {
+  shouldRemove?: boolean;
   id: number;
   x: number;
   y: number;
@@ -70,6 +71,18 @@ interface Blob {
   visionUpdateCounter: number;
   lastReproductionTick: number;
   birthsGiven: number;
+  brain?: {
+    mutated: boolean;
+    hiddenLayers: number[];
+  };
+}
+
+export interface SelectedNodeInfo {
+  id: number;
+  layer: 'input' | 'hidden' | 'output';
+  activation?: number;
+  bias?: number;
+  connections?: number;
 }
 
 interface NeuralNode {

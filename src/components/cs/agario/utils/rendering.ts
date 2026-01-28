@@ -2,12 +2,12 @@
 
 import {
   Blob, Food, FoodCluster, Obstacle, Log, TerrainZone
-} from './agario.types';
+} from '../config/agario.types';
 import {
   WORLD_WIDTH, WORLD_HEIGHT,
   REPRODUCTION_MIN_MASS, MIN_AGE_FOR_REPRODUCTION,
   FOOD_FOR_REPRODUCTION, REPRODUCTION_COOLDOWN
-} from './agario.constants';
+} from '../config/agario.constants';
 
 /**
  * Rendering System

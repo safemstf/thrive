@@ -1,13 +1,13 @@
 // ===================== CONSTANTS =====================
 
-import { NeatConfig } from "./neat";
+import { NeatConfig } from "../neat";
 
-const WORLD_WIDTH = 3000;
-const WORLD_HEIGHT = 3000;
+const WORLD_WIDTH = 4000;
+const WORLD_HEIGHT = 2000;
 const INITIAL_BLOBS = 120;
 const MAX_POPULATION = 150;
-const MAX_FOOD = 2200;
-const FOOD_SPAWN_RATE = 200;
+const MAX_FOOD = 1000;
+const FOOD_SPAWN_RATE = 100;
 const NUM_OBSTACLES = 50;
 const NUM_LOGS = 20;
 const VISION_RANGE = 100;
@@ -15,7 +15,7 @@ const VISION_UPDATE_INTERVAL = 2;
 
 // Natural reproduction
 const REPRODUCTION_MIN_MASS = 20;
-const REPRODUCTION_COOLDOWN = 200;
+const REPRODUCTION_COOLDOWN = 1000;
 const FOOD_FOR_REPRODUCTION = 20;
 const MIN_AGE_FOR_REPRODUCTION = 200;
 const REPRODUCTION_READY_THRESHOLD = 0.7; // Neural network threshold for reproduction
@@ -28,7 +28,7 @@ const CLUSTER_DISTANCE = 70;
 const MIN_CLUSTER_SIZE = 3;
 const CLUSTER_UPDATE_INTERVAL = 10;
 
-const STARVATION_RATE = 1;
+const STARVATION_RATE = 1.6;
 const MIN_MOVEMENT_THRESHOLD = 0.5;
 const IDLE_PENALTY_START = 20;
 const IDLE_FITNESS_PENALTY = 0.2;

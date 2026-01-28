@@ -19,6 +19,7 @@ const Container = styled.div`
 const MaxWidthWrapper = styled.div`
   max-width: 1200px;
   margin: 0 auto;
+  margin-left: 150px;
 `;
 
 const Header = styled.header`
@@ -410,6 +411,77 @@ const ControlButton = styled.button<{ $active?: boolean }>`
   @media (max-width: 768px) {
     font-size: 0.7rem;
     padding: 0.4rem 0.6rem;
+  }
+`;
+
+export const StatsContainer = styled.div`
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1rem;
+  backdrop-filter: blur(10px);
+`;
+
+export const StatsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+`;
+
+export const StatItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+`;
+
+export const SectionTitle = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0.5rem;
+`;
+
+export const Instructions = styled.div`
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #94a3b8;
+`;
+
+export const ZoomControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 0.25rem;
+`;
+
+export const ZoomButton = styled.button`
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #94a3b8;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(51, 65, 85, 0.8);
+    color: #fff;
+    border-color: #6366f6;
+  }
+
+  &:active {
+    transform: scale(0.95);
   }
 `;
 

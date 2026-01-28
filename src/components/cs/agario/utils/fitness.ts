@@ -1,7 +1,7 @@
 // src/components/cs/agario/fitness.ts
 
-import { Blob } from './agario.types';
-import { INPUT_SIZE, OUTPUT_SIZE } from './agario.constants';
+import { Blob } from '../config/agario.types';
+import { INPUT_SIZE, OUTPUT_SIZE } from '../config/agario.constants';
 
 /**
  * Fitness Calculation System
@@ -88,7 +88,7 @@ function calculateSurvivalFitness(age: number): number {
  */
 function calculateMassFitness(mass: number): number {
   if (mass <= FITNESS_WEIGHTS.MASS_THRESHOLD) return 0;
-  
+
   const massFactor = Math.log2(mass / FITNESS_WEIGHTS.MASS_THRESHOLD);
   return massFactor * FITNESS_WEIGHTS.MASS_GROWTH_MULTIPLIER;
 }
@@ -100,10 +100,10 @@ function calculateCombatFitness(kills: number): number {
   if (kills === 0) return 0;
 
   let fitness = kills * FITNESS_WEIGHTS.KILL_BASE_REWARD;
-  
+
   if (kills > 1) {
-    fitness += Math.pow(kills, FITNESS_WEIGHTS.KILL_SCALING_EXPONENT) * 
-               FITNESS_WEIGHTS.KILL_SCALING_BASE;
+    fitness += Math.pow(kills, FITNESS_WEIGHTS.KILL_SCALING_EXPONENT) *
+      FITNESS_WEIGHTS.KILL_SCALING_BASE;
   }
 
   return fitness;
@@ -214,7 +214,7 @@ function calculateComplexityFitness(
  */
 function calculateSpecializationFitness(blob: Blob): number {
   const spec = FITNESS_WEIGHTS.SPECIALIZATION;
-  
+
   let fitness = 0;
 
   // Combat specialist
@@ -271,9 +271,9 @@ export function calculateBlobFitness(blob: Blob, familySize: number): number {
   fitness += calculateReproductionFitness(blob.birthsGiven);
 
   // 7. Movement efficiency (includes penalties)
-  const { fitness: movementFitness, multiplier: movementMultiplier } = 
+  const { fitness: movementFitness, multiplier: movementMultiplier } =
     calculateMovementFitness(blob.age, blob.distanceTraveled, blob.idleTicks);
-  
+
   fitness *= movementMultiplier; // Apply movement penalty first
   fitness += movementFitness;    // Then add movement bonus
 
@@ -317,10 +317,10 @@ export function calculatePopulationFitness(blobs: Blob[]): Map<number, number> {
   for (const blob of blobs) {
     const familySize = familySizes.get(blob.familyLineage) || 1;
     const fitness = calculateBlobFitness(blob, familySize);
-    
+
     // Update blob's genome fitness
     blob.genome.fitness = fitness;
-    
+
     fitnessMap.set(blob.id, fitness);
   }
 
@@ -342,7 +342,7 @@ export function getFitnessStats(blobs: Blob[]): {
   }
 
   const fitnesses = blobs.map(b => b.genome.fitness).sort((a, b) => a - b);
-  
+
   const min = fitnesses[0];
   const max = fitnesses[fitnesses.length - 1];
   const total = fitnesses.reduce((sum, f) => sum + f, 0);
@@ -355,11 +355,24 @@ export function getFitnessStats(blobs: Blob[]): {
 /**
  * Get top N blobs by fitness
  */
-export function getTopBlobs(blobs: Blob[], count: number): Blob[] {
+export const getTopBlobs = (blobs: Blob[], count: number, sortBy: 'fitness' | 'mass' | 'kills' | 'children' = 'fitness'): Blob[] => {
   return [...blobs]
-    .sort((a, b) => b.genome.fitness - a.genome.fitness)
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'fitness':
+          return (b.genome.fitness || 0) - (a.genome.fitness || 0);
+        case 'mass':
+          return b.mass - a.mass;
+        case 'kills':
+          return b.kills - a.kills;
+        case 'children':
+          return b.childrenIds.length - a.childrenIds.length;
+        default:
+          return (b.genome.fitness || 0) - (a.genome.fitness || 0);
+      }
+    })
     .slice(0, count);
-}
+};
 
 /**
  * Calculate fitness percentile for a blob
@@ -371,9 +384,9 @@ export function getTopBlobs(blobs: Blob[], count: number): Blob[] {
 export function getFitnessPercentile(blob: Blob, blobs: Blob[]): number {
   const sorted = [...blobs].sort((a, b) => a.genome.fitness - b.genome.fitness);
   const index = sorted.findIndex(b => b.id === blob.id);
-  
+
   if (index === -1) return 0;
-  
+
   return (index / sorted.length) * 100;
 }
 
