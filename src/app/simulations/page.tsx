@@ -1261,7 +1261,7 @@ export default function SimulationsPage() {
               <input
                 type="range"
                 min={0.1}
-                max={3}
+                max={50}
                 step={0.1}
                 value={speed}
                 onChange={(e) => setSpeed(parseFloat(e.target.value))}
@@ -1361,7 +1361,7 @@ export default function SimulationsPage() {
                     <input
                       type="range"
                       min={0.1}
-                      max={3}
+                      max={50}
                       step={0.1}
                       value={speed}
                       onChange={(e) => setSpeed(parseFloat(e.target.value))}

@@ -1,14 +1,12 @@
-// src/components/cs/agario/neat.ts
+// src/components/cs/agario/neat.ts - SIMPLIFIED WORKING VERSION
 
 export interface NeatConfig {
   mutationRate: number;
   elitism: number;
-  randomBehaviour: number;
   mutationSize: number;
   addNodeRate: number;
   addConnectionRate: number;
   compatibilityThreshold: number;
-  activationFunction?: 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu';
 }
 
 export enum NodeType {
@@ -20,16 +18,16 @@ export enum NodeType {
 export class NodeGene {
   id: number;
   type: NodeType;
-  activationFunction: 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu';
+  activation: 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu';
   
-  constructor(id: number, type: NodeType, activationFunction: 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu' = 'leaky_relu') {
+  constructor(id: number, type: NodeType, activation: 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu' = 'leaky_relu') {
     this.id = id;
     this.type = type;
-    this.activationFunction = activationFunction;
+    this.activation = activation;
   }
   
   clone(): NodeGene {
-    return new NodeGene(this.id, this.type, this.activationFunction);
+    return new NodeGene(this.id, this.type, this.activation);
   }
 }
 
@@ -67,8 +65,7 @@ export class Genome {
     this.connections = new Map();
   }
   
-  // Activation functions
-  private applyActivation(x: number, func: 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu'): number {
+  private applyActivation(x: number, func: string): number {
     switch (func) {
       case 'sigmoid':
         return 1 / (1 + Math.exp(-x));
@@ -87,17 +84,16 @@ export class Genome {
       throw new Error(`Expected ${this.inputSize} inputs, got ${inputs.length}`);
     }
     
-    // Build network layers using topological sort
     const nodeValues = new Map<number, number>();
     const calculated = new Set<number>();
     
-    // Set input values
+    // Set input values (nodes 0 to inputSize-1)
     for (let i = 0; i < this.inputSize; i++) {
       nodeValues.set(i, inputs[i]);
       calculated.add(i);
     }
     
-    // Calculate hidden and output nodes in order
+    // Collect non-input nodes
     const nodesToCalculate: number[] = [];
     for (const [id, node] of this.nodes) {
       if (node.type !== NodeType.INPUT) {
@@ -105,439 +101,420 @@ export class Genome {
       }
     }
     
-    // Keep calculating until all nodes are done (simple approach)
-    let maxIterations = 100;
-    while (calculated.size < this.nodes.size && maxIterations > 0) {
-      maxIterations--;
+    // Iteratively calculate (handles any topology)
+    let iterations = 0;
+    const maxIterations = nodesToCalculate.length + 5;
+    
+    while (calculated.size < this.nodes.size && iterations < maxIterations) {
+      iterations++;
+      let madeProgress = false;
       
       for (const nodeId of nodesToCalculate) {
         if (calculated.has(nodeId)) continue;
         
         const node = this.nodes.get(nodeId)!;
         
-        // Check if all inputs to this node are calculated
-        const incomingConnections = Array.from(this.connections.values())
-          .filter(c => c.to === nodeId && c.enabled);
+        // Get enabled incoming connections
+        const incoming: ConnectionGene[] = [];
+        for (const conn of this.connections.values()) {
+          if (conn.to === nodeId && conn.enabled) {
+            incoming.push(conn);
+          }
+        }
         
-        const canCalculate = incomingConnections.every(c => calculated.has(c.from));
+        // Check if all source nodes are calculated
+        const ready = incoming.length === 0 || incoming.every(c => calculated.has(c.from));
         
-        if (canCalculate) {
-          // Calculate weighted sum
+        if (ready) {
           let sum = 0;
-          for (const conn of incomingConnections) {
-            const inputValue = nodeValues.get(conn.from) || 0;
-            sum += inputValue * conn.weight;
+          for (const conn of incoming) {
+            sum += (nodeValues.get(conn.from) || 0) * conn.weight;
           }
           
-          // Apply activation
-          const output = node.type === NodeType.OUTPUT 
-            ? Math.tanh(sum) // Always tanh for output
-            : this.applyActivation(sum, node.activationFunction);
-          
+          const output = this.applyActivation(sum, node.activation);
           nodeValues.set(nodeId, output);
           calculated.add(nodeId);
+          madeProgress = true;
         }
+      }
+      
+      // If no progress, force calculate remaining nodes with available inputs
+      if (!madeProgress) {
+        for (const nodeId of nodesToCalculate) {
+          if (!calculated.has(nodeId)) {
+            const node = this.nodes.get(nodeId)!;
+            let sum = 0;
+            for (const conn of this.connections.values()) {
+              if (conn.to === nodeId && conn.enabled && calculated.has(conn.from)) {
+                sum += (nodeValues.get(conn.from) || 0) * conn.weight;
+              }
+            }
+            nodeValues.set(nodeId, this.applyActivation(sum, node.activation));
+            calculated.add(nodeId);
+          }
+        }
+        break;
       }
     }
     
-    // Extract outputs
+    // Extract outputs (nodes inputSize to inputSize+outputSize-1)
     const outputs: number[] = [];
-    for (let i = this.inputSize; i < this.inputSize + this.outputSize; i++) {
-      outputs.push(nodeValues.get(i) || 0);
+    for (let i = 0; i < this.outputSize; i++) {
+      outputs.push(nodeValues.get(this.inputSize + i) || 0);
     }
     
     return outputs;
   }
   
   addNode(innovationNum: number, connection: ConnectionGene): NodeGene {
-    // Disable the old connection
     connection.enabled = false;
     
-    // Create new node
     const newNodeId = this.getNextNodeId();
-    const newNode = new NodeGene(newNodeId, NodeType.HIDDEN);
+    const newNode = new NodeGene(newNodeId, NodeType.HIDDEN, 'leaky_relu');
     this.nodes.set(newNodeId, newNode);
     
-    // Add two new connections (innovation numbers will be set by Neat class)
-    // Connection from old input to new node (weight 1)
     const conn1 = new ConnectionGene(innovationNum, connection.from, newNodeId, 1.0, true);
     this.connections.set(innovationNum, conn1);
     
-    // Connection from new node to old output (old weight)
     const conn2 = new ConnectionGene(innovationNum + 1, newNodeId, connection.to, connection.weight, true);
     this.connections.set(innovationNum + 1, conn2);
     
     return newNode;
   }
   
-  addConnection(innovationNum: number, from: number, to: number, weight: number): void {
-    // Check if connection already exists
-    const exists = Array.from(this.connections.values()).some(
-      c => c.from === from && c.to === to
-    );
-    
-    if (!exists) {
-      const conn = new ConnectionGene(innovationNum, from, to, weight, true);
-      this.connections.set(innovationNum, conn);
+  addConnection(innovationNum: number, from: number, to: number, weight: number): boolean {
+    for (const conn of this.connections.values()) {
+      if (conn.from === from && conn.to === to) {
+        if (!conn.enabled) {
+          conn.enabled = true;
+          return true;
+        }
+        return false;
+      }
     }
+    
+    this.connections.set(innovationNum, new ConnectionGene(innovationNum, from, to, weight, true));
+    return true;
   }
   
-  mutateWeights(mutationRate: number, mutationSize: number): void {
+  mutateWeights(rate: number, size: number): void {
     for (const conn of this.connections.values()) {
-      if (Math.random() < mutationRate) {
+      if (Math.random() < rate) {
         if (Math.random() < 0.1) {
-          // 10% chance to completely randomize
           conn.weight = (Math.random() * 2 - 1) * 2;
         } else {
-          // 90% chance to perturb
-          conn.weight += (Math.random() * 2 - 1) * mutationSize;
-          conn.weight = Math.max(-2, Math.min(2, conn.weight));
+          conn.weight += (Math.random() * 2 - 1) * size;
+          conn.weight = Math.max(-4, Math.min(4, conn.weight));
         }
       }
     }
   }
   
-  mutateActivation(): void {
-    // Randomly change activation function of hidden nodes
-    for (const node of this.nodes.values()) {
-      if (node.type === NodeType.HIDDEN && Math.random() < 0.05) {
-        const functions: Array<'tanh' | 'sigmoid' | 'relu' | 'leaky_relu'> = 
-          ['tanh', 'sigmoid', 'relu', 'leaky_relu'];
-        node.activationFunction = functions[Math.floor(Math.random() * functions.length)];
-      }
-    }
-  }
-  
   getNextNodeId(): number {
-    let maxId = -1;
+    let max = -1;
     for (const id of this.nodes.keys()) {
-      if (id > maxId) maxId = id;
+      if (id > max) max = id;
     }
-    return maxId + 1;
+    return max + 1;
   }
   
   clone(): Genome {
     const copy = new Genome(this.inputSize, this.outputSize);
-    
-    // Clone nodes
     for (const [id, node] of this.nodes) {
       copy.nodes.set(id, node.clone());
     }
-    
-    // Clone connections
-    for (const [innovation, conn] of this.connections) {
-      copy.connections.set(innovation, conn.clone());
+    for (const [inn, conn] of this.connections) {
+      copy.connections.set(inn, conn.clone());
     }
-    
     copy.fitness = this.fitness;
     return copy;
   }
   
-  // Calculate compatibility distance for speciation
-  compatibilityDistance(other: Genome, c1: number = 1.0, c2: number = 1.0, c3: number = 0.4): number {
-    const innovations1 = new Set(this.connections.keys());
-    const innovations2 = new Set(other.connections.keys());
+  compatibilityDistance(other: Genome): number {
+    const inn1 = new Set(this.connections.keys());
+    const inn2 = new Set(other.connections.keys());
     
-    const allInnovations = new Set([...innovations1, ...innovations2]);
-    const maxInnovation = Math.max(...allInnovations);
+    let disjoint = 0, matching = 0, weightDiff = 0;
     
-    let disjoint = 0;
-    let excess = 0;
-    let matching = 0;
-    let weightDiff = 0;
-    
-    for (const inn of allInnovations) {
-      const has1 = innovations1.has(inn);
-      const has2 = innovations2.has(inn);
-      
-      if (has1 && has2) {
+    const all = new Set([...inn1, ...inn2]);
+    for (const inn of all) {
+      if (inn1.has(inn) && inn2.has(inn)) {
         matching++;
-        const w1 = this.connections.get(inn)!.weight;
-        const w2 = other.connections.get(inn)!.weight;
-        weightDiff += Math.abs(w1 - w2);
-      } else if (inn === maxInnovation) {
-        excess++;
+        weightDiff += Math.abs(this.connections.get(inn)!.weight - other.connections.get(inn)!.weight);
       } else {
         disjoint++;
       }
     }
     
     const N = Math.max(this.connections.size, other.connections.size, 1);
-    const avgWeightDiff = matching > 0 ? weightDiff / matching : 0;
-    
-    return (c1 * excess / N) + (c2 * disjoint / N) + (c3 * avgWeightDiff);
+    return (disjoint / N) + (matching > 0 ? 0.4 * weightDiff / matching : 0);
   }
   
-  crossover(other: Genome, fitterParent: boolean): Genome {
+  crossover(other: Genome, fitterIsThis: boolean): Genome {
     const child = new Genome(this.inputSize, this.outputSize);
     
-    // Copy all nodes from both parents
-    const allNodeIds = new Set<number>();
-    for (const id of this.nodes.keys()) allNodeIds.add(id);
-    for (const id of other.nodes.keys()) allNodeIds.add(id);
-    
-    for (const id of allNodeIds) {
-      const node1 = this.nodes.get(id);
-      const node2 = other.nodes.get(id);
-      
-      if (node1) {
-        child.nodes.set(id, node1.clone());
-      } else if (node2) {
-        child.nodes.set(id, node2.clone());
-      }
+    // Copy all nodes from both
+    for (const [id, node] of this.nodes) child.nodes.set(id, node.clone());
+    for (const [id, node] of other.nodes) {
+      if (!child.nodes.has(id)) child.nodes.set(id, node.clone());
     }
     
     // Inherit connections
-    const allInnovations = new Set<number>();
-    for (const inn of this.connections.keys()) allInnovations.add(inn);
-    for (const inn of other.connections.keys()) allInnovations.add(inn);
-    
-    for (const inn of allInnovations) {
-      const conn1 = this.connections.get(inn);
-      const conn2 = other.connections.get(inn);
+    const allInn = new Set([...this.connections.keys(), ...other.connections.keys()]);
+    for (const inn of allInn) {
+      const c1 = this.connections.get(inn);
+      const c2 = other.connections.get(inn);
       
-      if (conn1 && conn2) {
-        // Both have it - randomly choose
-        const chosen = Math.random() < 0.5 ? conn1 : conn2;
-        child.connections.set(inn, chosen.clone());
-      } else if (fitterParent && conn1) {
-        // Only fitter parent has it
-        child.connections.set(inn, conn1.clone());
-      } else if (!fitterParent && conn2) {
-        child.connections.set(inn, conn2.clone());
+      if (c1 && c2) {
+        child.connections.set(inn, (Math.random() < 0.5 ? c1 : c2).clone());
+      } else if (fitterIsThis && c1) {
+        child.connections.set(inn, c1.clone());
+      } else if (!fitterIsThis && c2) {
+        child.connections.set(inn, c2.clone());
       }
     }
     
     return child;
   }
+  
+  getComplexity() {
+    const enabled = Array.from(this.connections.values()).filter(c => c.enabled).length;
+    return { nodes: this.nodes.size, connections: this.connections.size, enabled };
+  }
+}
+
+export class Species {
+  id: number;
+  members: Genome[] = [];
+  representative: Genome;
+  bestFitness: number = 0;
+  stagnation: number = 0;
+  
+  constructor(id: number, rep: Genome) {
+    this.id = id;
+    this.representative = rep.clone();
+  }
+  
+  add(g: Genome) { this.members.push(g); }
+  clear() { this.members = []; }
+  
+  update() {
+    if (this.members.length === 0) return;
+    const best = Math.max(...this.members.map(g => g.fitness));
+    if (best > this.bestFitness) {
+      this.bestFitness = best;
+      this.stagnation = 0;
+    } else {
+      this.stagnation++;
+    }
+  }
+  
+  selectParent(): Genome {
+    let best = this.members[0];
+    for (let i = 0; i < Math.min(3, this.members.length); i++) {
+      const c = this.members[Math.floor(Math.random() * this.members.length)];
+      if (c.fitness > best.fitness) best = c;
+    }
+    return best;
+  }
 }
 
 export class Neat {
   population: Genome[];
+  species: Species[] = [];
   config: NeatConfig;
   inputSize: number;
   outputSize: number;
   populationSize: number;
-  nextInnovation: number;
-  innovationHistory: Map<string, number>; // Track innovation numbers
-  generation: number;
-  species: Genome[][]; // Groups of similar genomes
+  nextInnovation: number = 0;
+  innovationHistory: Map<string, number> = new Map();
+  generation: number = 0;
+  bestFitnessEver: number = 0;
+  private nextSpeciesId: number = 0;
 
-  constructor(
-    inputSize: number,
-    outputSize: number,
-    populationSize: number,
-    config: Partial<NeatConfig> = {}
-  ) {
+  constructor(inputSize: number, outputSize: number, populationSize: number, config: Partial<NeatConfig> = {}) {
     this.inputSize = inputSize;
     this.outputSize = outputSize;
     this.populationSize = populationSize;
-    this.nextInnovation = 0;
-    this.innovationHistory = new Map();
-    this.generation = 0;
-    this.species = [];
     
     this.config = {
       mutationRate: config.mutationRate ?? 0.8,
-      elitism: config.elitism ?? 0.2,
-      randomBehaviour: config.randomBehaviour ?? 0.05,
+      elitism: config.elitism ?? 0.4,
       mutationSize: config.mutationSize ?? 0.5,
-      addNodeRate: config.addNodeRate ?? 0.03,
-      addConnectionRate: config.addConnectionRate ?? 0.05,
+      addNodeRate: config.addNodeRate ?? 0.4,
+      addConnectionRate: config.addConnectionRate ?? 0.25,
       compatibilityThreshold: config.compatibilityThreshold ?? 3.0,
-      activationFunction: config.activationFunction ?? 'leaky_relu',
     };
 
-    // Create initial minimal population (inputs directly to outputs)
     this.population = [];
     for (let i = 0; i < populationSize; i++) {
       this.population.push(this.createMinimalGenome());
     }
     
-    console.log(`🧬 NEAT initialized with minimal topology: ${inputSize} inputs → ${outputSize} outputs`);
+    console.log(`🧬 NEAT: ${inputSize}→${outputSize}, pop=${populationSize}`);
   }
   
   createMinimalGenome(): Genome {
-    const genome = new Genome(this.inputSize, this.outputSize);
+    const g = new Genome(this.inputSize, this.outputSize);
     
-    // Add input nodes
+    // Inputs: 0 to inputSize-1
     for (let i = 0; i < this.inputSize; i++) {
-      genome.nodes.set(i, new NodeGene(i, NodeType.INPUT));
+      g.nodes.set(i, new NodeGene(i, NodeType.INPUT));
     }
     
-    // Add output nodes
+    // Outputs: inputSize to inputSize+outputSize-1
     for (let i = 0; i < this.outputSize; i++) {
-      const id = this.inputSize + i;
-      genome.nodes.set(id, new NodeGene(id, NodeType.OUTPUT));
+      g.nodes.set(this.inputSize + i, new NodeGene(this.inputSize + i, NodeType.OUTPUT, 'tanh'));
     }
     
-    // Connect each input to each output (full connectivity to start)
+    // Full connectivity with random weights
     for (let i = 0; i < this.inputSize; i++) {
       for (let o = 0; o < this.outputSize; o++) {
         const to = this.inputSize + o;
-        const innovation = this.getInnovation(i, to);
-        const weight = (Math.random() * 2 - 1) * 0.5; // Small initial weights
-        genome.connections.set(innovation, new ConnectionGene(innovation, i, to, weight, true));
+        const inn = this.getInnovation(i, to);
+        g.connections.set(inn, new ConnectionGene(inn, i, to, (Math.random() * 2 - 1) * 1.5, true));
       }
     }
     
-    return genome;
+    return g;
   }
   
   getInnovation(from: number, to: number): number {
     const key = `${from}->${to}`;
-    if (this.innovationHistory.has(key)) {
-      return this.innovationHistory.get(key)!;
+    if (!this.innovationHistory.has(key)) {
+      this.innovationHistory.set(key, this.nextInnovation++);
     }
-    const innovation = this.nextInnovation++;
-    this.innovationHistory.set(key, innovation);
-    return innovation;
+    return this.innovationHistory.get(key)!;
   }
   
   mutate(genome: Genome): void {
-    // Mutate weights
     genome.mutateWeights(this.config.mutationRate, this.config.mutationSize);
     
-    // Add node mutation
-    if (Math.random() < this.config.addNodeRate && genome.connections.size > 0) {
-      const connections = Array.from(genome.connections.values()).filter(c => c.enabled);
-      if (connections.length > 0) {
-        const randomConn = connections[Math.floor(Math.random() * connections.length)];
-        const innovation = this.nextInnovation;
-        this.nextInnovation += 2; // Reserve 2 innovation numbers
-        genome.addNode(innovation, randomConn);
-        console.log(`➕ Added node! Total nodes: ${genome.nodes.size}`);
+    // Add node
+    if (Math.random() < this.config.addNodeRate) {
+      const enabled = Array.from(genome.connections.values()).filter(c => c.enabled);
+      if (enabled.length > 0) {
+        const conn = enabled[Math.floor(Math.random() * enabled.length)];
+        genome.addNode(this.nextInnovation, conn);
+        this.nextInnovation += 2;
       }
     }
     
-    // Add connection mutation
+    // Add connection
     if (Math.random() < this.config.addConnectionRate) {
       const nodeIds = Array.from(genome.nodes.keys());
-      const inputAndHidden = nodeIds.filter(id => {
-        const node = genome.nodes.get(id)!;
-        return node.type !== NodeType.OUTPUT;
-      });
-      const hiddenAndOutput = nodeIds.filter(id => {
-        const node = genome.nodes.get(id)!;
-        return node.type !== NodeType.INPUT;
-      });
+      const fromCandidates = nodeIds.filter(id => genome.nodes.get(id)!.type !== NodeType.OUTPUT);
+      const toCandidates = nodeIds.filter(id => genome.nodes.get(id)!.type !== NodeType.INPUT);
       
-      if (inputAndHidden.length > 0 && hiddenAndOutput.length > 0) {
-        const from = inputAndHidden[Math.floor(Math.random() * inputAndHidden.length)];
-        const to = hiddenAndOutput[Math.floor(Math.random() * hiddenAndOutput.length)];
-        
-        // Make sure not creating recurrent connection (simplified check)
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const from = fromCandidates[Math.floor(Math.random() * fromCandidates.length)];
+        const to = toCandidates[Math.floor(Math.random() * toCandidates.length)];
         if (from !== to) {
-          const innovation = this.getInnovation(from, to);
-          const weight = (Math.random() * 2 - 1);
-          genome.addConnection(innovation, from, to, weight);
+          const inn = this.getInnovation(from, to);
+          if (genome.addConnection(inn, from, to, (Math.random() * 2 - 1) * 2)) break;
         }
       }
     }
-    
-    // Mutate activation functions
-    genome.mutateActivation();
   }
   
   speciate(): void {
-    this.species = [];
+    for (const s of this.species) s.clear();
     
-    for (const genome of this.population) {
-      let foundSpecies = false;
-      
-      for (const spec of this.species) {
-        if (spec.length > 0) {
-          const representative = spec[0];
-          const distance = genome.compatibilityDistance(representative);
-          
-          if (distance < this.config.compatibilityThreshold) {
-            spec.push(genome);
-            foundSpecies = true;
-            break;
-          }
+    for (const g of this.population) {
+      let found = false;
+      for (const s of this.species) {
+        if (g.compatibilityDistance(s.representative) < this.config.compatibilityThreshold) {
+          s.add(g);
+          found = true;
+          break;
         }
       }
-      
-      if (!foundSpecies) {
-        this.species.push([genome]);
+      if (!found) {
+        const ns = new Species(this.nextSpeciesId++, g);
+        ns.add(g);
+        this.species.push(ns);
       }
     }
     
-    console.log(`🧬 Generation ${this.generation}: ${this.species.length} species`);
+    this.species = this.species.filter(s => s.members.length > 0);
+    for (const s of this.species) {
+      s.update();
+      s.representative = s.members[Math.floor(Math.random() * s.members.length)].clone();
+    }
+    
+    // Remove stagnant
+    if (this.species.length > 1) {
+      this.species = this.species.filter(s => s.stagnation < 15);
+      if (this.species.length === 0) {
+        const ns = new Species(this.nextSpeciesId++, this.population[0]);
+        ns.add(this.population[0]);
+        this.species.push(ns);
+      }
+    }
   }
   
   evolve(): void {
     this.generation++;
-    
-    // Sort by fitness
     this.population.sort((a, b) => b.fitness - a.fitness);
     
-    // Speciate
+    if (this.population[0].fitness > this.bestFitnessEver) {
+      this.bestFitnessEver = this.population[0].fitness;
+    }
+    
     this.speciate();
     
-    const newPopulation: Genome[] = [];
+    const newPop: Genome[] = [];
     
-    // Elitism - keep best from each species
-    const eliteCount = Math.floor(this.populationSize * this.config.elitism);
-    for (let i = 0; i < Math.min(eliteCount, this.population.length); i++) {
-      newPopulation.push(this.population[i].clone());
+    // Elitism
+    const elite = Math.max(1, Math.floor(this.populationSize * this.config.elitism));
+    for (let i = 0; i < elite && i < this.population.length; i++) {
+      newPop.push(this.population[i].clone());
     }
     
-    // Fill rest with offspring
-    while (newPopulation.length < this.populationSize) {
-      if (this.species.length === 0) {
-        // Failsafe: create new minimal genome
-        newPopulation.push(this.createMinimalGenome());
-        continue;
+    // Species fitness for selection
+    const specFit = this.species.map(s => 
+      Math.max(0.1, s.members.reduce((sum, g) => sum + g.fitness, 0) / s.members.length)
+    );
+    const totalFit = specFit.reduce((a, b) => a + b, 0);
+    
+    while (newPop.length < this.populationSize) {
+      // Select species
+      let r = Math.random() * totalFit, idx = 0;
+      for (let i = 0; i < this.species.length; i++) {
+        r -= specFit[i];
+        if (r <= 0) { idx = i; break; }
       }
-      
-      // Select random species
-      const speciesIdx = Math.floor(Math.random() * this.species.length);
-      const species = this.species[speciesIdx];
-      
-      if (species.length === 0) continue;
-      
-      // Select parents from species
-      const parent1 = species[Math.floor(Math.random() * species.length)];
-      const parent2 = species[Math.floor(Math.random() * species.length)];
+      const species = this.species[idx];
+      if (species.members.length === 0) continue;
       
       let child: Genome;
-      if (Math.random() < 0.25 || species.length === 1) {
-        // Asexual reproduction (mutation only)
-        child = parent1.clone();
+      if (species.members.length === 1 || Math.random() < 0.25) {
+        child = species.selectParent().clone();
       } else {
-        // Sexual reproduction (crossover)
-        const fitterParent = parent1.fitness >= parent2.fitness;
-        child = parent1.crossover(parent2, fitterParent);
+        const p1 = species.selectParent();
+        const p2 = species.selectParent();
+        child = p1.crossover(p2, p1.fitness >= p2.fitness);
       }
       
-      // Mutate child
       this.mutate(child);
       child.fitness = 0;
-      
-      newPopulation.push(child);
+      newPop.push(child);
     }
     
-    this.population = newPopulation;
+    this.population = newPop;
     
-    // Log complexity stats
-    const avgNodes = this.population.reduce((sum, g) => sum + g.nodes.size, 0) / this.population.length;
-    const avgConns = this.population.reduce((sum, g) => sum + g.connections.size, 0) / this.population.length;
-    console.log(`📊 Avg complexity: ${avgNodes.toFixed(1)} nodes, ${avgConns.toFixed(1)} connections`);
+    const avgN = this.population.reduce((s, g) => s + g.nodes.size, 0) / this.population.length;
+    const avgC = this.population.reduce((s, g) => s + g.getComplexity().enabled, 0) / this.population.length;
+    console.log(`🧬 Gen ${this.generation}: ${this.species.length} species, ${avgN.toFixed(1)}N, ${avgC.toFixed(1)}C, best=${this.bestFitnessEver.toFixed(0)}`);
   }
-
-  selectParent(): Genome {
-    // Tournament selection
-    const tournamentSize = 3;
-    let best: Genome | null = null;
-
-    for (let i = 0; i < tournamentSize; i++) {
-      const candidate = this.population[Math.floor(Math.random() * this.population.length)];
-      if (!best || candidate.fitness > best.fitness) {
-        best = candidate;
-      }
-    }
-
-    return best!;
+  
+  getStats() {
+    return {
+      generation: this.generation,
+      speciesCount: this.species.length,
+      avgNodes: this.population.reduce((s, g) => s + g.nodes.size, 0) / this.population.length,
+      avgConnections: this.population.reduce((s, g) => s + g.getComplexity().enabled, 0) / this.population.length,
+      bestFitness: this.bestFitnessEver
+    };
   }
 }
