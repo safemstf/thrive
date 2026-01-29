@@ -28,10 +28,17 @@ import {
   MAX_POPULATION,
   MAX_FOOD,
   FOOD_SPAWN_RATE,
+
+
+
   CLUSTER_UPDATE_INTERVAL,
+
+
   SURVIVAL_PRESSURE_INCREASE,
+
   INPUT_SIZE,
   OUTPUT_SIZE,
+
   NEAT_CONFIG,
   NUM_OBSTACLES
 } from './config/agario.constants';
@@ -115,8 +122,8 @@ export default function AgarioDemo({
   const survivalPressureRef = useRef(0);
   const biomesRef = useRef<BiomeConfig[]>([]);
   const populationPressureRef = useRef(0);
-  
   const [showWeights, setShowWeights] = useState<boolean>(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [selectedNodeInfo, setSelectedNodeInfo] = useState<SelectedNodeInfo | null>(null);
 
   // Spatial grid for performance
@@ -148,10 +155,16 @@ export default function AgarioDemo({
   const [lastInputs, setLastInputs] = useState<number[]>([]);
   const [lastOutputs, setLastOutputs] = useState<number[]>([]);
 
-  // Neural viewport state
-  const [neuralViewport, setNeuralViewport] = useState({ x: 0, y: 0, scale: 1 });
+  const [neuralNetDragging, setNeuralNetDragging] = useState(false);
+  const [draggedNodeId, setDraggedNodeId] = useState<number | null>(null);
+  // Replace the simple zoomLevel state with full viewport control
+  const [neuralViewport, setNeuralViewport] = useState({
+    x: 0,
+    y: 0,
+    scale: 1
+  });
   const [neuralPanning, setNeuralPanning] = useState(false);
-  const neuralLastMouseRef = useRef({ x: 0, y: 0 });
+  const neuralLastMouseRef = useRef({ x: 0, y: 0 }); 
 
   // Stats for display
   const [stats, setStats] = useState({
@@ -186,10 +199,12 @@ export default function AgarioDemo({
 
   // ===================== MEMOIZED CALCULATIONS =====================
 
+  // Memoize top blobs - only recalculate every 30 ticks
   const topBlobs = useMemo(() => {
     return getTopBlobs(blobsRef.current, 12);
   }, [Math.floor(stats.tickCount / 30), stats.population]);
 
+  // Memoize family size calculation
   const familySize = useMemo(() => {
     if (!selectedBlob) return 0;
     return blobsRef.current.filter(b =>
@@ -197,6 +212,7 @@ export default function AgarioDemo({
     ).length;
   }, [selectedBlob?.familyLineage, stats.population]);
 
+  // Memoize node counts for neural network
   const calculateNodeCount = useCallback((blob: Blob): number => {
     if (!blob.genome) return 0;
     const count = blob.genome.nodes.size || 0;
@@ -223,8 +239,10 @@ export default function AgarioDemo({
 
   // ===================== INITIALIZATION =====================
   const initSimulation = useCallback(() => {
+    // 1. Initialize NEAT
     neatRef.current = new Neat(INPUT_SIZE, OUTPUT_SIZE, INITIAL_BLOBS, NEAT_CONFIG);
 
+    // 2. Initialize terrain zones
     terrainZonesRef.current = [
       { x: 200, y: 200, width: 300, height: 300, type: 'safe' },
       { x: 800, y: 400, width: 400, height: 400, type: 'safe' },
@@ -232,8 +250,10 @@ export default function AgarioDemo({
       { x: 1000, y: 100, width: 400, height: 400, type: 'danger' }
     ];
 
+    // 3. Initialize biomes
     biomesRef.current = createBiomes(WORLD_WIDTH, WORLD_HEIGHT);
 
+    // 4. Initialize blobs with proper IDs
     blobsRef.current = [];
     for (const genome of neatRef.current.population) {
       const blob = createBlob(
@@ -249,16 +269,18 @@ export default function AgarioDemo({
       blobsRef.current.push(blob);
     }
 
+    // 5. Initialize food
     foodRef.current = spawnFood(
       [],
       biomesRef.current,
       WORLD_WIDTH,
       WORLD_HEIGHT,
-      MAX_FOOD / 2,
+      MAX_FOOD / 2,  // Start with half capacity
       MAX_FOOD,
-      0
+      0  // Initial population pressure
     );
 
+    // 5.5 Initialize obstacles
     obstaclesRef.current = [];
     for (let i = 0; i < NUM_OBSTACLES; i++) {
       obstaclesRef.current.push({
@@ -268,6 +290,7 @@ export default function AgarioDemo({
       });
     }
 
+    // 6. Initialize logs
     logsRef.current = [];
     for (let i = 0; i < 10; i++) {
       logsRef.current.push({
@@ -280,13 +303,16 @@ export default function AgarioDemo({
       });
     }
 
+    // 7. Reset counters
     tickCountRef.current = 0;
     totalDeathsRef.current = 0;
     totalBirthsRef.current = 0;
     survivalPressureRef.current = 0;
 
+    // 8. Initialize spatial grid
     spatialGridRef.current = updateSpatialGrid(foodRef.current, GRID_SIZE);
 
+    // 9. Update stats
     setStats({
       generation: 1,
       totalKills: 0,
@@ -317,19 +343,23 @@ export default function AgarioDemo({
     tickCountRef.current++;
     const tick = tickCountRef.current;
 
+    // Update spatial grid
     if (tick % 5 === 0) {
       spatialGridRef.current = updateSpatialGrid(foodRef.current, GRID_SIZE);
     }
 
+    // Update food clusters
     if (tick % CLUSTER_UPDATE_INTERVAL === 0) {
       foodClustersRef.current = clusterFood(foodRef.current, spatialGridRef.current, GRID_SIZE);
     }
 
+    // Calculate population pressure
     populationPressureRef.current = calculatePopulationPressure(
       blobsRef.current.length,
       foodRef.current.length
     );
 
+    // Spawn food
     foodRef.current = spawnFood(
       foodRef.current,
       biomesRef.current,
@@ -340,8 +370,11 @@ export default function AgarioDemo({
       populationPressureRef.current
     );
 
+
+    // Age food
     foodRef.current = ageFood(foodRef.current);
 
+    // Update survival pressure
     if (tick % 200 === 0) {
       survivalPressureRef.current += SURVIVAL_PRESSURE_INCREASE;
       obstaclesRef.current = updateSurvivalPressure(
@@ -350,6 +383,7 @@ export default function AgarioDemo({
       );
     }
 
+    // Create a wrapper for giveBirth that matches the expected signature
     const giveBirthWrapper = (parent: Blob): boolean => {
       const result = giveBirth(
         parent,
@@ -390,6 +424,7 @@ export default function AgarioDemo({
       return false;
     };
 
+    // Update each blob
     for (const blob of blobsRef.current) {
       simulateBlob(
         blob,
@@ -421,6 +456,7 @@ export default function AgarioDemo({
       }
     }
 
+    // Handle collisions
     const collisionResult = handleCollisions(
       blobsRef.current,
       obstaclesRef.current,
@@ -431,23 +467,28 @@ export default function AgarioDemo({
     blobsRef.current = collisionResult.updatedBlobs;
     foodRef.current = collisionResult.updatedFood;
 
+    // Remove dead blobs
     const allDeadBlobs = new Set([...deadBlobs, ...collisionResult.deadBlobIds || []]);
     blobsRef.current = blobsRef.current.filter(b => !allDeadBlobs.has(b.id));
 
+    // Calculate fitness
     calculatePopulationFitness(blobsRef.current);
 
+    // Update stats every 10 ticks for performance
     if (tick % 10 === 0) {
       const avgMass = blobsRef.current.reduce((s, b) => s + b.mass, 0) / Math.max(blobsRef.current.length, 1);
       const avgAge = blobsRef.current.reduce((s, b) => s + b.age, 0) / Math.max(blobsRef.current.length, 1);
       const bestFitness = Math.max(0, ...blobsRef.current.map(b => b.genome.fitness));
       const maxGen = Math.max(1, ...blobsRef.current.map(b => b.generation));
 
+      // Family stats
       const familySizes = new Map<number, number>();
       for (const blob of blobsRef.current) {
         familySizes.set(blob.familyLineage, (familySizes.get(blob.familyLineage) || 0) + 1);
       }
       const largestFamily = Math.max(0, ...Array.from(familySizes.values()));
 
+      // Reproduction rate
       const reproductionRate = totalBirthsRef.current / (tickCountRef.current / 1000);
       const killsThisTick = collisionResult.kills || 0;
 
@@ -471,11 +512,12 @@ export default function AgarioDemo({
     }
   }, [getZoneAt]);
 
-  // ===================== NEURAL NET VISUALIZATION =====================
+  // ===================== INTERACTIVE NEURAL NET VISUALIZATION =====================
 
   const updateNodeActivations = useCallback((layout: NeuralLayout, inputs: number[], outputs: number[]) => {
     const newNodes = new Map(layout.nodes);
 
+    // Update input node activations
     const inputNodes = Array.from(newNodes.values())
       .filter(n => n.type === 'input')
       .sort((a, b) => {
@@ -490,6 +532,7 @@ export default function AgarioDemo({
       }
     });
 
+    // Update output node activations
     const outputNodes = Array.from(newNodes.values())
       .filter(n => n.type === 'output')
       .sort((a, b) => {
@@ -513,41 +556,40 @@ export default function AgarioDemo({
     width: number,
     height: number
   ) => {
+    // Clear canvas
     ctx.fillStyle = '#0a0e1a';
     ctx.fillRect(0, 0, width, height);
 
+    // Apply viewport transform
     ctx.save();
     ctx.translate(neuralViewport.x, neuralViewport.y);
     ctx.scale(neuralViewport.scale, neuralViewport.scale);
 
-    // Grid
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.05)';
+    // Draw grid in world space
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.03)';
     ctx.lineWidth = 1 / neuralViewport.scale;
 
-    const gridSize = 50;
-    const viewLeft = -neuralViewport.x / neuralViewport.scale;
-    const viewTop = -neuralViewport.y / neuralViewport.scale;
-    const viewRight = viewLeft + width / neuralViewport.scale;
-    const viewBottom = viewTop + height / neuralViewport.scale;
+    const gridSize = 40;
+    const startX = Math.floor(-neuralViewport.x / neuralViewport.scale / gridSize) * gridSize;
+    const startY = Math.floor(-neuralViewport.y / neuralViewport.scale / gridSize) * gridSize;
+    const endX = startX + (width / neuralViewport.scale) + gridSize;
+    const endY = startY + (height / neuralViewport.scale) + gridSize;
 
-    const startX = Math.floor(viewLeft / gridSize) * gridSize;
-    const startY = Math.floor(viewTop / gridSize) * gridSize;
-
-    for (let x = startX; x <= viewRight; x += gridSize) {
+    for (let x = startX; x < endX; x += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(x, viewTop);
-      ctx.lineTo(x, viewBottom);
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
       ctx.stroke();
     }
 
-    for (let y = startY; y <= viewBottom; y += gridSize) {
+    for (let y = startY; y < endY; y += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(viewLeft, y);
-      ctx.lineTo(viewRight, y);
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
       ctx.stroke();
     }
 
-    // Connections
+    // Draw connections (your existing code, but lines scale with viewport)
     ctx.lineCap = 'round';
 
     for (const conn of layout.connections) {
@@ -558,8 +600,7 @@ export default function AgarioDemo({
 
       const weight = conn.weight;
       const strength = Math.min(Math.abs(weight), 1);
-      const baseLineWidth = 1 + strength * 2;
-      const lineWidth = baseLineWidth / neuralViewport.scale;
+      const lineWidth = (1 + strength * 2) / neuralViewport.scale;
 
       const isHovering = hoveringConnection &&
         hoveringConnection.from === conn.from &&
@@ -571,7 +612,7 @@ export default function AgarioDemo({
       const alpha = isHovering ? 0.9 : 0.2 + strength * 0.5;
 
       ctx.strokeStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`;
-      ctx.lineWidth = isHovering ? lineWidth * 1.5 : lineWidth;
+      ctx.lineWidth = isHovering ? lineWidth + 2 : lineWidth;
 
       const startX = fromNode.x;
       const startY = fromNode.y;
@@ -589,10 +630,11 @@ export default function AgarioDemo({
       ctx.moveTo(startX, startY);
       ctx.bezierCurveTo(controlX1, controlY1, controlX2, controlY2, endX, endY);
       ctx.stroke();
+      ctx.lineWidth = lineWidth;
 
       if (strength > 0.3) {
         const angle = Math.atan2(endY - controlY2, endX - controlX2);
-        const arrowSize = (3 + strength * 4) / neuralViewport.scale;
+        const arrowSize = 3 + strength * 4;
         const arrowX = endX - Math.cos(angle) * (toNode.radius + 2);
         const arrowY = endY - Math.sin(angle) * (toNode.radius + 2);
 
@@ -612,19 +654,23 @@ export default function AgarioDemo({
       }
     }
 
-    // Nodes
+    // Draw nodes
     for (const node of layout.nodes.values()) {
       const isHovering = hoveringNodeId === node.id;
       const isDragging = draggingNodeId === node.id;
 
       let color = '';
+      let glowColor = '';
 
       if (node.type === 'input') {
         color = '#3b82f6';
+        glowColor = 'rgba(59, 130, 246, 0.3)';
       } else if (node.type === 'hidden') {
         color = '#8b5cf6';
+        glowColor = 'rgba(139, 92, 246, 0.3)';
       } else {
         color = '#10b981';
+        glowColor = 'rgba(16, 185, 129, 0.3)';
       }
 
       if (showActivations && node.activationValue !== undefined) {
@@ -639,6 +685,7 @@ export default function AgarioDemo({
       }
 
       if (isHovering || isDragging) {
+        ctx.save();
         const glowGradient = ctx.createRadialGradient(
           node.x, node.y, 0,
           node.x, node.y, node.radius * 2.5
@@ -650,6 +697,7 @@ export default function AgarioDemo({
         ctx.beginPath();
         ctx.arc(node.x, node.y, node.radius * 2.5, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
       }
 
       ctx.fillStyle = color;
@@ -662,37 +710,76 @@ export default function AgarioDemo({
       ctx.stroke();
 
       if (node.isLocked) {
-        const lockSize = 6 / neuralViewport.scale;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.beginPath();
-        ctx.arc(node.x, node.y, lockSize, 0, Math.PI * 2);
+        ctx.arc(node.x, node.y, 6, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 9px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🔒', node.x, node.y);
       }
 
       ctx.fillStyle = '#ffffff';
-      const fontSize = Math.max(10, node.radius * 0.6) / neuralViewport.scale;
-      ctx.font = `bold ${fontSize}px monospace`;
+      ctx.font = `bold ${Math.max(10, node.radius * 0.6)}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(node.label, node.x, node.y);
 
       if (showActivations && node.activationValue !== undefined) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-        ctx.font = `${9 / neuralViewport.scale}px monospace`;
+        ctx.font = '9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(node.activationValue.toFixed(2), node.x, node.y + node.radius + 14 / neuralViewport.scale);
+        ctx.fillText(node.activationValue.toFixed(2), node.x, node.y + node.radius + 14);
       }
     }
 
+    // Draw weight tooltip
+    if (hoveringConnection) {
+      const conn = layout.connections.find(c =>
+        c.from === hoveringConnection.from && c.to === hoveringConnection.to
+      );
+
+      if (conn) {
+        const fromNode = layout.nodes.get(conn.from);
+        const toNode = layout.nodes.get(conn.to);
+
+        if (fromNode && toNode) {
+          const midX = (fromNode.x + toNode.x) / 2;
+          const midY = (fromNode.y + toNode.y) / 2;
+
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+          ctx.beginPath();
+          ctx.roundRect(midX - 45, midY - 18, 90, 36, 6);
+          ctx.fill();
+
+          ctx.strokeStyle = conn.weight > 0 ? '#22c55e' : '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.fillStyle = conn.weight > 0 ? '#22c55e' : '#ef4444';
+          ctx.font = 'bold 12px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`Weight: ${conn.weight.toFixed(3)}`, midX, midY - 4);
+
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '10px monospace';
+          ctx.fillText(`${conn.from} → ${conn.to}`, midX, midY + 8);
+        }
+      }
+    }
     ctx.restore();
 
-    // UI overlay
+    // Draw UI elements (zoom indicator, controls) in screen space
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(8, height - 38, 250, 30);
-
+    ctx.fillRect(10, height - 40, 180, 30);
     ctx.fillStyle = '#ffffff';
-    ctx.font = '11px monospace';
-    ctx.fillText(`Zoom: ${(neuralViewport.scale * 100).toFixed(0)}% • Shift+Drag to pan`, 16, height - 20);
+    ctx.font = '12px monospace';
+    ctx.fillText(`Zoom: ${(neuralViewport.scale * 100).toFixed(0)}%`, 20, height - 20);
+    ctx.fillText(`Pan: ${neuralViewport.x.toFixed(0)}, ${neuralViewport.y.toFixed(0)}`, 100, height - 20);
   }, [neuralViewport, hoveringNodeId, draggingNodeId, hoveringConnection, showActivations]);
 
   const distanceToLine = useCallback((px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
@@ -727,47 +814,122 @@ export default function AgarioDemo({
     return Math.sqrt(dx * dx + dy * dy);
   }, []);
 
-  // ===================== NEURAL NET MOUSE HANDLERS =====================
+  const handleExportNetwork = useCallback(() => {
+    if (!selectedBlob) return;
 
+    const networkData = {
+      blobId: selectedBlob.id,
+      familyLineage: selectedBlob.familyLineage,
+      generation: selectedBlob.generation,
+      brain: selectedBlob.brain || selectedBlob.genome,
+      timestamp: new Date().toISOString(),
+    };
+
+    const dataStr = JSON.stringify(networkData, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+    const exportFileDefaultName = `blob-${selectedBlob.id}-network.json`;
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  }, [selectedBlob]);
+
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel(prev => Math.min(prev + 0.1, 3.0));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    setZoomLevel(1.0);
+  }, []);
+
+  const handleNeuralNetWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+
+    if (!neuralNetCanvasRef.current) return;
+
+    const canvas = neuralNetCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+
+    // Get mouse position relative to canvas
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Calculate zoom factor
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.max(0.3, Math.min(3.0, neuralViewport.scale * zoomFactor));
+
+    // Calculate new viewport position to zoom toward mouse
+    const worldX = (mouseX - neuralViewport.x) / neuralViewport.scale;
+    const worldY = (mouseY - neuralViewport.y) / neuralViewport.scale;
+
+    const newX = mouseX - worldX * newScale;
+    const newY = mouseY - worldY * newScale;
+
+    setNeuralViewport({
+      x: newX,
+      y: newY,
+      scale: newScale
+    });
+  }, [neuralViewport]);
+
+
+  // Neural net mouse event handlers (all wrapped in useCallback)
   const handleNeuralNetMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!neuralLayout || !neuralNetCanvasRef.current) return;
 
     const canvas = neuralNetCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-    const worldX = (screenX - neuralViewport.x) / neuralViewport.scale;
-    const worldY = (screenY - neuralViewport.y) / neuralViewport.scale;
+    // Convert to world coordinates
+    const worldX = (x - neuralViewport.x) / neuralViewport.scale;
+    const worldY = (y - neuralViewport.y) / neuralViewport.scale;
 
+    // Check if clicking on a node
+    let nodeClicked = false;
     for (const node of neuralLayout.nodes.values()) {
-      const dx = worldX - node.x;
-      const dy = worldY - node.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (node.isLocked && node.type !== 'hidden') continue;
+
+      const distance = Math.sqrt(
+        (worldX - node.x) ** 2 + (worldY - node.y) ** 2
+      );
 
       if (distance < node.radius) {
-        if (!node.isLocked || node.type === 'hidden') {
-          setDraggingNodeId(node.id);
+        setDraggingNodeId(node.id);
+        nodeClicked = true;
+
+        if (e.shiftKey) {
+          const newNodes = new Map(neuralLayout.nodes);
+          const updatedNode = { ...node, isLocked: !node.isLocked };
+          newNodes.set(node.id, updatedNode);
+          setNeuralLayout({ ...neuralLayout, nodes: newNodes });
         }
         return;
       }
     }
 
-    if (e.shiftKey || e.button === 1) {
+    // If no node clicked, start panning (only with middle mouse or space+left)
+    if (!nodeClicked && (e.button === 1 || (e.button === 0 && e.shiftKey))) {
       setNeuralPanning(true);
       neuralLastMouseRef.current = { x: e.clientX, y: e.clientY };
-      canvas.style.cursor = 'grabbing';
     }
-  }, [neuralLayout, neuralViewport]);
+  }, [neuralLayout, neuralViewport, draggingNodeId]);
 
   const handleNeuralNetMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!neuralLayout || !neuralNetCanvasRef.current) return;
 
     const canvas = neuralNetCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
+    // Handle viewport panning
     if (neuralPanning) {
       const dx = e.clientX - neuralLastMouseRef.current.x;
       const dy = e.clientY - neuralLastMouseRef.current.y;
@@ -782,9 +944,11 @@ export default function AgarioDemo({
       return;
     }
 
-    const worldX = (screenX - neuralViewport.x) / neuralViewport.scale;
-    const worldY = (screenY - neuralViewport.y) / neuralViewport.scale;
+    // Convert to world coordinates
+    const worldX = (x - neuralViewport.x) / neuralViewport.scale;
+    const worldY = (y - neuralViewport.y) / neuralViewport.scale;
 
+    // Handle node dragging
     if (draggingNodeId !== null) {
       const newNodes = new Map(neuralLayout.nodes);
       const node = newNodes.get(draggingNodeId);
@@ -798,20 +962,15 @@ export default function AgarioDemo({
       return;
     }
 
-    canvas.style.cursor = e.shiftKey ? 'grab' : 'default';
-
+    // Update hover state
     let foundHover = false;
     for (const node of neuralLayout.nodes.values()) {
-      const dx = worldX - node.x;
-      const dy = worldY - node.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
+      const distance = Math.sqrt(
+        (worldX - node.x) ** 2 + (worldY - node.y) ** 2
+      );
       if (distance < node.radius) {
         setHoveringNodeId(node.id);
         foundHover = true;
-        if (!node.isLocked || node.type === 'hidden') {
-          canvas.style.cursor = 'pointer';
-        }
         break;
       }
     }
@@ -820,6 +979,7 @@ export default function AgarioDemo({
       setHoveringNodeId(null);
     }
 
+    // Check connection hover
     let foundConnHover = null;
     for (const conn of neuralLayout.connections) {
       const fromNode = neuralLayout.nodes.get(conn.from);
@@ -846,134 +1006,11 @@ export default function AgarioDemo({
       }
       setNeuralLayout({ ...neuralLayout, nodes: newNodes });
     }
-
     setDraggingNodeId(null);
     setNeuralPanning(false);
-
-    if (neuralNetCanvasRef.current) {
-      neuralNetCanvasRef.current.style.cursor = 'default';
-    }
   }, [draggingNodeId, neuralLayout]);
 
-  const handleNeuralNetWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-
-    if (!neuralNetCanvasRef.current) return;
-
-    const canvas = neuralNetCanvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    const worldXBefore = (mouseX - neuralViewport.x) / neuralViewport.scale;
-    const worldYBefore = (mouseY - neuralViewport.y) / neuralViewport.scale;
-
-    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.3, Math.min(3.0, neuralViewport.scale * zoomFactor));
-
-    const newX = mouseX - worldXBefore * newScale;
-    const newY = mouseY - worldYBefore * newScale;
-
-    setNeuralViewport({
-      x: newX,
-      y: newY,
-      scale: newScale
-    });
-  }, [neuralViewport]);
-
-  const handleResetNeuralView = useCallback(() => {
-    if (!neuralNetCanvasRef.current || !neuralLayout) return;
-
-    const canvas = neuralNetCanvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const width = rect.width;
-    const height = rect.height;
-
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-
-    for (const node of neuralLayout.nodes.values()) {
-      minX = Math.min(minX, node.x - node.radius);
-      maxX = Math.max(maxX, node.x + node.radius);
-      minY = Math.min(minY, node.y - node.radius);
-      maxY = Math.max(maxY, node.y + node.radius);
-    }
-
-    const layoutWidth = maxX - minX;
-    const layoutHeight = maxY - minY;
-
-    const padding = 80;
-    const scaleX = (width - padding * 2) / layoutWidth;
-    const scaleY = (height - padding * 2) / layoutHeight;
-    const scale = Math.min(scaleX, scaleY, 1.5);
-
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-
-    setNeuralViewport({
-      x: width / 2 - centerX * scale,
-      y: height / 2 - centerY * scale,
-      scale
-    });
-  }, [neuralLayout]);
-
-  // ===================== OTHER HANDLERS =====================
-
-  const handleExportNetwork = useCallback(() => {
-    if (!selectedBlob) return;
-
-    const networkData = {
-      blobId: selectedBlob.id,
-      familyLineage: selectedBlob.familyLineage,
-      generation: selectedBlob.generation,
-      brain: selectedBlob.brain || selectedBlob.genome,
-      timestamp: new Date().toISOString(),
-    };
-
-    const dataStr = JSON.stringify(networkData, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-
-    const exportFileDefaultName = `blob-${selectedBlob.id}-network.json`;
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
-  }, [selectedBlob]);
-
-  const handleResetLayout = useCallback(() => {
-    if (selectedBlob && neuralNetCanvasRef.current) {
-      const currentBlob = blobsRef.current.find(b => b.id === selectedBlob.id);
-      if (currentBlob) {
-        const container = neuralNetCanvasRef.current.parentElement;
-        if (!container) return;
-
-        const width = container.clientWidth || 800;
-        const height = container.clientHeight || 600;
-
-        const newLayout = createNeuralLayout(currentBlob.genome, width, height);
-        setNeuralLayout(newLayout);
-        
-        // Reset viewport
-        setTimeout(() => handleResetNeuralView(), 100);
-      }
-    }
-  }, [selectedBlob, handleResetNeuralView]);
-
-  const logLayoutInfo = useCallback(() => {
-    if (!neuralLayout) {
-      console.log('No neural layout');
-      return;
-    }
-
-    console.log('Neural Layout Info:');
-    console.log(`- Total nodes: ${neuralLayout.nodes.size}`);
-    console.log(`- Total connections: ${neuralLayout.connections.length}`);
-    console.log(`- Viewport:`, neuralViewport);
-  }, [neuralLayout, neuralViewport]);
-
-  // ===================== EFFECTS =====================
-
+  // Neural net physics animation
   useEffect(() => {
     if (!neuralLayout || neuralNetMode === 'fixed' || draggingNodeId !== null) {
       if (animationFrameRef.current) {
@@ -1005,6 +1042,7 @@ export default function AgarioDemo({
     };
   }, [neuralLayout, neuralNetMode, draggingNodeId]);
 
+  // Update neural layout when selected blob changes
   useEffect(() => {
     if (!selectedBlob || !neuralNetCanvasRef.current) return;
 
@@ -1030,10 +1068,65 @@ export default function AgarioDemo({
         return updateNodeActivations(prev, currentBlob.cachedVision || [], outputs);
       });
     }
+  }, [selectedBlob, updateNodeActivations]);
 
-    setTimeout(() => handleResetNeuralView(), 100);
-  }, [selectedBlob?.id, updateNodeActivations, handleResetNeuralView]);
+  // Update activations periodically
+  useEffect(() => {
+    if (!selectedBlob || !neuralNetCanvasRef.current) return;
 
+    const currentBlob = blobsRef.current.find(b => b.id === selectedBlob.id);
+    if (!currentBlob) return;
+
+    const container = neuralNetCanvasRef.current.parentElement;
+    if (!container) return;
+
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 600;
+
+    const newLayout = createNeuralLayout(currentBlob.genome, width, height);
+    setNeuralLayout(newLayout);
+
+    if (currentBlob.cachedVision) {
+      setLastInputs(currentBlob.cachedVision);
+      const outputs = currentBlob.genome.activate(currentBlob.cachedVision);
+      setLastOutputs(outputs);
+
+      setNeuralLayout(prev => {
+        if (!prev) return prev;
+        return updateNodeActivations(prev, currentBlob.cachedVision || [], outputs);
+      });
+    }
+  }, [selectedBlob, updateNodeActivations]);
+
+  // Handle neural net canvas resizing
+  useEffect(() => {
+    if (!neuralNetCanvasRef.current || !selectedBlob) return;
+
+    const canvas = neuralNetCanvasRef.current;
+    const container = canvas.parentElement;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0 && neuralLayout) {
+          const currentBlob = blobsRef.current.find(b => b.id === selectedBlob.id);
+          if (currentBlob) {
+            const newLayout = createNeuralLayout(currentBlob.genome, width, height);
+            setNeuralLayout(newLayout);
+          }
+        }
+      }
+    });
+
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.unobserve(container);
+    };
+  }, [selectedBlob, neuralLayout]);
+
+  // Render neural net canvas
   useEffect(() => {
     if (!neuralLayout || !neuralNetCanvasRef.current) return;
 
@@ -1058,9 +1151,11 @@ export default function AgarioDemo({
     ctx.resetTransform();
     ctx.scale(dpr, dpr);
 
+    // Viewport transform is now inside renderDynamicNeuralNet
     renderDynamicNeuralNet(ctx, neuralLayout, width, height);
-  }, [neuralLayout, renderDynamicNeuralNet, neuralViewport]);
+  }, [neuralLayout, renderDynamicNeuralNet, neuralViewport]); // Add neuralViewport dependency
 
+  // cleanup function
   useEffect(() => {
     return () => {
       if (animationFrameRef.current) {
@@ -1111,6 +1206,8 @@ export default function AgarioDemo({
     );
   }, [followBest, selectedBlob]);
 
+  // ===================== EVENT HANDLERS =====================
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsPanning(true);
     lastMouseRef.current = { x: e.clientX, y: e.clientY };
@@ -1154,6 +1251,9 @@ export default function AgarioDemo({
     setFollowBest(false);
   }, []);
 
+  // ===================== EFFECTS =====================
+
+  // Animation loop
   useEffect(() => {
     let frameId: number;
     let lastUpdate = 0;
@@ -1179,6 +1279,7 @@ export default function AgarioDemo({
     return () => cancelAnimationFrame(frameId);
   }, [update, render]);
 
+  // Canvas sizing
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1208,17 +1309,80 @@ export default function AgarioDemo({
     };
   }, [handleWheel]);
 
+  // Initialize on mount
   useEffect(() => {
     initSimulation();
     setIsRunning(true);
   }, [initSimulation]);
 
-  const handleToggleFollowBest = useCallback(() => setFollowBest(prev => !prev), []);
-  const handleToggleDrawer = useCallback(() => setDrawerExpanded(prev => !prev), []);
-  const handleCloseModal = useCallback(() => setSelectedBlob(null), []);
-  const handleToggleNeuralNetMode = useCallback(() => setNeuralNetMode(prev => prev === 'physics' ? 'fixed' : 'physics'), []);
-  const handleToggleShowActivations = useCallback(() => setShowActivations(prev => !prev), []);
-  const handleToggleShowWeights = useCallback(() => setShowWeights(prev => !prev), []);
+  // ===================== ADDITIONAL CALLBACKS =====================
+
+  const handleResetLayout = useCallback(() => {
+    if (selectedBlob && neuralNetCanvasRef.current) {
+      const currentBlob = blobsRef.current.find(b => b.id === selectedBlob.id);
+      if (currentBlob) {
+        const container = neuralNetCanvasRef.current.parentElement;
+        if (!container) return;
+
+        const width = container.clientWidth || 800;
+        const height = container.clientHeight || 600;
+
+        const newLayout = createNeuralLayout(currentBlob.genome, width, height);
+        setNeuralLayout(newLayout);
+      }
+    }
+  }, [selectedBlob]);
+
+  const logLayoutInfo = useCallback(() => {
+    if (!neuralLayout) {
+      console.log('No neural layout');
+      return;
+    }
+
+    console.log('Neural Layout Info:');
+    console.log(`- Total nodes: ${neuralLayout.nodes.size}`);
+    console.log(`- Total connections: ${neuralLayout.connections.length}`);
+
+    console.log('Node positions:');
+    for (const node of neuralLayout.nodes.values()) {
+      console.log(`  Node ${node.id} (${node.type}): (${node.x.toFixed(1)}, ${node.y.toFixed(1)})`);
+    }
+
+    if (neuralNetCanvasRef.current) {
+      const canvas = neuralNetCanvasRef.current;
+      console.log(`Canvas dimensions: ${canvas.width}x${canvas.height}`);
+      console.log(`Canvas style: ${canvas.style.width}x${canvas.style.height}`);
+
+      const container = canvas.parentElement;
+      if (container) {
+        console.log(`Container dimensions: ${container.clientWidth}x${container.clientHeight}`);
+      }
+    }
+  }, [neuralLayout]);
+
+  const handleToggleFollowBest = useCallback(() => {
+    setFollowBest(prev => !prev);
+  }, []);
+
+  const handleToggleDrawer = useCallback(() => {
+    setDrawerExpanded(prev => !prev);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setSelectedBlob(null);
+  }, []);
+
+  const handleToggleNeuralNetMode = useCallback(() => {
+    setNeuralNetMode(prev => prev === 'physics' ? 'fixed' : 'physics');
+  }, []);
+
+  const handleToggleShowActivations = useCallback(() => {
+    setShowActivations(prev => !prev);
+  }, []);
+
+  const handleToggleShowWeights = useCallback(() => {
+    setShowWeights(prev => !prev);
+  }, []);
 
   // ===================== RENDER JSX =====================
 
@@ -1290,16 +1454,16 @@ export default function AgarioDemo({
           neuralNetMode={neuralNetMode}
           showActivations={showActivations}
           showWeights={showWeights}
-          zoomLevel={neuralViewport.scale}
+          zoomLevel={zoomLevel}
           onToggleNeuralNetMode={handleToggleNeuralNetMode}
           onToggleShowActivations={handleToggleShowActivations}
           onToggleShowWeights={handleToggleShowWeights}
           onResetLayout={handleResetLayout}
           onLogLayoutInfo={logLayoutInfo}
           onExportNetwork={handleExportNetwork}
-          onZoomIn={() => {}}
-          onZoomOut={() => {}}
-          onResetZoom={handleResetNeuralView}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onResetZoom={handleResetZoom}
           onNeuralNetMouseDown={handleNeuralNetMouseDown}
           onNeuralNetMouseMove={handleNeuralNetMouseMove}
           onNeuralNetMouseUp={handleNeuralNetMouseUp}
