@@ -21,7 +21,7 @@ const MIN_AGE_FOR_REPRODUCTION = 200;
 const REPRODUCTION_READY_THRESHOLD = 0.5; // Neural network threshold for reproduction
 
 // Survival pressure
-const MAX_OBSTACLES = 50;
+const MAX_OBSTACLES = 30;
 
 // Food clustering
 const CLUSTER_DISTANCE = 70;
