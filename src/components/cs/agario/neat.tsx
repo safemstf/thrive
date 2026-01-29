@@ -1,4 +1,6 @@
-// src/components/cs/agario/neat.ts - ENHANCED VERSION
+// src/components/cs/agario/neat.ts - IMPROVED VERSION WITH BETTER NODE ADDITION
+
+import { ActivationFunction } from "./config/agario.types";
 
 export interface NeatConfig {
   mutationRate: number;
@@ -7,6 +9,7 @@ export interface NeatConfig {
   addNodeRate: number;
   addConnectionRate: number;
   compatibilityThreshold: number;
+  maxNodes?: number; // Optional limit on genome complexity
 }
 
 export enum NodeType {
@@ -15,8 +18,6 @@ export enum NodeType {
   OUTPUT = 'OUTPUT'
 }
 
-// All possible activation functions
-export type ActivationFunction = 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu';
 
 export class NodeGene {
   id: number;
@@ -90,7 +91,7 @@ export class Genome {
     const nodeValues = new Map<number, number>();
     const calculated = new Set<number>();
 
-    // Set input values (nodes 0 to inputSize-1)
+    // Set input values
     for (let i = 0; i < this.inputSize; i++) {
       nodeValues.set(i, inputs[i]);
       calculated.add(i);
@@ -141,7 +142,6 @@ export class Genome {
         }
       }
 
-      // If no progress, force calculate remaining nodes with available inputs
       if (!madeProgress) {
         for (const nodeId of nodesToCalculate) {
           if (!calculated.has(nodeId)) {
@@ -160,7 +160,7 @@ export class Genome {
       }
     }
 
-    // Extract outputs (nodes inputSize to inputSize+outputSize-1)
+    // Extract outputs
     const outputs: number[] = [];
     for (let i = 0; i < this.outputSize; i++) {
       outputs.push(nodeValues.get(this.inputSize + i) || 0);
@@ -169,7 +169,17 @@ export class Genome {
     return outputs;
   }
 
+  /**
+   * IMPROVED: Add a node by splitting an ENABLED connection
+   * This ensures new nodes are always part of an active pathway
+   */
   addNode(newNodeId: number, innovation1: number, innovation2: number, connection: ConnectionGene): NodeGene {
+    // IMPORTANT: Only split ENABLED connections to ensure the new node is useful
+    if (!connection.enabled) {
+      console.warn('Attempted to add node on disabled connection');
+      return null as any; // Should not happen with proper mutation logic
+    }
+
     // Disable the original connection
     connection.enabled = false;
 
@@ -181,22 +191,22 @@ export class Genome {
     const newNode = new NodeGene(newNodeId, NodeType.HIDDEN, randomActivation);
     this.nodes.set(newNodeId, newNode);
 
-    // Create first connection: from original from to new node
+    // Create first connection: from -> newNode (weight = 1.0 to preserve signal)
     const conn1 = new ConnectionGene(
       innovation1,
       connection.from,
       newNodeId,
-      1.0, // Typically weight is set to 1
+      1.0,
       true
     );
     this.connections.set(innovation1, conn1);
 
-    // Create second connection: from new node to original to
+    // Create second connection: newNode -> to (preserve original weight)
     const conn2 = new ConnectionGene(
       innovation2,
       newNodeId,
       connection.to,
-      connection.weight, // Keep original weight
+      connection.weight,
       true
     );
     this.connections.set(innovation2, conn2);
@@ -205,15 +215,15 @@ export class Genome {
   }
 
   addConnection(innovationNum: number, from: number, to: number, weight: number): boolean {
-    // Check if connection already exists (enabled or disabled)
+    // Check if connection already exists
     for (const conn of this.connections.values()) {
       if (conn.from === from && conn.to === to) {
         if (!conn.enabled) {
           conn.enabled = true;
-          conn.weight = weight; // Update weight when re-enabling
+          conn.weight = weight;
           return true;
         }
-        return false; // Connection already exists and is enabled
+        return false; // Already exists and enabled
       }
     }
 
@@ -221,13 +231,9 @@ export class Genome {
     const newConn = new ConnectionGene(innovationNum, from, to, weight, true);
     this.connections.set(innovationNum, newConn);
 
-    // Ensure both nodes exist in the genome
-    if (!this.nodes.has(from)) {
-      console.warn(`Node ${from} not found when adding connection ${from}->${to}`);
-      return false;
-    }
-    if (!this.nodes.has(to)) {
-      console.warn(`Node ${to} not found when adding connection ${from}->${to}`);
+    // Ensure both nodes exist
+    if (!this.nodes.has(from) || !this.nodes.has(to)) {
+      console.warn(`Node ${from} or ${to} not found when adding connection`);
       return false;
     }
 
@@ -238,8 +244,10 @@ export class Genome {
     for (const conn of this.connections.values()) {
       if (Math.random() < rate) {
         if (Math.random() < 0.1) {
+          // Complete randomization (10% chance)
           conn.weight = (Math.random() * 2 - 1) * 2;
         } else {
+          // Perturbation (90% chance)
           conn.weight += (Math.random() * 2 - 1) * size;
           conn.weight = Math.max(-4, Math.min(4, conn.weight));
         }
@@ -247,18 +255,73 @@ export class Genome {
     }
   }
 
-  // NEW: Mutate activation functions
   mutateActivation(rate: number = 0.1): void {
     const activations: ActivationFunction[] = ['tanh', 'sigmoid', 'relu', 'leaky_relu'];
 
     for (const [id, node] of this.nodes) {
       if (node.type === NodeType.HIDDEN && Math.random() < rate) {
-        // Change to a different activation function
         const current = node.activation;
         const options = activations.filter(a => a !== current);
         node.activation = options[Math.floor(Math.random() * options.length)];
       }
     }
+  }
+
+  /**
+   * Get active (reachable) nodes - nodes that are part of enabled paths
+   */
+  getActiveNodes(): Set<number> {
+    const active = new Set<number>();
+    
+    // All inputs are active
+    for (let i = 0; i < this.inputSize; i++) {
+      active.add(i);
+    }
+
+    // BFS to find all reachable nodes through enabled connections
+    const queue = [...active];
+    const visited = new Set(active);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      
+      for (const conn of this.connections.values()) {
+        if (conn.enabled && conn.from === current && !visited.has(conn.to)) {
+          visited.add(conn.to);
+          active.add(conn.to);
+          queue.push(conn.to);
+        }
+      }
+    }
+
+    return active;
+  }
+
+  /**
+   * Clean up unused nodes (nodes not part of any enabled path)
+   * Call this periodically or after evolution to prevent bloat
+   */
+  pruneUnusedNodes(): number {
+    const activeNodes = this.getActiveNodes();
+    let prunedCount = 0;
+
+    // Remove nodes that are not active and not inputs/outputs
+    for (const [id, node] of this.nodes) {
+      if (!activeNodes.has(id) && 
+          node.type === NodeType.HIDDEN) {
+        this.nodes.delete(id);
+        prunedCount++;
+      }
+    }
+
+    // Remove connections involving pruned nodes
+    for (const [inn, conn] of this.connections) {
+      if (!this.nodes.has(conn.from) || !this.nodes.has(conn.to)) {
+        this.connections.delete(inn);
+      }
+    }
+
+    return prunedCount;
   }
 
   getNextNodeId(): number {
@@ -330,7 +393,13 @@ export class Genome {
 
   getComplexity() {
     const enabled = Array.from(this.connections.values()).filter(c => c.enabled).length;
-    return { nodes: this.nodes.size, connections: this.connections.size, enabled };
+    const activeNodes = this.getActiveNodes().size;
+    return { 
+      nodes: this.nodes.size, 
+      activeNodes,
+      connections: this.connections.size, 
+      enabled 
+    };
   }
 }
 
@@ -430,20 +499,27 @@ export class Neat {
     return this.innovationHistory.get(key)!;
   }
 
+  /**
+   * IMPROVED MUTATION: Only add nodes to ENABLED connections
+   * and optionally enforce complexity limits
+   */
   mutate(genome: Genome): void {
     genome.mutateWeights(this.config.mutationRate, this.config.mutationSize);
-
-    // Mutate activation functions (10% chance per hidden node)
     genome.mutateActivation(0.1);
 
-    // Add node
-    if (Math.random() < this.config.addNodeRate) {
+    // Check complexity limit before adding nodes
+    const maxNodes = this.config.maxNodes || Infinity;
+    const currentNodes = genome.nodes.size;
+
+    // Add node - ONLY to enabled connections
+    if (currentNodes < maxNodes && Math.random() < this.config.addNodeRate) {
+      // CRITICAL FIX: Only select from ENABLED connections
       const enabled = Array.from(genome.connections.values()).filter(c => c.enabled);
+      
       if (enabled.length > 0) {
         const conn = enabled[Math.floor(Math.random() * enabled.length)];
         const newNodeId = genome.getNextNodeId();
 
-        // Get innovation numbers for new connections
         const innov1 = this.getInnovation(conn.from, newNodeId);
         const innov2 = this.getInnovation(newNodeId, conn.to);
 
@@ -457,7 +533,6 @@ export class Neat {
       const fromCandidates = nodeIds.filter(id => genome.nodes.get(id)!.type !== NodeType.OUTPUT);
       const toCandidates = nodeIds.filter(id => genome.nodes.get(id)!.type !== NodeType.INPUT);
 
-      // Try multiple attempts to find a valid connection
       let attempts = 0;
       let added = false;
 
@@ -467,10 +542,9 @@ export class Neat {
         const from = fromCandidates[Math.floor(Math.random() * fromCandidates.length)];
         const to = toCandidates[Math.floor(Math.random() * toCandidates.length)];
 
-        // Skip if same node or if connection already exists
         if (from === to) continue;
 
-        // Check if connection already exists
+        // Check if connection exists
         let exists = false;
         for (const conn of genome.connections.values()) {
           if (conn.from === from && conn.to === to) {
@@ -481,13 +555,12 @@ export class Neat {
 
         if (!exists) {
           const inn = this.getInnovation(from, to);
-          const weight = (Math.random() * 2 - 1) * 2; // Random weight between -2 and 2
+          const weight = (Math.random() * 2 - 1) * 2;
           added = genome.addConnection(inn, from, to, weight);
         }
       }
     }
   }
-
 
   speciate(): void {
     for (const s of this.species) s.clear();
@@ -514,7 +587,7 @@ export class Neat {
       s.representative = s.members[Math.floor(Math.random() * s.members.length)].clone();
     }
 
-    // Remove stagnant
+    // Remove stagnant species
     if (this.species.length > 1) {
       this.species = this.species.filter(s => s.stagnation < 15);
       if (this.species.length === 0) {
@@ -525,12 +598,26 @@ export class Neat {
     }
   }
 
-  evolve(): void {
+  /**
+   * IMPROVED EVOLUTION: Optional periodic pruning to prevent bloat
+   */
+  evolve(pruneEveryNGenerations: number = 0): void {
     this.generation++;
     this.population.sort((a, b) => b.fitness - a.fitness);
 
     if (this.population[0].fitness > this.bestFitnessEver) {
       this.bestFitnessEver = this.population[0].fitness;
+    }
+
+    // Optional: Prune unused nodes periodically
+    if (pruneEveryNGenerations > 0 && this.generation % pruneEveryNGenerations === 0) {
+      let totalPruned = 0;
+      for (const genome of this.population) {
+        totalPruned += genome.pruneUnusedNodes();
+      }
+      if (totalPruned > 0) {
+        console.log(`🧹 Pruned ${totalPruned} unused nodes`);
+      }
     }
 
     this.speciate();
@@ -576,17 +663,23 @@ export class Neat {
     this.population = newPop;
 
     const avgN = this.population.reduce((s, g) => s + g.nodes.size, 0) / this.population.length;
+    const avgActiveN = this.population.reduce((s, g) => s + g.getComplexity().activeNodes, 0) / this.population.length;
     const avgC = this.population.reduce((s, g) => s + g.getComplexity().enabled, 0) / this.population.length;
-    console.log(`🧬 Gen ${this.generation}: ${this.species.length} species, ${avgN.toFixed(1)}N, ${avgC.toFixed(1)}C, best=${this.bestFitnessEver.toFixed(0)}`);
+    console.log(`🧬 Gen ${this.generation}: ${this.species.length} species, ${avgN.toFixed(1)}N (${avgActiveN.toFixed(1)} active), ${avgC.toFixed(1)}C, best=${this.bestFitnessEver.toFixed(0)}`);
   }
 
   getStats() {
+    const bestGenome = this.population[0];
+    const complexity = bestGenome.getComplexity();
+    
     return {
       generation: this.generation,
       speciesCount: this.species.length,
       avgNodes: this.population.reduce((s, g) => s + g.nodes.size, 0) / this.population.length,
+      avgActiveNodes: this.population.reduce((s, g) => s + g.getComplexity().activeNodes, 0) / this.population.length,
       avgConnections: this.population.reduce((s, g) => s + g.getComplexity().enabled, 0) / this.population.length,
-      bestFitness: this.bestFitnessEver
+      bestFitness: this.bestFitnessEver,
+      bestGenomeComplexity: complexity
     };
   }
 }

@@ -77,6 +77,20 @@ interface Blob {
   };
 }
 
+export type ActivationFunction = 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu';
+
+export interface BiomeConfig {
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  foodDensity: number;
+  foodQuality: number;
+  dangerLevel: number;
+  color?: string;
+}
+
 export interface SelectedNodeInfo {
   id: number;
   layer: 'input' | 'hidden' | 'output';

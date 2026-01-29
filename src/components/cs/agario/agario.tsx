@@ -6,7 +6,8 @@ import React, {
 } from "react";
 
 import {
-  Genome, Neat} from './neat';
+  Genome, Neat
+} from './neat';
 import {
   Container,
   MaxWidthWrapper,
@@ -16,7 +17,9 @@ import {
 } from './config/agario.styles';
 
 import {
-  TerrainZone, Food, FoodCluster, Obstacle, Log, Blob, NeuralLayout} from './config/agario.types';
+  TerrainZone, Food, FoodCluster, Obstacle, Log, Blob, NeuralLayout,
+  BiomeConfig
+} from './config/agario.types';
 
 import {
   WORLD_WIDTH,
@@ -25,12 +28,12 @@ import {
   MAX_POPULATION,
   MAX_FOOD,
   FOOD_SPAWN_RATE,
-  
-  
-  
+
+
+
   CLUSTER_UPDATE_INTERVAL,
 
-  
+
   SURVIVAL_PRESSURE_INCREASE,
 
   INPUT_SIZE,
@@ -74,7 +77,9 @@ import {
   clusterFood,
   ageFood,
   updateSpatialGrid,
-  getNearbyFood
+  getNearbyFood,
+  createBiomes,
+  calculatePopulationPressure
 } from './utils/environment';
 
 import { HeaderSection } from "./components/HeaderSection";
@@ -115,6 +120,8 @@ export default function AgarioDemo({
   const totalDeathsRef = useRef(0);
   const totalBirthsRef = useRef(0);
   const survivalPressureRef = useRef(0);
+  const biomesRef = useRef<BiomeConfig[]>([]);
+  const populationPressureRef = useRef(0);
   const [showWeights, setShowWeights] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [selectedNodeInfo, setSelectedNodeInfo] = useState<SelectedNodeInfo | null>(null);
@@ -147,6 +154,17 @@ export default function AgarioDemo({
   const [showActivations, setShowActivations] = useState(true);
   const [lastInputs, setLastInputs] = useState<number[]>([]);
   const [lastOutputs, setLastOutputs] = useState<number[]>([]);
+
+  const [neuralNetDragging, setNeuralNetDragging] = useState(false);
+  const [draggedNodeId, setDraggedNodeId] = useState<number | null>(null);
+  // Replace the simple zoomLevel state with full viewport control
+  const [neuralViewport, setNeuralViewport] = useState({
+    x: 0,
+    y: 0,
+    scale: 1
+  });
+  const [neuralPanning, setNeuralPanning] = useState(false);
+  const neuralLastMouseRef = useRef({ x: 0, y: 0 }); 
 
   // Stats for display
   const [stats, setStats] = useState({
@@ -189,7 +207,7 @@ export default function AgarioDemo({
   // Memoize family size calculation
   const familySize = useMemo(() => {
     if (!selectedBlob) return 0;
-    return blobsRef.current.filter(b => 
+    return blobsRef.current.filter(b =>
       b.familyLineage === selectedBlob.familyLineage
     ).length;
   }, [selectedBlob?.familyLineage, stats.population]);
@@ -232,7 +250,10 @@ export default function AgarioDemo({
       { x: 1000, y: 100, width: 400, height: 400, type: 'danger' }
     ];
 
-    // 3. Initialize blobs with proper IDs
+    // 3. Initialize biomes
+    biomesRef.current = createBiomes(WORLD_WIDTH, WORLD_HEIGHT);
+
+    // 4. Initialize blobs with proper IDs
     blobsRef.current = [];
     for (const genome of neatRef.current.population) {
       const blob = createBlob(
@@ -248,17 +269,18 @@ export default function AgarioDemo({
       blobsRef.current.push(blob);
     }
 
-    // 4. Initialize food
+    // 5. Initialize food
     foodRef.current = spawnFood(
       [],
-      MAX_FOOD,
-      MAX_FOOD,
+      biomesRef.current,
       WORLD_WIDTH,
       WORLD_HEIGHT,
-      getZoneAt
+      MAX_FOOD / 2,  // Start with half capacity
+      MAX_FOOD,
+      0  // Initial population pressure
     );
 
-    // 5. Initialize obstacles
+    // 5.5 Initialize obstacles
     obstaclesRef.current = [];
     for (let i = 0; i < NUM_OBSTACLES; i++) {
       obstaclesRef.current.push({
@@ -328,18 +350,26 @@ export default function AgarioDemo({
 
     // Update food clusters
     if (tick % CLUSTER_UPDATE_INTERVAL === 0) {
-      foodClustersRef.current = clusterFood(foodRef.current);
+      foodClustersRef.current = clusterFood(foodRef.current, spatialGridRef.current, GRID_SIZE);
     }
+
+    // Calculate population pressure
+    populationPressureRef.current = calculatePopulationPressure(
+      blobsRef.current.length,
+      foodRef.current.length
+    );
 
     // Spawn food
     foodRef.current = spawnFood(
       foodRef.current,
-      FOOD_SPAWN_RATE,
-      MAX_FOOD,
+      biomesRef.current,
       WORLD_WIDTH,
       WORLD_HEIGHT,
-      getZoneAt
+      FOOD_SPAWN_RATE,
+      MAX_FOOD,
+      populationPressureRef.current
     );
+
 
     // Age food
     foodRef.current = ageFood(foodRef.current);
@@ -425,7 +455,7 @@ export default function AgarioDemo({
         totalDeathsRef.current++;
       }
     }
-    
+
     // Handle collisions
     const collisionResult = handleCollisions(
       blobsRef.current,
@@ -530,25 +560,36 @@ export default function AgarioDemo({
     ctx.fillStyle = '#0a0e1a';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw subtle background pattern
+    // Apply viewport transform
+    ctx.save();
+    ctx.translate(neuralViewport.x, neuralViewport.y);
+    ctx.scale(neuralViewport.scale, neuralViewport.scale);
+
+    // Draw grid in world space
     ctx.strokeStyle = 'rgba(59, 130, 246, 0.03)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 / neuralViewport.scale;
 
-    for (let x = 0; x < width; x += 40) {
+    const gridSize = 40;
+    const startX = Math.floor(-neuralViewport.x / neuralViewport.scale / gridSize) * gridSize;
+    const startY = Math.floor(-neuralViewport.y / neuralViewport.scale / gridSize) * gridSize;
+    const endX = startX + (width / neuralViewport.scale) + gridSize;
+    const endY = startY + (height / neuralViewport.scale) + gridSize;
+
+    for (let x = startX; x < endX; x += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
       ctx.stroke();
     }
 
-    for (let y = 0; y < height; y += 40) {
+    for (let y = startY; y < endY; y += gridSize) {
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
       ctx.stroke();
     }
 
-    // Draw connections first
+    // Draw connections (your existing code, but lines scale with viewport)
     ctx.lineCap = 'round';
 
     for (const conn of layout.connections) {
@@ -559,7 +600,7 @@ export default function AgarioDemo({
 
       const weight = conn.weight;
       const strength = Math.min(Math.abs(weight), 1);
-      const lineWidth = 1 + strength * 2;
+      const lineWidth = (1 + strength * 2) / neuralViewport.scale;
 
       const isHovering = hoveringConnection &&
         hoveringConnection.from === conn.from &&
@@ -589,6 +630,7 @@ export default function AgarioDemo({
       ctx.moveTo(startX, startY);
       ctx.bezierCurveTo(controlX1, controlY1, controlX2, controlY2, endX, endY);
       ctx.stroke();
+      ctx.lineWidth = lineWidth;
 
       if (strength > 0.3) {
         const angle = Math.atan2(endY - controlY2, endX - controlX2);
@@ -664,7 +706,7 @@ export default function AgarioDemo({
       ctx.fill();
 
       ctx.strokeStyle = isDragging ? '#fbbf24' : isHovering ? '#3b82f6' : 'rgba(255, 255, 255, 0.8)';
-      ctx.lineWidth = isDragging ? 3 : isHovering ? 2 : 1;
+      ctx.lineWidth = (isDragging ? 3 : isHovering ? 2 : 1) / neuralViewport.scale;
       ctx.stroke();
 
       if (node.isLocked) {
@@ -729,7 +771,16 @@ export default function AgarioDemo({
         }
       }
     }
-  }, [hoveringNodeId, draggingNodeId, hoveringConnection, showActivations]);
+    ctx.restore();
+
+    // Draw UI elements (zoom indicator, controls) in screen space
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(10, height - 40, 180, 30);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '12px monospace';
+    ctx.fillText(`Zoom: ${(neuralViewport.scale * 100).toFixed(0)}%`, 20, height - 20);
+    ctx.fillText(`Pan: ${neuralViewport.x.toFixed(0)}, ${neuralViewport.y.toFixed(0)}`, 100, height - 20);
+  }, [neuralViewport, hoveringNodeId, draggingNodeId, hoveringConnection, showActivations]);
 
   const distanceToLine = useCallback((px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
     const A = px - x1;
@@ -798,32 +849,34 @@ export default function AgarioDemo({
 
   const handleNeuralNetWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    const zoomFactor = 0.001;
-    const newZoom = zoomLevel - (e.deltaY * zoomFactor);
-    setZoomLevel(Math.max(0.5, Math.min(3.0, newZoom)));
-  }, [zoomLevel]);
 
-  const detectNodeAtPosition = useCallback((x: number, y: number, layout: NeuralLayout | null): SelectedNodeInfo | null => {
-    if (!layout) return null;
+    if (!neuralNetCanvasRef.current) return;
 
-    for (const node of layout.nodes.values()) {
-      const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
-      if (distance < node.radius) {
-        const outgoingConnections = layout.connections.filter(conn => conn.from === node.id).length;
-        const incomingConnections = layout.connections.filter(conn => conn.to === node.id).length;
-        const totalConnections = outgoingConnections + incomingConnections;
+    const canvas = neuralNetCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
 
-        return {
-          id: node.id,
-          layer: node.type as 'input' | 'hidden' | 'output',
-          activation: node.activationValue,
-          connections: totalConnections
-        };
-      }
-    }
+    // Get mouse position relative to canvas
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    return null;
-  }, []);
+    // Calculate zoom factor
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.max(0.3, Math.min(3.0, neuralViewport.scale * zoomFactor));
+
+    // Calculate new viewport position to zoom toward mouse
+    const worldX = (mouseX - neuralViewport.x) / neuralViewport.scale;
+    const worldY = (mouseY - neuralViewport.y) / neuralViewport.scale;
+
+    const newX = mouseX - worldX * newScale;
+    const newY = mouseY - worldY * newScale;
+
+    setNeuralViewport({
+      x: newX,
+      y: newY,
+      scale: newScale
+    });
+  }, [neuralViewport]);
+
 
   // Neural net mouse event handlers (all wrapped in useCallback)
   const handleNeuralNetMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -831,17 +884,25 @@ export default function AgarioDemo({
 
     const canvas = neuralNetCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
+    // Convert to world coordinates
+    const worldX = (x - neuralViewport.x) / neuralViewport.scale;
+    const worldY = (y - neuralViewport.y) / neuralViewport.scale;
+
+    // Check if clicking on a node
+    let nodeClicked = false;
     for (const node of neuralLayout.nodes.values()) {
       if (node.isLocked && node.type !== 'hidden') continue;
 
-      const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
+      const distance = Math.sqrt(
+        (worldX - node.x) ** 2 + (worldY - node.y) ** 2
+      );
+
       if (distance < node.radius) {
         setDraggingNodeId(node.id);
+        nodeClicked = true;
 
         if (e.shiftKey) {
           const newNodes = new Map(neuralLayout.nodes);
@@ -853,53 +914,60 @@ export default function AgarioDemo({
       }
     }
 
-    for (const conn of neuralLayout.connections) {
-      const fromNode = neuralLayout.nodes.get(conn.from);
-      const toNode = neuralLayout.nodes.get(conn.to);
-
-      if (!fromNode || !toNode) continue;
-
-      const distance = distanceToLine(x, y, fromNode.x, fromNode.y, toNode.x, toNode.y);
-      if (distance < 15) {
-        break;
-      }
+    // If no node clicked, start panning (only with middle mouse or space+left)
+    if (!nodeClicked && (e.button === 1 || (e.button === 0 && e.shiftKey))) {
+      setNeuralPanning(true);
+      neuralLastMouseRef.current = { x: e.clientX, y: e.clientY };
     }
-
-    if (e.button === 0 && !e.shiftKey) {
-      const clickedNode = detectNodeAtPosition(x, y, neuralLayout);
-      if (clickedNode) {
-        setSelectedNodeInfo(clickedNode);
-      } else {
-        setSelectedNodeInfo(null);
-      }
-    }
-  }, [neuralLayout, distanceToLine, detectNodeAtPosition]);
+  }, [neuralLayout, neuralViewport, draggingNodeId]);
 
   const handleNeuralNetMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!neuralLayout || !neuralNetCanvasRef.current) return;
 
     const canvas = neuralNetCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
+    // Handle viewport panning
+    if (neuralPanning) {
+      const dx = e.clientX - neuralLastMouseRef.current.x;
+      const dy = e.clientY - neuralLastMouseRef.current.y;
+
+      setNeuralViewport(prev => ({
+        ...prev,
+        x: prev.x + dx,
+        y: prev.y + dy
+      }));
+
+      neuralLastMouseRef.current = { x: e.clientX, y: e.clientY };
+      return;
+    }
+
+    // Convert to world coordinates
+    const worldX = (x - neuralViewport.x) / neuralViewport.scale;
+    const worldY = (y - neuralViewport.y) / neuralViewport.scale;
+
+    // Handle node dragging
     if (draggingNodeId !== null) {
       const newNodes = new Map(neuralLayout.nodes);
       const node = newNodes.get(draggingNodeId);
 
       if (node && !node.isLocked) {
-        node.x = x;
-        node.y = y;
+        node.x = worldX;
+        node.y = worldY;
         node.isDragging = true;
         setNeuralLayout({ ...neuralLayout, nodes: newNodes });
       }
+      return;
     }
 
+    // Update hover state
     let foundHover = false;
     for (const node of neuralLayout.nodes.values()) {
-      const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
+      const distance = Math.sqrt(
+        (worldX - node.x) ** 2 + (worldY - node.y) ** 2
+      );
       if (distance < node.radius) {
         setHoveringNodeId(node.id);
         foundHover = true;
@@ -911,6 +979,7 @@ export default function AgarioDemo({
       setHoveringNodeId(null);
     }
 
+    // Check connection hover
     let foundConnHover = null;
     for (const conn of neuralLayout.connections) {
       const fromNode = neuralLayout.nodes.get(conn.from);
@@ -918,7 +987,7 @@ export default function AgarioDemo({
 
       if (!fromNode || !toNode) continue;
 
-      const distance = distanceToLine(x, y, fromNode.x, fromNode.y, toNode.x, toNode.y);
+      const distance = distanceToLine(worldX, worldY, fromNode.x, fromNode.y, toNode.x, toNode.y);
       if (distance < 10) {
         foundConnHover = { from: conn.from, to: conn.to };
         break;
@@ -926,7 +995,7 @@ export default function AgarioDemo({
     }
 
     setHoveringConnection(foundConnHover);
-  }, [neuralLayout, draggingNodeId, distanceToLine]);
+  }, [neuralLayout, neuralViewport, draggingNodeId, neuralPanning, distanceToLine]);
 
   const handleNeuralNetMouseUp = useCallback(() => {
     if (draggingNodeId !== null && neuralLayout) {
@@ -938,6 +1007,7 @@ export default function AgarioDemo({
       setNeuralLayout({ ...neuralLayout, nodes: newNodes });
     }
     setDraggingNodeId(null);
+    setNeuralPanning(false);
   }, [draggingNodeId, neuralLayout]);
 
   // Neural net physics animation
@@ -1079,18 +1149,11 @@ export default function AgarioDemo({
     canvas.style.height = `${height}px`;
 
     ctx.resetTransform();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(dpr, dpr);
 
-    ctx.save();
-    ctx.translate(width / 2, height / 2);
-    ctx.scale(zoomLevel, zoomLevel);
-    ctx.translate(-width / 2, -height / 2);
-
+    // Viewport transform is now inside renderDynamicNeuralNet
     renderDynamicNeuralNet(ctx, neuralLayout, width, height);
-
-    ctx.restore();
-  }, [neuralLayout, renderDynamicNeuralNet, zoomLevel]);
+  }, [neuralLayout, renderDynamicNeuralNet, neuralViewport]); // Add neuralViewport dependency
 
   // cleanup function
   useEffect(() => {
