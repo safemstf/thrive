@@ -1,19 +1,25 @@
 // src/components/cs/agario/utils/simulation-optimized.ts
 
 import { Genome } from '../neat';
-import { 
-  Blob, Food, FoodCluster, Obstacle, Log, TerrainZone 
+import {
+  Blob, Food, FoodCluster, Obstacle, Log, TerrainZone
 } from '../config/agario.types';
-import { 
+import {
   WORLD_WIDTH, WORLD_HEIGHT,
   MAX_POPULATION,
-  STARVATION_RATE, MIN_MOVEMENT_THRESHOLD, IDLE_PENALTY_START, 
+  STARVATION_RATE, MIN_MOVEMENT_THRESHOLD, IDLE_PENALTY_START,
   IDLE_FITNESS_PENALTY, MOVEMENT_REWARD_FACTOR, STARVATION_DEATH_PENALTY,
   BASE_STARVATION_INTERVAL,
   SURVIVAL_PRESSURE_INCREASE, MAX_OBSTACLES,
   CLUSTER_UPDATE_INTERVAL,
   VISION_UPDATE_INTERVAL,
-  REPRODUCTION_MIN_MASS, REPRODUCTION_COOLDOWN, FOOD_FOR_REPRODUCTION, MIN_AGE_FOR_REPRODUCTION
+  REPRODUCTION_MIN_MASS, REPRODUCTION_COOLDOWN, FOOD_FOR_REPRODUCTION, MIN_AGE_FOR_REPRODUCTION,
+  AGING_PENALTY_START,
+  MAX_AGE_PENALTY,
+  AGE_PENALTY_EXPONENT,
+  AGING_PENALTY_RATE,
+  MIN_REPRODUCTION_EFFICIENCY,
+  AGING_STARVATION_MULTIPLIER
 } from '../config/agario.constants';
 
 /**
@@ -34,16 +40,16 @@ interface BlobSpatialGrid {
  */
 export function createBlobSpatialGrid(blobs: Blob[], gridSize: number = COLLISION_GRID_SIZE): BlobSpatialGrid {
   const grid = new Map<string, Blob[]>();
-  
+
   for (const blob of blobs) {
     const radius = Math.sqrt(blob.mass) * 2.5;
-    
+
     // Add blob to all cells it might occupy
     const minX = Math.floor((blob.x - radius) / gridSize);
     const maxX = Math.floor((blob.x + radius) / gridSize);
     const minY = Math.floor((blob.y - radius) / gridSize);
     const maxY = Math.floor((blob.y + radius) / gridSize);
-    
+
     for (let gx = minX; gx <= maxX; gx++) {
       for (let gy = minY; gy <= maxY; gy++) {
         const key = `${gx},${gy}`;
@@ -54,7 +60,7 @@ export function createBlobSpatialGrid(blobs: Blob[], gridSize: number = COLLISIO
       }
     }
   }
-  
+
   return { grid, gridSize };
 }
 
@@ -62,19 +68,19 @@ export function createBlobSpatialGrid(blobs: Blob[], gridSize: number = COLLISIO
  * Get nearby blobs from spatial grid
  */
 function getNearbyBlobs(
-  x: number, 
-  y: number, 
+  x: number,
+  y: number,
   radius: number,
   spatialGrid: BlobSpatialGrid
 ): Blob[] {
   const { grid, gridSize } = spatialGrid;
   const nearbyBlobs = new Set<Blob>();
-  
+
   const minX = Math.floor((x - radius) / gridSize);
   const maxX = Math.floor((x + radius) / gridSize);
   const minY = Math.floor((y - radius) / gridSize);
   const maxY = Math.floor((y + radius) / gridSize);
-  
+
   for (let gx = minX; gx <= maxX; gx++) {
     for (let gy = minY; gy <= maxY; gy++) {
       const key = `${gx},${gy}`;
@@ -84,7 +90,7 @@ function getNearbyBlobs(
       }
     }
   }
-  
+
   return Array.from(nearbyBlobs);
 }
 
@@ -133,24 +139,56 @@ export const simulateBlob = (
     inputs = blob.cachedVision;
   }
 
+  // ==================== AGING PENALTY CALCULATION ====================
+  // Calculate aging penalty only if blob is old enough
+  if (blob.age > AGING_PENALTY_START) {
+    const effectiveAge = blob.age - AGING_PENALTY_START;
+    blob.effectiveAge = effectiveAge;
+
+    // Exponential aging penalty: more severe as blob gets older
+    // Formula: efficiency = MAX_AGE_PENALTY + (1 - MAX_AGE_PENALTY) * exp(-rate * age^exponent)
+    const ageFactor = Math.min(effectiveAge * AGING_PENALTY_RATE, 10); // Cap to prevent overflow
+    const expPenalty = Math.pow(ageFactor, AGE_PENALTY_EXPONENT);
+    blob.agingEfficiency = MAX_AGE_PENALTY + (1 - MAX_AGE_PENALTY) * Math.exp(-expPenalty);
+
+    // Clamp to reasonable minimum
+    blob.agingEfficiency = Math.max(MIN_REPRODUCTION_EFFICIENCY, blob.agingEfficiency);
+
+    // Apply small fitness penalty for aging (encourages reproduction before aging)
+    if (tick % 100 === 0) {
+      const agePenalty = (1 - blob.agingEfficiency) * 0.5;
+      blob.genome.fitness -= agePenalty;
+    }
+  } else {
+    blob.agingEfficiency = 1.0; // Full efficiency when young
+    blob.effectiveAge = 0;
+  }
+
   const outputs = blob.genome.activate(inputs);
 
   const acceleration = Math.tanh(outputs[0]) * 0.45;
   const rotation = Math.tanh(outputs[1]) * 0.2;
   const reproduceSignal = Math.tanh(outputs[2]);
 
-  // Neural network controlled reproduction
+  // ==================== AGING-AFFECTED REPRODUCTION ====================
+  // Old blobs have harder time reproducing
   if (reproduceSignal > 0.7) {
-    const canReproduce =
+    const baseCanReproduce =
       blob.age >= MIN_AGE_FOR_REPRODUCTION &&
       blob.mass >= REPRODUCTION_MIN_MASS &&
       (blob.kills > 0 || blob.foodEaten >= FOOD_FOR_REPRODUCTION) &&
       (tick - blob.lastReproductionTick) > REPRODUCTION_COOLDOWN;
 
+    // Apply aging penalty to reproduction: old blobs need more resources
+    const canReproduce = baseCanReproduce &&
+      (blob.agingEfficiency > MIN_REPRODUCTION_EFFICIENCY ||
+        blob.mass > REPRODUCTION_MIN_MASS * 1.5);
+
     if (canReproduce) {
       giveBirth(blob);
-    } else {
-      blob.genome.fitness -= 1;
+    } else if (blob.agingEfficiency <= MIN_REPRODUCTION_EFFICIENCY) {
+      // Penalize very old blobs for trying to reproduce
+      blob.genome.fitness -= 2;
     }
   }
 
@@ -183,7 +221,7 @@ export const simulateBlob = (
   // Movement tracking (optimized with squared distance)
   const distMovedSq = distanceSquared(blob.x, blob.y, blob.lastX, blob.lastY);
   const wrapThresholdSq = (WORLD_WIDTH / 2) * (WORLD_WIDTH / 2);
-  
+
   if (distMovedSq < wrapThresholdSq) {
     const distMoved = Math.sqrt(distMovedSq); // Only calc sqrt when needed
     blob.distanceTraveled += distMoved;
@@ -205,14 +243,27 @@ export const simulateBlob = (
   blob.lastX = blob.x;
   blob.lastY = blob.y;
 
-  // Starvation
+  // ==================== AGING-AFFECTED STARVATION ====================
+  // Apply increased starvation with age
   if (tick % BASE_STARVATION_INTERVAL === 0) {
-    const baseMassLoss = STARVATION_RATE;
+    let baseMassLoss = STARVATION_RATE;
+
+    // Increase starvation rate with age
+    if (blob.age > AGING_PENALTY_START) {
+      const ageStarvationMultiplier = 1 + (blob.effectiveAge * AGING_STARVATION_MULTIPLIER);
+      baseMassLoss *= ageStarvationMultiplier;
+    }
+
     blob.mass = Math.max(15, blob.mass - baseMassLoss);
 
-    if (blob.mass <= 7) {
+    // Aged blobs die more easily from starvation
+    const starvationThreshold = blob.age > AGING_PENALTY_START ? 12 : 7;
+    if (blob.mass <= starvationThreshold) {
       blob.shouldRemove = true;
-      blob.genome.fitness += STARVATION_DEATH_PENALTY;
+
+      // More severe penalty for old blobs dying
+      const ageMultiplier = blob.age > AGING_PENALTY_START ? 1.5 : 1.0;
+      blob.genome.fitness += STARVATION_DEATH_PENALTY * ageMultiplier;
     }
   }
 
@@ -232,7 +283,7 @@ export const handleCollisionsOptimized = (
   obstacles: Obstacle[],
   food: Food[],
   totalDeathsRef: { current: number }
-): { updatedBlobs: Blob[], updatedFood: Food[], kills: number, deadBlobIds: Set<number>} => {
+): { updatedBlobs: Blob[], updatedFood: Food[], kills: number, deadBlobIds: Set<number> } => {
   const blobsToRemove = new Set<number>();
   const updatedFood = [...food];
   let kills = 0;
@@ -273,7 +324,7 @@ export const handleCollisionsOptimized = (
     }
   }
 
-  // === FOOD EATING ===
+  // === FOOD EATING WITH AGING PENALTY ===
   for (let i = updatedFood.length - 1; i >= 0; i--) {
     const f = updatedFood[i];
 
@@ -281,8 +332,8 @@ export const handleCollisionsOptimized = (
       if (blobsToRemove.has(blob.id)) continue;
 
       const blobRadius = Math.sqrt(blob.mass) * 2.5;
-      
-      // AABB broad-phase check (very fast)
+
+      // AABB broad-phase check
       if (Math.abs(blob.x - f.x) > blobRadius) continue;
       if (Math.abs(blob.y - f.y) > blobRadius) continue;
 
@@ -291,34 +342,37 @@ export const handleCollisionsOptimized = (
       const radiusSq = blobRadius * blobRadius;
 
       if (distSq < radiusSq) {
-        blob.mass += f.mass;
+        // Apply aging penalty to food absorption
+        const massGained = f.mass * (blob.agingEfficiency || 1.0);
+        blob.mass += massGained;
         blob.foodEaten++;
-        blob.genome.fitness += 2;
+
+        // Fitness reward reduced for old blobs
+        const fitnessGain = 2 * (blob.agingEfficiency || 1.0);
+        blob.genome.fitness += fitnessGain;
+
         updatedFood.splice(i, 1);
         break;
       }
     }
   }
 
-  // === BLOB EATING BLOB (OPTIMIZED WITH SPATIAL GRID) ===
+  // === BLOB EATING BLOB WITH AGING PENALTY ===
   for (const blob of blobs) {
     if (blobsToRemove.has(blob.id)) continue;
 
     const blobRadius = Math.sqrt(blob.mass) * 2.5;
-    
-    // Only check nearby blobs using spatial grid (HUGE OPTIMIZATION)
     const nearbyBlobs = getNearbyBlobs(blob.x, blob.y, blobRadius * 2, blobSpatialGrid);
 
     for (const other of nearbyBlobs) {
       if (blob.id === other.id || blobsToRemove.has(other.id)) continue;
 
-      // Must be significantly larger to eat
       if (blob.mass <= other.mass * 1.15) continue;
 
       // AABB broad-phase check
       const otherRadius = Math.sqrt(other.mass) * 2.5;
       const maxDist = blobRadius * 0.8;
-      
+
       if (Math.abs(blob.x - other.x) > maxDist) continue;
       if (Math.abs(blob.y - other.y) > maxDist) continue;
 
@@ -327,10 +381,15 @@ export const handleCollisionsOptimized = (
       const collisionDistSq = (blobRadius * 0.8) ** 2;
 
       if (distSq < collisionDistSq) {
-        // Eat!
-        blob.mass += other.mass * 0.7;
+        // Apply aging penalty to kill absorption
+        const massGained = other.mass * 0.7 * (blob.agingEfficiency || 1.0);
+        blob.mass += massGained;
         blob.kills++;
-        blob.genome.fitness += 35;
+
+        // Fitness reward reduced for old blobs
+        const fitnessGain = 35 * (blob.agingEfficiency || 1.0);
+        blob.genome.fitness += fitnessGain;
+
         kills++;
 
         // Drop some food
@@ -352,7 +411,7 @@ export const handleCollisionsOptimized = (
       }
     }
   }
-
+  
   const updatedBlobs = blobs.filter(b => !blobsToRemove.has(b.id));
 
   return { updatedBlobs, updatedFood, kills, deadBlobIds: blobsToRemove };
@@ -368,7 +427,7 @@ export const updateSurvivalPressure = (
   survivalPressure: number
 ): Obstacle[] => {
   const newObstacles = [...obstacles];
-  
+
   if (newObstacles.length < MAX_OBSTACLES && Math.random() < survivalPressure * 0.5) {
     newObstacles.push({
       x: Math.random() * WORLD_WIDTH,
@@ -376,6 +435,6 @@ export const updateSurvivalPressure = (
       radius: 15 + Math.random() * 20
     });
   }
-  
+
   return newObstacles;
 };

@@ -71,6 +71,8 @@ interface Blob {
   visionUpdateCounter: number;
   lastReproductionTick: number;
   birthsGiven: number;
+  agingEfficiency?: number; // 0.3 to 1.0, multiplier for resource gain
+  effectiveAge?: number; // Age adjusted for penalties
   brain?: {
     mutated: boolean;
     hiddenLayers: number[];

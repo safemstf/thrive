@@ -35,6 +35,14 @@ const IDLE_FITNESS_PENALTY = 0.2;
 const MOVEMENT_REWARD_FACTOR = 0.43;
 const STARVATION_DEATH_PENALTY = -60;
 
+// Aging system constants
+export const AGING_PENALTY_START = 3000; // Ticks before aging penalties start
+export const AGING_PENALTY_RATE = 0.01; // Base aging penalty multiplier
+export const MAX_AGE_PENALTY = 0.5; // Maximum penalty (50% efficiency at oldest)
+export const AGING_STARVATION_MULTIPLIER = 0.0005; // Additional starvation per age
+export const AGE_PENALTY_EXPONENT = 2.5; // Exponential curve for aging penalty
+export const MIN_REPRODUCTION_EFFICIENCY = 0.3; // Minimum efficiency for reproduction
+
 // Increase the base starvation rate
 const BASE_STARVATION_INTERVAL = 150;
 
@@ -69,6 +77,7 @@ const NEAT_CONFIG: NeatConfig = {
   addConnectionRate: 0.5,
   compatibilityThreshold: 3.0
 };
+
 
 export {
   NEAT_CONFIG,
