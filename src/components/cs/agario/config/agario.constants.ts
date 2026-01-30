@@ -36,7 +36,7 @@ const MOVEMENT_REWARD_FACTOR = 0.43;
 const STARVATION_DEATH_PENALTY = -60;
 
 // Aging system constants
-export const AGING_PENALTY_START = 3000; // Ticks before aging penalties start
+export const AGING_PENALTY_START = 6000; // Ticks before aging penalties start
 export const AGING_PENALTY_RATE = 0.01; // Base aging penalty multiplier
 export const MAX_AGE_PENALTY = 0.5; // Maximum penalty (50% efficiency at oldest)
 export const AGING_STARVATION_MULTIPLIER = 0.0005; // Additional starvation per age
