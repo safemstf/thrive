@@ -1,4 +1,4 @@
-// src/components/cs/agario/utils/neural-net-visualization-enhanced.ts
+// src/components/cs/agario/utils/neural-net-visualization.ts
 
 import { Genome, NodeType } from '../neat';
 import { NeuralLayout, NeuralConnection, ActivationFunction } from '../config/agario.types';
@@ -27,7 +27,7 @@ export interface NeuralNodeEnhanced {
 /**
  * Vision system configurations for automatic label generation
  */
-export type VisionSystem = 'original' | 'minimal' | 'compact' | 'enhanced';
+export type VisionSystem = 'gradient' | 'original' | 'minimal' | 'compact' | 'enhanced';
 
 interface VisionConfig {
   inputCount: number;
@@ -43,6 +43,20 @@ interface VisionConfig {
  * Configuration for each vision system
  */
 const VISION_CONFIGS: Record<VisionSystem, VisionConfig> = {
+  // NEW: Gradient-based vision (8 inputs) - DEFAULT
+  gradient: {
+    inputCount: 8,
+    outputCount: 3,
+    visionRays: 0, // Engineered features aren't ray-based
+    signalsPerRay: 1,
+    stateInputs: 8, // All 8 are state-like features
+    getInputLabel: (i: number) => {
+      // Engineered feature labels from FeaturePreprocessor.getFeatureLabels()
+      return ['NetMotX', 'NetMotY', 'ThreatOpp', 'Urgency', 'Openness', 'Metabolism', 'ReproPot', 'Confidence'][i] || `I${i}`;
+    },
+    getOutputLabel: (i: number) => ['Acc', 'Rot', 'Rep'][i] || `O${i}`
+  },
+
   original: {
     inputCount: 14,
     outputCount: 2,
@@ -116,13 +130,14 @@ const VISION_CONFIGS: Record<VisionSystem, VisionConfig> = {
  */
 export const detectVisionSystem = (inputCount: number): VisionSystem => {
   switch (inputCount) {
+    case 8: return 'gradient';  // NEW: Gradient vision (default)
     case 12: return 'minimal';
     case 14: return 'original';
     case 20: return 'compact';
     case 40: return 'enhanced';
     default: {
-      console.warn(`Unknown input count ${inputCount}, defaulting to compact`);
-      return 'compact';
+      console.warn(`Unknown input count ${inputCount}, defaulting to gradient`);
+      return 'gradient';
     }
   }
 };
@@ -184,44 +199,44 @@ export const createNeuralLayoutEnhanced = (
   const nodeRadius = Math.min(16, width * 0.015);
 
   // === POSITION INPUT NODES ===
+  // All inputs vertically centered as a single column
   const inputX = width * 0.12;
+  const totalInputs = inputNodes.length;
+  const inputSpacing = Math.min(50, (height * 0.8) / Math.max(totalInputs, 4));
+  const inputTotalHeight = (totalInputs - 1) * inputSpacing;
+  const inputYStart = (height - inputTotalHeight) / 2;
 
-  // Group inputs by type for better visual organization
-  const visionInputCount = config.visionRays * config.signalsPerRay;
-  const stateInputCount = config.stateInputs;
-
-  // Vision inputs section
-  const visionSpacing = Math.min(45, (height * 0.6) / Math.max(visionInputCount, 8));
-  const visionHeight = (visionInputCount - 1) * visionSpacing;
-  const visionYStart = (height * 0.4 - visionHeight) / 2;
-
-  // State inputs section (below vision)
-  const stateSpacing = Math.min(50, (height * 0.25) / Math.max(stateInputCount, 4));
-  const stateYStart = height * 0.65;
+  // For gradient vision, first 6 are sensory, last 2 are state
+  const sensoryCutoff = visionSystem === 'gradient' ? 6 : config.visionRays * config.signalsPerRay;
 
   inputNodes.forEach((id, i) => {
     const node = genome.nodes.get(id)!;
-    let x = inputX;
-    let y = 0;
-    let label = config.getInputLabel(i);
+    const x = inputX;
+    const y = inputYStart + i * inputSpacing;
+    const label = config.getInputLabel(i);
     let color = '#4a9eff'; // Default blue
 
-    if (i < visionInputCount) {
-      // Vision input
-      y = visionYStart + i * visionSpacing;
-
-      // Color-code by signal type
-      if (visionSystem === 'compact') {
-        color = i % 2 === 0 ? '#4ade80' : '#f87171'; // Green=attractive, Red=repulsive
-      } else if (visionSystem === 'enhanced') {
+    // Color-code by signal type
+    if (visionSystem === 'gradient') {
+      if (i < 3) {
+        color = '#4ade80'; // Green for attraction (AttrX, AttrY, AttrStr)
+      } else if (i < 6) {
+        color = '#f87171'; // Red for danger (DangX, DangY, DangStr)
+      } else {
+        color = '#8b5cf6'; // Purple for state (Mass, Repro)
+      }
+    } else if (visionSystem === 'compact') {
+      color = i < sensoryCutoff ? (i % 2 === 0 ? '#4ade80' : '#f87171') : '#8b5cf6';
+    } else if (visionSystem === 'enhanced') {
+      if (i < sensoryCutoff) {
         const signalType = i % 4;
-        const colors = ['#4ade80', '#f87171', '#fbbf24', '#a78bfa']; // Food, Threat, Prey, Obstacle
+        const colors = ['#4ade80', '#f87171', '#fbbf24', '#a78bfa'];
         color = colors[signalType];
+      } else {
+        color = '#8b5cf6';
       }
     } else {
-      // State input
-      y = stateYStart + (i - visionInputCount) * stateSpacing;
-      color = '#8b5cf6'; // Purple for state
+      color = i < sensoryCutoff ? '#4a9eff' : '#8b5cf6';
     }
 
     nodes.set(id, {
@@ -318,8 +333,8 @@ export const createNeuralLayoutEnhanced = (
     }
   }
 
-  return { 
-    nodes, 
+  return {
+    nodes,
     connections,
     viewport: {
       x: 0,
@@ -347,18 +362,18 @@ export const findNodeAtPosition = (
   // Adjust coordinates for viewport transform
   const adjustedX = (x - viewportX) / viewportScale;
   const adjustedY = (y - viewportY) / viewportScale;
-  
+
   let closestNode: NeuralNodeEnhanced | null = null;
   let closestDistance = Infinity;
 
   for (const node of layout.nodes.values()) {
     if (node.isLocked) continue; // Skip locked nodes (inputs/outputs)
-    
+
     const distance = Math.sqrt(
-      Math.pow(node.x - adjustedX, 2) + 
+      Math.pow(node.x - adjustedX, 2) +
       Math.pow(node.y - adjustedY, 2)
     );
-    
+
     // Check if within node radius plus a small tolerance
     if (distance < node.radius + 5 && distance < closestDistance) {
       closestNode = node;
@@ -386,7 +401,7 @@ export const startDraggingNode = (
 
   const adjustedX = (clientX - viewportX) / viewportScale;
   const adjustedY = (clientY - viewportY) / viewportScale;
-  
+
   // Calculate drag offset from node center
   const dragOffsetX = adjustedX - node.x;
   const dragOffsetY = adjustedY - node.y;
@@ -424,7 +439,7 @@ export const updateDraggingNode = (
 
   const adjustedX = (clientX - viewportX) / viewportScale;
   const adjustedY = (clientY - viewportY) / viewportScale;
-  
+
   // Calculate new position based on drag offset
   const newX = adjustedX - (node.dragOffsetX || 0);
   const newY = adjustedY - (node.dragOffsetY || 0);
@@ -770,7 +785,7 @@ export const applyPhysics = (
 
   // Check if it's already an enhanced layout
   let enhancedLayout: NeuralLayoutEnhanced;
-  
+
   if (layout.nodes instanceof Map) {
     // It's already enhanced
     enhancedLayout = layout as NeuralLayoutEnhanced;
@@ -787,11 +802,11 @@ export const applyPhysics = (
     for (const [id, node] of standardLayout.nodes) {
       // Provide default activation if missing
       let activation = node.activation || 'tanh';
-      
+
       // For input/output nodes, use more appropriate defaults
       if (node.type === 'input') activation = 'linear';
       if (node.type === 'output') activation = 'sigmoid';
-      
+
       enhancedLayout.nodes.set(id, {
         ...node,
         vx: node.vx || 0,

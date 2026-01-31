@@ -1,4 +1,4 @@
-// src/components/cs/agario/utils/simulation-optimized.ts
+// src/components/cs/agario/utils/simulation.ts
 
 import { Genome } from '../neat';
 import {
@@ -9,6 +9,7 @@ import {
   MAX_POPULATION,
   STARVATION_RATE, MIN_MOVEMENT_THRESHOLD, IDLE_PENALTY_START,
   IDLE_FITNESS_PENALTY, MOVEMENT_REWARD_FACTOR, STARVATION_DEATH_PENALTY,
+  IDLE_STARVATION_RATE, IDLE_DEATH_THRESHOLD,
   BASE_STARVATION_INTERVAL,
   SURVIVAL_PRESSURE_INCREASE, MAX_OBSTACLES,
   CLUSTER_UPDATE_INTERVAL,
@@ -19,8 +20,15 @@ import {
   AGE_PENALTY_EXPONENT,
   AGING_PENALTY_RATE,
   MIN_REPRODUCTION_EFFICIENCY,
-  AGING_STARVATION_MULTIPLIER
+  AGING_STARVATION_MULTIPLIER,
+  BLOB_ACCELERATION,
+  BLOB_ROTATION_SPEED,
+  BLOB_FRICTION,
+  BLOB_BASE_MAX_SPEED,
+  BLOB_MASS_SPEED_FACTOR
 } from '../config/agario.constants';
+import { createEngineeredVisionSystem } from './feature-engineering';
+import { getNearbyFood } from './environment';
 
 /**
  * Optimized simulation with spatial grid for collisions
@@ -113,6 +121,7 @@ function distance(x1: number, y1: number, x2: number, y2: number): number {
 }
 
 // ===================== BLOB SIMULATION =====================
+const visionSystem = createEngineeredVisionSystem();
 
 export const simulateBlob = (
   blob: Blob,
@@ -122,8 +131,9 @@ export const simulateBlob = (
   logs: Log[],
   tick: number,
   spatialGrid: Map<string, Food[]>,
-  getVision: (blob: Blob) => number[],
-  giveBirth: (parent: Blob) => boolean
+  getNearbyFood: (x: number, y: number, range: number) => Food[],
+  giveBirth: (parent: Blob) => boolean,
+  visionSystem: ReturnType<typeof createEngineeredVisionSystem>  // ✅ Add vision system
 ): Blob => {
   // Age increment
   blob.age++;
@@ -132,7 +142,17 @@ export const simulateBlob = (
   // Neural network decision
   let inputs: number[];
   if (!blob.cachedVision || blob.visionUpdateCounter >= VISION_UPDATE_INTERVAL) {
-    inputs = getVision(blob);
+    // ✅ Use the vision system here
+    inputs = visionSystem.getVision(
+      blob,
+      blobs,
+      food,
+      obstacles,
+      getNearbyFood,  // This should be your spatial grid function
+      tick,
+      WORLD_WIDTH,
+      WORLD_HEIGHT
+    );
     blob.cachedVision = inputs;
     blob.visionUpdateCounter = 0;
   } else {
@@ -166,8 +186,8 @@ export const simulateBlob = (
 
   const outputs = blob.genome.activate(inputs);
 
-  const acceleration = Math.tanh(outputs[0]) * 0.45;
-  const rotation = Math.tanh(outputs[1]) * 0.2;
+  const acceleration = Math.tanh(outputs[0]) * BLOB_ACCELERATION;
+  const rotation = Math.tanh(outputs[1]) * BLOB_ROTATION_SPEED;
   const reproduceSignal = Math.tanh(outputs[2]);
 
   // ==================== AGING-AFFECTED REPRODUCTION ====================
@@ -199,11 +219,11 @@ export const simulateBlob = (
   blob.vx += Math.cos(newAngle) * acceleration;
   blob.vy += Math.sin(newAngle) * acceleration;
 
-  blob.vx *= 0.95;
-  blob.vy *= 0.95;
+  blob.vx *= BLOB_FRICTION;
+  blob.vy *= BLOB_FRICTION;
 
   const speed = Math.sqrt(blob.vx * blob.vx + blob.vy * blob.vy);
-  const maxSpeed = 5 / Math.sqrt(blob.mass / 30);
+  const maxSpeed = BLOB_BASE_MAX_SPEED / Math.sqrt(blob.mass / BLOB_MASS_SPEED_FACTOR);
   if (speed > maxSpeed) {
     blob.vx = (blob.vx / speed) * maxSpeed;
     blob.vy = (blob.vy / speed) * maxSpeed;
@@ -228,14 +248,27 @@ export const simulateBlob = (
 
     if (distMoved < MIN_MOVEMENT_THRESHOLD) {
       blob.idleTicks++;
+
+      // Graduated idle punishment
       if (blob.idleTicks > IDLE_PENALTY_START) {
-        blob.genome.fitness -= IDLE_FITNESS_PENALTY;
+        // Fitness penalty (every 5 ticks to reduce spam)
+        if (tick % 5 === 0) {
+          blob.genome.fitness -= IDLE_FITNESS_PENALTY;
+        }
+
+        // Gradual mass loss (every 10 ticks)
         if (tick % 10 === 0) {
-          const idleStarvation = (blob.idleTicks - IDLE_PENALTY_START) * 0.1;
-          blob.mass = Math.max(20, blob.mass - idleStarvation);
+          blob.mass -= IDLE_STARVATION_RATE * 3; // ~0.45 mass per 10 ticks
+        }
+
+        // Kill blob if idle for too long
+        if (blob.idleTicks > IDLE_DEATH_THRESHOLD) {
+          blob.shouldRemove = true;
+          blob.genome.fitness -= 30;
         }
       }
     } else {
+      // Moving! Reset idle counter and reward
       blob.idleTicks = 0;
       blob.genome.fitness += distMoved * MOVEMENT_REWARD_FACTOR;
     }
@@ -254,17 +287,20 @@ export const simulateBlob = (
       baseMassLoss *= ageStarvationMultiplier;
     }
 
-    blob.mass = Math.max(15, blob.mass - baseMassLoss);
-
-    // Aged blobs die more easily from starvation
-    const starvationThreshold = blob.age > AGING_PENALTY_START ? 12 : 7;
-    if (blob.mass <= starvationThreshold) {
-      blob.shouldRemove = true;
-
-      // More severe penalty for old blobs dying
-      const ageMultiplier = blob.age > AGING_PENALTY_START ? 1.5 : 1.0;
-      blob.genome.fitness += STARVATION_DEATH_PENALTY * ageMultiplier;
+    // Extra starvation for idle blobs (1.5x, not 2x)
+    if (blob.idleTicks > IDLE_PENALTY_START) {
+      baseMassLoss *= 1.5;
     }
+
+    blob.mass = Math.max(10, blob.mass - baseMassLoss);
+  }
+
+  // Check for death from starvation
+  // Lower threshold = more forgiving
+  const starvationThreshold = blob.age > AGING_PENALTY_START ? 14 : 12;
+  if (blob.mass <= starvationThreshold) {
+    blob.shouldRemove = true;
+    blob.genome.fitness += STARVATION_DEATH_PENALTY;
   }
 
   return blob;

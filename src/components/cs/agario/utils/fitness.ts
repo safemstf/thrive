@@ -67,6 +67,24 @@ const FITNESS_WEIGHTS = {
     HAS_CHILDREN: 120,
   },
 
+  // === INTELLIGENCE REWARDS ===
+  // These reward SMART behavior, not just any behavior
+
+  // Efficiency: food per distance (rewards directed movement, not random wandering)
+  EFFICIENCY_MULTIPLIER: 500,
+  MIN_DISTANCE_FOR_EFFICIENCY: 100, // Must travel at least this much
+
+  // Danger survival: bonus for surviving while near threats
+  DANGER_SURVIVAL_BONUS: 100,
+  DANGER_ENCOUNTER_THRESHOLD: 5, // Must have encountered danger this many times
+
+  // Growth rate: mass gained per tick alive (rewards fast learners)
+  GROWTH_RATE_MULTIPLIER: 1000,
+  MIN_AGE_FOR_GROWTH_RATE: 200,
+
+  // Close call survival: escaped near-death situations
+  CLOSE_CALL_BONUS: 50,
+
   // Fitness cap
   MAX_FITNESS: 10000,
 } as const;
@@ -240,6 +258,70 @@ function calculateSpecializationFitness(blob: Blob): number {
   return fitness;
 }
 
+// ===================== INTELLIGENCE FITNESS =====================
+
+/**
+ * Calculate efficiency fitness - rewards directed movement toward food
+ * A blob that travels 100 units and eats 10 food is smarter than one
+ * that travels 1000 units and eats 10 food
+ */
+function calculateEfficiencyFitness(blob: Blob): number {
+  if (blob.distanceTraveled < FITNESS_WEIGHTS.MIN_DISTANCE_FOR_EFFICIENCY) {
+    return 0;
+  }
+
+  if (blob.foodEaten === 0) {
+    return 0;
+  }
+
+  // Food per unit distance traveled (higher = more efficient)
+  const efficiency = blob.foodEaten / (blob.distanceTraveled / 100);
+
+  return Math.min(efficiency * FITNESS_WEIGHTS.EFFICIENCY_MULTIPLIER, 200);
+}
+
+/**
+ * Calculate growth rate fitness - rewards fast learners
+ * Mass gained per tick alive shows how quickly the blob figured things out
+ */
+function calculateGrowthRateFitness(blob: Blob): number {
+  if (blob.age < FITNESS_WEIGHTS.MIN_AGE_FOR_GROWTH_RATE) {
+    return 0;
+  }
+
+  const startingMass = 30; // Initial mass
+  const massGained = Math.max(0, blob.mass - startingMass);
+  const growthRate = massGained / blob.age;
+
+  return Math.min(growthRate * FITNESS_WEIGHTS.GROWTH_RATE_MULTIPLIER, 150);
+}
+
+/**
+ * Calculate danger awareness fitness
+ * Rewards blobs that have encountered dangers and survived
+ * (tracked via dangerEncounters field on blob)
+ */
+function calculateDangerAwarenessFitness(blob: Blob): number {
+  const dangerEncounters = (blob as any).dangerEncounters || 0;
+
+  if (dangerEncounters < FITNESS_WEIGHTS.DANGER_ENCOUNTER_THRESHOLD) {
+    return 0;
+  }
+
+  // Survived multiple danger encounters = smart blob
+  return Math.min(dangerEncounters * 10, FITNESS_WEIGHTS.DANGER_SURVIVAL_BONUS);
+}
+
+/**
+ * Calculate close call bonus
+ * Rewards blobs that survived near-death (low mass) situations
+ */
+function calculateCloseCallFitness(blob: Blob): number {
+  const closeCalls = (blob as any).closeCalls || 0;
+
+  return Math.min(closeCalls * FITNESS_WEIGHTS.CLOSE_CALL_BONUS, 150);
+}
+
 // ===================== MAIN FITNESS CALCULATION =====================
 
 /**
@@ -289,7 +371,22 @@ export function calculateBlobFitness(blob: Blob, familySize: number): number {
   // 10. Specialization bonuses
   fitness += calculateSpecializationFitness(blob);
 
-  // 11. Cap fitness to prevent overflow
+  // === INTELLIGENCE REWARDS ===
+  // These reward SMART behavior, making evolution favor intelligence
+
+  // 11. Efficiency - food per distance (directed hunting)
+  fitness += calculateEfficiencyFitness(blob);
+
+  // 12. Growth rate - how fast did they figure things out
+  fitness += calculateGrowthRateFitness(blob);
+
+  // 13. Danger awareness - survived dangerous situations
+  fitness += calculateDangerAwarenessFitness(blob);
+
+  // 14. Close calls - survived near-death
+  fitness += calculateCloseCallFitness(blob);
+
+  // 15. Cap fitness to prevent overflow
   fitness = Math.min(fitness, FITNESS_WEIGHTS.MAX_FITNESS);
 
   return fitness;

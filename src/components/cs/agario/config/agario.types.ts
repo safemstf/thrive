@@ -29,6 +29,18 @@ interface FoodCluster {
   foods: Food[];
 }
 
+interface FoodIsland {
+  id: number;
+  x: number;
+  y: number;
+  radius: number;
+  spawnRate: number;
+  richness: number;
+  currentFood: number;
+  maxFood: number;
+  color: string;
+}
+
 interface Obstacle {
   x: number;
   y: number;
@@ -135,6 +147,7 @@ export type {
   TerrainZone,
   Food,
   FoodCluster,
+  FoodIsland,
   Obstacle,
   Log,
   Blob,

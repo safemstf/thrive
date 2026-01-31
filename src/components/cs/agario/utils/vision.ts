@@ -1,36 +1,41 @@
-// src/components/cs/agario/utils/vision-enhanced.ts
+// src/components/cs/agario/utils/vision.ts
+// GRADIENT-BASED VISION SYSTEM
+//
+// Philosophy: Instead of 8 directional rays with multiple signals each (40 inputs),
+// we compute weighted GRADIENTS that encode direction naturally.
+//
+// This is how bacteria navigate (chemotaxis) - they sense concentration gradients
+// and move accordingly. Much simpler and faster to evolve!
+
 import { Blob, Food, Obstacle } from '../config/agario.types';
-import { VISION_RANGE, REPRODUCTION_COOLDOWN } from '../config/agario.constants';
+import { VISION_RANGE } from '../config/agario.constants';
 
 // Precompute constants
 const VISION_RANGE_SQ = VISION_RANGE * VISION_RANGE;
 const INV_VISION_RANGE = 1 / VISION_RANGE;
 
-// 8 directional rays (45° apart)
-const VISION_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315].map(angle => ({
-  angle,
-  rad: (angle * Math.PI) / 180,
-  dx: Math.cos((angle * Math.PI) / 180),
-  dy: Math.sin((angle * Math.PI) / 180)
-}));
-
-interface VisionRayData {
-  foodSignal: number;      // 0-1: closeness of food
-  threatSignal: number;    // 0-1: danger level (bigger blob)
-  preySignal: number;      // 0-1: opportunity (smaller blob)
-  obstacleSignal: number;  // 0-1: wall/obstacle proximity
-}
-
 /**
- * ENHANCED VISION SYSTEM
- * 
- * Input design philosophy:
- * - Each ray returns 4 signals (food, threat, prey, obstacle)
- * - Separate channels avoid signal interference
- * - All normalized to [0, 1] or [-1, 1] ranges
- * - Distance-weighted signals (closer = stronger)
+ * GRADIENT VISION SYSTEM - 8 INPUTS TOTAL
+ *
+ * Sensory Inputs (6):
+ *   0. attraction_dx  (-1 to 1): X direction toward food/prey
+ *   1. attraction_dy  (-1 to 1): Y direction toward food/prey
+ *   2. attraction_strength (0 to 1): How much food/prey nearby
+ *   3. danger_dx      (-1 to 1): X direction of danger (threats + obstacles + walls)
+ *   4. danger_dy      (-1 to 1): Y direction of danger
+ *   5. danger_strength (0 to 1): How urgent is the danger
+ *
+ * State Inputs (2):
+ *   6. mass_normalized (0 to 1): How big am I (log scale)
+ *   7. reproduction_ready (0 to 1): Can I reproduce
+ *
+ * Benefits:
+ *   - Direction is encoded in the SIGN of dx/dy (no need for 8 separate rays)
+ *   - Walls, obstacles, and threats all contribute to ONE danger gradient
+ *   - 8 inputs vs 40 = 5x fewer connections = much faster evolution
+ *   - Can use larger VISION_RANGE (400+) with better performance
  */
-export const getVisionEnhanced = (
+export const getVision = (
   blob: Blob,
   blobs: Blob[],
   food: Food[],
@@ -40,415 +45,193 @@ export const getVisionEnhanced = (
   worldWidth: number,
   worldHeight: number
 ): number[] => {
-  // === 32 directional inputs (8 rays × 4 signals each) ===
-  const rayData: VisionRayData[] = new Array(8).fill(null).map(() => ({
-    foodSignal: 0,
-    threatSignal: 0,
-    preySignal: 0,
-    obstacleSignal: 0
-  }));
 
-  // Process each direction
-  for (let i = 0; i < VISION_ANGLES.length; i++) {
-    const { dx, dy } = VISION_ANGLES[i];
-    
-    let closestFood = VISION_RANGE_SQ;
-    let closestThreat = VISION_RANGE_SQ;
-    let closestPrey = VISION_RANGE_SQ;
-    let closestObstacle = VISION_RANGE_SQ;
+  // === ATTRACTION GRADIENT (food + prey) ===
+  let attractionX = 0;
+  let attractionY = 0;
+  let attractionTotal = 0;
 
-    // === FOOD DETECTION ===
-    const nearbyFood = getNearbyFood(blob.x, blob.y, VISION_RANGE);
-    for (const f of nearbyFood) {
-      const fdx = f.x - blob.x;
-      const fdy = f.y - blob.y;
-      const distSq = fdx * fdx + fdy * fdy;
+  // === DANGER GRADIENT (threats + obstacles + walls) ===
+  let dangerX = 0;
+  let dangerY = 0;
+  let dangerTotal = 0;
 
-      if (distSq > VISION_RANGE_SQ) continue;
+  // --- FOOD ATTRACTION ---
+  const nearbyFood = getNearbyFood(blob.x, blob.y, VISION_RANGE);
+  for (const f of nearbyFood) {
+    const dx = f.x - blob.x;
+    const dy = f.y - blob.y;
+    const distSq = dx * dx + dy * dy;
 
-      const dot = fdx * dx + fdy * dy;
-      if (dot <= 0) continue;
+    if (distSq > VISION_RANGE_SQ || distSq < 1) continue;
 
-      const dist = Math.sqrt(distSq);
-      const cosAngle = dot / (dist + 0.001);
+    const dist = Math.sqrt(distSq);
+    // Closer food = stronger pull (inverse square falloff)
+    const weight = Math.pow(1 - dist * INV_VISION_RANGE, 2) * f.mass;
 
-      if (cosAngle > 0.7 && distSq < closestFood) {
-        closestFood = distSq;
-        // Exponential falloff: closer food = much stronger signal
-        rayData[i].foodSignal = Math.pow(1 - dist * INV_VISION_RANGE, 2);
-      }
-    }
-
-    // === BLOB DETECTION (Threats vs Prey) ===
-    for (const other of blobs) {
-      if (other.id === blob.id) continue;
-
-      const bdx = other.x - blob.x;
-      const bdy = other.y - blob.y;
-      const distSq = bdx * bdx + bdy * bdy;
-
-      if (distSq > VISION_RANGE_SQ) continue;
-
-      const dot = bdx * dx + bdy * dy;
-      if (dot <= 0) continue;
-
-      const dist = Math.sqrt(distSq);
-      const cosAngle = dot / (dist + 0.001);
-
-      if (cosAngle > 0.65) {
-        const massRatio = other.mass / blob.mass;
-        const proximity = Math.pow(1 - dist * INV_VISION_RANGE, 2);
-
-        // THREAT: Can eat us (>15% bigger)
-        if (massRatio > 1.15) {
-          if (distSq < closestThreat) {
-            closestThreat = distSq;
-            // Stronger signal for bigger threats, closer = MORE urgent
-            const threatLevel = Math.min((massRatio - 1) * 2, 1);
-            rayData[i].threatSignal = proximity * (0.5 + threatLevel * 0.5);
-          }
-        }
-        // PREY: We can eat them (<87% of our size)
-        else if (massRatio < 0.87) {
-          if (distSq < closestPrey) {
-            closestPrey = distSq;
-            // Stronger signal for much smaller prey
-            const preyValue = Math.min((1 / massRatio - 1) * 0.5, 1);
-            rayData[i].preySignal = proximity * (0.5 + preyValue * 0.5);
-          }
-        }
-        // NEUTRAL: Similar size - very weak signals
-        else {
-          const neutralProximity = proximity * 0.2;
-          if (massRatio > 1.0) {
-            rayData[i].threatSignal = Math.max(rayData[i].threatSignal, neutralProximity);
-          } else {
-            rayData[i].preySignal = Math.max(rayData[i].preySignal, neutralProximity);
-          }
-        }
-      }
-    }
-
-    // === OBSTACLE DETECTION ===
-    for (const obs of obstacles) {
-      const odx = obs.x - blob.x;
-      const ody = obs.y - blob.y;
-      const distSq = odx * odx + ody * ody;
-      const dist = Math.sqrt(distSq);
-      const effectiveDist = Math.max(0, dist - obs.radius);
-      const effectiveDistSq = effectiveDist * effectiveDist;
-
-      if (effectiveDistSq > VISION_RANGE_SQ) continue;
-
-      const dot = odx * dx + ody * dy;
-      if (dot <= 0) continue;
-
-      const cosAngle = dot / (dist + 0.001);
-
-      if (cosAngle > 0.6 && effectiveDistSq < closestObstacle) {
-        closestObstacle = effectiveDistSq;
-        rayData[i].obstacleSignal = Math.pow(1 - effectiveDist * INV_VISION_RANGE, 1.5);
-      }
-    }
+    // Normalize direction and weight it
+    attractionX += (dx / dist) * weight;
+    attractionY += (dy / dist) * weight;
+    attractionTotal += weight;
   }
 
-  // === FLATTEN RAY DATA INTO INPUT ARRAY ===
-  const visionInputs: number[] = [];
-  for (const ray of rayData) {
-    visionInputs.push(
-      ray.foodSignal,
-      ray.threatSignal,
-      ray.preySignal,
-      ray.obstacleSignal
-    );
+  // --- BLOB DETECTION (prey vs threat) ---
+  for (const other of blobs) {
+    if (other.id === blob.id) continue;
+
+    // Skip family members (they're neutral)
+    if (other.familyLineage === blob.familyLineage) continue;
+
+    const dx = other.x - blob.x;
+    const dy = other.y - blob.y;
+    const distSq = dx * dx + dy * dy;
+
+    if (distSq > VISION_RANGE_SQ || distSq < 1) continue;
+
+    const dist = Math.sqrt(distSq);
+    const proximity = Math.pow(1 - dist * INV_VISION_RANGE, 2);
+    const massRatio = other.mass / blob.mass;
+
+    // Normalize direction
+    const ndx = dx / dist;
+    const ndy = dy / dist;
+
+    if (massRatio > 1.15) {
+      // THREAT: They can eat us - add to danger gradient
+      // Bigger threat = stronger danger signal
+      const threatLevel = Math.min((massRatio - 1) * 2, 1);
+      const weight = proximity * (0.5 + threatLevel * 0.5) * other.mass * 0.1;
+
+      // Danger points TOWARD the threat (we'll flee opposite direction)
+      dangerX += ndx * weight;
+      dangerY += ndy * weight;
+      dangerTotal += weight;
+    }
+    else if (massRatio < 0.87) {
+      // PREY: We can eat them - add to attraction gradient
+      const preyValue = Math.min((1 / massRatio - 1) * 0.5, 1);
+      const weight = proximity * (0.5 + preyValue * 0.5) * other.mass * 0.5;
+
+      attractionX += ndx * weight;
+      attractionY += ndy * weight;
+      attractionTotal += weight;
+    }
+    // Similar size = neutral, ignore
   }
 
-  // === STATE INPUTS (8 additional inputs) ===
-  const stateInputs = [
-    // 1. Mass (log scale for better range)
-    Math.min(Math.log10(blob.mass + 1) / 2, 1),
-    
-    // 2. Speed magnitude (normalized)
-    Math.min(Math.sqrt(blob.vx * blob.vx + blob.vy * blob.vy) / 8, 1),
-    
-    // 3. Energy efficiency (mass gained per distance traveled)
-    // Requires tracking - for now use mass growth rate
-    Math.tanh(blob.mass / 100 - 0.5), // -1 to 1
-    
-    // 4. Reproduction readiness
-    Math.min((currentTick - blob.lastReproductionTick) / REPRODUCTION_COOLDOWN, 1),
-    
-    // 5-8. Directional wall proximity (N, E, S, W)
-    Math.max(0, 1 - blob.y / 200),                    // North wall
-    Math.max(0, 1 - (worldWidth - blob.x) / 200),    // East wall  
-    Math.max(0, 1 - (worldHeight - blob.y) / 200),   // South wall
-    Math.max(0, 1 - blob.x / 200)                     // West wall
+  // --- OBSTACLE DANGER ---
+  for (const obs of obstacles) {
+    const dx = obs.x - blob.x;
+    const dy = obs.y - blob.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const effectiveDist = Math.max(1, dist - obs.radius);
+
+    if (effectiveDist > VISION_RANGE) continue;
+
+    // Closer = more dangerous (exponential falloff for obstacles)
+    const proximity = Math.pow(1 - effectiveDist * INV_VISION_RANGE, 1.5);
+    const weight = proximity * obs.radius * 0.5; // Bigger obstacles = more danger
+
+    // Danger points toward obstacle
+    dangerX += (dx / dist) * weight;
+    dangerY += (dy / dist) * weight;
+    dangerTotal += weight;
+  }
+
+  // --- WALL DANGER ---
+  // Walls are sensed as danger gradients pointing TOWARD the wall
+  const wallProximityRange = Math.min(VISION_RANGE, 200);
+
+  // North wall (y = 0)
+  if (blob.y < wallProximityRange) {
+    const proximity = Math.pow(1 - blob.y / wallProximityRange, 2);
+    const weight = proximity * 50;
+    dangerY -= weight; // Danger points toward wall (negative Y)
+    dangerTotal += weight;
+  }
+
+  // South wall (y = worldHeight)
+  if (blob.y > worldHeight - wallProximityRange) {
+    const proximity = Math.pow(1 - (worldHeight - blob.y) / wallProximityRange, 2);
+    const weight = proximity * 50;
+    dangerY += weight; // Danger points toward wall (positive Y)
+    dangerTotal += weight;
+  }
+
+  // West wall (x = 0)
+  if (blob.x < wallProximityRange) {
+    const proximity = Math.pow(1 - blob.x / wallProximityRange, 2);
+    const weight = proximity * 50;
+    dangerX -= weight; // Danger points toward wall (negative X)
+    dangerTotal += weight;
+  }
+
+  // East wall (x = worldWidth)
+  if (blob.x > worldWidth - wallProximityRange) {
+    const proximity = Math.pow(1 - (worldWidth - blob.x) / wallProximityRange, 2);
+    const weight = proximity * 50;
+    dangerX += weight; // Danger points toward wall (positive X)
+    dangerTotal += weight;
+  }
+
+  // === NORMALIZE GRADIENTS ===
+
+  // Attraction gradient: normalize to [-1, 1] range
+  let attrDx = 0, attrDy = 0, attrStrength = 0;
+  if (attractionTotal > 0.01) {
+    const attrMag = Math.sqrt(attractionX * attractionX + attractionY * attractionY);
+    if (attrMag > 0.01) {
+      attrDx = attractionX / attrMag; // Unit direction
+      attrDy = attractionY / attrMag;
+    }
+    // Strength is normalized by a reasonable max value
+    attrStrength = Math.min(attractionTotal / 100, 1);
+  }
+
+  // Danger gradient: normalize to [-1, 1] range
+  let dangDx = 0, dangDy = 0, dangStrength = 0;
+  if (dangerTotal > 0.01) {
+    const dangMag = Math.sqrt(dangerX * dangerX + dangerY * dangerY);
+    if (dangMag > 0.01) {
+      dangDx = dangerX / dangMag; // Unit direction
+      dangDy = dangerY / dangMag;
+    }
+    dangStrength = Math.min(dangerTotal / 100, 1);
+  }
+
+  // === STATE INPUTS ===
+
+  // Mass (log scale for better range)
+  const massNormalized = Math.min(Math.log10(blob.mass + 1) / 2.5, 1);
+
+  // Reproduction readiness
+  const reproductionCooldown = 200; // Should match REPRODUCTION_COOLDOWN
+  const reproReady = Math.min((currentTick - (blob.lastReproductionTick || 0)) / reproductionCooldown, 1);
+
+  // === RETURN 8 INPUTS ===
+  return [
+    attrDx,        // 0: Attraction direction X (-1 to 1)
+    attrDy,        // 1: Attraction direction Y (-1 to 1)
+    attrStrength,  // 2: Attraction strength (0 to 1)
+    dangDx,        // 3: Danger direction X (-1 to 1)
+    dangDy,        // 4: Danger direction Y (-1 to 1)
+    dangStrength,  // 5: Danger strength (0 to 1)
+    massNormalized, // 6: Mass awareness (0 to 1)
+    reproReady     // 7: Reproduction readiness (0 to 1)
   ];
-
-  return [...visionInputs, ...stateInputs];
 };
 
-/**
- * COMPACT VERSION: Fewer inputs for faster evolution
- * 
- * 8 rays × 2 signals = 16 vision inputs
- * 6 state inputs
- * Total: 22 inputs (vs 40 in enhanced version)
- */
-export const getVisionCompact = (
-  blob: Blob,
-  blobs: Blob[],
-  food: Food[],
-  obstacles: Obstacle[],
-  getNearbyFood: (x: number, y: number, range: number) => Food[],
-  currentTick: number,
-  worldWidth: number,
-  worldHeight: number
-): number[] => {
-  const rays = new Array(8).fill(null).map(() => ({
-    attractiveSignal: 0,  // Food + Prey (things to chase)
-    repulsiveSignal: 0    // Threats + Obstacles (things to avoid)
-  }));
+// Input labels for neural net visualization
+export const VISION_INPUT_LABELS = [
+  'AttrX',   // Attraction direction X
+  'AttrY',   // Attraction direction Y
+  'AttrStr', // Attraction strength
+  'DangX',   // Danger direction X
+  'DangY',   // Danger direction Y
+  'DangStr', // Danger strength
+  'Mass',    // Mass awareness
+  'Repro'    // Reproduction readiness
+];
 
-  for (let i = 0; i < VISION_ANGLES.length; i++) {
-    const { dx, dy } = VISION_ANGLES[i];
-    
-    let bestAttraction = 0;
-    let bestRepulsion = 0;
-    let closestAttractionDistSq = VISION_RANGE_SQ;
-    let closestRepulsionDistSq = VISION_RANGE_SQ;
-
-    // FOOD (always attractive)
-    const nearbyFood = getNearbyFood(blob.x, blob.y, VISION_RANGE);
-    for (const f of nearbyFood) {
-      const fdx = f.x - blob.x;
-      const fdy = f.y - blob.y;
-      const distSq = fdx * fdx + fdy * fdy;
-
-      if (distSq > VISION_RANGE_SQ) continue;
-
-      const dot = fdx * dx + fdy * dy;
-      if (dot <= 0) continue;
-
-      const dist = Math.sqrt(distSq);
-      const cosAngle = dot / (dist + 0.001);
-
-      if (cosAngle > 0.7 && distSq < closestAttractionDistSq) {
-        closestAttractionDistSq = distSq;
-        bestAttraction = Math.pow(1 - dist * INV_VISION_RANGE, 2) * 0.8;
-      }
-    }
-
-    // BLOBS (attractive if prey, repulsive if threat)
-    for (const other of blobs) {
-      if (other.id === blob.id) continue;
-
-      const bdx = other.x - blob.x;
-      const bdy = other.y - blob.y;
-      const distSq = bdx * bdx + bdy * bdy;
-
-      if (distSq > VISION_RANGE_SQ) continue;
-
-      const dot = bdx * dx + bdy * dy;
-      if (dot <= 0) continue;
-
-      const dist = Math.sqrt(distSq);
-      const cosAngle = dot / (dist + 0.001);
-
-      if (cosAngle > 0.65) {
-        const massRatio = other.mass / blob.mass;
-        const proximity = Math.pow(1 - dist * INV_VISION_RANGE, 2);
-
-        if (massRatio > 1.15) {
-          // THREAT
-          if (distSq < closestRepulsionDistSq) {
-            closestRepulsionDistSq = distSq;
-            const threatLevel = Math.min((massRatio - 1) * 2, 1);
-            bestRepulsion = proximity * (0.6 + threatLevel * 0.4);
-          }
-        } else if (massRatio < 0.87) {
-          // PREY
-          if (distSq < closestAttractionDistSq) {
-            closestAttractionDistSq = distSq;
-            const preyValue = Math.min((1 / massRatio - 1) * 0.5, 1);
-            bestAttraction = Math.max(bestAttraction, proximity * (0.6 + preyValue * 0.4));
-          }
-        }
-      }
-    }
-
-    // OBSTACLES (always repulsive)
-    for (const obs of obstacles) {
-      const odx = obs.x - blob.x;
-      const ody = obs.y - blob.y;
-      const dist = Math.sqrt(odx * odx + ody * ody);
-      const effectiveDist = Math.max(0, dist - obs.radius);
-      const effectiveDistSq = effectiveDist * effectiveDist;
-
-      if (effectiveDistSq > VISION_RANGE_SQ) continue;
-
-      const dot = odx * dx + ody * dy;
-      if (dot <= 0) continue;
-
-      const cosAngle = dot / (dist + 0.001);
-
-      if (cosAngle > 0.6 && effectiveDistSq < closestRepulsionDistSq) {
-        closestRepulsionDistSq = effectiveDistSq;
-        bestRepulsion = Math.max(bestRepulsion, Math.pow(1 - effectiveDist * INV_VISION_RANGE, 1.5));
-      }
-    }
-
-    rays[i].attractiveSignal = bestAttraction;
-    rays[i].repulsiveSignal = bestRepulsion;
-  }
-
-  // Flatten vision
-  const visionInputs: number[] = [];
-  for (const ray of rays) {
-    visionInputs.push(ray.attractiveSignal, ray.repulsiveSignal);
-  }
-
-  // State inputs (6 total)
-  const stateInputs = [
-    // Mass (log scale)
-    Math.min(Math.log10(blob.mass + 1) / 2, 1),
-    
-    // Speed
-    Math.min(Math.sqrt(blob.vx * blob.vx + blob.vy * blob.vy) / 8, 1),
-    
-    // Reproduction readiness
-    Math.min((currentTick - blob.lastReproductionTick) / REPRODUCTION_COOLDOWN, 1),
-    
-    // Wall danger (minimum distance to any wall)
-    Math.max(0, 1 - Math.min(blob.x, blob.y, worldWidth - blob.x, worldHeight - blob.y) / 200)
-  ];
-
-  return [...visionInputs, ...stateInputs];
-};
-
-/**
- * MINIMAL VERSION: Absolute minimum for basic behavior
- * 
- * 8 rays × 1 combined signal = 8 vision inputs
- * 4 state inputs  
- * Total: 12 inputs (fastest evolution, good enough for simple scenarios)
- */
-export const getVisionMinimal = (
-  blob: Blob,
-  blobs: Blob[],
-  food: Food[],
-  obstacles: Obstacle[],
-  getNearbyFood: (x: number, y: number, range: number) => Food[],
-  currentTick: number,
-  worldWidth: number,
-  worldHeight: number
-): number[] => {
-  const rays = new Array(8).fill(0);
-
-  for (let i = 0; i < VISION_ANGLES.length; i++) {
-    const { dx, dy } = VISION_ANGLES[i];
-    
-    let signal = 0;
-    let closestDistSq = VISION_RANGE_SQ;
-
-    // Priority: Threats > Prey > Food > Obstacles
-    
-    // Check threats first (most important)
-    for (const other of blobs) {
-      if (other.id === blob.id) continue;
-      
-      const bdx = other.x - blob.x;
-      const bdy = other.y - blob.y;
-      const distSq = bdx * bdx + bdy * bdy;
-      
-      if (distSq > VISION_RANGE_SQ) continue;
-      
-      const dot = bdx * dx + bdy * dy;
-      if (dot <= 0) continue;
-      
-      const dist = Math.sqrt(distSq);
-      const cosAngle = dot / (dist + 0.001);
-      
-      if (cosAngle > 0.65) {
-        const massRatio = other.mass / blob.mass;
-        
-        if (massRatio > 1.15 && distSq < closestDistSq) {
-          // THREAT: negative signal
-          closestDistSq = distSq;
-          const proximity = 1 - dist * INV_VISION_RANGE;
-          const threatLevel = Math.min((massRatio - 1) * 1.5, 1);
-          signal = -proximity * (0.7 + threatLevel * 0.3);
-        } else if (massRatio < 0.87 && distSq < closestDistSq && signal >= 0) {
-          // PREY: positive signal (only if no threat)
-          closestDistSq = distSq;
-          const proximity = 1 - dist * INV_VISION_RANGE;
-          signal = proximity * 0.6;
-        }
-      }
-    }
-
-    // Food (only if no blob detected)
-    if (signal === 0) {
-      const nearbyFood = getNearbyFood(blob.x, blob.y, VISION_RANGE);
-      for (const f of nearbyFood) {
-        const fdx = f.x - blob.x;
-        const fdy = f.y - blob.y;
-        const distSq = fdx * fdx + fdy * fdy;
-        
-        if (distSq > VISION_RANGE_SQ) continue;
-        
-        const dot = fdx * dx + fdy * dy;
-        if (dot <= 0) continue;
-        
-        const dist = Math.sqrt(distSq);
-        const cosAngle = dot / (dist + 0.001);
-        
-        if (cosAngle > 0.7 && distSq < closestDistSq) {
-          closestDistSq = distSq;
-          signal = (1 - dist * INV_VISION_RANGE) * 0.5;
-        }
-      }
-    }
-
-    // Obstacles (only if nothing else detected)
-    if (signal === 0) {
-      for (const obs of obstacles) {
-        const odx = obs.x - blob.x;
-        const ody = obs.y - blob.y;
-        const dist = Math.sqrt(odx * odx + ody * ody);
-        const effectiveDist = Math.max(0, dist - obs.radius);
-        
-        if (effectiveDist > VISION_RANGE) continue;
-        
-        const dot = odx * dx + ody * dy;
-        if (dot <= 0) continue;
-        
-        const cosAngle = dot / (dist + 0.001);
-        
-        if (cosAngle > 0.6) {
-          signal = -(1 - effectiveDist * INV_VISION_RANGE) * 0.4;
-        }
-      }
-    }
-
-    rays[i] = signal;
-  }
-
-  // State inputs (4 total)
-  const stateInputs = [
-    Math.min(Math.log10(blob.mass + 1) / 2, 1),
-    Math.min((currentTick - blob.lastReproductionTick) / REPRODUCTION_COOLDOWN, 1),
-    Math.max(0, 1 - Math.min(blob.x, blob.y, worldWidth - blob.x, worldHeight - blob.y) / 200),
-    Math.min(blob.idleTicks / 150, 1) // Idleness penalty
-  ];
-
-  return [...rays, ...stateInputs];
-};
-
-// Export versions with clear names
-export const getVision40Input = getVisionEnhanced;  // 40 inputs (8×4 + 8)
-export const getVision20Input = getVisionCompact;   // 20 inputs (8×2 + 4)  ← RECOMMENDED
-export const getVision12Input = getVisionMinimal;   // 12 inputs (8×1 + 4)
-
-// Default export: Compact version (best balance)
-export const getVision = getVisionCompact;
+// Export for backwards compatibility during transition
+export const getVisionGradient = getVision;

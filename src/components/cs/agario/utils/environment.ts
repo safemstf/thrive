@@ -1,21 +1,210 @@
-// src/components/cs/agario/environment-enhanced.ts
+// src/components/cs/agario/environment.ts
 
 import { BiomeConfig, Food, FoodCluster, Obstacle } from '../config/agario.types';
 import {
   MAX_FOOD, FOOD_SPAWN_RATE,
   CLUSTER_DISTANCE, MIN_CLUSTER_SIZE,
-  MAX_OBSTACLES
+  MAX_OBSTACLES, WORLD_WIDTH, WORLD_HEIGHT,
+  FOOD_ISLAND_COUNT,
+  FOOD_ISLAND_RADIUS_MIN,
+  FOOD_ISLAND_RADIUS_MAX,
+  FOOD_ISLAND_SPAWN_RATE_MIN,
+  FOOD_ISLAND_SPAWN_RATE_MAX,
+  FOOD_ISLAND_MAX_FOOD,
+  FOOD_ISLAND_RICH_CHANCE,
+  FOOD_ISLAND_SCATTER_RATE
 } from '../config/agario.constants';
 
 /**
- * ENHANCED FOOD SPAWNING
- * 
- * Features:
- * - Biome-based spawning (rich zones, sparse zones, danger zones)
- * - Cluster-based distribution for realistic foraging
- * - Adaptive spawn rates based on population pressure
- * - Quality variation (some food is more nutritious)
+ * FOOD ISLAND SYSTEM
+ *
+ * Instead of food covering the entire map, food spawns from discrete "islands"
+ * (sources/springs) that emit food radially. High density at center, low at edges.
+ *
+ * This creates:
+ * - Natural hotspots blobs need to discover
+ * - Territory competition
+ * - Navigation challenges (find the islands!)
+ * - Resource scarcity between islands
  */
+
+// ===================== FOOD ISLAND TYPES =====================
+
+export interface FoodIsland {
+  id: number;
+  x: number;
+  y: number;
+  radius: number;           // How far food spreads from center
+  spawnRate: number;        // Food per tick at center
+  richness: number;         // Food quality multiplier
+  currentFood: number;      // Track food currently near this island
+  maxFood: number;          // Cap food per island
+  color: string;            // For visualization
+}
+
+// ===================== FOOD ISLAND MANAGEMENT =====================
+
+let nextIslandId = 0;
+
+/**
+ * Create food islands distributed across the world
+ * Uses constants from agario.constants.ts for configuration
+ */
+export const createFoodIslands = (
+  worldWidth: number,
+  worldHeight: number,
+  islandCount: number = FOOD_ISLAND_COUNT
+): FoodIsland[] => {
+  const islands: FoodIsland[] = [];
+
+  // Create a grid-like distribution with some randomness
+  const cols = Math.ceil(Math.sqrt(islandCount * (worldWidth / worldHeight)));
+  const rows = Math.ceil(islandCount / cols);
+
+  const cellWidth = worldWidth / cols;
+  const cellHeight = worldHeight / rows;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (islands.length >= islandCount) break;
+
+      // Random position within cell (with padding from edges)
+      const padding = 0.2;
+      const x = cellWidth * (col + padding + Math.random() * (1 - 2 * padding));
+      const y = cellHeight * (row + padding + Math.random() * (1 - 2 * padding));
+
+      // Vary island properties using constants
+      const isRich = Math.random() < FOOD_ISLAND_RICH_CHANCE;
+
+      // Calculate radius within configured range
+      const radiusRange = FOOD_ISLAND_RADIUS_MAX - FOOD_ISLAND_RADIUS_MIN;
+      const baseRadius = FOOD_ISLAND_RADIUS_MIN + Math.random() * radiusRange * 0.5;
+      const richRadius = FOOD_ISLAND_RADIUS_MIN + radiusRange * 0.5 + Math.random() * radiusRange * 0.5;
+
+      // Calculate spawn rate within configured range
+      const spawnRange = FOOD_ISLAND_SPAWN_RATE_MAX - FOOD_ISLAND_SPAWN_RATE_MIN;
+      const baseSpawnRate = FOOD_ISLAND_SPAWN_RATE_MIN + Math.random() * spawnRange * 0.4;
+      const richSpawnRate = FOOD_ISLAND_SPAWN_RATE_MIN + spawnRange * 0.5 + Math.random() * spawnRange * 0.5;
+
+      islands.push({
+        id: nextIslandId++,
+        x,
+        y,
+        radius: isRich ? richRadius : baseRadius,
+        spawnRate: isRich ? richSpawnRate : baseSpawnRate,
+        richness: isRich ? 1.5 + Math.random() * 0.5 : 0.8 + Math.random() * 0.4,
+        currentFood: 0,
+        maxFood: isRich ? FOOD_ISLAND_MAX_FOOD * 1.5 : FOOD_ISLAND_MAX_FOOD,
+        color: isRich ? '#22c55e' : '#4ade80'
+      });
+    }
+  }
+
+  console.log(`🏝️ Created ${islands.length} food islands`);
+  return islands;
+};
+
+/**
+ * Spawn food from islands with radial density falloff
+ * Center = high density, edges = low density
+ */
+export const spawnFoodFromIslands = (
+  currentFood: Food[],
+  islands: FoodIsland[],
+  maxFood: number = MAX_FOOD
+): Food[] => {
+  if (currentFood.length >= maxFood) return currentFood;
+
+  const newFood = [...currentFood];
+
+  for (const island of islands) {
+    // Count food near this island
+    island.currentFood = currentFood.filter(f => {
+      const dist = Math.sqrt((f.x - island.x) ** 2 + (f.y - island.y) ** 2);
+      return dist < island.radius * 1.2;
+    }).length;
+
+    // Skip if island is at capacity
+    if (island.currentFood >= island.maxFood) continue;
+
+    // Spawn rate decreases as island fills up
+    const fillRatio = island.currentFood / island.maxFood;
+    const adjustedSpawnRate = island.spawnRate * (1 - fillRatio * 0.8);
+
+    // Spawn food with probability based on spawn rate
+    const foodToSpawn = Math.floor(adjustedSpawnRate);
+    const fractional = adjustedSpawnRate - foodToSpawn;
+    const totalSpawn = foodToSpawn + (Math.random() < fractional ? 1 : 0);
+
+    for (let i = 0; i < totalSpawn && newFood.length < maxFood; i++) {
+      // Radial spawn with density falloff (more food near center)
+      // Use sqrt for uniform distribution, then bias toward center
+      const angle = Math.random() * Math.PI * 2;
+
+      // Bias toward center: use lower exponent for more center-heavy distribution
+      const normalizedDist = Math.pow(Math.random(), 0.6); // 0.6 = center-biased
+      const dist = normalizedDist * island.radius;
+
+      const x = island.x + Math.cos(angle) * dist;
+      const y = island.y + Math.sin(angle) * dist;
+
+      // Skip if out of bounds
+      if (x < 0 || x > WORLD_WIDTH || y < 0 || y > WORLD_HEIGHT) continue;
+
+      // Food quality based on distance from center (closer = better)
+      const qualityMultiplier = 1 + (1 - normalizedDist) * 0.5; // 1.0 to 1.5
+      const mass = (2 + Math.random() * 2) * island.richness * qualityMultiplier;
+
+      newFood.push({
+        x,
+        y,
+        mass,
+        age: 0
+      });
+    }
+  }
+
+  return newFood;
+};
+
+/**
+ * Get the nearest food island to a position
+ */
+export const getNearestIsland = (
+  x: number,
+  y: number,
+  islands: FoodIsland[]
+): FoodIsland | null => {
+  if (islands.length === 0) return null;
+
+  let nearest = islands[0];
+  let nearestDist = Infinity;
+
+  for (const island of islands) {
+    const dist = Math.sqrt((x - island.x) ** 2 + (y - island.y) ** 2);
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearest = island;
+    }
+  }
+
+  return nearest;
+};
+
+/**
+ * Check if a position is within any food island's radius
+ */
+export const isInFoodIsland = (
+  x: number,
+  y: number,
+  islands: FoodIsland[]
+): boolean => {
+  for (const island of islands) {
+    const dist = Math.sqrt((x - island.x) ** 2 + (y - island.y) ** 2);
+    if (dist < island.radius) return true;
+  }
+  return false;
+};
 
 
 
@@ -112,8 +301,31 @@ export const getBiomeAt = (
   return null; // Default/neutral zone
 };
 
+// Global food islands (initialized once)
+let globalFoodIslands: FoodIsland[] = [];
+
 /**
- * ENHANCED FOOD SPAWNING with biome awareness
+ * Initialize or get food islands
+ */
+export const getFoodIslands = (worldWidth: number, worldHeight: number): FoodIsland[] => {
+  if (globalFoodIslands.length === 0) {
+    globalFoodIslands = createFoodIslands(worldWidth, worldHeight, FOOD_ISLAND_COUNT);
+  }
+  return globalFoodIslands;
+};
+
+/**
+ * Reset food islands (call when reinitializing simulation)
+ */
+export const resetFoodIslands = (worldWidth: number, worldHeight: number): FoodIsland[] => {
+  nextIslandId = 0;
+  globalFoodIslands = createFoodIslands(worldWidth, worldHeight, FOOD_ISLAND_COUNT);
+  return globalFoodIslands;
+};
+
+/**
+ * FOOD SPAWNING - Now uses island system!
+ * Backward compatible: still accepts biomes param but uses islands internally
  */
 export const spawnFood = (
   currentFood: Food[],
@@ -124,49 +336,28 @@ export const spawnFood = (
   maxFood: number = MAX_FOOD,
   populationPressure: number = 0
 ): Food[] => {
-  const newFood = [...currentFood];
+  // Get or create food islands
+  const islands = getFoodIslands(worldWidth, worldHeight);
 
-  // Adaptive spawn rate based on pressure
-  const adaptiveCount = Math.floor(count * (1 + populationPressure * 0.5));
+  // Use the island-based spawning system
+  let newFood = spawnFoodFromIslands(currentFood, islands, maxFood);
 
-  for (let i = 0; i < adaptiveCount && newFood.length < maxFood; i++) {
-    // Weighted biome selection (prefer high-density biomes)
-    let selectedBiome: BiomeConfig | null = null;
+  // Occasionally spawn a small amount of food outside islands (configured scatter rate)
+  // This gives blobs some crumbs to follow between islands
+  const scatteredCount = Math.floor(count * FOOD_ISLAND_SCATTER_RATE * (1 + populationPressure));
+  for (let i = 0; i < scatteredCount && newFood.length < maxFood; i++) {
+    const x = Math.random() * worldWidth;
+    const y = Math.random() * worldHeight;
 
-    if (biomes.length > 0 && Math.random() < 0.7) {
-      // 70% chance to spawn in a biome
-      const totalWeight = biomes.reduce((sum, b) => sum + b.foodDensity, 0);
-      let rand = Math.random() * totalWeight;
-
-      for (const biome of biomes) {
-        rand -= biome.foodDensity;
-        if (rand <= 0) {
-          selectedBiome = biome;
-          break;
-        }
-      }
+    // Only spawn if NOT in an island (to keep islands as primary sources)
+    if (!isInFoodIsland(x, y, islands)) {
+      newFood.push({
+        x,
+        y,
+        mass: 1 + Math.random() * 1.5, // Smaller, less nutritious
+        age: 0
+      });
     }
-
-    let x, y, mass;
-
-    if (selectedBiome) {
-      // Spawn in selected biome
-      x = selectedBiome.x + Math.random() * selectedBiome.width;
-      y = selectedBiome.y + Math.random() * selectedBiome.height;
-      mass = (2 + Math.random() * 2) * selectedBiome.foodQuality;
-    } else {
-      // Spawn in neutral zone
-      x = Math.random() * worldWidth;
-      y = Math.random() * worldHeight;
-      mass = 2 + Math.random() * 2;
-    }
-
-    newFood.push({
-      x,
-      y,
-      mass,
-      age: 0
-    });
   }
 
   return newFood;

@@ -79,7 +79,10 @@ import {
   updateSpatialGrid,
   getNearbyFood,
   createBiomes,
-  calculatePopulationPressure
+  calculatePopulationPressure,
+  getFoodIslands,
+  resetFoodIslands,
+  FoodIsland
 } from './utils/environment';
 
 import { HeaderSection } from "./components/HeaderSection";
@@ -88,6 +91,7 @@ import { LeaderboardComponent } from "./components/LeaderboardComponent";
 import { NeuralNetModalComponent } from "./components/NeuralNetModal";
 import { StatsDrawerComponent } from "./components/StatsDrawerComponent";
 import { ViewportControlsComponent } from "./components/ViewportControlsComponent";
+import { createEngineeredVisionSystem } from "./utils/feature-engineering";
 
 // ===================== PROPS INTERFACE =====================
 
@@ -121,6 +125,7 @@ export default function AgarioDemo({
   const totalBirthsRef = useRef(0);
   const survivalPressureRef = useRef(0);
   const biomesRef = useRef<BiomeConfig[]>([]);
+  const foodIslandsRef = useRef<FoodIsland[]>([]);
   const populationPressureRef = useRef(0);
   const [showWeights, setShowWeights] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
@@ -164,7 +169,7 @@ export default function AgarioDemo({
     scale: 1
   });
   const [neuralPanning, setNeuralPanning] = useState(false);
-  const neuralLastMouseRef = useRef({ x: 0, y: 0 }); 
+  const neuralLastMouseRef = useRef({ x: 0, y: 0 });
 
   // Stats for display
   const [stats, setStats] = useState({
@@ -250,8 +255,9 @@ export default function AgarioDemo({
       { x: 1000, y: 100, width: 400, height: 400, type: 'danger' }
     ];
 
-    // 3. Initialize biomes
+    // 3. Initialize biomes and food islands
     biomesRef.current = createBiomes(WORLD_WIDTH, WORLD_HEIGHT);
+    foodIslandsRef.current = resetFoodIslands(WORLD_WIDTH, WORLD_HEIGHT);
 
     // 4. Initialize blobs with proper IDs
     blobsRef.current = [];
@@ -425,6 +431,8 @@ export default function AgarioDemo({
     };
 
     // Update each blob
+    const visionSystem = createEngineeredVisionSystem();
+
     for (const blob of blobsRef.current) {
       simulateBlob(
         blob,
@@ -434,17 +442,11 @@ export default function AgarioDemo({
         logsRef.current,
         tick,
         spatialGridRef.current,
-        (blob: Blob) => getVision(
-          blob,
-          blobsRef.current,
-          foodRef.current,
-          obstaclesRef.current,
-          (x: number, y: number, range: number) => getNearbyFood(x, y, range, spatialGridRef.current, GRID_SIZE),
-          tick,
-          WORLD_WIDTH,
-          WORLD_HEIGHT
-        ),
-        giveBirthWrapper
+        (x: number, y: number, range: number) =>
+          getNearbyFood(x, y, range, spatialGridRef.current, GRID_SIZE),
+        giveBirthWrapper,
+        visionSystem  // ✅ Pass the vision system
+
       );
     }
 
@@ -1202,7 +1204,8 @@ export default function AgarioDemo({
       obstaclesRef.current,
       logsRef.current,
       terrainZonesRef.current,
-      renderCtx
+      renderCtx,
+      foodIslandsRef.current  // Pass food islands for visualization
     );
   }, [followBest, selectedBlob]);
 
