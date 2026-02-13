@@ -57,7 +57,8 @@ import { SelectedNodeInfo } from "./config/agario.types";
 import {
   simulateBlob,
   handleCollisions,
-  updateSurvivalPressure
+  updateSurvivalPressure,
+  applyCoriolisEffect
 } from './utils/simulation';
 
 import { getVision } from './utils/vision';
@@ -91,7 +92,9 @@ import { LeaderboardComponent } from "./components/LeaderboardComponent";
 import { NeuralNetModalComponent } from "./components/NeuralNetModal";
 import { StatsDrawerComponent } from "./components/StatsDrawerComponent";
 import { ViewportControlsComponent } from "./components/ViewportControlsComponent";
+import { TrainingPanelComponent } from "./components/TrainingPanelComponent";
 import { createEngineeredVisionSystem } from "./utils/feature-engineering";
+import { SerializedGenome, HeadlessTrainer } from "./utils/headless-trainer";
 
 // ===================== PROPS INTERFACE =====================
 
@@ -139,6 +142,9 @@ export default function AgarioDemo({
   const cameraRef = useRef<Camera>({ x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, zoom: 0.9 });
   const [zoom, setZoom] = useState(0.9);
   const [followBest, setFollowBest] = useState(false);
+  const [followedBlobId, setFollowedBlobId] = useState<number | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   // Panning
   const [isPanning, setIsPanning] = useState(false);
@@ -149,6 +155,7 @@ export default function AgarioDemo({
   const [speed, setSpeed] = useState(1);
   const [drawerExpanded, setDrawerExpanded] = useState(false);
   const [selectedBlob, setSelectedBlob] = useState<Blob | null>(null);
+  const [showTrainingPanel, setShowTrainingPanel] = useState(false);
 
   // Neural net visualization state
   const [neuralLayout, setNeuralLayout] = useState<NeuralLayout | null>(null);
@@ -446,8 +453,10 @@ export default function AgarioDemo({
           getNearbyFood(x, y, range, spatialGridRef.current, GRID_SIZE),
         giveBirthWrapper,
         visionSystem  // ✅ Pass the vision system
-
       );
+
+      // Apply weak Coriolis effect - subtle curved trajectories
+      applyCoriolisEffect(blob, WORLD_WIDTH, WORLD_HEIGHT);
     }
 
     const deadBlobs = new Set<number>();
@@ -1179,9 +1188,19 @@ export default function AgarioDemo({
     const width = canvas.width / dpr;
     const height = canvas.height / dpr;
 
-    if (!isRunningRef.current && !followBest) return;
+    if (!isRunningRef.current && !followBest && !followedBlobId) return;
 
-    if (followBest && blobsRef.current.length > 0) {
+    // Camera following logic
+    if (followedBlobId !== null) {
+      // Follow a specific blob
+      const targetBlob = blobsRef.current.find(b => b.id === followedBlobId);
+      if (targetBlob) {
+        updateCamera(cameraRef.current, { x: targetBlob.x, y: targetBlob.y }, 0.08);
+      } else {
+        // Blob died, clear follow
+        setFollowedBlobId(null);
+      }
+    } else if (followBest && blobsRef.current.length > 0) {
       const target = getCameraTarget(blobsRef.current, 'best');
       if (target) {
         updateCamera(cameraRef.current, target, 0.08);
@@ -1207,7 +1226,7 @@ export default function AgarioDemo({
       renderCtx,
       foodIslandsRef.current  // Pass food islands for visualization
     );
-  }, [followBest, selectedBlob]);
+  }, [followBest, followedBlobId, selectedBlob]);
 
   // ===================== EVENT HANDLERS =====================
 
@@ -1365,6 +1384,45 @@ export default function AgarioDemo({
 
   const handleToggleFollowBest = useCallback(() => {
     setFollowBest(prev => !prev);
+    setFollowedBlobId(null); // Clear specific follow when toggling follow best
+  }, []);
+
+  const handleFollowBlob = useCallback((blob: Blob) => {
+    if (followedBlobId === blob.id) {
+      // Toggle off if already following this blob
+      setFollowedBlobId(null);
+      setFollowBest(false);
+    } else {
+      setFollowedBlobId(blob.id);
+      setFollowBest(false); // Disable follow best when following specific blob
+    }
+  }, [followedBlobId]);
+
+  const handleToggleFullscreen = useCallback(() => {
+    if (!canvasContainerRef.current) return;
+
+    if (!document.fullscreenElement) {
+      canvasContainerRef.current.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch(err => {
+        console.error('Failed to enter fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      }).catch(err => {
+        console.error('Failed to exit fullscreen:', err);
+      });
+    }
+  }, []);
+
+  // Listen for fullscreen changes (e.g., user presses Escape)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
   const handleToggleDrawer = useCallback(() => {
@@ -1387,6 +1445,50 @@ export default function AgarioDemo({
     setShowWeights(prev => !prev);
   }, []);
 
+  const handleToggleTrainingPanel = useCallback(() => {
+    setShowTrainingPanel(prev => !prev);
+  }, []);
+
+  // Load trained elite agents into the live simulation
+  const handleLoadElites = useCallback((elites: SerializedGenome[]) => {
+    if (!neatRef.current || elites.length === 0) return;
+
+    console.log(`Loading ${elites.length} elite agents into simulation...`);
+
+    // Create new blobs from elite genomes
+    const newBlobs: Blob[] = [];
+
+    for (const serialized of elites) {
+      // Deserialize the genome
+      const genome = HeadlessTrainer.deserializeGenome(serialized, neatRef.current);
+
+      // Create blob with the trained genome
+      const blob = createBlob(
+        genome,
+        serialized.generation,
+        undefined,
+        Math.random() * WORLD_WIDTH,
+        Math.random() * WORLD_HEIGHT,
+        undefined,
+        undefined,
+        () => nextBlobIdRef.current++
+      );
+
+      newBlobs.push(blob);
+    }
+
+    // Replace current population with trained elites
+    // Keep some existing blobs if population is small
+    const keepExisting = Math.max(0, Math.min(5, blobsRef.current.length));
+    const existingToKeep = blobsRef.current
+      .sort((a, b) => (b.genome.fitness || 0) - (a.genome.fitness || 0))
+      .slice(0, keepExisting);
+
+    blobsRef.current = [...newBlobs, ...existingToKeep];
+
+    console.log(`Loaded ${newBlobs.length} elite agents + kept ${keepExisting} existing = ${blobsRef.current.length} total`);
+  }, []);
+
   // ===================== RENDER JSX =====================
 
   return (
@@ -1399,7 +1501,7 @@ export default function AgarioDemo({
         />
 
         <VideoSection>
-          <CanvasContainer>
+          <CanvasContainer ref={canvasContainerRef}>
             <SimCanvas
               ref={canvasRef}
               onMouseDown={handleMouseDown}
@@ -1423,17 +1525,22 @@ export default function AgarioDemo({
             <LeaderboardComponent
               topBlobs={topBlobs}
               selectedBlobId={selectedBlob?.id || null}
+              followedBlobId={followedBlobId}
               onSelectBlob={setSelectedBlob}
+              onFollowBlob={handleFollowBlob}
+              onOpenTraining={handleToggleTrainingPanel}
               currentTick={tickCountRef.current}
             />
 
             <ViewportControlsComponent
               zoom={zoom}
               followBest={followBest}
+              isFullscreen={isFullscreen}
               onZoomIn={zoomIn}
               onZoomOut={zoomOut}
               onResetCamera={resetCamera}
               onToggleFollowBest={handleToggleFollowBest}
+              onToggleFullscreen={handleToggleFullscreen}
             />
           </CanvasContainer>
         </VideoSection>
@@ -1476,6 +1583,16 @@ export default function AgarioDemo({
           selectedNodeInfo={selectedNodeInfo}
         />
       )}
+
+      {/* Training Panel */}
+      <TrainingPanelComponent
+        isOpen={showTrainingPanel}
+        onClose={() => setShowTrainingPanel(false)}
+        onLoadElites={handleLoadElites}
+        isSimulationRunning={isRunning}
+        onPauseSimulation={() => setIsRunning(false)}
+        onResumeSimulation={() => setIsRunning(true)}
+      />
     </Container>
   );
 }

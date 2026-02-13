@@ -44,25 +44,25 @@ export interface RenderContext {
  * CRITICAL OPTIMIZATION: Prevents rendering off-screen entities
  */
 export function isInView(
-  x: number, 
-  y: number, 
-  radius: number, 
+  x: number,
+  y: number,
+  radius: number,
   ctx: RenderContext
 ): boolean {
   const { camera, width, height } = ctx;
-  
+
   // Transform to screen coordinates
   const screenX = (x - camera.x) * camera.zoom + width / 2;
   const screenY = (y - camera.y) * camera.zoom + height / 2;
   const screenRadius = radius * camera.zoom;
-  
+
   // Add margin for partially visible objects
   const margin = screenRadius + 50;
-  
-  return screenX > -margin && 
-         screenX < width + margin &&
-         screenY > -margin && 
-         screenY < height + margin;
+
+  return screenX > -margin &&
+    screenX < width + margin &&
+    screenY > -margin &&
+    screenY < height + margin;
 }
 
 /**
@@ -91,10 +91,10 @@ export function applyCameraTransform(ctx: RenderContext): void {
 
 export function renderGrid(ctx: RenderContext): void {
   const { ctx: canvas, camera } = ctx;
-  
+
   // Skip grid at low zoom (LOD optimization)
   if (camera.zoom < 0.3) return;
-  
+
   canvas.strokeStyle = 'rgba(59, 130, 246, 0.08)';
   canvas.lineWidth = 1 / camera.zoom;
 
@@ -117,7 +117,7 @@ export function renderGrid(ctx: RenderContext): void {
 
 export function renderBorder(ctx: RenderContext): void {
   const { ctx: canvas, camera } = ctx;
-  
+
   canvas.strokeStyle = 'rgba(59, 130, 246, 0.4)';
   canvas.lineWidth = 4 / camera.zoom;
   canvas.strokeRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
@@ -130,30 +130,30 @@ export function renderTerrainZones(
   ctx: RenderContext
 ): void {
   const { ctx: canvas, camera } = ctx;
-  
+
   // Only render if zoomed in enough
   if (camera.zoom <= 0.4) return;
 
   for (const zone of zones) {
     // Frustum culling for zones
-    if (!isInView(zone.x + zone.width / 2, zone.y + zone.height / 2, 
-                   Math.max(zone.width, zone.height) / 2, ctx)) {
+    if (!isInView(zone.x + zone.width / 2, zone.y + zone.height / 2,
+      Math.max(zone.width, zone.height) / 2, ctx)) {
       continue;
     }
 
     canvas.fillStyle =
       zone.type === 'safe' ? 'rgba(34, 197, 94, 0.06)' :
-      zone.type === 'danger' ? 'rgba(239, 68, 68, 0.06)' :
-      'rgba(100, 100, 100, 0.02)';
-    
+        zone.type === 'danger' ? 'rgba(239, 68, 68, 0.06)' :
+          'rgba(100, 100, 100, 0.02)';
+
     canvas.fillRect(zone.x, zone.y, zone.width, zone.height);
 
     if (camera.zoom > 0.6) {
       canvas.strokeStyle =
         zone.type === 'safe' ? 'rgba(34, 197, 94, 0.12)' :
-        zone.type === 'danger' ? 'rgba(239, 68, 68, 0.12)' :
-        'rgba(100, 100, 100, 0.08)';
-      
+          zone.type === 'danger' ? 'rgba(239, 68, 68, 0.12)' :
+            'rgba(100, 100, 100, 0.08)';
+
       canvas.lineWidth = 1 / camera.zoom;
       canvas.strokeRect(zone.x, zone.y, zone.width, zone.height);
     }
@@ -716,6 +716,112 @@ export function renderObstacles(obstacles: Obstacle[], ctx: RenderContext): void
   }
 }
 
+// ===================== CORIOLIS EFFECT VISUALIZATION =====================
+
+/**
+ * Render subtle visual cues for the Coriolis effect
+ * Shows hemisphere regions and equator line - very subtle background hint
+ */
+export function renderCoriolisHint(ctx: RenderContext): void {
+  const { ctx: canvas, camera } = ctx;
+  const lod = getLODLevel(camera.zoom);
+
+  // Only show at high zoom - this is a very subtle effect
+  if (lod === 'low') return;
+
+  // Equator line (where Coriolis effect is minimal)
+  const equatorY = WORLD_HEIGHT * 0.5;
+
+  canvas.save();
+
+  // Very subtle gradient showing hemispheres
+  if (lod === 'high' && camera.zoom > 0.6) {
+    // Northern hemisphere - very subtle blue tint (clockwise deflection)
+    const northGradient = canvas.createLinearGradient(0, 0, 0, equatorY);
+    northGradient.addColorStop(0, 'rgba(100, 150, 200, 0.02)');
+    northGradient.addColorStop(1, 'rgba(100, 150, 200, 0)');
+    canvas.fillStyle = northGradient;
+    canvas.fillRect(0, 0, WORLD_WIDTH, equatorY);
+
+    // Southern hemisphere - very subtle purple tint (counter-clockwise deflection)
+    const southGradient = canvas.createLinearGradient(0, equatorY, 0, WORLD_HEIGHT);
+    southGradient.addColorStop(0, 'rgba(150, 100, 200, 0)');
+    southGradient.addColorStop(1, 'rgba(150, 100, 200, 0.02)');
+    canvas.fillStyle = southGradient;
+    canvas.fillRect(0, equatorY, WORLD_WIDTH, WORLD_HEIGHT - equatorY);
+  }
+
+  // Equator line - dashed, very subtle
+  canvas.strokeStyle = 'rgba(200, 200, 100, 0.08)';
+  canvas.lineWidth = 2 / camera.zoom;
+  canvas.setLineDash([20 / camera.zoom, 20 / camera.zoom]);
+  canvas.beginPath();
+  canvas.moveTo(0, equatorY);
+  canvas.lineTo(WORLD_WIDTH, equatorY);
+  canvas.stroke();
+  canvas.setLineDash([]);
+
+  // Small rotation arrows at edges to hint at deflection direction
+  if (lod === 'high' && camera.zoom > 0.7) {
+    const arrowSize = 30 / camera.zoom;
+
+    // Northern hemisphere arrows (clockwise - deflects right)
+    canvas.strokeStyle = 'rgba(100, 150, 200, 0.15)';
+    canvas.lineWidth = 2 / camera.zoom;
+    drawCoriolisArrow(canvas, 50, WORLD_HEIGHT * 0.25, arrowSize, true);
+    drawCoriolisArrow(canvas, WORLD_WIDTH - 50, WORLD_HEIGHT * 0.25, arrowSize, true);
+
+    // Southern hemisphere arrows (counter-clockwise - deflects left)
+    canvas.strokeStyle = 'rgba(150, 100, 200, 0.15)';
+    drawCoriolisArrow(canvas, 50, WORLD_HEIGHT * 0.75, arrowSize, false);
+    drawCoriolisArrow(canvas, WORLD_WIDTH - 50, WORLD_HEIGHT * 0.75, arrowSize, false);
+  }
+
+  canvas.restore();
+}
+
+/**
+ * Draw a curved arrow showing rotation direction
+ */
+function drawCoriolisArrow(
+  canvas: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  clockwise: boolean
+): void {
+  canvas.save();
+  canvas.translate(x, y);
+
+  // Draw curved arc
+  canvas.beginPath();
+  const startAngle = clockwise ? -Math.PI * 0.7 : Math.PI * 0.3;
+  const endAngle = clockwise ? Math.PI * 0.3 : Math.PI * 1.3;
+  canvas.arc(0, 0, size * 0.6, startAngle, endAngle, !clockwise);
+  canvas.stroke();
+
+  // Arrow head at end
+  const arrowAngle = clockwise ? endAngle + Math.PI / 2 : endAngle - Math.PI / 2;
+  const arrowX = Math.cos(endAngle) * size * 0.6;
+  const arrowY = Math.sin(endAngle) * size * 0.6;
+  const headSize = size * 0.2;
+
+  canvas.beginPath();
+  canvas.moveTo(arrowX, arrowY);
+  canvas.lineTo(
+    arrowX - Math.cos(arrowAngle - 0.5) * headSize,
+    arrowY - Math.sin(arrowAngle - 0.5) * headSize
+  );
+  canvas.moveTo(arrowX, arrowY);
+  canvas.lineTo(
+    arrowX - Math.cos(arrowAngle + 0.5) * headSize,
+    arrowY - Math.sin(arrowAngle + 0.5) * headSize
+  );
+  canvas.stroke();
+
+  canvas.restore();
+}
+
 // ===================== FAMILY CONNECTIONS =====================
 
 export function renderFamilyConnections(blobs: Blob[], ctx: RenderContext): void {
@@ -765,8 +871,11 @@ function canBlobReproduce(blob: Blob, currentTick: number): boolean {
   );
 }
 
+// ===================== CLEAN JELLYFISH RENDERING =====================
+// Simple, elegant jellyfish with subtle generation-based differences
+
 /**
- * Draw jellyfish bell (dome/cap)
+ * Draw a clean, elegant jellyfish bell
  */
 function drawJellyfishBell(
   canvas: CanvasRenderingContext2D,
@@ -775,58 +884,88 @@ function drawJellyfishBell(
   radius: number,
   color: string,
   pulsePhase: number,
-  camera: Camera
+  camera: Camera,
+  generation: number,
+  mass: number
 ): void {
-  // Pulse effect - bell expands and contracts
-  const pulseAmount = Math.sin(pulsePhase) * 0.15;
+  // Gentle pulse animation
+  const pulseAmount = Math.sin(pulsePhase) * 0.12;
   const bellWidth = radius * (1 + pulseAmount);
-  const bellHeight = radius * 0.7 * (1 - pulseAmount * 0.5);
+  const bellHeight = radius * 0.7 * (1 - pulseAmount * 0.3);
 
-  // Draw the bell as a semi-ellipse with gradient
   canvas.save();
   canvas.translate(x, y);
 
-  // Create gradient for 3D effect
+  // Main bell gradient - translucent and glowing
   const gradient = canvas.createRadialGradient(
-    0, -bellHeight * 0.3, 0,
+    0, -bellHeight * 0.4, 0,
     0, 0, bellWidth
   );
+  gradient.addColorStop(0, adjustColorBrightness(color, 60));
+  gradient.addColorStop(0.3, color);
+  gradient.addColorStop(0.7, adjustColorBrightness(color, -20));
+  gradient.addColorStop(1, adjustColorBrightness(color, -40));
 
-  // Parse color and create lighter/darker variants
-  const baseColor = color;
-  gradient.addColorStop(0, adjustColorBrightness(baseColor, 40));
-  gradient.addColorStop(0.5, baseColor);
-  gradient.addColorStop(1, adjustColorBrightness(baseColor, -30));
-
-  // Draw bell dome
+  // Transparency based on mass (larger = more opaque)
+  const alpha = 0.6 + Math.min(0.3, mass / 150);
+  canvas.globalAlpha = alpha;
   canvas.fillStyle = gradient;
+
+  // Draw smooth bell dome
   canvas.beginPath();
   canvas.ellipse(0, 0, bellWidth, bellHeight, 0, Math.PI, 0, false);
-  canvas.quadraticCurveTo(bellWidth * 0.5, bellHeight * 0.8, 0, bellHeight * 0.5);
-  canvas.quadraticCurveTo(-bellWidth * 0.5, bellHeight * 0.8, -bellWidth, 0);
+
+  // Curved underside with slight inward curve
+  canvas.quadraticCurveTo(bellWidth * 0.6, bellHeight * 0.6, 0, bellHeight * 0.4);
+  canvas.quadraticCurveTo(-bellWidth * 0.6, bellHeight * 0.6, -bellWidth, 0);
   canvas.closePath();
   canvas.fill();
 
-  // Bell rim glow
-  canvas.strokeStyle = adjustColorBrightness(baseColor, 60);
-  canvas.lineWidth = 2 / camera.zoom;
-  canvas.globalAlpha = 0.6;
+  // Inner glow (center lighter)
+  canvas.globalAlpha = 0.3;
+  const innerGlow = canvas.createRadialGradient(0, -bellHeight * 0.2, 0, 0, 0, bellWidth * 0.5);
+  innerGlow.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
+  innerGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  canvas.fillStyle = innerGlow;
   canvas.beginPath();
-  canvas.ellipse(0, 0, bellWidth, bellHeight * 0.3, 0, Math.PI, 0, false);
-  canvas.stroke();
-  canvas.globalAlpha = 1;
-
-  // Inner translucent pattern
-  canvas.fillStyle = `rgba(255, 255, 255, 0.15)`;
-  canvas.beginPath();
-  canvas.ellipse(0, -bellHeight * 0.2, bellWidth * 0.6, bellHeight * 0.4, 0, 0, Math.PI * 2);
+  canvas.ellipse(0, -bellHeight * 0.1, bellWidth * 0.5, bellHeight * 0.4, 0, 0, Math.PI * 2);
   canvas.fill();
 
+  // Bell rim highlight
+  canvas.globalAlpha = alpha * 0.6;
+  canvas.strokeStyle = adjustColorBrightness(color, 80);
+  canvas.lineWidth = 2 / camera.zoom;
+  canvas.beginPath();
+  canvas.ellipse(0, 0, bellWidth * 0.95, bellHeight * 0.25, 0, Math.PI, 0, false);
+  canvas.stroke();
+
+  // Generation indicator: subtle internal pattern for evolved jellyfish
+  if (generation > 5) {
+    const patternIntensity = Math.min(0.25, (generation - 5) / 40);
+    canvas.globalAlpha = patternIntensity;
+    canvas.strokeStyle = adjustColorBrightness(color, -30);
+    canvas.lineWidth = 1 / camera.zoom;
+
+    // Simple radial lines (like real jellyfish canals)
+    const lineCount = 4 + Math.floor(generation / 10);
+    for (let i = 0; i < lineCount; i++) {
+      const angle = (i / lineCount) * Math.PI * 2;
+      canvas.beginPath();
+      canvas.moveTo(0, bellHeight * 0.1);
+      canvas.lineTo(
+        Math.cos(angle) * bellWidth * 0.6,
+        Math.sin(angle) * bellHeight * 0.4 - bellHeight * 0.1
+      );
+      canvas.stroke();
+    }
+  }
+
+  canvas.globalAlpha = 1;
   canvas.restore();
 }
 
 /**
- * Draw jellyfish tentacles
+ * Draw clean, flowing jellyfish tentacles
  */
 function drawJellyfishTentacles(
   canvas: CanvasRenderingContext2D,
@@ -838,64 +977,56 @@ function drawJellyfishTentacles(
   movementAngle: number,
   speed: number,
   camera: Camera,
-  blobId: number
+  blobId: number,
+  generation: number,
+  mass: number
 ): void {
-  const tentacleCount = Math.min(8, Math.max(4, Math.floor(radius / 4)));
   const bellHeight = radius * 0.7;
-  const tentacleBase = y + bellHeight * 0.4;
+  const tentacleBase = y + bellHeight * 0.3;
+
+  // Tentacle count increases slightly with generation
+  const tentacleCount = Math.min(10, 5 + Math.floor(generation / 8));
+
+  // Movement drag - tentacles trail behind
+  const dragX = -Math.cos(movementAngle) * speed * 5;
+  const dragY = -Math.sin(movementAngle) * speed * 5;
+
+  // Alpha based on mass
+  const baseAlpha = 0.5 + Math.min(0.3, mass / 150);
 
   canvas.save();
+  canvas.lineCap = 'round';
 
   for (let i = 0; i < tentacleCount; i++) {
-    // Spread tentacles across the bell bottom
+    // Spread tentacles evenly under the bell
     const spreadFactor = (i / (tentacleCount - 1)) - 0.5; // -0.5 to 0.5
-    const tentacleX = x + spreadFactor * radius * 1.5;
+    const tentacleX = x + spreadFactor * radius * 1.6;
 
-    // Tentacle length varies by position (longer in middle)
-    const lengthFactor = 1 - Math.abs(spreadFactor) * 0.5;
-    const tentacleLength = radius * (1.2 + lengthFactor * 0.8);
+    // Length varies: longer in middle
+    const positionFactor = 1 - Math.abs(spreadFactor) * 0.5;
+    const tentacleLength = radius * (1.0 + positionFactor * 0.6);
 
     // Wave motion - each tentacle has offset phase
-    const waveOffset = (blobId * 0.3 + i * 0.8) + pulsePhase;
-    const waveAmount = Math.sin(waveOffset) * 0.3;
+    const waveOffset = (blobId * 0.5 + i * 0.9) + pulsePhase;
+    const waveAmount = Math.sin(waveOffset) * radius * 0.25;
 
-    // Movement drag effect - tentacles trail behind when moving
-    const dragX = -Math.cos(movementAngle) * speed * 3;
-    const dragY = -Math.sin(movementAngle) * speed * 3;
+    // Draw smooth bezier curve tentacle
+    canvas.strokeStyle = adjustColorBrightness(color, -10);
+    canvas.lineWidth = Math.max(1.5, (3 - i * 0.2)) / camera.zoom;
+    canvas.globalAlpha = baseAlpha * (0.7 - Math.abs(spreadFactor) * 0.3);
 
-    // Draw wavy tentacle using bezier curves
-    canvas.strokeStyle = adjustColorBrightness(color, -20);
-    canvas.lineWidth = Math.max(1, (3 - i * 0.3)) / camera.zoom;
-    canvas.lineCap = 'round';
-    canvas.globalAlpha = 0.7 - i * 0.05;
+    // Control points for smooth curve
+    const cp1x = tentacleX + waveAmount * 0.5 + dragX * 0.3;
+    const cp1y = tentacleBase + tentacleLength * 0.35 + dragY * 0.2;
+    const cp2x = tentacleX - waveAmount * 0.7 + dragX * 0.6;
+    const cp2y = tentacleBase + tentacleLength * 0.7 + dragY * 0.4;
+    const endX = tentacleX + waveAmount * 0.4 + dragX * 0.8;
+    const endY = tentacleBase + tentacleLength + dragY * 0.5;
 
     canvas.beginPath();
     canvas.moveTo(tentacleX, tentacleBase);
-
-    // Control points for bezier curve
-    const cp1x = tentacleX + waveAmount * radius * 0.5 + dragX * 0.3;
-    const cp1y = tentacleBase + tentacleLength * 0.3 + dragY * 0.2;
-    const cp2x = tentacleX - waveAmount * radius * 0.7 + dragX * 0.6;
-    const cp2y = tentacleBase + tentacleLength * 0.6 + dragY * 0.4;
-    const endX = tentacleX + waveAmount * radius * 0.3 + dragX;
-    const endY = tentacleBase + tentacleLength + dragY * 0.5;
-
     canvas.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
     canvas.stroke();
-
-    // Add some glow/shimmer dots along tentacles
-    if (i % 2 === 0) {
-      canvas.fillStyle = `rgba(255, 255, 255, 0.4)`;
-      const dotY = tentacleBase + tentacleLength * (0.3 + Math.sin(waveOffset * 2) * 0.1);
-      canvas.beginPath();
-      canvas.arc(
-        tentacleX + waveAmount * radius * 0.3,
-        dotY,
-        2 / camera.zoom,
-        0, Math.PI * 2
-      );
-      canvas.fill();
-    }
   }
 
   canvas.globalAlpha = 1;
@@ -933,29 +1064,31 @@ export function renderBlob(blob: Blob, ctx: RenderContext): void {
   // Frustum culling
   if (!isInView(blob.x, blob.y, radius + 40, ctx)) return;
 
-  // Calculate animation values
-  const pulsePhase = (currentTick * 0.08 + blob.id * 0.5) % (Math.PI * 2);
+  // Animation values
+  const pulsePhase = (currentTick * 0.07 + blob.id * 0.5) % (Math.PI * 2);
   const movementAngle = Math.atan2(blob.vy, blob.vx);
   const speed = Math.sqrt(blob.vx * blob.vx + blob.vy * blob.vy);
 
-  // === LOW LOD: Simple oval only ===
+  // === LOW LOD: Simple translucent oval ===
   if (lod === 'low') {
     canvas.fillStyle = blob.color;
+    canvas.globalAlpha = 0.7;
     canvas.beginPath();
     canvas.ellipse(blob.x, blob.y, radius, radius * 0.6, 0, 0, Math.PI * 2);
     canvas.fill();
+    canvas.globalAlpha = 1;
     return;
   }
 
-  // === MEDIUM/HIGH LOD: Full jellyfish rendering ===
+  // === MEDIUM/HIGH LOD: Clean jellyfish ===
 
-  // Health warning
-  if (blob.mass / 100 < 0.5) {
-    canvas.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-    canvas.lineWidth = 3 / camera.zoom;
-    canvas.setLineDash([5 / camera.zoom, 5 / camera.zoom]);
+  // Health warning (starvation)
+  if (blob.mass < 20) {
+    canvas.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+    canvas.lineWidth = 2 / camera.zoom;
+    canvas.setLineDash([4 / camera.zoom, 4 / camera.zoom]);
     canvas.beginPath();
-    canvas.arc(blob.x, blob.y, radius + 3, 0, Math.PI * 2);
+    canvas.arc(blob.x, blob.y, radius + 4, 0, Math.PI * 2);
     canvas.stroke();
     canvas.setLineDash([]);
   }
@@ -963,55 +1096,48 @@ export function renderBlob(blob: Blob, ctx: RenderContext): void {
   // Draw tentacles first (behind the bell)
   drawJellyfishTentacles(
     canvas, blob.x, blob.y, radius, blob.color,
-    pulsePhase, movementAngle, speed, camera, blob.id
+    pulsePhase, movementAngle, speed, camera, blob.id,
+    blob.generation, blob.mass
   );
 
   // Draw the bell (dome)
   drawJellyfishBell(
     canvas, blob.x, blob.y, radius, blob.color,
-    pulsePhase, camera
+    pulsePhase, camera, blob.generation, blob.mass
   );
 
-  // Reproduction readiness glow (only at high LOD)
+  // Reproduction readiness glow
   if (lod === 'high' && canBlobReproduce(blob, currentTick)) {
     const glowGradient = canvas.createRadialGradient(
       blob.x, blob.y, radius * 0.5,
-      blob.x, blob.y, radius + 20
+      blob.x, blob.y, radius + 15
     );
-    glowGradient.addColorStop(0, 'rgba(147, 51, 234, 0)');
-    glowGradient.addColorStop(0.7, 'rgba(147, 51, 234, 0.2)');
-    glowGradient.addColorStop(1, 'rgba(147, 51, 234, 0)');
+    glowGradient.addColorStop(0, 'rgba(168, 85, 247, 0)');
+    glowGradient.addColorStop(0.6, 'rgba(168, 85, 247, 0.2)');
+    glowGradient.addColorStop(1, 'rgba(168, 85, 247, 0)');
 
     canvas.fillStyle = glowGradient;
     canvas.beginPath();
-    canvas.arc(blob.x, blob.y, radius + 20, 0, Math.PI * 2);
-    canvas.fill();
-  }
-
-  // Log carrying indicator
-  if (blob.grabbedLog !== undefined && lod === 'high') {
-    canvas.fillStyle = 'rgba(139, 69, 19, 0.7)';
-    canvas.beginPath();
-    canvas.arc(blob.x, blob.y - radius - 8, 5, 0, Math.PI * 2);
+    canvas.arc(blob.x, blob.y, radius + 15, 0, Math.PI * 2);
     canvas.fill();
   }
 
   // ID label (only at medium/high zoom)
   if (camera.zoom > 0.5) {
-    canvas.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    canvas.font = `bold ${11 / camera.zoom}px monospace`;
+    canvas.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    canvas.font = `bold ${9 / camera.zoom}px monospace`;
     canvas.textAlign = 'center';
     canvas.textBaseline = 'middle';
-    canvas.fillText(`#${blob.id}`, blob.x, blob.y - radius * 0.2);
+    canvas.fillText(`${blob.id}`, blob.x, blob.y - radius * 0.2);
   }
 
   // Selection highlight
   if (selectedBlobId === blob.id) {
-    canvas.strokeStyle = '#6366f1';
-    canvas.lineWidth = 3 / camera.zoom;
-    canvas.setLineDash([5 / camera.zoom, 5 / camera.zoom]);
+    canvas.strokeStyle = '#818cf8';
+    canvas.lineWidth = 2 / camera.zoom;
+    canvas.setLineDash([4 / camera.zoom, 4 / camera.zoom]);
     canvas.beginPath();
-    canvas.arc(blob.x, blob.y, radius + 12, 0, Math.PI * 2);
+    canvas.arc(blob.x, blob.y, radius + 10, 0, Math.PI * 2);
     canvas.stroke();
     canvas.setLineDash([]);
   }
@@ -1019,11 +1145,11 @@ export function renderBlob(blob: Blob, ctx: RenderContext): void {
 
 export function renderBlobs(blobs: Blob[], ctx: RenderContext): void {
   let renderedCount = 0;
-  
+
   for (const blob of blobs) {
     renderBlob(blob, ctx);
     renderedCount++;
-    
+
     // Safety limit to prevent freezing
     if (renderedCount > 500) break;
   }
@@ -1136,6 +1262,9 @@ export function renderSimulation(
 
   // Background layers
   renderTerrainZones(terrainZones, ctx);
+
+  // Subtle Coriolis effect visualization (hemisphere hints)
+  renderCoriolisHint(ctx);
 
   // Food islands (render before grid so they're subtle)
   if (foodIslands && foodIslands.length > 0) {

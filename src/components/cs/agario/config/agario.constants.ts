@@ -6,7 +6,7 @@ const WORLD_WIDTH = 4000;
 const WORLD_HEIGHT = 2000;
 const INITIAL_BLOBS = 70;
 const MAX_POPULATION = 300;
-const MAX_FOOD = 1000;
+const MAX_FOOD = 1500;
 const FOOD_SPAWN_RATE = 100;
 const NUM_OBSTACLES = 0;  // Start with 0 for curriculum learning - let them learn to eat first!
 const NUM_LOGS = 0;
@@ -29,7 +29,7 @@ const MIN_CLUSTER_SIZE = 7;
 const CLUSTER_UPDATE_INTERVAL = 10;
 
 // Food Islands - where food spawns from
-const FOOD_ISLAND_COUNT = 3;           // Number of food sources across map
+const FOOD_ISLAND_COUNT = 10;           // Number of food sources across map
 const FOOD_ISLAND_RADIUS_MIN = 150;    // Minimum island spread radius
 const FOOD_ISLAND_RADIUS_MAX = 350;    // Maximum island spread radius
 const FOOD_ISLAND_SPAWN_RATE_MIN = 3;  // Min food per tick at center
@@ -68,6 +68,14 @@ const BLOB_ROTATION_SPEED = 0.15;     // Was 0.2 - how fast blobs turn
 const BLOB_FRICTION = 0.92;           // Was 0.95 - velocity damping (lower = slower)
 const BLOB_BASE_MAX_SPEED = 3;      // Was 5 - max speed for a blob of mass 30
 const BLOB_MASS_SPEED_FACTOR = 30;    // Mass at which speed = base max speed
+const BLOB_MAX_MASS = 120;            // Maximum mass cap - prevents blobs from getting too big
+
+// Coriolis Effect - subtle global rotational influence on movement
+// Instead of discrete currents, this creates a planet-like deflection
+const CORIOLIS_STRENGTH = 0.015;      // Very subtle deflection (0.01-0.03 range)
+const CORIOLIS_HEMISPHERE_SPLIT = 0.5; // Y position where rotation flips (0.5 = middle)
+const CORIOLIS_EQUATOR_CALM = 0.1;    // Width of calm zone at equator (0-1)
+const CORIOLIS_LATITUDE_SCALING = true; // Stronger effect towards poles
 
 // Neural IO sizes
 // Gradient vision: 6 sensory + 2 state = 8 inputs (down from 40!)
@@ -158,4 +166,11 @@ export {
   BLOB_FRICTION,
   BLOB_BASE_MAX_SPEED,
   BLOB_MASS_SPEED_FACTOR,
+  BLOB_MAX_MASS,
+
+  // Coriolis Effect exports
+  CORIOLIS_STRENGTH,
+  CORIOLIS_HEMISPHERE_SPLIT,
+  CORIOLIS_EQUATOR_CALM,
+  CORIOLIS_LATITUDE_SCALING,
 };

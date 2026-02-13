@@ -47,6 +47,18 @@ interface Obstacle {
   radius: number;
 }
 
+// Ocean currents push blobs around - terrain that affects pathing
+interface OceanCurrent {
+  id: number;
+  x: number;
+  y: number;
+  radius: number;
+  angle: number;        // Current direction in radians
+  strength: number;     // Push force
+  rotationSpeed: number; // How fast the current swirls (0 = straight, >0 = clockwise)
+  type: 'stream' | 'whirlpool' | 'gyre';  // Visual/behavior type
+}
+
 interface Log {
   id: number;
   x: number;
@@ -89,6 +101,7 @@ interface Blob {
     mutated: boolean;
     hiddenLayers: number[];
   };
+  lastHeuristicReason?: string;  // Current AI decision reason
 }
 
 export type ActivationFunction = 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu';
@@ -149,6 +162,7 @@ export type {
   FoodCluster,
   FoodIsland,
   Obstacle,
+  OceanCurrent,
   Log,
   Blob,
   NeuralNode,

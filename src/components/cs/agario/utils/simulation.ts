@@ -25,10 +25,12 @@ import {
   BLOB_ROTATION_SPEED,
   BLOB_FRICTION,
   BLOB_BASE_MAX_SPEED,
-  BLOB_MASS_SPEED_FACTOR
+  BLOB_MASS_SPEED_FACTOR,
+  BLOB_MAX_MASS
 } from '../config/agario.constants';
 import { createEngineeredVisionSystem } from './feature-engineering';
 import { getNearbyFood } from './environment';
+import { getEnhancedOutputs, calculateHeuristicReward } from './decision-tree';
 
 /**
  * Optimized simulation with spatial grid for collisions
@@ -184,11 +186,32 @@ export const simulateBlob = (
     blob.effectiveAge = 0;
   }
 
-  const outputs = blob.genome.activate(inputs);
+  // Get raw neural network outputs
+  const rawOutputs = blob.genome.activate(inputs);
 
-  const acceleration = Math.tanh(outputs[0]) * BLOB_ACCELERATION;
-  const rotation = Math.tanh(outputs[1]) * BLOB_ROTATION_SPEED;
-  const reproduceSignal = Math.tanh(outputs[2]);
+  // Blend with decision tree heuristics for smarter behavior
+  // Blend factor: 0.3 = 30% heuristic influence, 70% neural network
+  // This helps early generations survive while still allowing evolution
+  const { outputs: enhancedOutputs, heuristic } = getEnhancedOutputs(
+    blob, blobs, food, obstacles, rawOutputs, tick, 0.3
+  );
+
+  // Store heuristic reason for display in UI
+  blob.lastHeuristicReason = heuristic.reason;
+
+  // Apply heuristic-based reward shaping (helps evolution learn good behaviors)
+  if (tick % 20 === 0) {
+    const heuristicReward = calculateHeuristicReward(
+      blob, blobs, food, obstacles,
+      { accel: enhancedOutputs[0], turn: enhancedOutputs[1], reproduce: enhancedOutputs[2] },
+      tick
+    );
+    blob.genome.fitness += heuristicReward * 0.5;  // Scaled down to not dominate
+  }
+
+  const acceleration = Math.tanh(enhancedOutputs[0]) * BLOB_ACCELERATION;
+  const rotation = Math.tanh(enhancedOutputs[1]) * BLOB_ROTATION_SPEED;
+  const reproduceSignal = Math.tanh(enhancedOutputs[2]);
 
   // ==================== AGING-AFFECTED REPRODUCTION ====================
   // Old blobs have harder time reproducing
@@ -380,7 +403,7 @@ export const handleCollisionsOptimized = (
       if (distSq < radiusSq) {
         // Apply aging penalty to food absorption
         const massGained = f.mass * (blob.agingEfficiency || 1.0);
-        blob.mass += massGained;
+        blob.mass = Math.min(BLOB_MAX_MASS, blob.mass + massGained); // Cap mass!
         blob.foodEaten++;
 
         // Fitness reward reduced for old blobs
@@ -419,7 +442,7 @@ export const handleCollisionsOptimized = (
       if (distSq < collisionDistSq) {
         // Apply aging penalty to kill absorption
         const massGained = other.mass * 0.7 * (blob.agingEfficiency || 1.0);
-        blob.mass += massGained;
+        blob.mass = Math.min(BLOB_MAX_MASS, blob.mass + massGained); // Cap mass!
         blob.kills++;
 
         // Fitness reward reduced for old blobs
@@ -473,4 +496,63 @@ export const updateSurvivalPressure = (
   }
 
   return newObstacles;
+};
+
+// ===================== CORIOLIS EFFECT =====================
+
+/**
+ * Apply Coriolis-like deflection to blob movement
+ *
+ * This simulates a weak planetary rotation effect:
+ * - Northern hemisphere: deflects movement clockwise (right)
+ * - Southern hemisphere: deflects movement counter-clockwise (left)
+ * - Equator: minimal effect (calm zone)
+ * - Effect scales with speed (faster = more deflection)
+ * - Effect scales with latitude (stronger towards poles)
+ *
+ * This creates subtle curved trajectories that blobs must learn to navigate
+ */
+export const applyCoriolisEffect = (
+  blob: Blob,
+  worldWidth: number,
+  worldHeight: number,
+  strength: number = 0.015,
+  hemisphereSplit: number = 0.5,
+  equatorCalm: number = 0.1,
+  latitudeScaling: boolean = true
+): void => {
+  // Calculate "latitude" - normalized Y position (0 = top/north, 1 = bottom/south)
+  const normalizedY = blob.y / worldHeight;
+
+  // Distance from equator (0 at equator, 1 at poles)
+  const equatorY = hemisphereSplit;
+  const distFromEquator = Math.abs(normalizedY - equatorY) / Math.max(equatorY, 1 - equatorY);
+
+  // Determine hemisphere: negative = north (clockwise), positive = south (counter-clockwise)
+  const hemisphere = normalizedY < equatorY ? -1 : 1;
+
+  // Calculate effect strength based on latitude
+  let effectStrength = strength;
+
+  // Calm zone at equator - reduced effect
+  if (distFromEquator < equatorCalm) {
+    effectStrength *= distFromEquator / equatorCalm;
+  }
+
+  // Scale with latitude if enabled (stronger at poles)
+  if (latitudeScaling) {
+    effectStrength *= 0.3 + distFromEquator * 0.7; // 30% at equator, 100% at poles
+  }
+
+  // Coriolis only affects moving objects - scale with speed
+  const speed = Math.sqrt(blob.vx * blob.vx + blob.vy * blob.vy);
+  if (speed < 0.1) return; // No effect when nearly stationary
+
+  // Apply perpendicular deflection to velocity
+  // Coriolis force is perpendicular to velocity direction
+  const deflectionX = -blob.vy * effectStrength * hemisphere;
+  const deflectionY = blob.vx * effectStrength * hemisphere;
+
+  blob.vx += deflectionX;
+  blob.vy += deflectionY;
 };

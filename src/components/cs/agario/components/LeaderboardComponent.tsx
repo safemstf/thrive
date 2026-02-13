@@ -1,11 +1,11 @@
 // src/components/cs/agario/components/LeaderboardComponent.tsx
 import React, { useState, useMemo } from 'react';
-import { Trophy, Users, TrendingUp, Target, Heart, Zap, Crown, Baby } from 'lucide-react';
+import { Trophy, ChevronDown, ChevronUp, Eye, Brain, Zap } from 'lucide-react';
 import { LeaderboardHUD, LeaderboardEntry } from '../config/agario.styles';
 import { Blob } from '../config/agario.types';
-import { 
-  MIN_AGE_FOR_REPRODUCTION, 
-  REPRODUCTION_MIN_MASS, 
+import {
+  MIN_AGE_FOR_REPRODUCTION,
+  REPRODUCTION_MIN_MASS,
   FOOD_FOR_REPRODUCTION,
   REPRODUCTION_COOLDOWN
 } from '../config/agario.constants';
@@ -13,346 +13,364 @@ import {
 interface LeaderboardComponentProps {
   topBlobs: Blob[];
   selectedBlobId: number | null;
+  followedBlobId: number | null;
   onSelectBlob: (blob: Blob) => void;
+  onFollowBlob: (blob: Blob) => void;
+  onOpenTraining: () => void;
   currentTick: number;
 }
 
-type SortMetric = 'fitness' | 'mass' | 'kills' | 'age' | 'children' | 'reproductionRate';
+type SortMetric = 'fitness' | 'mass' | 'generation' | 'children';
 
 export const LeaderboardComponent: React.FC<LeaderboardComponentProps> = ({
   topBlobs,
   selectedBlobId,
+  followedBlobId,
   onSelectBlob,
+  onFollowBlob,
+  onOpenTraining,
   currentTick
 }) => {
   const [sortBy, setSortBy] = useState<SortMetric>('fitness');
   const [sortDesc, setSortDesc] = useState(true);
 
-  // Calculate additional metrics for each blob
+  // Enrich blobs with computed data
   const enrichedBlobs = useMemo(() => {
     return topBlobs.map(blob => {
-      // Calculate reproduction readiness
-      const reproductionCooldown = (currentTick - blob.lastReproductionTick) / REPRODUCTION_COOLDOWN;
-      const reproductionReady = Math.min(1, reproductionCooldown);
-      
-      // Calculate reproductive efficiency (children per unit time)
-      const ageInTicks = blob.age;
-      const reproductionRate = ageInTicks > 100 ? blob.childrenIds.length / (ageInTicks / 1000) : 0;
-      
-      // Calculate survival score (composite metric)
-      const survivalScore = 
-        (blob.mass * 0.3) + 
-        (blob.kills * 10) + 
-        (blob.childrenIds.length * 15) + 
-        (blob.foodEaten * 0.5) +
-        (blob.age * 0.1);
+      const canReproduce = blob.age >= MIN_AGE_FOR_REPRODUCTION &&
+        blob.mass >= REPRODUCTION_MIN_MASS &&
+        (blob.kills > 0 || blob.foodEaten >= FOOD_FOR_REPRODUCTION) &&
+        (currentTick - blob.lastReproductionTick) > REPRODUCTION_COOLDOWN;
 
-      return {
-        ...blob,
-        reproductionReady,
-        reproductionRate,
-        survivalScore,
-        canReproduce: blob.age >= MIN_AGE_FOR_REPRODUCTION &&
-          blob.mass >= REPRODUCTION_MIN_MASS &&
-          (blob.kills > 0 || blob.foodEaten >= FOOD_FOR_REPRODUCTION)
-      };
+      return { ...blob, canReproduce };
     });
   }, [topBlobs, currentTick]);
 
-  // Sort blobs based on selected metric
+  // Sort blobs
   const sortedBlobs = useMemo(() => {
     return [...enrichedBlobs].sort((a, b) => {
-      let aValue = 0;
-      let bValue = 0;
-
+      let aValue = 0, bValue = 0;
       switch (sortBy) {
-        case 'fitness':
-          aValue = a.genome.fitness || 0;
-          bValue = b.genome.fitness || 0;
-          break;
-        case 'mass':
-          aValue = a.mass;
-          bValue = b.mass;
-          break;
-        case 'kills':
-          aValue = a.kills;
-          bValue = b.kills;
-          break;
-        case 'age':
-          aValue = a.age;
-          bValue = b.age;
-          break;
-        case 'children':
-          aValue = a.childrenIds.length;
-          bValue = b.childrenIds.length;
-          break;
-        case 'reproductionRate':
-          aValue = a.reproductionRate;
-          bValue = b.reproductionRate;
-          break;
+        case 'fitness': aValue = a.genome.fitness || 0; bValue = b.genome.fitness || 0; break;
+        case 'mass': aValue = a.mass; bValue = b.mass; break;
+        case 'generation': aValue = a.generation; bValue = b.generation; break;
+        case 'children': aValue = a.childrenIds.length; bValue = b.childrenIds.length; break;
       }
-
       return sortDesc ? bValue - aValue : aValue - bValue;
     });
   }, [enrichedBlobs, sortBy, sortDesc]);
 
-  // Handle sort click
   const handleSort = (metric: SortMetric) => {
-    if (sortBy === metric) {
-      setSortDesc(!sortDesc);
-    } else {
-      setSortBy(metric);
-      setSortDesc(true);
-    }
+    if (sortBy === metric) setSortDesc(!sortDesc);
+    else { setSortBy(metric); setSortDesc(true); }
   };
 
-  // Get sort icon
-  const getSortIcon = (metric: SortMetric) => {
-    if (sortBy !== metric) return null;
-    return sortDesc ? '↓' : '↑';
-  };
-
-  // Get metric color
-  const getMetricColor = (value: number, metric: SortMetric): string => {
-    switch (metric) {
-      case 'fitness':
-        return value > 50 ? '#22c55e' : value > 0 ? '#fbbf24' : '#ef4444';
-      case 'mass':
-        return value > 50 ? '#22c55e' : value > 30 ? '#fbbf24' : '#94a3b8';
-      case 'kills':
-        return value > 5 ? '#ef4444' : value > 0 ? '#f97316' : '#94a3b8';
-      case 'age':
-        return value > 500 ? '#8b5cf6' : value > 100 ? '#3b82f6' : '#94a3b8';
-      case 'children':
-        return value > 5 ? '#ec4899' : value > 0 ? '#8b5cf6' : '#94a3b8';
-      case 'reproductionRate':
-        return value > 1 ? '#10b981' : value > 0.1 ? '#fbbf24' : '#94a3b8';
-      default:
-        return '#ffffff';
-    }
-  };
-
-  // Format metric value
-  const formatMetric = (blob: typeof enrichedBlobs[0], metric: SortMetric): string => {
-    switch (metric) {
-      case 'fitness':
-        return blob.genome.fitness.toFixed(1);
-      case 'mass':
-        return blob.mass.toFixed(1);
-      case 'kills':
-        return blob.kills.toString();
-      case 'age':
-        return blob.age.toString();
-      case 'children':
-        return blob.childrenIds.length.toString();
-      case 'reproductionRate':
-        return blob.reproductionRate.toFixed(2);
-      default:
-        return '';
-    }
-  };
+  const SortButton = ({ metric, label }: { metric: SortMetric; label: string }) => (
+    <button
+      onClick={() => handleSort(metric)}
+      style={{
+        background: sortBy === metric ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
+        border: 'none',
+        color: sortBy === metric ? '#a5b4fc' : '#64748b',
+        cursor: 'pointer',
+        padding: '4px 8px',
+        borderRadius: '4px',
+        fontSize: '0.7rem',
+        fontWeight: sortBy === metric ? 600 : 400,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '2px',
+        transition: 'all 0.15s'
+      }}
+    >
+      {label}
+      {sortBy === metric && (sortDesc ? <ChevronDown size={10} /> : <ChevronUp size={10} />)}
+    </button>
+  );
 
   return (
     <LeaderboardHUD>
-      <div style={{ 
-        fontWeight: 700, 
-        marginBottom: '0.75rem', 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '0.5rem',
-        justifyContent: 'space-between'
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '8px',
+        paddingBottom: '8px',
+        borderBottom: '1px solid rgba(255,255,255,0.1)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Trophy size={16} />
-          Top Survivors
-          <Users size={14} style={{ opacity: 0.5 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+          <Trophy size={14} color="#fbbf24" />
+          Leaderboard
         </div>
-        
-        <div style={{ 
-          display: 'flex', 
-          gap: '0.25rem', 
-          fontSize: '0.7rem',
-          background: 'rgba(0, 0, 0, 0.3)',
-          padding: '0.25rem 0.5rem',
-          borderRadius: '4px'
-        }}>
-          <button
-            onClick={() => handleSort('fitness')}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: sortBy === 'fitness' ? '#fbbf24' : '#94a3b8',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px'
-            }}
-            title="Sort by fitness"
-          >
-            <Zap size={10} />{getSortIcon('fitness')}
-          </button>
-          <button
-            onClick={() => handleSort('mass')}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: sortBy === 'mass' ? '#fbbf24' : '#94a3b8',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px'
-            }}
-            title="Sort by mass"
-          >
-            <TrendingUp size={10} />{getSortIcon('mass')}
-          </button>
-          <button
-            onClick={() => handleSort('children')}
-            style={{ 
-              background: 'none', 
-              border: 'none', 
-              color: sortBy === 'children' ? '#fbbf24' : '#94a3b8',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '2px'
-            }}
-            title="Sort by children count"
-          >
-            <Baby size={10} />{getSortIcon('children')}
-          </button>
+        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
+          {topBlobs.length} shown
         </div>
       </div>
 
-      {sortedBlobs.map((blob, i) => {
-        const isBest = i === 0;
-        const isSelected = selectedBlobId === blob.id;
-        const metricValue = formatMetric(blob, sortBy);
-        const metricColor = getMetricColor(parseFloat(metricValue) || 0, sortBy);
+      {/* Sort Controls */}
+      <div style={{
+        display: 'flex',
+        gap: '4px',
+        marginBottom: '8px',
+        flexWrap: 'wrap'
+      }}>
+        <SortButton metric="fitness" label="Fitness" />
+        <SortButton metric="mass" label="Mass" />
+        <SortButton metric="generation" label="Gen" />
+        <SortButton metric="children" label="Kids" />
+      </div>
 
-        return (
-          <LeaderboardEntry
-            key={blob.id}
-            $rank={i}
-            $selected={isSelected}
-            onClick={() => onSelectBlob(blob)}
-            style={{
-              borderLeft: isBest ? '3px solid #fbbf24' : '3px solid transparent',
-              background: isBest ? 'rgba(251, 191, 36, 0.1)' : undefined
-            }}
-          >
-            <div className="rank" style={{ 
-              color: isBest ? '#fbbf24' : undefined,
-              fontWeight: isBest ? 700 : 600
-            }}>
-              #{i + 1}
-              {isBest && <Crown size={10} style={{ marginLeft: '2px' }} />}
-            </div>
-            
-            <div className="blob-color" style={{ 
-              background: blob.color,
-              boxShadow: isBest ? `0 0 8px ${blob.color}` : undefined
-            }} />
-            
-            <div className="info" style={{ flex: 1 }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'center'
+      {/* Blob List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {sortedBlobs.map((blob, i) => {
+          const isSelected = selectedBlobId === blob.id;
+          const isFollowed = followedBlobId === blob.id;
+          const isTop = i === 0;
+
+          return (
+            <LeaderboardEntry
+              key={blob.id}
+              $rank={i}
+              $selected={isSelected}
+              style={{
+                background: isFollowed
+                  ? 'rgba(34, 197, 94, 0.15)'
+                  : isSelected
+                    ? 'rgba(99, 102, 241, 0.2)'
+                    : isTop
+                      ? 'rgba(251, 191, 36, 0.08)'
+                      : 'rgba(255, 255, 255, 0.02)',
+                borderLeft: isFollowed
+                  ? '2px solid #22c55e'
+                  : isTop
+                    ? '2px solid #fbbf24'
+                    : '2px solid transparent',
+                padding: '8px 10px',
+                borderRadius: '6px',
+                transition: 'all 0.15s'
+              }}
+            >
+              {/* Main Row */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
               }}>
-                <div style={{ fontWeight: 600 }}>
-                  #{blob.id.toString().slice(-4)} • <span style={{ color: '#22c55e' }}>{blob.mass.toFixed(0)}</span>m
+                {/* Rank */}
+                <div style={{
+                  width: '18px',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  color: isTop ? '#fbbf24' : '#64748b'
+                }}>
+                  {i + 1}
                 </div>
-                <div style={{ 
-                  fontSize: '0.7rem', 
-                  color: metricColor,
+
+                {/* Color Dot */}
+                <div style={{
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  background: blob.color,
+                  boxShadow: `0 0 6px ${blob.color}40`,
+                  flexShrink: 0
+                }} />
+
+                {/* ID */}
+                <div style={{
                   fontWeight: 600,
-                  background: 'rgba(0, 0, 0, 0.3)',
-                  padding: '1px 4px',
-                  borderRadius: '3px'
+                  fontSize: '0.8rem',
+                  color: '#e2e8f0',
+                  width: '40px'
                 }}>
-                  {metricValue}
+                  #{blob.id}
                 </div>
-              </div>
-              
-              <div className="gen" style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                marginTop: '2px'
-              }}>
-                <div style={{ display: 'flex', gap: '6px', fontSize: '0.75rem' }}>
-                  <span title="Age" style={{ color: '#8b5cf6' }}>
-                    🕒{blob.age}
-                  </span>
-                  <span title="Children" style={{ color: '#ec4899' }}>
-                    👶{blob.childrenIds.length}
-                  </span>
-                  <span title="Kills" style={{ color: '#ef4444' }}>
-                    ⚔️{blob.kills}
-                  </span>
-                  <span title="Food eaten" style={{ color: '#10b981' }}>
-                    🍎{blob.foodEaten}
-                  </span>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '2px' }}>
-                  {blob.canReproduce ? (
-                    <div title="Ready to reproduce" style={{ color: '#22c55e' }}>
-                      <Heart size={10} fill="#22c55e" />
-                    </div>
-                  ) : (
-                    <div title="Not ready to reproduce" style={{ color: '#94a3b8' }}>
-                      <Heart size={10} />
-                    </div>
-                  )}
-                  
-                  {blob.reproductionReady >= 0.8 && (
-                    <div title="Reproduction cooldown ready" style={{ color: '#3b82f6' }}>
-                      <Target size={10} />
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Progress bar for reproduction cooldown */}
-              {blob.canReproduce && blob.reproductionReady < 1 && (
-                <div style={{ 
-                  marginTop: '4px',
-                  height: '2px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '1px',
-                  overflow: 'hidden'
+
+                {/* Stats Grid - Compact */}
+                <div style={{
+                  display: 'flex',
+                  gap: '6px',
+                  flex: 1,
+                  fontSize: '0.7rem'
                 }}>
+                  {/* Generation */}
                   <div style={{
-                    height: '100%',
-                    width: `${blob.reproductionReady * 100}%`,
-                    background: 'linear-gradient(90deg, #3b82f6, #8b5cf6)',
-                    transition: 'width 0.3s'
-                  }} />
+                    color: blob.generation > 20 ? '#a78bfa' : blob.generation > 10 ? '#818cf8' : '#94a3b8',
+                    fontWeight: 600
+                  }}>
+                    G{blob.generation}
+                  </div>
+
+                  {/* Mass */}
+                  <div style={{
+                    color: blob.mass > 60 ? '#34d399' : blob.mass > 35 ? '#fbbf24' : '#94a3b8'
+                  }}>
+                    {blob.mass.toFixed(0)}m
+                  </div>
+
+                  {/* Children */}
+                  <div style={{
+                    color: blob.childrenIds.length > 3 ? '#f472b6' : blob.childrenIds.length > 0 ? '#c084fc' : '#64748b'
+                  }}>
+                    {blob.childrenIds.length}👶
+                  </div>
+
+                  {/* Kills */}
+                  <div style={{
+                    color: blob.kills > 3 ? '#f87171' : blob.kills > 0 ? '#fb923c' : '#64748b'
+                  }}>
+                    {blob.kills}⚔
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                  {/* Follow Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFollowBlob(blob);
+                    }}
+                    style={{
+                      background: isFollowed ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '4px 6px',
+                      cursor: 'pointer',
+                      color: isFollowed ? '#22c55e' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      transition: 'all 0.15s'
+                    }}
+                    title={isFollowed ? 'Stop following' : 'Follow this blob'}
+                  >
+                    <Eye size={12} />
+                  </button>
+
+                  {/* Neural Net Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectBlob(blob);
+                    }}
+                    style={{
+                      background: isSelected ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '4px 6px',
+                      cursor: 'pointer',
+                      color: isSelected ? '#818cf8' : '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      transition: 'all 0.15s'
+                    }}
+                    title="View neural network"
+                  >
+                    <Brain size={12} />
+                  </button>
+                </div>
+
+                {/* Reproduction Ready Indicator */}
+                {blob.canReproduce && (
+                  <div style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: '#a855f7',
+                    boxShadow: '0 0 6px #a855f7',
+                    animation: 'pulse 1.5s infinite',
+                    flexShrink: 0
+                  }} title="Ready to reproduce" />
+                )}
+              </div>
+
+              {/* Heuristic Reason (if available) */}
+              {blob.lastHeuristicReason && (
+                <div style={{
+                  marginTop: '4px',
+                  fontSize: '0.65rem',
+                  color: '#64748b',
+                  fontStyle: 'italic',
+                  paddingLeft: '30px'
+                }}>
+                  {blob.lastHeuristicReason}
                 </div>
               )}
-            </div>
-          </LeaderboardEntry>
-        );
-      })}
 
-      {/* Legend */}
-      <div style={{ 
-        marginTop: '0.75rem', 
-        padding: '0.5rem',
-        background: 'rgba(0, 0, 0, 0.3)',
-        borderRadius: '4px',
-        fontSize: '0.7rem',
-        color: '#94a3b8',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gap: '0.25rem'
-      }}>
-        <div>🕒 = Age</div>
-        <div>👶 = Children</div>
-        <div>⚔️ = Kills</div>
-        <div>🍎 = Food eaten</div>
+              {/* Fitness Bar (subtle) */}
+              <div style={{
+                marginTop: '4px',
+                height: '2px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '2px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min(100, Math.max(0, (blob.genome.fitness + 50) / 2))}%`,
+                  background: blob.genome.fitness > 50
+                    ? 'linear-gradient(90deg, #22c55e, #4ade80)'
+                    : blob.genome.fitness > 0
+                      ? 'linear-gradient(90deg, #eab308, #facc15)'
+                      : 'linear-gradient(90deg, #ef4444, #f87171)',
+                  borderRadius: '2px',
+                  transition: 'width 0.3s'
+                }} />
+              </div>
+            </LeaderboardEntry>
+          );
+        })}
       </div>
+
+      {/* Footer Stats */}
+      <div style={{
+        marginTop: '10px',
+        paddingTop: '8px',
+        borderTop: '1px solid rgba(255,255,255,0.1)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        fontSize: '0.7rem',
+        color: '#64748b'
+      }}>
+        <div>
+          Max Gen: <span style={{ color: '#a78bfa', fontWeight: 600 }}>
+            {Math.max(1, ...topBlobs.map(b => b.generation))}
+          </span>
+        </div>
+        <div>
+          Top Fit: <span style={{ color: '#34d399', fontWeight: 600 }}>
+            {Math.max(0, ...topBlobs.map(b => b.genome.fitness)).toFixed(0)}
+          </span>
+        </div>
+      </div>
+
+      {/* Train Button */}
+      <button
+        onClick={onOpenTraining}
+        style={{
+          marginTop: '10px',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          padding: '10px',
+          background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+          border: 'none',
+          borderRadius: '8px',
+          color: '#fff',
+          fontWeight: 600,
+          fontSize: '0.8rem',
+          cursor: 'pointer',
+          transition: 'all 0.2s'
+        }}
+        title="Open Headless Training - Train faster without rendering"
+      >
+        <Zap size={14} />
+        Headless Training
+      </button>
     </LeaderboardHUD>
   );
 };
