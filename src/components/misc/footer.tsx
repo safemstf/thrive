@@ -21,11 +21,15 @@ const TEAM_MEMBERS = [
     vanity: 'dev-gurung-a8b863136',
     profileUrl: 'https://www.linkedin.com/in/dev-gurung-a8b863136/',
   },
-
   {
     name: 'Alan Mathew',
     vanity: 'alan-mathew-992863184',
     profileUrl: 'https://www.linkedin.com/in/alan-mathew-992863184/',
+  },
+   {
+    name: 'Joseph Devasia',
+    vanity: 'josephdevasia',
+    profileUrl: 'https://www.linkedin.com/in/josephdevasia/',
   },
 ];
 
@@ -185,20 +189,22 @@ const MemberGrid = styled.div`
   margin-top: 1rem;
 
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, max-content));
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.25rem;
-  justify-content: center; /* 👈 centers the cards */
+  justify-items: center;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
 
-  @media (max-width: 420px) {
+  @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
 `;
 
 const MemberCard = styled.div`
   width: 100%;
-  max-width: 340px; /* 👈 matches LinkedIn badge */
-  margin: 0 auto;
-
+  max-width: 340px;
+  
   display: flex;
   align-items: center;
   justify-content: center;
@@ -217,7 +223,8 @@ const MemberCardInner = styled.div`
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  align-items: center; /* 👈 centers everything */
+  align-items: center;
+  width: 100%;
 
   .linkedin-wrapper {
     display: flex;
@@ -227,6 +234,7 @@ const MemberCardInner = styled.div`
 
   .badge-base {
     margin: 0 auto !important;
+    display: block !important;
   }
 
   .profile-fallback {
