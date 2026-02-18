@@ -873,7 +873,7 @@ const allItems: SimulationItem[] = [
   },
   {
     key: 'predprey',
-    label: 'Jelly Fish Ecosystem',
+    label: 'Ecosystem',
     icon: <Zap size={22} />,
     color: '#10b981',
     description: 'Spatial Lotka–Volterra population dynamics',

@@ -85,6 +85,41 @@ const FITNESS_WEIGHTS = {
   // Close call survival: escaped near-death situations
   CLOSE_CALL_BONUS: 50,
 
+  // === EMERGENT BEHAVIOR REWARDS ===
+  // These reward behaviors that indicate learned intelligence
+
+  // Velocity variance: rewards blobs that change speed (hunting, fleeing)
+  // Low variance = boring constant movement, high variance = reactive behavior
+  VELOCITY_VARIANCE_MULTIPLIER: 100,
+
+  // Directional changes: rewards blobs that turn (seeking, avoiding)
+  DIRECTION_CHANGE_MULTIPLIER: 50,
+
+  // Success rate: food eaten / distance traveled (efficiency)
+  SUCCESS_RATE_MULTIPLIER: 300,
+
+  // Survival despite obstacles: bonus for surviving when obstacles present
+  OBSTACLE_SURVIVAL_BONUS: 80,
+
+  // === INTELLIGENCE QUALITY METRICS ===
+  // These are the MOST important - they measure decision quality, not luck
+
+  // Decision accuracy: % of decisions matching optimal (most important!)
+  DECISION_ACCURACY_MULTIPLIER: 800,  // High weight - this IS intelligence
+
+  // Specific intelligent behaviors
+  THREAT_ESCAPE_BONUS: 100,           // Recognized and fled from threat
+  PREY_PURSUIT_BONUS: 80,             // Recognized and chased prey
+
+  // Adaptability: changing strategy appropriately
+  BEHAVIOR_SWITCH_BONUS: 50,          // Changed behavior when situation changed
+
+  // === NOVELTY / DIVERSITY ===
+  // Prevent convergence to single strategy - encourage diverse behaviors
+
+  // Unique behavior bonus (calculated at population level)
+  NOVELTY_MULTIPLIER: 100,            // Bonus for being behaviorally unique
+
   // Fitness cap
   MAX_FITNESS: 10000,
 } as const;
@@ -317,9 +352,102 @@ function calculateDangerAwarenessFitness(blob: Blob): number {
  * Rewards blobs that survived near-death (low mass) situations
  */
 function calculateCloseCallFitness(blob: Blob): number {
-  const closeCalls = (blob as any).closeCalls || 0;
+  const closeCalls = blob.closeCalls || 0;
 
   return Math.min(closeCalls * FITNESS_WEIGHTS.CLOSE_CALL_BONUS, 150);
+}
+
+// ===================== EMERGENT BEHAVIOR FITNESS =====================
+
+/**
+ * Calculate behavioral complexity fitness
+ * Rewards blobs that show varied, reactive behavior
+ */
+function calculateBehavioralFitness(blob: Blob): number {
+  let fitness = 0;
+
+  // Speed variance: blobs that change speed are reacting to environment
+  const speedVariance = blob.speedVariance || 0;
+  fitness += Math.min(speedVariance * 0.5, FITNESS_WEIGHTS.VELOCITY_VARIANCE_MULTIPLIER);
+
+  // Direction changes: blobs that turn are seeking/avoiding
+  const dirChanges = blob.directionChanges || 0;
+  const changeRatio = blob.age > 0 ? dirChanges / blob.age : 0;
+  // Sweet spot: not too few (idle) not too many (spinning)
+  if (changeRatio > 0.01 && changeRatio < 0.2) {
+    fitness += FITNESS_WEIGHTS.DIRECTION_CHANGE_MULTIPLIER;
+  }
+
+  return fitness;
+}
+
+/**
+ * Calculate obstacle survival fitness
+ * Rewards blobs that encountered obstacles but survived
+ */
+function calculateObstacleSurvivalFitness(blob: Blob): number {
+  const obstacleEncounters = blob.obstacleEncounters || 0;
+
+  // Must have encountered obstacles to get bonus
+  if (obstacleEncounters < 5) return 0;
+
+  // Bonus scales with encounters survived
+  return Math.min(obstacleEncounters * 2, FITNESS_WEIGHTS.OBSTACLE_SURVIVAL_BONUS);
+}
+
+// ===================== INTELLIGENCE QUALITY FITNESS =====================
+
+/**
+ * THE MOST IMPORTANT FITNESS COMPONENT
+ *
+ * This measures decision quality - how often the neural network
+ * makes decisions that match what an "optimal" agent would do.
+ *
+ * Decision accuracy is the core measure of intelligence:
+ * - A random agent gets ~50% accuracy
+ * - A perfect agent gets 100% accuracy
+ * - Evolution should push accuracy higher over time
+ */
+function calculateIntelligenceFitness(blob: Blob): number {
+  let fitness = 0;
+
+  const totalDecisions = blob.totalDecisions || 0;
+  const correctDecisions = blob.correctDecisions || 0;
+
+  // Need enough decisions to measure accurately
+  if (totalDecisions < 10) return 0;
+
+  // Decision accuracy: percentage of correct decisions
+  const accuracy = correctDecisions / totalDecisions;
+
+  // Heavily reward high accuracy
+  // accuracy of 0.5 (random) = 0 bonus
+  // accuracy of 0.7 = 160 bonus
+  // accuracy of 0.9 = 320 bonus
+  const accuracyBonus = Math.max(0, (accuracy - 0.5) * 2) * FITNESS_WEIGHTS.DECISION_ACCURACY_MULTIPLIER;
+  fitness += accuracyBonus;
+
+  // Threat escape: showed understanding of danger
+  const escapedThreats = blob.escapedThreats || 0;
+  if (escapedThreats > 0) {
+    fitness += Math.min(escapedThreats * 10, FITNESS_WEIGHTS.THREAT_ESCAPE_BONUS);
+  }
+
+  // Prey pursuit: showed understanding of opportunity
+  const pursuedPrey = blob.pursuedPrey || 0;
+  if (pursuedPrey > 0) {
+    fitness += Math.min(pursuedPrey * 8, FITNESS_WEIGHTS.PREY_PURSUIT_BONUS);
+  }
+
+  // Behavior switching: showed adaptability
+  const behaviorSwitches = blob.behaviorSwitches || 0;
+  // Sweet spot: some switches good, too many is random
+  const switchRatio = blob.age > 0 ? behaviorSwitches / blob.age : 0;
+  if (switchRatio > 0.005 && switchRatio < 0.05) {
+    fitness += FITNESS_WEIGHTS.BEHAVIOR_SWITCH_BONUS;
+  }
+
+  return fitness;
 }
 
 // ===================== MAIN FITNESS CALCULATION =====================
@@ -386,15 +514,67 @@ export function calculateBlobFitness(blob: Blob, familySize: number): number {
   // 14. Close calls - survived near-death
   fitness += calculateCloseCallFitness(blob);
 
-  // 15. Cap fitness to prevent overflow
+  // === EMERGENT BEHAVIOR REWARDS ===
+  // These reward behaviors that emerge from learning
+
+  // 15. Behavioral complexity - varied, reactive movement
+  fitness += calculateBehavioralFitness(blob);
+
+  // 16. Obstacle survival - navigated around hazards
+  fitness += calculateObstacleSurvivalFitness(blob);
+
+  // === INTELLIGENCE QUALITY (MOST IMPORTANT) ===
+  // This is the key to evolving actual intelligence
+
+  // 17. Intelligence - decision accuracy and situational awareness
+  fitness += calculateIntelligenceFitness(blob);
+
+  // 18. Cap fitness to prevent overflow
   fitness = Math.min(fitness, FITNESS_WEIGHTS.MAX_FITNESS);
 
   return fitness;
 }
 
 /**
+ * Calculate a behavioral fingerprint for a blob
+ * Used for novelty search - blobs with unique behaviors get bonuses
+ */
+function getBehavioralFingerprint(blob: Blob): number[] {
+  // Create a vector representing the blob's behavioral characteristics
+  const totalDec = blob.totalDecisions || 1;
+  const accuracy = (blob.correctDecisions || 0) / totalDec;
+  const escapeRate = (blob.escapedThreats || 0) / Math.max(1, blob.dangerEncounters || 1);
+  const huntRate = (blob.pursuedPrey || 0) / Math.max(1, blob.age / 100);
+  const switchRate = (blob.behaviorSwitches || 0) / Math.max(1, blob.age);
+  const speedVar = (blob.speedVariance || 0) / Math.max(1, blob.age);
+  const dirChangeRate = (blob.directionChanges || 0) / Math.max(1, blob.age);
+
+  return [
+    accuracy,
+    escapeRate,
+    huntRate,
+    switchRate * 100,
+    speedVar,
+    dirChangeRate * 10
+  ];
+}
+
+/**
+ * Calculate behavioral distance between two blobs
+ */
+function behavioralDistance(fp1: number[], fp2: number[]): number {
+  let sumSq = 0;
+  for (let i = 0; i < fp1.length; i++) {
+    const diff = fp1[i] - fp2[i];
+    sumSq += diff * diff;
+  }
+  return Math.sqrt(sumSq);
+}
+
+/**
  * Calculate fitness for all blobs in a population
- * 
+ * Includes novelty bonus for behavioral diversity
+ *
  * @param blobs - Array of all blobs
  * @returns Map of blob ID to calculated fitness
  */
@@ -410,15 +590,60 @@ export function calculatePopulationFitness(blobs: Blob[]): Map<number, number> {
     );
   }
 
-  // Calculate fitness for each blob
+  // Calculate base fitness for each blob
   for (const blob of blobs) {
     const familySize = familySizes.get(blob.familyLineage) || 1;
     const fitness = calculateBlobFitness(blob, familySize);
-
-    // Update blob's genome fitness
     blob.genome.fitness = fitness;
-
     fitnessMap.set(blob.id, fitness);
+  }
+
+  // === NOVELTY BONUS ===
+  // Reward blobs that have unique behavioral profiles
+  // This prevents convergence to a single "winning" strategy
+  // OPTIMIZATION: Only calculate for a sample when population is large
+
+  if (blobs.length > 5) {
+    // Calculate behavioral fingerprints
+    const fingerprints = new Map<number, number[]>();
+    for (const blob of blobs) {
+      fingerprints.set(blob.id, getBehavioralFingerprint(blob));
+    }
+
+    // For large populations, sample to reduce O(n²) overhead
+    const MAX_NOVELTY_SAMPLE = 30;
+    const blobsToEvaluate = blobs.length > MAX_NOVELTY_SAMPLE
+      ? blobs.slice().sort(() => Math.random() - 0.5).slice(0, MAX_NOVELTY_SAMPLE)
+      : blobs;
+
+    // For each blob, calculate average distance to K nearest neighbors
+    const K = Math.min(5, Math.floor(blobsToEvaluate.length / 3));
+
+    for (const blob of blobsToEvaluate) {
+      const myFp = fingerprints.get(blob.id)!;
+      const distances: number[] = [];
+
+      for (const other of blobsToEvaluate) {
+        if (other.id === blob.id) continue;
+        const otherFp = fingerprints.get(other.id)!;
+        distances.push(behavioralDistance(myFp, otherFp));
+      }
+
+      // Sort and take K nearest
+      distances.sort((a, b) => a - b);
+      const kNearest = distances.slice(0, K);
+      const avgDistance = kNearest.length > 0
+        ? kNearest.reduce((a, b) => a + b, 0) / kNearest.length
+        : 0;
+
+      // Novelty bonus: higher distance = more unique = bonus
+      // Scale so reasonable diversity gets ~50-100 bonus
+      const noveltyBonus = Math.min(avgDistance * FITNESS_WEIGHTS.NOVELTY_MULTIPLIER, 150);
+
+      // Add novelty bonus to fitness
+      blob.genome.fitness += noveltyBonus;
+      fitnessMap.set(blob.id, blob.genome.fitness);
+    }
   }
 
   return fitnessMap;

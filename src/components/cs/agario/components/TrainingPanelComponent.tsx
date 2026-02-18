@@ -500,6 +500,48 @@ export const TrainingPanelComponent: React.FC<TrainingPanelComponentProps> = ({
               </div>
             </div>
 
+            {/* Curriculum phase indicator */}
+            {(progress.curriculumPhase ?? 1) > 0 && (
+              <div style={{
+                background: 'rgba(34, 197, 94, 0.1)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                marginBottom: '12px',
+                border: '1px solid rgba(34, 197, 94, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: '0.75rem',
+                    color: '#fff'
+                  }}>
+                    {progress.curriculumPhase ?? 1}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, color: '#22c55e' }}>
+                      {['Learning Basics', 'Obstacle Avoidance', 'Hunting & Fleeing', 'Reproduction', 'Full Complexity'][((progress.curriculumPhase ?? 1) - 1)] || 'Training'}
+                    </div>
+                    <div style={{ fontSize: '0.6rem', color: '#64748b' }}>
+                      Curriculum Phase {progress.curriculumPhase ?? 1}/5
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', fontSize: '0.65rem', color: '#64748b' }}>
+                  {progress.obstacleCount ?? 0} obstacles
+                </div>
+              </div>
+            )}
+
             {/* Complexity metrics - key for tracking neural net evolution */}
             <div style={{
               background: 'rgba(139, 92, 246, 0.1)',

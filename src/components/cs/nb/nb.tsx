@@ -5,8 +5,8 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   Play, Pause, RotateCcw, Settings, Target, Zap, Star, Users, Activity,
-  Clock, Cpu, Eye, Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle,
-  Grid, Maximize2, X
+  Clock, Cpu, Eye, Plus, Trash2,
+  Grid, Maximize2, Minimize2, X
 } from 'lucide-react';
 
 import { useNBodySimulation, PerformanceMetrics, PhysicsUpdate } from './nb.logic';
@@ -17,10 +17,8 @@ import {
   MASS_UNITS, ASTRONOMICAL_UNITS, Vector3Data
 } from './nb.config';
 import {
-  SimulationContainer, CanvasContainer, FloatingPanel, PanelHeader, PanelContent,
-  IconButton, PrimaryButton, SliderContainer, CustomSlider, InputGroup,
-  MetricCard, StatusIndicator, ScenarioGrid, ScenarioCard, LoadingOverlay,
-  ProgressBar, NBodyGlobalStyles
+  IconButton, PrimaryButton, SliderContainer, CustomSlider,
+  MetricCard, LoadingOverlay, NBodyGlobalStyles
 } from './nb.styles';
 
 interface NBodySandboxProps {
@@ -41,6 +39,7 @@ interface UIState {
   showLabels: boolean;
   showGrid: boolean;
   mobileViewing: boolean;
+  fpActive: boolean;
 }
 
 const NBodySandbox: React.FC<NBodySandboxProps> = ({
@@ -63,7 +62,8 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     showVelocityVectors: false,
     showLabels: true,
     showGrid: false,
-    mobileViewing: false
+    mobileViewing: false,
+    fpActive: false
   });
 
   const [physicsConfig, setPhysicsConfig] = useState(DEFAULT_PHYSICS);
@@ -176,6 +176,39 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
     };
   }, [uiState.mobileViewing, simulation]);
 
+  // ===== FIRST PERSON MODE HANDLERS =====
+  const handleEnterFirstPerson = useCallback(() => {
+    if (!uiState.selectedBodyId) return;
+    rendering.enterFirstPerson(uiState.selectedBodyId);
+    setUIState(prev => ({ ...prev, fpActive: true }));
+  }, [uiState.selectedBodyId, rendering]);
+
+  const handleExitFirstPerson = useCallback(() => {
+    rendering.exitFirstPerson();
+    setUIState(prev => ({ ...prev, fpActive: false }));
+  }, [rendering]);
+
+  // Keyboard shortcut: V / Escape — first-person mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'v' || e.key === 'V') {
+        if (uiState.selectedBodyId && !uiState.fpActive) {
+          rendering.enterFirstPerson(uiState.selectedBodyId);
+          setUIState(prev => ({ ...prev, fpActive: true }));
+        } else if (uiState.fpActive) {
+          rendering.exitFirstPerson();
+          setUIState(prev => ({ ...prev, fpActive: false }));
+        }
+      }
+      if (e.key === 'Escape' && uiState.fpActive) {
+        rendering.exitFirstPerson();
+        setUIState(prev => ({ ...prev, fpActive: false }));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [uiState.selectedBodyId, uiState.fpActive, rendering]);
+
   const handlePlayPause = useCallback(() => {
     simulation.simulationState.isRunning ? simulation.pause() : simulation.start();
   }, [simulation]);
@@ -266,6 +299,59 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
       activePanel: prev.activePanel === panel ? null : panel
     }));
   }, []);
+
+  // ===== FULLSCREEN (works on desktop AND mobile) =====
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const handleToggleFullscreen = useCallback(async () => {
+    const el = canvasContainerRef.current?.parentElement as HTMLElement | null; // the section
+    const doc = document as any;
+    try {
+      if (!doc.fullscreenElement && !doc.webkitFullscreenElement) {
+        const target = el || canvasContainerRef.current;
+        if (!target) return;
+        if (target.requestFullscreen) await target.requestFullscreen();
+        else if ((target as any).webkitRequestFullscreen) await (target as any).webkitRequestFullscreen();
+        setIsFullscreen(true);
+        if (!simulation.simulationState.isRunning) simulation.start();
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+      } else {
+        if (doc.exitFullscreen) await doc.exitFullscreen();
+        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+        setIsFullscreen(false);
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+      }
+    } catch (err) {
+      console.warn('Fullscreen toggle failed', err);
+    }
+  }, [simulation]);
+
+  // Sync fullscreen state with browser events
+  useEffect(() => {
+    const onFSChange = () => {
+      const doc = document as any;
+      const active = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+      setIsFullscreen(active);
+      setTimeout(() => window.dispatchEvent(new Event('resize')), 100);
+    };
+    document.addEventListener('fullscreenchange', onFSChange);
+    document.addEventListener('webkitfullscreenchange', onFSChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFSChange);
+      document.removeEventListener('webkitfullscreenchange', onFSChange);
+    };
+  }, []);
+
+  // Keyboard shortcut: F = fullscreen toggle
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.key === 'f' || e.key === 'F') && !uiState.fpActive) {
+        handleToggleFullscreen();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [uiState.fpActive, handleToggleFullscreen]);
 
   const handleScenarioSelect = useCallback(async (scenarioId: string) => {
     const scenario = PREDEFINED_SCENARIOS[scenarioId];
@@ -578,21 +664,121 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
 
           <section className={`nb-canvas-section ${uiState.mobileViewing ? 'mobile-viewing' : ''}`}>
             <div ref={canvasContainerRef} className="nb-canvas-container">
-              <div className="nb-hud">
-                <div className="nb-hud-title">Day {Math.floor(timeInDays)}</div>
-                <div className="nb-hud-row">
-                  <span style={{ opacity: 0.7 }}>Bodies:</span>
-                  <span style={{ fontWeight: 600, color: '#60a5fa' }}>{simulation.simulationState.bodyCount}</span>
+
+              {/* Fullscreen button — top right corner, always visible when not in FP mode */}
+              {!uiState.fpActive && (
+                <button
+                  onClick={handleToggleFullscreen}
+                  title={isFullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)'}
+                  style={{
+                    position: 'absolute', top: '1rem', right: '1rem',
+                    zIndex: 15,
+                    display: 'flex', alignItems: 'center', gap: '0.35rem',
+                    background: 'rgba(0,0,0,0.6)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '8px', color: '#cbd5e1',
+                    padding: '0.45rem 0.75rem', cursor: 'pointer',
+                    fontSize: '0.72rem', fontWeight: 500,
+                    backdropFilter: 'blur(8px)',
+                    letterSpacing: '0.03em',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                  }}
+                >
+                  {isFullscreen
+                    ? <><Minimize2 size={14} /> Exit Full</>
+                    : <><Maximize2 size={14} /> Fullscreen</>
+                  }
+                </button>
+              )}
+
+              {/* Standard HUD — hidden in FP mode */}
+              {!uiState.fpActive && (
+                <div className="nb-hud">
+                  <div className="nb-hud-title">Day {Math.floor(timeInDays)}</div>
+                  <div className="nb-hud-row">
+                    <span style={{ opacity: 0.7 }}>Bodies:</span>
+                    <span style={{ fontWeight: 600, color: '#60a5fa' }}>{simulation.simulationState.bodyCount}</span>
+                  </div>
+                  <div className="nb-hud-row">
+                    <span style={{ opacity: 0.7 }}>Speed:</span>
+                    <span style={{ fontWeight: 600, color: '#60a5fa' }}>{simulation.simulationState.speed.toFixed(1)}×</span>
+                  </div>
+                  <div className="nb-hud-row">
+                    <span style={{ opacity: 0.7 }}>FPS:</span>
+                    <span style={{ fontWeight: 600, color: '#60a5fa' }}>{simulation.simulationState.fps}</span>
+                  </div>
                 </div>
-                <div className="nb-hud-row">
-                  <span style={{ opacity: 0.7 }}>Speed:</span>
-                  <span style={{ fontWeight: 600, color: '#60a5fa' }}>{simulation.simulationState.speed.toFixed(1)}×</span>
+              )}
+
+              {/* ===== FIRST-PERSON MODE OVERLAY ===== */}
+              {uiState.fpActive && (
+                <div style={{
+                  position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20
+                }}>
+                  {/* Exit button — top right */}
+                  <button
+                    onClick={handleExitFirstPerson}
+                    style={{
+                      position: 'absolute', top: '1rem', right: '1rem',
+                      pointerEvents: 'auto',
+                      background: 'rgba(0,0,0,0.55)',
+                      border: '1px solid rgba(255,255,255,0.18)',
+                      borderRadius: '8px',
+                      color: '#e2e8f0',
+                      padding: '0.35rem 0.8rem',
+                      cursor: 'pointer',
+                      fontSize: '0.78rem',
+                      backdropFilter: 'blur(8px)',
+                      letterSpacing: '0.02em',
+                      transition: 'background 0.2s'
+                    }}
+                  >
+                    ✕ Exit View
+                  </button>
+
+                  {/* Drag hint — fades after first interaction — top center */}
+                  <div style={{
+                    position: 'absolute', top: '1rem', left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontSize: '0.7rem',
+                    color: 'rgba(148,163,184,0.5)',
+                    pointerEvents: 'none',
+                    letterSpacing: '0.05em'
+                  }}>
+                    drag to look · press V or Esc to exit
+                  </div>
+
+                  {/* Subtle HUD — bottom left */}
+                  {rendering.fpHUD && (
+                    <div style={{
+                      position: 'absolute', bottom: '1.5rem', left: '1.5rem',
+                      fontFamily: '"JetBrains Mono", "Fira Code", "Courier New", monospace',
+                      fontSize: '0.7rem',
+                      color: 'rgba(147,197,253,0.6)',
+                      lineHeight: '1.7',
+                      pointerEvents: 'none',
+                      textShadow: '0 0 8px rgba(59,130,246,0.4)'
+                    }}>
+                      <div>📍 {rendering.fpHUD.bodyName}</div>
+                      <div>☀ {rendering.fpHUD.distAU < 0.001
+                        ? `${(rendering.fpHUD.distAU * 1496).toFixed(0)} km`
+                        : `${rendering.fpHUD.distAU.toFixed(4)} AU`}
+                      </div>
+                      <div>⚡ {rendering.fpHUD.speedKms.toFixed(2)} km/s</div>
+                    </div>
+                  )}
+
+                  {/* Center crosshair dot */}
+                  <div style={{
+                    position: 'absolute', top: '50%', left: '50%',
+                    width: '5px', height: '5px', borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.25)',
+                    transform: 'translate(-50%, -50%)',
+                    boxShadow: '0 0 6px rgba(255,255,255,0.3)'
+                  }} />
                 </div>
-                <div className="nb-hud-row">
-                  <span style={{ opacity: 0.7 }}>FPS:</span>
-                  <span style={{ fontWeight: 600, color: '#60a5fa' }}>{simulation.simulationState.fps}</span>
-                </div>
-              </div>
+              )}
 
               <div className={`nb-overlay-controls ${uiState.mobileViewing ? 'active' : ''}`}>
                 <button className="nb-overlay-btn primary" onClick={handlePlayPause}>
@@ -624,6 +810,22 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
               <IconButton onClick={toggleCameraFollow} $variant="secondary" $active={!!uiState.cameraFollowTarget}>
                 <Target size={16} />
               </IconButton>
+              {uiState.selectedBodyId && !uiState.fpActive && (
+                <IconButton
+                  onClick={handleEnterFirstPerson}
+                  $variant="secondary"
+                  title="View from this body's surface (V)"
+                  style={{ position: 'relative' }}
+                >
+                  <Eye size={16} />
+                  <span style={{
+                    position: 'absolute', bottom: '-18px', left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontSize: '0.6rem', color: 'rgba(148,163,184,0.8)',
+                    whiteSpace: 'nowrap', pointerEvents: 'none'
+                  }}>View [V]</span>
+                </IconButton>
+              )}
             </div>
 
             <SliderContainer>
@@ -690,41 +892,139 @@ const NBodySandbox: React.FC<NBodySandboxProps> = ({
             </div>
           </div>
 
+          {/* ===== EXPLORE PANEL ===== */}
           <div className="nb-controls-section">
             <div className="nb-section-title">
               <Star size={20} />
-              Scenarios
+              Explore
             </div>
 
-            <ScenarioGrid>
-              {Object.entries(PREDEFINED_SCENARIOS).map(([id, scenario]) => {
-                const isFeatured = scenario.category === 'educational' || scenario.difficulty === 'beginner';
-                return (
-                  <ScenarioCard
+            {/* Scenario switcher — compact row */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '0.72rem', color: '#64748b', marginBottom: '0.5rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>System</div>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {Object.entries(PREDEFINED_SCENARIOS).map(([id, scenario]) => (
+                  <button
                     key={id}
-                    $active={uiState.selectedScenario === id}
-                    $featured={isFeatured}
                     onClick={() => handleScenarioSelect(id)}
+                    style={{
+                      padding: '0.3rem 0.7rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      borderRadius: '999px',
+                      border: `1px solid ${uiState.selectedScenario === id ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.1)'}`,
+                      background: uiState.selectedScenario === id ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.04)',
+                      color: uiState.selectedScenario === id ? '#a5b4fc' : '#94a3b8',
+                      cursor: 'pointer',
+                      transition: 'all 0.18s',
+                      whiteSpace: 'nowrap',
+                    }}
                   >
-                    <div className="header">
-                      <h4>{scenario.name}</h4>
-                      {isFeatured && <div className="badge">Featured</div>}
-                    </div>
-                    <div className="description">{scenario.description}</div>
-                    <div className="stats">
-                      <div className="stat">
-                        <Users size={12} />
-                        <span>{scenario.bodies.length} bodies</span>
+                    {scenario.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Body browser */}
+            {(() => {
+              const bodies = simulation.getBodies();
+              const groups: Record<string, typeof bodies> = {
+                star: bodies.filter(b => b.type === 'star' || b.type === 'blackhole'),
+                planet: bodies.filter(b => b.type === 'planet'),
+                moon: bodies.filter(b => b.type === 'moon'),
+                other: bodies.filter(b => b.type !== 'star' && b.type !== 'blackhole' && b.type !== 'planet' && b.type !== 'moon'),
+              };
+              const groupMeta: Record<string, { label: string; icon: string }> = {
+                star:   { label: 'Stars', icon: '☀' },
+                planet: { label: 'Planets', icon: '🪐' },
+                moon:   { label: 'Moons', icon: '🌙' },
+                other:  { label: 'Other', icon: '🛸' },
+              };
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {Object.entries(groups).map(([groupKey, groupBodies]) => {
+                    if (groupBodies.length === 0) return null;
+                    const meta = groupMeta[groupKey];
+                    return (
+                      <div key={groupKey}>
+                        <div style={{ fontSize: '0.7rem', color: '#475569', marginBottom: '0.4rem', letterSpacing: '0.07em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <span>{meta.icon}</span> {meta.label}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                          {groupBodies.map(body => {
+                            const isSelected = uiState.selectedBodyId === body.id;
+                            const dotColor = body.color || '#aaa';
+                            return (
+                              <div
+                                key={body.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.45rem',
+                                  padding: '0.3rem 0.65rem 0.3rem 0.5rem',
+                                  borderRadius: '999px',
+                                  border: `1px solid ${isSelected ? 'rgba(99,102,241,0.7)' : 'rgba(255,255,255,0.08)'}`,
+                                  background: isSelected ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.03)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.18s',
+                                }}
+                              >
+                                {/* Click name → focus/target body */}
+                                <span
+                                  onClick={() => {
+                                    simulation.selectBody(body.id, false);
+                                    setUIState(prev => ({ ...prev, selectedBodyId: body.id }));
+                                    if (typeof rendering.setFollowBody === 'function') {
+                                      rendering.setFollowBody(body.id);
+                                      setUIState(prev => ({ ...prev, cameraFollowTarget: body.id }));
+                                    }
+                                  }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+                                >
+                                  <span style={{
+                                    width: '8px', height: '8px', borderRadius: '50%',
+                                    background: dotColor, flexShrink: 0,
+                                    boxShadow: groupKey === 'star' ? `0 0 6px ${dotColor}` : 'none',
+                                  }} />
+                                  <span style={{ fontSize: '0.78rem', color: isSelected ? '#c7d2fe' : '#cbd5e1', fontWeight: isSelected ? 600 : 400 }}>
+                                    {body.name}
+                                  </span>
+                                </span>
+
+                                {/* Eye icon → enter first-person from this body */}
+                                <span
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    simulation.selectBody(body.id, false);
+                                    rendering.enterFirstPerson(body.id);
+                                    setUIState(prev => ({ ...prev, selectedBodyId: body.id, fpActive: true }));
+                                  }}
+                                  title="View from surface (V)"
+                                  style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    width: '18px', height: '18px', borderRadius: '50%',
+                                    background: 'rgba(99,102,241,0.15)',
+                                    color: 'rgba(147,197,253,0.7)',
+                                    fontSize: '0.65rem', cursor: 'pointer',
+                                    flexShrink: 0, transition: 'background 0.15s',
+                                  }}
+                                >
+                                  👁
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className="stat">
-                        <Clock size={12} />
-                        <span>{Math.round(scenario.estimatedDuration / 60)}min</span>
-                      </div>
-                    </div>
-                  </ScenarioCard>
-                );
-              })}
-            </ScenarioGrid>
+                    );
+                  })}
+                  {bodies.length === 0 && (
+                    <div style={{ color: '#475569', fontSize: '0.8rem', fontStyle: 'italic' }}>No bodies in simulation</div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="nb-controls-section">

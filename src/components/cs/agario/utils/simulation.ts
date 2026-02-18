@@ -2,7 +2,7 @@
 
 import { Genome } from '../neat';
 import {
-  Blob, Food, FoodCluster, Obstacle, Log, TerrainZone
+  Blob, Food, FoodCluster, Obstacle, Log, TerrainZone, TerrainBarrier
 } from '../config/agario.types';
 import {
   WORLD_WIDTH, WORLD_HEIGHT,
@@ -29,7 +29,7 @@ import {
   BLOB_MAX_MASS
 } from '../config/agario.constants';
 import { createEngineeredVisionSystem } from './feature-engineering';
-import { getNearbyFood } from './environment';
+import { getNearbyFood, applyBarrierCollisions } from './environment';
 import { getEnhancedOutputs, calculateHeuristicReward } from './decision-tree';
 
 /**
@@ -135,7 +135,9 @@ export const simulateBlob = (
   spatialGrid: Map<string, Food[]>,
   getNearbyFood: (x: number, y: number, range: number) => Food[],
   giveBirth: (parent: Blob) => boolean,
-  visionSystem: ReturnType<typeof createEngineeredVisionSystem>  // ✅ Add vision system
+  visionSystem: ReturnType<typeof createEngineeredVisionSystem>,
+  heuristicBlendFactor: number = 0.0,  // Default: NO heuristics - let neural nets learn!
+  barriers: TerrainBarrier[] = []  // Non-lethal terrain that blocks movement
 ): Blob => {
   // Age increment
   blob.age++;
@@ -144,7 +146,7 @@ export const simulateBlob = (
   // Neural network decision
   let inputs: number[];
   if (!blob.cachedVision || blob.visionUpdateCounter >= VISION_UPDATE_INTERVAL) {
-    // ✅ Use the vision system here
+    // ✅ Use the vision system here (now with barrier sensing!)
     inputs = visionSystem.getVision(
       blob,
       blobs,
@@ -153,10 +155,42 @@ export const simulateBlob = (
       getNearbyFood,  // This should be your spatial grid function
       tick,
       WORLD_WIDTH,
-      WORLD_HEIGHT
+      WORLD_HEIGHT,
+      barriers  // Non-lethal terrain for navigation challenges
     );
     blob.cachedVision = inputs;
     blob.visionUpdateCounter = 0;
+
+    // Track danger/obstacle encounters for fitness (every vision update)
+    const blobRadius = Math.sqrt(blob.mass) * 2.5;
+    const dangerRange = 150;
+
+    // Check for nearby threats (larger blobs)
+    for (const other of blobs) {
+      if (other.id === blob.id) continue;
+      if (other.mass <= blob.mass * 1.15) continue; // Not a threat
+
+      const dx = other.x - blob.x;
+      const dy = other.y - blob.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < dangerRange) {
+        blob.dangerEncounters = (blob.dangerEncounters || 0) + 1;
+        break; // Only count once per update
+      }
+    }
+
+    // Check for nearby obstacles
+    for (const obs of obstacles) {
+      const dx = obs.x - blob.x;
+      const dy = obs.y - blob.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) - obs.radius - blobRadius;
+
+      if (dist < 80) {
+        blob.obstacleEncounters = (blob.obstacleEncounters || 0) + 1;
+        break; // Only count once per update
+      }
+    }
   } else {
     inputs = blob.cachedVision;
   }
@@ -189,24 +223,71 @@ export const simulateBlob = (
   // Get raw neural network outputs
   const rawOutputs = blob.genome.activate(inputs);
 
-  // Blend with decision tree heuristics for smarter behavior
-  // Blend factor: 0.3 = 30% heuristic influence, 70% neural network
-  // This helps early generations survive while still allowing evolution
+  // Blend with decision tree heuristics (if enabled)
+  // heuristicBlendFactor: 0 = pure neural network, 1 = pure heuristic
+  // For training: use 0 to let neural nets learn independently
+  // For display: can use small value for smoother initial behavior
   const { outputs: enhancedOutputs, heuristic } = getEnhancedOutputs(
-    blob, blobs, food, obstacles, rawOutputs, tick, 0.3
+    blob, blobs, food, obstacles, rawOutputs, tick, heuristicBlendFactor
   );
 
   // Store heuristic reason for display in UI
   blob.lastHeuristicReason = heuristic.reason;
 
-  // Apply heuristic-based reward shaping (helps evolution learn good behaviors)
-  if (tick % 20 === 0) {
+  // ==================== INTELLIGENCE TRACKING ====================
+  // Compare neural network decision to optimal decision (heuristic)
+  // This measures how "smart" the blob's decisions are
+  // Only check every 50 ticks to reduce overhead (was 10, caused 6x slowdown)
+  if (tick % 50 === 0) {
+    blob.totalDecisions = (blob.totalDecisions || 0) + 1;
+
+    // The heuristic represents "optimal" decision for survival
+    // Check if neural network agrees with optimal move
+    const nnAccel = Math.tanh(rawOutputs[0]);
+    const nnTurn = Math.tanh(rawOutputs[1]);
+
+    const heuristicAccel = heuristic.accelerate;
+    const heuristicTurn = heuristic.turn;
+
+    // Decision is "correct" if it's in the same direction as optimal
+    // (both positive or both negative)
+    const accelCorrect = Math.sign(nnAccel) === Math.sign(heuristicAccel) || Math.abs(heuristicAccel) < 0.2;
+    const turnCorrect = Math.abs(nnTurn - heuristicTurn) < 0.5; // Within 0.5 of optimal turn
+
+    if (accelCorrect && turnCorrect && heuristic.confidence > 0.5) {
+      blob.correctDecisions = (blob.correctDecisions || 0) + 1;
+    }
+
+    // Track specific intelligent behaviors
+    if (heuristic.reason.startsWith('FLEE') && nnAccel > 0.3 && turnCorrect) {
+      blob.escapedThreats = (blob.escapedThreats || 0) + 1;
+    }
+
+    if (heuristic.reason.startsWith('HUNT') && nnAccel > 0.3 && turnCorrect) {
+      blob.pursuedPrey = (blob.pursuedPrey || 0) + 1;
+    }
+
+    // Track behavior switches (adaptability)
+    if (blob.lastHeuristicReason && blob.lastHeuristicReason !== heuristic.reason) {
+      // Changed strategy - check if the response was appropriate
+      const previousWasFlee = blob.lastHeuristicReason.startsWith('FLEE');
+      const currentIsFlee = heuristic.reason.startsWith('FLEE');
+
+      if (previousWasFlee !== currentIsFlee) {
+        blob.behaviorSwitches = (blob.behaviorSwitches || 0) + 1;
+      }
+    }
+  }
+
+  // Apply heuristic-based reward shaping ONLY if heuristics are enabled
+  // When heuristicBlendFactor is 0, we want pure neural net learning
+  if (heuristicBlendFactor > 0 && tick % 20 === 0) {
     const heuristicReward = calculateHeuristicReward(
       blob, blobs, food, obstacles,
       { accel: enhancedOutputs[0], turn: enhancedOutputs[1], reproduce: enhancedOutputs[2] },
       tick
     );
-    blob.genome.fitness += heuristicReward * 0.5;  // Scaled down to not dominate
+    blob.genome.fitness += heuristicReward * 0.5 * heuristicBlendFactor;  // Scale with blend factor
   }
 
   const acceleration = Math.tanh(enhancedOutputs[0]) * BLOB_ACCELERATION;
@@ -255,15 +336,54 @@ export const simulateBlob = (
   blob.x += blob.vx;
   blob.y += blob.vy;
 
-  // Wrap around
+  // Wrap around (toroidal world)
   if (blob.x < 0) blob.x += WORLD_WIDTH;
   if (blob.x > WORLD_WIDTH) blob.x -= WORLD_WIDTH;
   if (blob.y < 0) blob.y += WORLD_HEIGHT;
   if (blob.y > WORLD_HEIGHT) blob.y -= WORLD_HEIGHT;
 
+  // Apply terrain barrier collisions (non-lethal, just bounces off)
+  // This creates navigation challenges and breaks "circle movement is optimal" strategy
+  if (barriers.length > 0) {
+    applyBarrierCollisions(blob, barriers);
+  }
+
   // Movement tracking (optimized with squared distance)
   const distMovedSq = distanceSquared(blob.x, blob.y, blob.lastX, blob.lastY);
   const wrapThresholdSq = (WORLD_WIDTH / 2) * (WORLD_WIDTH / 2);
+
+  // Track emergent behavior metrics
+  const currentSpeed = Math.sqrt(blob.vx * blob.vx + blob.vy * blob.vy);
+  const currentHeading = Math.atan2(blob.vy, blob.vx);
+
+  // Initialize tracking fields if needed
+  if (blob.speedVariance === undefined) blob.speedVariance = 0;
+  if (blob.directionChanges === undefined) blob.directionChanges = 0;
+  if (blob.dangerEncounters === undefined) blob.dangerEncounters = 0;
+  if (blob.obstacleEncounters === undefined) blob.obstacleEncounters = 0;
+  if (blob.closeCalls === undefined) blob.closeCalls = 0;
+
+  // Track speed variance (indicates reactive behavior)
+  if (blob.lastSpeed !== undefined) {
+    const speedDiff = Math.abs(currentSpeed - blob.lastSpeed);
+    blob.speedVariance += speedDiff * 0.1;  // Accumulate with decay
+  }
+  blob.lastSpeed = currentSpeed;
+
+  // Track significant direction changes (indicates seeking/avoiding behavior)
+  if (blob.lastHeading !== undefined) {
+    let headingDiff = Math.abs(currentHeading - blob.lastHeading);
+    if (headingDiff > Math.PI) headingDiff = 2 * Math.PI - headingDiff;
+    if (headingDiff > 0.3) {  // ~17 degrees
+      blob.directionChanges++;
+    }
+  }
+  blob.lastHeading = currentHeading;
+
+  // Track close calls (low mass survival)
+  if (blob.mass < 20 && blob.mass > 12) {
+    blob.closeCalls = (blob.closeCalls || 0) + 1;
+  }
 
   if (distMovedSq < wrapThresholdSq) {
     const distMoved = Math.sqrt(distMovedSq); // Only calc sqrt when needed

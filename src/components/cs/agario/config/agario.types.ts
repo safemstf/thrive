@@ -13,6 +13,25 @@ interface TerrainZone {
   type: ZoneType;
 }
 
+// ===================== TERRAIN TOPOLOGY =====================
+// Mountains and barriers that create paths, chokepoints, and navigation challenges
+// These are NON-LETHAL - they just block movement and force routing decisions
+
+interface TerrainBarrier {
+  id: number;
+  type: 'mountain' | 'ridge' | 'reef';  // Visual style
+  // Polygon points defining the barrier shape
+  points: Array<{ x: number; y: number }>;
+  // For collision detection - bounding box
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  // Visual properties
+  color: string;
+  opacity: number;
+}
+
 interface Food {
   x: number;
   y: number;
@@ -45,6 +64,20 @@ interface Obstacle {
   x: number;
   y: number;
   radius: number;
+  // Moving obstacle properties (optional for static obstacles)
+  vx?: number;           // Velocity X
+  vy?: number;           // Velocity Y
+  movementType?: 'static' | 'linear' | 'circular' | 'patrol';
+  // For circular movement
+  orbitCenterX?: number;
+  orbitCenterY?: number;
+  orbitRadius?: number;
+  orbitSpeed?: number;
+  orbitAngle?: number;
+  // For patrol movement
+  patrolPoints?: Array<{x: number, y: number}>;
+  patrolIndex?: number;
+  patrolSpeed?: number;
 }
 
 // Ocean currents push blobs around - terrain that affects pathing
@@ -102,6 +135,32 @@ interface Blob {
     hiddenLayers: number[];
   };
   lastHeuristicReason?: string;  // Current AI decision reason
+
+  // Emergent behavior tracking
+  dangerEncounters?: number;     // Times near larger blobs
+  closeCalls?: number;           // Times mass dropped below 20
+  obstacleEncounters?: number;   // Times near obstacles
+  directionChanges?: number;     // Significant heading changes
+  speedVariance?: number;        // Variance in movement speed
+  lastSpeed?: number;            // For tracking speed changes
+  lastHeading?: number;          // For tracking direction changes
+
+  // === INTELLIGENCE METRICS ===
+  // These measure decision QUALITY, not just outcomes
+
+  // Correct decisions: approaching food, fleeing threats
+  correctDecisions?: number;     // Decisions that matched optimal action
+  totalDecisions?: number;       // Total decision points evaluated
+
+  // Spatial awareness
+  escapedThreats?: number;       // Started fleeing when threat appeared
+  pursuedPrey?: number;          // Chased smaller blobs successfully
+
+  // Prediction ability (did action lead to expected outcome?)
+  predictedOutcomes?: number;    // Actions that achieved intended goal
+
+  // Adaptability
+  behaviorSwitches?: number;     // Changed strategy based on situation
 }
 
 export type ActivationFunction = 'tanh' | 'sigmoid' | 'relu' | 'leaky_relu';
@@ -158,6 +217,7 @@ export type { ZoneType };
 
 export type {
   TerrainZone,
+  TerrainBarrier,
   Food,
   FoodCluster,
   FoodIsland,

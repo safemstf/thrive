@@ -239,7 +239,7 @@ export type BodyScale = {
 export const BODY_SCALE: Record<string, BodyScale> = {
   star: { min: 5, max: 15, multiplier: 2e-7, lodDistances: [0, 500, 1000, 2000], glowScale: 3, enableTrails: false, trailLength: 0 },
   planet: { min: 1, max: 5, multiplier: 5e-6, lodDistances: [0, 300, 800, 1500], enableTrails: true, trailLength: 300 },
-  moon: { min: 0.3, max: 2, multiplier: 1e-5, lodDistances: [0, 200, 600, 1200], enableTrails: true, trailLength: 150 },
+  moon: { min: 0.6, max: 2.5, multiplier: 2e-5, lodDistances: [0, 200, 600, 1200], enableTrails: true, trailLength: 200 },
   asteroid: { min: 0.1, max: 0.5, multiplier: 1e-4, lodDistances: [0, 100, 400, 800], enableTrails: true, trailLength: 80 },
   comet: { min: 0.2, max: 1, multiplier: 5e-5, lodDistances: [0, 150, 500, 1000], enableTrails: true, trailLength: 400 },
   // UPDATED: Better spacecraft visualization

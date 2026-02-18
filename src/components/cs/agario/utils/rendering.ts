@@ -1,7 +1,7 @@
 // src/components/cs/agario/utils/rendering.ts
 
 import {
-  Blob, Food, FoodCluster, FoodIsland, Obstacle, Log, TerrainZone
+  Blob, Food, FoodCluster, FoodIsland, Obstacle, Log, TerrainZone, TerrainBarrier
 } from '../config/agario.types';
 import {
   WORLD_WIDTH, WORLD_HEIGHT,
@@ -871,13 +871,15 @@ function canBlobReproduce(blob: Blob, currentTick: number): boolean {
   );
 }
 
-// ===================== CLEAN JELLYFISH RENDERING =====================
-// Simple, elegant jellyfish with subtle generation-based differences
+// ===================== ABSTRACT ORGANISM RENDERING =====================
+// Minimal, elegant design: glowing orbs with energy trails
+// Beauty through simplicity - lets the behavior shine
 
 /**
- * Draw a clean, elegant jellyfish bell
+ * Draw an abstract glowing organism
+ * Design philosophy: Pure, minimal form that emphasizes movement and state
  */
-function drawJellyfishBell(
+function drawAbstractOrganism(
   canvas: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -886,171 +888,257 @@ function drawJellyfishBell(
   pulsePhase: number,
   camera: Camera,
   generation: number,
-  mass: number
+  mass: number,
+  fitness: number
 ): void {
-  // Gentle pulse animation
-  const pulseAmount = Math.sin(pulsePhase) * 0.12;
-  const bellWidth = radius * (1 + pulseAmount);
-  const bellHeight = radius * 0.7 * (1 - pulseAmount * 0.3);
+  // Subtle breathing animation
+  const breathe = Math.sin(pulsePhase) * 0.08;
+  const coreRadius = radius * (0.6 + breathe);
+  const auraRadius = radius * (1.2 - breathe * 0.5);
 
   canvas.save();
   canvas.translate(x, y);
 
-  // Main bell gradient - translucent and glowing
-  const gradient = canvas.createRadialGradient(
-    0, -bellHeight * 0.4, 0,
-    0, 0, bellWidth
+  // === OUTER AURA ===
+  // Soft glow that shows the organism's "reach"
+  const auraGradient = canvas.createRadialGradient(0, 0, coreRadius * 0.5, 0, 0, auraRadius);
+  auraGradient.addColorStop(0, adjustColorBrightness(color, 30, 0.25)); // 25% alpha
+  auraGradient.addColorStop(0.5, colorWithAlpha(color, 0.12)); // 12% alpha
+  auraGradient.addColorStop(1, colorWithAlpha(color, 0)); // 0% alpha
+
+  canvas.fillStyle = auraGradient;
+  canvas.beginPath();
+  canvas.arc(0, 0, auraRadius, 0, Math.PI * 2);
+  canvas.fill();
+
+  // === CORE BODY ===
+  // Clean, solid core with subtle gradient
+  const coreGradient = canvas.createRadialGradient(
+    -coreRadius * 0.3, -coreRadius * 0.3, 0,
+    0, 0, coreRadius
   );
-  gradient.addColorStop(0, adjustColorBrightness(color, 60));
-  gradient.addColorStop(0.3, color);
-  gradient.addColorStop(0.7, adjustColorBrightness(color, -20));
-  gradient.addColorStop(1, adjustColorBrightness(color, -40));
+  coreGradient.addColorStop(0, adjustColorBrightness(color, 80));
+  coreGradient.addColorStop(0.4, adjustColorBrightness(color, 30));
+  coreGradient.addColorStop(0.8, color);
+  coreGradient.addColorStop(1, adjustColorBrightness(color, -30));
 
-  // Transparency based on mass (larger = more opaque)
-  const alpha = 0.6 + Math.min(0.3, mass / 150);
-  canvas.globalAlpha = alpha;
-  canvas.fillStyle = gradient;
-
-  // Draw smooth bell dome
+  canvas.fillStyle = coreGradient;
   canvas.beginPath();
-  canvas.ellipse(0, 0, bellWidth, bellHeight, 0, Math.PI, 0, false);
-
-  // Curved underside with slight inward curve
-  canvas.quadraticCurveTo(bellWidth * 0.6, bellHeight * 0.6, 0, bellHeight * 0.4);
-  canvas.quadraticCurveTo(-bellWidth * 0.6, bellHeight * 0.6, -bellWidth, 0);
-  canvas.closePath();
+  canvas.arc(0, 0, coreRadius, 0, Math.PI * 2);
   canvas.fill();
 
-  // Inner glow (center lighter)
-  canvas.globalAlpha = 0.3;
-  const innerGlow = canvas.createRadialGradient(0, -bellHeight * 0.2, 0, 0, 0, bellWidth * 0.5);
-  innerGlow.addColorStop(0, 'rgba(255, 255, 255, 0.5)');
-  innerGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
-  canvas.fillStyle = innerGlow;
+  // === INNER NUCLEUS ===
+  // Bright center - the "brain"
+  const nucleusRadius = coreRadius * 0.35;
+  const nucleusGradient = canvas.createRadialGradient(0, 0, 0, 0, 0, nucleusRadius);
+  nucleusGradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+  nucleusGradient.addColorStop(0.5, adjustColorBrightness(color, 100, 0.8)); // 80% alpha
+  nucleusGradient.addColorStop(1, adjustColorBrightness(color, 50, 0.5)); // 50% alpha
+
+  canvas.fillStyle = nucleusGradient;
   canvas.beginPath();
-  canvas.ellipse(0, -bellHeight * 0.1, bellWidth * 0.5, bellHeight * 0.4, 0, 0, Math.PI * 2);
+  canvas.arc(0, 0, nucleusRadius, 0, Math.PI * 2);
   canvas.fill();
 
-  // Bell rim highlight
-  canvas.globalAlpha = alpha * 0.6;
-  canvas.strokeStyle = adjustColorBrightness(color, 80);
-  canvas.lineWidth = 2 / camera.zoom;
-  canvas.beginPath();
-  canvas.ellipse(0, 0, bellWidth * 0.95, bellHeight * 0.25, 0, Math.PI, 0, false);
-  canvas.stroke();
+  // === GENERATION RINGS ===
+  // More evolved = more intricate internal structure
+  if (generation > 3) {
+    const ringCount = Math.min(4, Math.floor(generation / 5));
+    const ringAlpha = Math.min(0.4, generation / 50);
 
-  // Generation indicator: subtle internal pattern for evolved jellyfish
-  if (generation > 5) {
-    const patternIntensity = Math.min(0.25, (generation - 5) / 40);
-    canvas.globalAlpha = patternIntensity;
-    canvas.strokeStyle = adjustColorBrightness(color, -30);
+    canvas.strokeStyle = `rgba(255, 255, 255, ${ringAlpha})`;
     canvas.lineWidth = 1 / camera.zoom;
 
-    // Simple radial lines (like real jellyfish canals)
-    const lineCount = 4 + Math.floor(generation / 10);
-    for (let i = 0; i < lineCount; i++) {
-      const angle = (i / lineCount) * Math.PI * 2;
+    for (let i = 1; i <= ringCount; i++) {
+      const ringRadius = coreRadius * (0.3 + i * 0.15);
       canvas.beginPath();
-      canvas.moveTo(0, bellHeight * 0.1);
-      canvas.lineTo(
-        Math.cos(angle) * bellWidth * 0.6,
-        Math.sin(angle) * bellHeight * 0.4 - bellHeight * 0.1
-      );
+      canvas.arc(0, 0, ringRadius, 0, Math.PI * 2);
       canvas.stroke();
     }
   }
 
-  canvas.globalAlpha = 1;
+  // === FITNESS INDICATOR ===
+  // Small orbital dots showing fitness level (subtle)
+  if (fitness > 50) {
+    const dotCount = Math.min(6, Math.floor(fitness / 100));
+    const orbitRadius = coreRadius * 1.1;
+    const orbitAlpha = Math.min(0.6, fitness / 500);
+
+    canvas.fillStyle = `rgba(255, 255, 255, ${orbitAlpha})`;
+
+    for (let i = 0; i < dotCount; i++) {
+      const angle = (i / dotCount) * Math.PI * 2 + pulsePhase * 0.5;
+      const dotX = Math.cos(angle) * orbitRadius;
+      const dotY = Math.sin(angle) * orbitRadius;
+      const dotSize = 2 / camera.zoom;
+
+      canvas.beginPath();
+      canvas.arc(dotX, dotY, dotSize, 0, Math.PI * 2);
+      canvas.fill();
+    }
+  }
+
   canvas.restore();
 }
 
 /**
- * Draw clean, flowing jellyfish tentacles
+ * Draw energy trails behind moving organisms
+ * Trails show movement history - intelligent movement creates interesting patterns
  */
-function drawJellyfishTentacles(
+function drawEnergyTrail(
   canvas: CanvasRenderingContext2D,
   x: number,
   y: number,
   radius: number,
   color: string,
-  pulsePhase: number,
   movementAngle: number,
   speed: number,
   camera: Camera,
   blobId: number,
-  generation: number,
-  mass: number
+  generation: number
 ): void {
-  const bellHeight = radius * 0.7;
-  const tentacleBase = y + bellHeight * 0.3;
+  // Only draw trails for moving organisms
+  if (speed < 0.3) return;
 
-  // Tentacle count increases slightly with generation
-  const tentacleCount = Math.min(10, 5 + Math.floor(generation / 8));
+  const trailLength = Math.min(radius * 2, speed * 15);
+  const trailWidth = radius * 0.4;
 
-  // Movement drag - tentacles trail behind
-  const dragX = -Math.cos(movementAngle) * speed * 5;
-  const dragY = -Math.sin(movementAngle) * speed * 5;
-
-  // Alpha based on mass
-  const baseAlpha = 0.5 + Math.min(0.3, mass / 150);
+  // Trail flows opposite to movement direction
+  const trailEndX = x - Math.cos(movementAngle) * trailLength;
+  const trailEndY = y - Math.sin(movementAngle) * trailLength;
 
   canvas.save();
+
+  // Trail gradient - fades out
+  const trailGradient = canvas.createLinearGradient(x, y, trailEndX, trailEndY);
+  trailGradient.addColorStop(0, colorWithAlpha(color, 0.37)); // 37% alpha at organism
+  trailGradient.addColorStop(0.3, colorWithAlpha(color, 0.19)); // 19% alpha
+  trailGradient.addColorStop(1, colorWithAlpha(color, 0)); // Fade to transparent
+
+  canvas.strokeStyle = trailGradient;
+  canvas.lineWidth = trailWidth / camera.zoom;
   canvas.lineCap = 'round';
 
-  for (let i = 0; i < tentacleCount; i++) {
-    // Spread tentacles evenly under the bell
-    const spreadFactor = (i / (tentacleCount - 1)) - 0.5; // -0.5 to 0.5
-    const tentacleX = x + spreadFactor * radius * 1.6;
+  // Simple trail line
+  canvas.beginPath();
+  canvas.moveTo(x, y);
+  canvas.lineTo(trailEndX, trailEndY);
+  canvas.stroke();
 
-    // Length varies: longer in middle
-    const positionFactor = 1 - Math.abs(spreadFactor) * 0.5;
-    const tentacleLength = radius * (1.0 + positionFactor * 0.6);
+  // Add subtle wave to trail for more evolved organisms
+  if (generation > 10 && speed > 0.5) {
+    const waveAmplitude = trailWidth * 0.3;
+    const waveFreq = 3;
 
-    // Wave motion - each tentacle has offset phase
-    const waveOffset = (blobId * 0.5 + i * 0.9) + pulsePhase;
-    const waveAmount = Math.sin(waveOffset) * radius * 0.25;
-
-    // Draw smooth bezier curve tentacle
-    canvas.strokeStyle = adjustColorBrightness(color, -10);
-    canvas.lineWidth = Math.max(1.5, (3 - i * 0.2)) / camera.zoom;
-    canvas.globalAlpha = baseAlpha * (0.7 - Math.abs(spreadFactor) * 0.3);
-
-    // Control points for smooth curve
-    const cp1x = tentacleX + waveAmount * 0.5 + dragX * 0.3;
-    const cp1y = tentacleBase + tentacleLength * 0.35 + dragY * 0.2;
-    const cp2x = tentacleX - waveAmount * 0.7 + dragX * 0.6;
-    const cp2y = tentacleBase + tentacleLength * 0.7 + dragY * 0.4;
-    const endX = tentacleX + waveAmount * 0.4 + dragX * 0.8;
-    const endY = tentacleBase + tentacleLength + dragY * 0.5;
-
+    canvas.strokeStyle = `rgba(255, 255, 255, 0.15)`;
+    canvas.lineWidth = 1.5 / camera.zoom;
     canvas.beginPath();
-    canvas.moveTo(tentacleX, tentacleBase);
-    canvas.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+    canvas.moveTo(x, y);
+
+    for (let t = 0; t <= 1; t += 0.1) {
+      const px = x + (trailEndX - x) * t;
+      const py = y + (trailEndY - y) * t;
+      const wave = Math.sin(t * Math.PI * waveFreq + blobId) * waveAmplitude * (1 - t);
+
+      // Perpendicular offset
+      const perpX = -Math.sin(movementAngle) * wave;
+      const perpY = Math.cos(movementAngle) * wave;
+
+      if (t === 0) canvas.moveTo(px + perpX, py + perpY);
+      else canvas.lineTo(px + perpX, py + perpY);
+    }
     canvas.stroke();
   }
 
-  canvas.globalAlpha = 1;
   canvas.restore();
 }
 
 /**
- * Adjust color brightness
+ * Convert any color format to RGBA with specified alpha
+ * Handles HSL, RGB, hex colors
  */
-function adjustColorBrightness(color: string, amount: number): string {
+function colorWithAlpha(color: string, alpha: number): string {
+  // HSL format: hsl(h, s%, l%)
+  const hslMatch = color.match(/hsl\(\s*([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%\s*\)/);
+  if (hslMatch) {
+    const h = parseFloat(hslMatch[1]);
+    const s = parseFloat(hslMatch[2]);
+    const l = parseFloat(hslMatch[3]);
+    return `hsla(${h}, ${s}%, ${l}%, ${alpha})`;
+  }
+
+  // HSLA format: hsla(h, s%, l%, a)
+  const hslaMatch = color.match(/hsla\(\s*([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%,\s*([\d.]+)\s*\)/);
+  if (hslaMatch) {
+    const h = parseFloat(hslaMatch[1]);
+    const s = parseFloat(hslaMatch[2]);
+    const l = parseFloat(hslaMatch[3]);
+    return `hsla(${h}, ${s}%, ${l}%, ${alpha})`;
+  }
+
+  // Hex format: #RRGGBB
+  if (color.startsWith('#')) {
+    const hex = color.slice(1);
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  // RGB format: rgb(r, g, b)
+  const rgbMatch = color.match(/rgb\(\s*(\d+),\s*(\d+),\s*(\d+)\s*\)/);
+  if (rgbMatch) {
+    return `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, ${alpha})`;
+  }
+
+  // RGBA format: rgba(r, g, b, a)
+  const rgbaMatch = color.match(/rgba\(\s*(\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\s*\)/);
+  if (rgbaMatch) {
+    return `rgba(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]}, ${alpha})`;
+  }
+
+  // Fallback - return with rgba wrapper
+  return `rgba(128, 128, 128, ${alpha})`;
+}
+
+/**
+ * Adjust color brightness and optionally add alpha
+ */
+function adjustColorBrightness(color: string, amount: number, alpha?: number): string {
+  // Convert HSL to RGB first for brightness adjustment
+  const hslMatch = color.match(/hsla?\(\s*([\d.]+),\s*([\d.]+)%,\s*([\d.]+)%/);
+  if (hslMatch) {
+    const h = parseFloat(hslMatch[1]);
+    const s = parseFloat(hslMatch[2]);
+    // Adjust lightness
+    const l = Math.min(100, Math.max(0, parseFloat(hslMatch[3]) + amount / 2.55));
+    if (alpha !== undefined) {
+      return `hsla(${h}, ${s}%, ${l}%, ${alpha})`;
+    }
+    return `hsl(${h}, ${s}%, ${l}%)`;
+  }
+
   // Handle hex colors
   if (color.startsWith('#')) {
     const hex = color.slice(1);
     const r = Math.min(255, Math.max(0, parseInt(hex.slice(0, 2), 16) + amount));
     const g = Math.min(255, Math.max(0, parseInt(hex.slice(2, 4), 16) + amount));
     const b = Math.min(255, Math.max(0, parseInt(hex.slice(4, 6), 16) + amount));
+    if (alpha !== undefined) {
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
     return `rgb(${r}, ${g}, ${b})`;
   }
+
   // Handle rgb/rgba colors
   const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
   if (match) {
     const r = Math.min(255, Math.max(0, parseInt(match[1]) + amount));
     const g = Math.min(255, Math.max(0, parseInt(match[2]) + amount));
     const b = Math.min(255, Math.max(0, parseInt(match[3]) + amount));
+    if (alpha !== undefined) {
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
     return `rgb(${r}, ${g}, ${b})`;
   }
   return color;
@@ -1065,81 +1153,85 @@ export function renderBlob(blob: Blob, ctx: RenderContext): void {
   if (!isInView(blob.x, blob.y, radius + 40, ctx)) return;
 
   // Animation values
-  const pulsePhase = (currentTick * 0.07 + blob.id * 0.5) % (Math.PI * 2);
+  const pulsePhase = (currentTick * 0.05 + blob.id * 0.3) % (Math.PI * 2);
   const movementAngle = Math.atan2(blob.vy, blob.vx);
   const speed = Math.sqrt(blob.vx * blob.vx + blob.vy * blob.vy);
+  const fitness = blob.genome.fitness || 0;
 
-  // === LOW LOD: Simple translucent oval ===
+  // === LOW LOD: Simple glowing circle ===
   if (lod === 'low') {
-    canvas.fillStyle = blob.color;
-    canvas.globalAlpha = 0.7;
+    const gradient = canvas.createRadialGradient(blob.x, blob.y, 0, blob.x, blob.y, radius);
+    gradient.addColorStop(0, blob.color);
+    gradient.addColorStop(1, colorWithAlpha(blob.color, 0.25));
+    canvas.fillStyle = gradient;
     canvas.beginPath();
-    canvas.ellipse(blob.x, blob.y, radius, radius * 0.6, 0, 0, Math.PI * 2);
+    canvas.arc(blob.x, blob.y, radius, 0, Math.PI * 2);
     canvas.fill();
-    canvas.globalAlpha = 1;
     return;
   }
 
-  // === MEDIUM/HIGH LOD: Clean jellyfish ===
+  // === MEDIUM/HIGH LOD: Abstract glowing organism ===
 
-  // Health warning (starvation)
+  // Health warning (starvation) - subtle red pulse
   if (blob.mass < 20) {
-    canvas.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+    const warningPulse = Math.sin(currentTick * 0.2) * 0.3 + 0.4;
+    canvas.strokeStyle = `rgba(239, 68, 68, ${warningPulse})`;
     canvas.lineWidth = 2 / camera.zoom;
-    canvas.setLineDash([4 / camera.zoom, 4 / camera.zoom]);
     canvas.beginPath();
-    canvas.arc(blob.x, blob.y, radius + 4, 0, Math.PI * 2);
+    canvas.arc(blob.x, blob.y, radius * 1.3, 0, Math.PI * 2);
     canvas.stroke();
-    canvas.setLineDash([]);
   }
 
-  // Draw tentacles first (behind the bell)
-  drawJellyfishTentacles(
+  // Draw energy trail first (behind the organism)
+  drawEnergyTrail(
     canvas, blob.x, blob.y, radius, blob.color,
-    pulsePhase, movementAngle, speed, camera, blob.id,
-    blob.generation, blob.mass
+    movementAngle, speed, camera, blob.id, blob.generation
   );
 
-  // Draw the bell (dome)
-  drawJellyfishBell(
+  // Draw the abstract organism
+  drawAbstractOrganism(
     canvas, blob.x, blob.y, radius, blob.color,
-    pulsePhase, camera, blob.generation, blob.mass
+    pulsePhase, camera, blob.generation, blob.mass, fitness
   );
 
-  // Reproduction readiness glow
+  // Reproduction readiness - gentle purple outer glow
   if (lod === 'high' && canBlobReproduce(blob, currentTick)) {
-    const glowGradient = canvas.createRadialGradient(
-      blob.x, blob.y, radius * 0.5,
-      blob.x, blob.y, radius + 15
-    );
-    glowGradient.addColorStop(0, 'rgba(168, 85, 247, 0)');
-    glowGradient.addColorStop(0.6, 'rgba(168, 85, 247, 0.2)');
-    glowGradient.addColorStop(1, 'rgba(168, 85, 247, 0)');
-
-    canvas.fillStyle = glowGradient;
+    const glowPulse = Math.sin(currentTick * 0.1) * 0.1 + 0.2;
+    canvas.strokeStyle = `rgba(168, 85, 247, ${glowPulse})`;
+    canvas.lineWidth = 3 / camera.zoom;
     canvas.beginPath();
-    canvas.arc(blob.x, blob.y, radius + 15, 0, Math.PI * 2);
-    canvas.fill();
+    canvas.arc(blob.x, blob.y, radius * 1.4, 0, Math.PI * 2);
+    canvas.stroke();
   }
 
-  // ID label (only at medium/high zoom)
-  if (camera.zoom > 0.5) {
-    canvas.fillStyle = 'rgba(255, 255, 255, 0.85)';
-    canvas.font = `bold ${9 / camera.zoom}px monospace`;
+  // ID label (only at high zoom) - minimal
+  if (camera.zoom > 0.7) {
+    canvas.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    canvas.font = `${8 / camera.zoom}px monospace`;
     canvas.textAlign = 'center';
     canvas.textBaseline = 'middle';
-    canvas.fillText(`${blob.id}`, blob.x, blob.y - radius * 0.2);
+    canvas.fillText(`${blob.id}`, blob.x, blob.y);
   }
 
-  // Selection highlight
+  // Selection highlight - clean ring
   if (selectedBlobId === blob.id) {
-    canvas.strokeStyle = '#818cf8';
+    canvas.strokeStyle = 'rgba(129, 140, 248, 0.8)';
     canvas.lineWidth = 2 / camera.zoom;
-    canvas.setLineDash([4 / camera.zoom, 4 / camera.zoom]);
     canvas.beginPath();
-    canvas.arc(blob.x, blob.y, radius + 10, 0, Math.PI * 2);
+    canvas.arc(blob.x, blob.y, radius * 1.5, 0, Math.PI * 2);
     canvas.stroke();
-    canvas.setLineDash([]);
+
+    // Selection glow
+    const selectionGlow = canvas.createRadialGradient(
+      blob.x, blob.y, radius,
+      blob.x, blob.y, radius * 1.8
+    );
+    selectionGlow.addColorStop(0, 'rgba(129, 140, 248, 0.2)');
+    selectionGlow.addColorStop(1, 'rgba(129, 140, 248, 0)');
+    canvas.fillStyle = selectionGlow;
+    canvas.beginPath();
+    canvas.arc(blob.x, blob.y, radius * 1.8, 0, Math.PI * 2);
+    canvas.fill();
   }
 }
 
@@ -1240,6 +1332,101 @@ export function renderFoodIslands(
   }
 }
 
+// ===================== TERRAIN BARRIERS =====================
+
+/**
+ * Render terrain barriers (mountains, ridges, reefs)
+ * These are non-lethal obstacles that create navigation challenges
+ */
+function renderTerrainBarriers(
+  barriers: TerrainBarrier[],
+  ctx: RenderContext
+): void {
+  const { ctx: canvas, camera } = ctx;
+
+  for (const barrier of barriers) {
+    // Check if barrier is in view (quick bounding box check)
+    const centerX = (barrier.minX + barrier.maxX) / 2;
+    const centerY = (barrier.minY + barrier.maxY) / 2;
+    const radius = Math.max(barrier.maxX - barrier.minX, barrier.maxY - barrier.minY) / 2;
+
+    if (!isInView(centerX, centerY, radius, ctx)) continue;
+
+    const points = barrier.points;
+    if (points.length < 3) continue;
+
+    // Determine LOD
+    const lod = getLODLevel(camera.zoom);
+
+    // Draw the barrier polygon
+    canvas.beginPath();
+    canvas.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      canvas.lineTo(points[i].x, points[i].y);
+    }
+    canvas.closePath();
+
+    // Fill with semi-transparent color based on type
+    if (lod === 'high' || lod === 'medium') {
+      // Create gradient for depth effect
+      const gradient = canvas.createLinearGradient(
+        barrier.minX, barrier.minY,
+        barrier.maxX, barrier.maxY
+      );
+
+      switch (barrier.type) {
+        case 'mountain':
+          // Brown/gray mountain colors
+          gradient.addColorStop(0, `hsla(35, 25%, 35%, ${barrier.opacity * 0.9})`);
+          gradient.addColorStop(0.5, `hsla(35, 20%, 25%, ${barrier.opacity})`);
+          gradient.addColorStop(1, `hsla(35, 30%, 20%, ${barrier.opacity * 0.8})`);
+          break;
+        case 'ridge':
+          // Darker ridge colors
+          gradient.addColorStop(0, `hsla(30, 20%, 30%, ${barrier.opacity * 0.8})`);
+          gradient.addColorStop(1, `hsla(30, 15%, 20%, ${barrier.opacity * 0.9})`);
+          break;
+        case 'reef':
+          // Blue-green reef colors
+          gradient.addColorStop(0, `hsla(210, 30%, 40%, ${barrier.opacity * 0.7})`);
+          gradient.addColorStop(1, `hsla(200, 25%, 30%, ${barrier.opacity * 0.8})`);
+          break;
+        default:
+          gradient.addColorStop(0, barrier.color);
+          gradient.addColorStop(1, barrier.color);
+      }
+
+      canvas.fillStyle = gradient;
+    } else {
+      // Low LOD - simple solid color
+      canvas.fillStyle = `rgba(60, 50, 40, ${barrier.opacity * 0.7})`;
+    }
+
+    canvas.fill();
+
+    // Draw outline for definition
+    if (lod !== 'low') {
+      canvas.strokeStyle = `rgba(30, 25, 20, ${barrier.opacity})`;
+      canvas.lineWidth = Math.max(1, 2 / camera.zoom);
+      canvas.stroke();
+
+      // Add highlight on one edge for 3D effect
+      if (lod === 'high' && camera.zoom > 0.6) {
+        canvas.strokeStyle = `rgba(255, 255, 255, 0.15)`;
+        canvas.lineWidth = Math.max(0.5, 1 / camera.zoom);
+        canvas.beginPath();
+        // Draw highlight on upper-left edges
+        for (let i = 0; i < Math.min(3, points.length); i++) {
+          const p = points[i];
+          if (i === 0) canvas.moveTo(p.x, p.y);
+          else canvas.lineTo(p.x, p.y);
+        }
+        canvas.stroke();
+      }
+    }
+  }
+}
+
 // ===================== MAIN RENDER FUNCTION =====================
 
 export function renderSimulation(
@@ -1250,7 +1437,8 @@ export function renderSimulation(
   logs: Log[],
   terrainZones: TerrainZone[],
   ctx: RenderContext,
-  foodIslands?: FoodIsland[]  // Optional for backward compatibility
+  foodIslands?: FoodIsland[],  // Optional for backward compatibility
+  barriers?: TerrainBarrier[]  // Non-lethal terrain topology
 ): void {
   const { ctx: canvas } = ctx;
 
@@ -1273,6 +1461,12 @@ export function renderSimulation(
 
   renderGrid(ctx);
   renderBorder(ctx);
+
+  // Terrain barriers (mountains, ridges, reefs) - render before food/obstacles
+  // These create navigation challenges and break "circle movement is optimal"
+  if (barriers && barriers.length > 0) {
+    renderTerrainBarriers(barriers, ctx);
+  }
 
   // Food (LOD system)
   const clusteredFoodIds = renderFoodClusters(foodClusters, ctx);

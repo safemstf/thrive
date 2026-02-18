@@ -1,6 +1,6 @@
 // src/components/cs/agario/environment.ts
 
-import { BiomeConfig, Food, FoodCluster, Obstacle } from '../config/agario.types';
+import { BiomeConfig, Food, FoodCluster, Obstacle, TerrainBarrier } from '../config/agario.types';
 import {
   MAX_FOOD, FOOD_SPAWN_RATE,
   CLUSTER_DISTANCE, MIN_CLUSTER_SIZE,
@@ -12,7 +12,12 @@ import {
   FOOD_ISLAND_SPAWN_RATE_MAX,
   FOOD_ISLAND_MAX_FOOD,
   FOOD_ISLAND_RICH_CHANCE,
-  FOOD_ISLAND_SCATTER_RATE
+  FOOD_ISLAND_SCATTER_RATE,
+  MOVING_OBSTACLE_RATIO,
+  OBSTACLE_SPEED_MIN,
+  OBSTACLE_SPEED_MAX,
+  OBSTACLE_ORBIT_RADIUS_MIN,
+  OBSTACLE_ORBIT_RADIUS_MAX
 } from '../config/agario.constants';
 
 /**
@@ -734,3 +739,504 @@ export const getEnvironmentStats = (state: EnvironmentState) => {
 // Export original functions for backward compatibility
 export const clusterFood = clusterFoodEnhanced;
 export const ageFood = ageFoodEnhanced;
+
+// ===================== MOVING OBSTACLES =====================
+// Obstacles that move require PREDICTION to avoid - key for intelligence!
+
+/**
+ * Create obstacles with optional movement patterns
+ * Some are static, some move in patterns - blobs must PREDICT to survive
+ */
+export function createObstacles(
+  count: number,
+  worldWidth: number,
+  worldHeight: number
+): Obstacle[] {
+  const obstacles: Obstacle[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const x = Math.random() * worldWidth;
+    const y = Math.random() * worldHeight;
+    const radius = 20 + Math.random() * 25;
+
+    // Decide if this obstacle moves
+    const isMoving = Math.random() < MOVING_OBSTACLE_RATIO;
+
+    if (!isMoving) {
+      // Static obstacle
+      obstacles.push({ x, y, radius, movementType: 'static', vx: 0, vy: 0 });
+    } else {
+      // Moving obstacle - choose movement pattern
+      const patternRoll = Math.random();
+
+      if (patternRoll < 0.4) {
+        // Circular/orbital movement (40%)
+        const orbitRadius = OBSTACLE_ORBIT_RADIUS_MIN +
+          Math.random() * (OBSTACLE_ORBIT_RADIUS_MAX - OBSTACLE_ORBIT_RADIUS_MIN);
+        const orbitSpeed = (OBSTACLE_SPEED_MIN +
+          Math.random() * (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)) * 0.01;
+        const orbitAngle = Math.random() * Math.PI * 2;
+
+        obstacles.push({
+          x,
+          y,
+          radius,
+          movementType: 'circular',
+          vx: 0,
+          vy: 0,
+          orbitCenterX: x,
+          orbitCenterY: y,
+          orbitRadius,
+          orbitSpeed: orbitSpeed * (Math.random() > 0.5 ? 1 : -1), // Random direction
+          orbitAngle
+        });
+      } else if (patternRoll < 0.7) {
+        // Linear bouncing movement (30%)
+        const speed = OBSTACLE_SPEED_MIN +
+          Math.random() * (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN);
+        const angle = Math.random() * Math.PI * 2;
+
+        obstacles.push({
+          x,
+          y,
+          radius,
+          movementType: 'linear',
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed
+        });
+      } else {
+        // Patrol between points (30%)
+        const numPoints = 2 + Math.floor(Math.random() * 3); // 2-4 patrol points
+        const patrolPoints: Array<{x: number, y: number}> = [];
+
+        // Create patrol points in a rough path
+        let px = x;
+        let py = y;
+        for (let j = 0; j < numPoints; j++) {
+          patrolPoints.push({ x: px, y: py });
+          // Next point within reasonable distance
+          px = Math.max(50, Math.min(worldWidth - 50,
+            px + (Math.random() - 0.5) * 400));
+          py = Math.max(50, Math.min(worldHeight - 50,
+            py + (Math.random() - 0.5) * 400));
+        }
+
+        obstacles.push({
+          x,
+          y,
+          radius,
+          movementType: 'patrol',
+          vx: 0,
+          vy: 0,
+          patrolPoints,
+          patrolIndex: 0,
+          patrolSpeed: OBSTACLE_SPEED_MIN +
+            Math.random() * (OBSTACLE_SPEED_MAX - OBSTACLE_SPEED_MIN)
+        });
+      }
+    }
+  }
+
+  return obstacles;
+}
+
+/**
+ * Update moving obstacles each tick
+ * Returns the updated obstacle array
+ */
+export function updateObstacles(
+  obstacles: Obstacle[],
+  worldWidth: number,
+  worldHeight: number
+): Obstacle[] {
+  for (const obs of obstacles) {
+    if (!obs.movementType || obs.movementType === 'static') {
+      continue;
+    }
+
+    switch (obs.movementType) {
+      case 'circular': {
+        // Orbit around center point
+        if (obs.orbitAngle !== undefined && obs.orbitSpeed !== undefined &&
+            obs.orbitCenterX !== undefined && obs.orbitCenterY !== undefined &&
+            obs.orbitRadius !== undefined) {
+          obs.orbitAngle += obs.orbitSpeed;
+
+          const newX = obs.orbitCenterX + Math.cos(obs.orbitAngle) * obs.orbitRadius;
+          const newY = obs.orbitCenterY + Math.sin(obs.orbitAngle) * obs.orbitRadius;
+
+          // Update velocity for vision system to use
+          obs.vx = newX - obs.x;
+          obs.vy = newY - obs.y;
+
+          obs.x = newX;
+          obs.y = newY;
+        }
+        break;
+      }
+
+      case 'linear': {
+        // Move and bounce off walls
+        obs.x += obs.vx || 0;
+        obs.y += obs.vy || 0;
+
+        // Bounce off walls
+        if (obs.x < obs.radius || obs.x > worldWidth - obs.radius) {
+          obs.vx = -(obs.vx || 0);
+          obs.x = Math.max(obs.radius, Math.min(worldWidth - obs.radius, obs.x));
+        }
+        if (obs.y < obs.radius || obs.y > worldHeight - obs.radius) {
+          obs.vy = -(obs.vy || 0);
+          obs.y = Math.max(obs.radius, Math.min(worldHeight - obs.radius, obs.y));
+        }
+        break;
+      }
+
+      case 'patrol': {
+        // Move toward current patrol point
+        if (obs.patrolPoints && obs.patrolPoints.length > 0 &&
+            obs.patrolIndex !== undefined && obs.patrolSpeed !== undefined) {
+          const target = obs.patrolPoints[obs.patrolIndex];
+          const dx = target.x - obs.x;
+          const dy = target.y - obs.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 10) {
+            // Reached target, move to next
+            obs.patrolIndex = (obs.patrolIndex + 1) % obs.patrolPoints.length;
+          } else {
+            // Move toward target
+            const speed = obs.patrolSpeed;
+            obs.vx = (dx / dist) * speed;
+            obs.vy = (dy / dist) * speed;
+            obs.x += obs.vx;
+            obs.y += obs.vy;
+          }
+        }
+        break;
+      }
+    }
+
+    // Keep within world bounds
+    obs.x = Math.max(obs.radius, Math.min(worldWidth - obs.radius, obs.x));
+    obs.y = Math.max(obs.radius, Math.min(worldHeight - obs.radius, obs.y));
+  }
+
+  return obstacles;
+}
+
+// ===================== TERRAIN TOPOLOGY SYSTEM =====================
+// Mountains and barriers that create paths, chokepoints, and navigation challenges
+// These are NON-LETHAL - blobs bounce off them, forcing routing decisions
+//
+// Design Philosophy:
+// - Create natural "corridors" that reward directional navigation
+// - Chokepoints where blobs must make decisions
+// - Resource-rich areas behind barriers (risk vs reward)
+// - Break up the "circular movement is optimal" strategy
+
+let nextBarrierId = 0;
+
+/**
+ * Generate terrain barriers that create interesting topology
+ * Creates mountain ranges, ridges, and passages
+ */
+export function createTerrainBarriers(
+  worldWidth: number,
+  worldHeight: number
+): TerrainBarrier[] {
+  const barriers: TerrainBarrier[] = [];
+
+  // Create 3-5 major mountain ranges that span significant portions of the map
+  const numRanges = 3 + Math.floor(Math.random() * 3);
+
+  for (let i = 0; i < numRanges; i++) {
+    // Each range is a series of connected peaks
+    const rangeStartX = Math.random() * worldWidth * 0.8 + worldWidth * 0.1;
+    const rangeStartY = Math.random() * worldHeight * 0.8 + worldHeight * 0.1;
+
+    // Range direction (mostly horizontal or vertical with some variation)
+    const isHorizontal = Math.random() > 0.5;
+    const rangeLength = 400 + Math.random() * 600;
+    const rangeAngle = isHorizontal
+      ? (Math.random() - 0.5) * 0.5  // Mostly horizontal
+      : Math.PI / 2 + (Math.random() - 0.5) * 0.5;  // Mostly vertical
+
+    // Create peaks along the range
+    const numPeaks = 3 + Math.floor(Math.random() * 4);
+    const peakSpacing = rangeLength / numPeaks;
+
+    for (let j = 0; j < numPeaks; j++) {
+      const peakDist = j * peakSpacing + (Math.random() - 0.5) * peakSpacing * 0.3;
+      const peakX = rangeStartX + Math.cos(rangeAngle) * peakDist;
+      const peakY = rangeStartY + Math.sin(rangeAngle) * peakDist;
+
+      // Skip if too close to edge
+      if (peakX < 100 || peakX > worldWidth - 100 ||
+          peakY < 100 || peakY > worldHeight - 100) continue;
+
+      // Create a roughly circular mountain with irregular edges
+      const peakRadius = 40 + Math.random() * 60;
+      const numPoints = 6 + Math.floor(Math.random() * 4);
+      const points: Array<{ x: number; y: number }> = [];
+
+      for (let k = 0; k < numPoints; k++) {
+        const angle = (k / numPoints) * Math.PI * 2;
+        const radius = peakRadius * (0.7 + Math.random() * 0.6);
+        points.push({
+          x: peakX + Math.cos(angle) * radius,
+          y: peakY + Math.sin(angle) * radius
+        });
+      }
+
+      // Calculate bounding box
+      const xs = points.map(p => p.x);
+      const ys = points.map(p => p.y);
+
+      barriers.push({
+        id: nextBarrierId++,
+        type: 'mountain',
+        points,
+        minX: Math.min(...xs),
+        maxX: Math.max(...xs),
+        minY: Math.min(...ys),
+        maxY: Math.max(...ys),
+        color: `hsl(${30 + Math.random() * 20}, ${30 + Math.random() * 20}%, ${25 + Math.random() * 15}%)`,
+        opacity: 0.8
+      });
+    }
+
+    // Create ridges connecting peaks (narrow barriers)
+    for (let j = 0; j < numPeaks - 1; j++) {
+      const ridge = createRidgeBetweenPeaks(
+        rangeStartX + Math.cos(rangeAngle) * j * peakSpacing,
+        rangeStartY + Math.sin(rangeAngle) * j * peakSpacing,
+        rangeStartX + Math.cos(rangeAngle) * (j + 1) * peakSpacing,
+        rangeStartY + Math.sin(rangeAngle) * (j + 1) * peakSpacing,
+        15 + Math.random() * 25  // Ridge width
+      );
+      if (ridge) barriers.push(ridge);
+    }
+  }
+
+  // Add some isolated reef/rock formations for variety
+  const numReefs = 5 + Math.floor(Math.random() * 5);
+  for (let i = 0; i < numReefs; i++) {
+    const reef = createReef(
+      100 + Math.random() * (worldWidth - 200),
+      100 + Math.random() * (worldHeight - 200),
+      30 + Math.random() * 50
+    );
+    barriers.push(reef);
+  }
+
+  return barriers;
+}
+
+/**
+ * Create a ridge (narrow barrier) between two points
+ */
+function createRidgeBetweenPeaks(
+  x1: number, y1: number,
+  x2: number, y2: number,
+  width: number
+): TerrainBarrier | null {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const length = Math.sqrt(dx * dx + dy * dy);
+
+  if (length < 20) return null;
+
+  // Perpendicular direction
+  const perpX = -dy / length;
+  const perpY = dx / length;
+
+  const halfWidth = width / 2;
+
+  const points = [
+    { x: x1 + perpX * halfWidth, y: y1 + perpY * halfWidth },
+    { x: x2 + perpX * halfWidth, y: y2 + perpY * halfWidth },
+    { x: x2 - perpX * halfWidth, y: y2 - perpY * halfWidth },
+    { x: x1 - perpX * halfWidth, y: y1 - perpY * halfWidth },
+  ];
+
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
+
+  return {
+    id: nextBarrierId++,
+    type: 'ridge',
+    points,
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys),
+    color: `hsl(${25 + Math.random() * 15}, ${25 + Math.random() * 15}%, ${30 + Math.random() * 10}%)`,
+    opacity: 0.7
+  };
+}
+
+/**
+ * Create a small reef/rock formation
+ */
+function createReef(x: number, y: number, radius: number): TerrainBarrier {
+  const numPoints = 5 + Math.floor(Math.random() * 3);
+  const points: Array<{ x: number; y: number }> = [];
+
+  for (let i = 0; i < numPoints; i++) {
+    const angle = (i / numPoints) * Math.PI * 2;
+    const r = radius * (0.6 + Math.random() * 0.8);
+    points.push({
+      x: x + Math.cos(angle) * r,
+      y: y + Math.sin(angle) * r
+    });
+  }
+
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
+
+  return {
+    id: nextBarrierId++,
+    type: 'reef',
+    points,
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+    minY: Math.min(...ys),
+    maxY: Math.max(...ys),
+    color: `hsl(${200 + Math.random() * 40}, ${20 + Math.random() * 20}%, ${35 + Math.random() * 15}%)`,
+    opacity: 0.6
+  };
+}
+
+/**
+ * Check if a point is inside a terrain barrier (polygon)
+ */
+export function isPointInBarrier(x: number, y: number, barrier: TerrainBarrier): boolean {
+  // Quick bounding box check first
+  if (x < barrier.minX || x > barrier.maxX ||
+      y < barrier.minY || y > barrier.maxY) {
+    return false;
+  }
+
+  // Ray casting algorithm for polygon containment
+  const points = barrier.points;
+  let inside = false;
+
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const xi = points[i].x, yi = points[i].y;
+    const xj = points[j].x, yj = points[j].y;
+
+    if (((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
+}
+
+/**
+ * Check if a circle (blob) collides with a barrier
+ * Returns the push-out vector if collision, null otherwise
+ */
+export function checkBarrierCollision(
+  x: number, y: number, radius: number,
+  barrier: TerrainBarrier
+): { pushX: number; pushY: number } | null {
+  // Quick bounding box check with radius
+  if (x + radius < barrier.minX || x - radius > barrier.maxX ||
+      y + radius < barrier.minY || y - radius > barrier.maxY) {
+    return null;
+  }
+
+  // Check if center is inside
+  if (isPointInBarrier(x, y, barrier)) {
+    // Find nearest edge and push out
+    const center = {
+      x: (barrier.minX + barrier.maxX) / 2,
+      y: (barrier.minY + barrier.maxY) / 2
+    };
+
+    const dx = x - center.x;
+    const dy = y - center.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+    // Push toward the nearest edge
+    return {
+      pushX: (dx / dist) * (radius + 10),
+      pushY: (dy / dist) * (radius + 10)
+    };
+  }
+
+  // Check if edge intersects with circle
+  const points = barrier.points;
+  for (let i = 0; i < points.length; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % points.length];
+
+    // Distance from point to line segment
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const lengthSq = dx * dx + dy * dy;
+
+    if (lengthSq === 0) continue;
+
+    // Project point onto line segment
+    let t = Math.max(0, Math.min(1,
+      ((x - p1.x) * dx + (y - p1.y) * dy) / lengthSq
+    ));
+
+    const closestX = p1.x + t * dx;
+    const closestY = p1.y + t * dy;
+
+    const distX = x - closestX;
+    const distY = y - closestY;
+    const dist = Math.sqrt(distX * distX + distY * distY);
+
+    if (dist < radius) {
+      // Collision! Push out along the normal
+      const pushDist = radius - dist + 2;
+      return {
+        pushX: (distX / dist) * pushDist,
+        pushY: (distY / dist) * pushDist
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Apply barrier collisions to a blob
+ * Modifies blob position to keep it outside all barriers
+ */
+export function applyBarrierCollisions(
+  blob: { x: number; y: number; vx: number; vy: number; mass: number },
+  barriers: TerrainBarrier[]
+): void {
+  const radius = Math.sqrt(blob.mass) * 2.5;
+
+  for (const barrier of barriers) {
+    const collision = checkBarrierCollision(blob.x, blob.y, radius, barrier);
+
+    if (collision) {
+      // Push blob out of barrier
+      blob.x += collision.pushX;
+      blob.y += collision.pushY;
+
+      // Reflect velocity (bounce)
+      const pushMag = Math.sqrt(collision.pushX * collision.pushX + collision.pushY * collision.pushY);
+      if (pushMag > 0) {
+        const normalX = collision.pushX / pushMag;
+        const normalY = collision.pushY / pushMag;
+
+        // Reflect velocity across normal
+        const dot = blob.vx * normalX + blob.vy * normalY;
+        if (dot < 0) {  // Only reflect if moving toward barrier
+          blob.vx -= 2 * dot * normalX * 0.6;  // 0.6 = energy loss
+          blob.vy -= 2 * dot * normalY * 0.6;
+        }
+      }
+    }
+  }
+}

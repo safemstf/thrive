@@ -4,11 +4,21 @@ import { NeatConfig } from "../neat";
 
 const WORLD_WIDTH = 4000;
 const WORLD_HEIGHT = 2000;
+
+// World topology
+const WORLD_WRAP = true;  // Toroidal world - wraps at edges (no box feeling!)
 const INITIAL_BLOBS = 70;
 const MAX_POPULATION = 300;
 const MAX_FOOD = 1500;
 const FOOD_SPAWN_RATE = 100;
-const NUM_OBSTACLES = 0;  // Start with 0 for curriculum learning - let them learn to eat first!
+const NUM_OBSTACLES = 15;  // Re-enabled: obstacles provide selection pressure for spatial awareness
+
+// Moving obstacles - require prediction to avoid!
+const MOVING_OBSTACLE_RATIO = 0.5;  // 50% of obstacles will move
+const OBSTACLE_SPEED_MIN = 0.5;     // Minimum movement speed
+const OBSTACLE_SPEED_MAX = 2.0;     // Maximum movement speed
+const OBSTACLE_ORBIT_RADIUS_MIN = 100;
+const OBSTACLE_ORBIT_RADIUS_MAX = 300;
 const NUM_LOGS = 0;
 const VISION_RANGE = 500; // Increased! Gradient vision is more efficient
 const VISION_UPDATE_INTERVAL = 2;
@@ -78,8 +88,9 @@ const CORIOLIS_EQUATOR_CALM = 0.1;    // Width of calm zone at equator (0-1)
 const CORIOLIS_LATITUDE_SCALING = true; // Stronger effect towards poles
 
 // Neural IO sizes
-// Gradient vision: 6 sensory + 2 state = 8 inputs (down from 40!)
-const INPUT_SIZE = 8;
+// Enhanced gradient vision: 6 spatial + 2 velocity + 4 state = 12 inputs
+// Velocity inputs enable PREDICTION - key for intelligence!
+const INPUT_SIZE = 12;
 const OUTPUT_SIZE = 3;
 
 // Neural net visualization
@@ -112,6 +123,7 @@ export {
   NEAT_CONFIG,
   WORLD_WIDTH,
   WORLD_HEIGHT,
+  WORLD_WRAP,
   INITIAL_BLOBS,
   MAX_POPULATION,
   MAX_FOOD,
@@ -173,4 +185,11 @@ export {
   CORIOLIS_HEMISPHERE_SPLIT,
   CORIOLIS_EQUATOR_CALM,
   CORIOLIS_LATITUDE_SCALING,
+
+  // Moving obstacle exports
+  MOVING_OBSTACLE_RATIO,
+  OBSTACLE_SPEED_MIN,
+  OBSTACLE_SPEED_MAX,
+  OBSTACLE_ORBIT_RADIUS_MIN,
+  OBSTACLE_ORBIT_RADIUS_MAX,
 };

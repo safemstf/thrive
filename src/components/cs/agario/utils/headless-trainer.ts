@@ -2,7 +2,7 @@
 // Headless training engine - runs evolution without rendering for 10-100x speedup
 
 import { Genome, Neat, NodeType, NodeGene, ConnectionGene } from '../neat';
-import { Blob, Food, Obstacle, BiomeConfig, ActivationFunction } from '../config/agario.types';
+import { Blob, Food, Obstacle, BiomeConfig, ActivationFunction, TerrainBarrier } from '../config/agario.types';
 import {
   WORLD_WIDTH, WORLD_HEIGHT,
   INITIAL_BLOBS, MAX_POPULATION, MAX_FOOD,
@@ -12,7 +12,7 @@ import {
 
 import { createBlob, giveBirth } from './reproduction';
 import { simulateBlob, handleCollisions, applyCoriolisEffect } from './simulation';
-import { spawnFood, updateSpatialGrid, getNearbyFood, createBiomes, ageFood } from './environment';
+import { spawnFood, updateSpatialGrid, getNearbyFood, createBiomes, ageFood, createObstacles, updateObstacles, createTerrainBarriers, applyBarrierCollisions } from './environment';
 import { calculatePopulationFitness } from './fitness';
 import { createEngineeredVisionSystem } from './feature-engineering';
 
@@ -27,6 +27,9 @@ export interface TrainingConfig {
   saveInterval: number;         // Save checkpoint every N generations
   targetFitness: number;        // Stop when reached
   parallelWorlds: number;       // Run multiple simulations (future: Web Workers)
+  // Curriculum learning settings
+  enableCurriculum: boolean;    // Gradually increase difficulty
+  heuristicBlend: number;       // 0 = pure NN, 1 = pure heuristic (default: 0)
 }
 
 export interface TrainingProgress {
@@ -46,6 +49,9 @@ export interface TrainingProgress {
   maxNodes: number;             // Most complex genome (nodes)
   maxConnections: number;       // Most complex genome (connections)
   complexityScore: number;      // Combined complexity metric
+  // Curriculum learning
+  curriculumPhase: number;      // Current difficulty phase (1-5)
+  obstacleCount: number;        // Current number of obstacles
 }
 
 export interface SerializedGenome {
@@ -85,7 +91,10 @@ export const DEFAULT_TRAINING_CONFIG: TrainingConfig = {
   mutationRate: 0.3,
   saveInterval: 25,               // Save more frequently
   targetFitness: 1000,            // High target - keep training until stopped
-  parallelWorlds: 1
+  parallelWorlds: 1,
+  // Curriculum learning - helps evolution find solutions gradually
+  enableCurriculum: true,         // Start easy, get harder
+  heuristicBlend: 0.0             // NO heuristics! Let neural nets learn independently
 };
 
 // Preset configurations for different training needs
@@ -140,6 +149,7 @@ export class HeadlessTrainer {
   private blobs: Blob[] = [];
   private food: Food[] = [];
   private obstacles: Obstacle[] = [];
+  private barriers: TerrainBarrier[] = [];  // Non-lethal terrain topology
   private biomes: BiomeConfig[] = [];
   private spatialGrid: Map<string, Food[]> = new Map();
 
@@ -153,6 +163,11 @@ export class HeadlessTrainer {
   private isPaused = false;
   private startTime = 0;
   private ticksProcessed = 0;
+
+  // Curriculum learning state
+  private curriculumPhase = 1;      // 1-5, increasing difficulty
+  private currentObstacleCount = 0; // Starts low, increases with phase
+  private currentHeuristicBlend = 0; // No heuristics by default
 
   private eliteGenomes: SerializedGenome[] = [];
   private onProgress?: (progress: TrainingProgress) => void;
@@ -198,15 +213,25 @@ export class HeadlessTrainer {
       0
     );
 
-    // Initialize obstacles
-    this.obstacles = [];
-    for (let i = 0; i < NUM_OBSTACLES; i++) {
-      this.obstacles.push({
-        x: Math.random() * WORLD_WIDTH,
-        y: Math.random() * WORLD_HEIGHT,
-        radius: 20 + Math.random() * 20
-      });
+    // Initialize curriculum
+    this.curriculumPhase = 1;
+    this.currentHeuristicBlend = this.config.heuristicBlend;
+
+    // Curriculum learning: start with fewer obstacles
+    if (this.config.enableCurriculum) {
+      this.currentObstacleCount = Math.floor(NUM_OBSTACLES * 0.2); // Start with 20%
+    } else {
+      this.currentObstacleCount = NUM_OBSTACLES;
     }
+
+    // Initialize obstacles based on curriculum
+    // Now includes MOVING obstacles that require prediction!
+    this.obstacles = createObstacles(this.currentObstacleCount, WORLD_WIDTH, WORLD_HEIGHT);
+
+    // Initialize terrain barriers (mountains, ridges, reefs)
+    // These create navigation challenges and break "circle movement is optimal" strategy
+    this.barriers = createTerrainBarriers(WORLD_WIDTH, WORLD_HEIGHT);
+    console.log(`🏔️ Created ${this.barriers.length} terrain barriers`);
 
     // Initialize spatial grid
     this.spatialGrid = updateSpatialGrid(this.food, 100);
@@ -319,6 +344,9 @@ export class HeadlessTrainer {
     );
     this.food = ageFood(this.food);
 
+    // Update moving obstacles - blobs must PREDICT to survive!
+    this.obstacles = updateObstacles(this.obstacles, WORLD_WIDTH, WORLD_HEIGHT);
+
     // Create vision system
     const visionSystem = createEngineeredVisionSystem();
 
@@ -355,7 +383,8 @@ export class HeadlessTrainer {
       return false;
     };
 
-    // Simulate each blob
+    // Simulate each blob - NO heuristics during training!
+    // This forces neural networks to actually learn, not just copy heuristics
     for (const blob of this.blobs) {
       simulateBlob(
         blob,
@@ -367,7 +396,9 @@ export class HeadlessTrainer {
         this.spatialGrid,
         (x, y, range) => getNearbyFood(x, y, range, this.spatialGrid, GRID_SIZE),
         giveBirthWrapper,
-        visionSystem
+        visionSystem,
+        this.currentHeuristicBlend,  // 0 by default = pure neural network learning
+        this.barriers  // Non-lethal terrain topology for navigation challenges
       );
 
       // Apply Coriolis effect
@@ -397,8 +428,11 @@ export class HeadlessTrainer {
     this.totalDeaths += deadBlobIds.size;
     this.blobs = this.blobs.filter(b => !deadBlobIds.has(b.id));
 
-    // Calculate fitness
-    calculatePopulationFitness(this.blobs);
+    // Calculate fitness ONLY periodically (expensive operation!)
+    // Novelty search is O(n²), so we only run it every 100 ticks
+    if (this.tick % 100 === 0) {
+      calculatePopulationFitness(this.blobs);
+    }
   }
 
   // ===================== GENERATION EVOLUTION =====================
@@ -418,8 +452,12 @@ export class HeadlessTrainer {
     const maxGen = Math.max(1, ...this.blobs.map(b => b.generation));
     const bestFitness = sortedBlobs[0]?.genome.fitness || 0;
     const avgFitness = this.blobs.reduce((s, b) => s + (b.genome.fitness || 0), 0) / Math.max(this.blobs.length, 1);
+    const complexity = this.calculateComplexityMetrics();
 
-    console.log(`Gen ${this.generation}: Best=${bestFitness.toFixed(1)}, Avg=${avgFitness.toFixed(1)}, MaxLineage=${maxGen}, Pop=${this.blobs.length}`);
+    console.log(`Gen ${this.generation}: Best=${bestFitness.toFixed(1)}, Avg=${avgFitness.toFixed(1)}, MaxLineage=${maxGen}, Complexity=${complexity.complexityScore.toFixed(1)}, Phase=${this.curriculumPhase}`);
+
+    // Update curriculum - increase difficulty as population improves
+    this.updateCurriculum(bestFitness, avgFitness);
 
     // Check for target fitness reached (skip if Infinity for indefinite training)
     if (isFinite(this.config.targetFitness) && bestFitness >= this.config.targetFitness) {
@@ -563,6 +601,74 @@ export class HeadlessTrainer {
     console.log('⏹️ Training stopped');
   }
 
+  // ===================== CURRICULUM LEARNING =====================
+
+  /**
+   * Update curriculum based on population performance
+   * As blobs get better, we make the environment harder
+   */
+  private updateCurriculum(bestFitness: number, avgFitness: number): void {
+    if (!this.config.enableCurriculum) return;
+
+    // Phase thresholds based on average fitness
+    // These are MUCH harder now - we want real intelligence, not lucky survival
+    // Phase 1: Learn to move and eat (avg < 150)
+    // Phase 2: Learn obstacle avoidance (avg 150-350)
+    // Phase 3: Learn hunting/fleeing (avg 350-600)
+    // Phase 4: Learn reproduction (avg 600-1000)
+    // Phase 5: Full complexity (avg > 1000) - requires real intelligence!
+    const phaseThresholds = [0, 150, 350, 600, 1000];
+
+    let newPhase = 1;
+    for (let i = phaseThresholds.length - 1; i >= 0; i--) {
+      if (avgFitness >= phaseThresholds[i]) {
+        newPhase = i + 1;
+        break;
+      }
+    }
+
+    // Only increase phase, never decrease (ratchet effect)
+    if (newPhase > this.curriculumPhase) {
+      this.curriculumPhase = newPhase;
+      console.log(`📈 Curriculum advanced to Phase ${this.curriculumPhase}!`);
+
+      // Update obstacles based on phase
+      const obstaclePercent = [0.2, 0.4, 0.6, 0.8, 1.0][this.curriculumPhase - 1];
+      const targetObstacles = Math.floor(NUM_OBSTACLES * obstaclePercent);
+
+      // Add new obstacles if needed - include moving obstacles!
+      if (this.obstacles.length < targetObstacles) {
+        const newObstacles = createObstacles(
+          targetObstacles - this.obstacles.length,
+          WORLD_WIDTH,
+          WORLD_HEIGHT
+        );
+        this.obstacles = [...this.obstacles, ...newObstacles];
+      }
+
+      this.currentObstacleCount = this.obstacles.length;
+    }
+  }
+
+  /**
+   * Get current curriculum phase info for progress reporting
+   */
+  public getCurriculumInfo(): { phase: number; obstacleCount: number; description: string } {
+    const descriptions = [
+      'Phase 1: Learning to move and eat',
+      'Phase 2: Learning obstacle avoidance',
+      'Phase 3: Learning hunting and fleeing',
+      'Phase 4: Learning reproduction',
+      'Phase 5: Full complexity'
+    ];
+
+    return {
+      phase: this.curriculumPhase,
+      obstacleCount: this.currentObstacleCount,
+      description: descriptions[this.curriculumPhase - 1] || 'Unknown'
+    };
+  }
+
   // ===================== COMPLEXITY METRICS =====================
 
   private calculateComplexityMetrics(): {
@@ -630,7 +736,10 @@ export class HeadlessTrainer {
       avgConnections: complexity.avgConnections,
       maxNodes: complexity.maxNodes,
       maxConnections: complexity.maxConnections,
-      complexityScore: complexity.complexityScore
+      complexityScore: complexity.complexityScore,
+      // Curriculum
+      curriculumPhase: this.curriculumPhase,
+      obstacleCount: this.currentObstacleCount
     };
 
     this.onProgress?.(progress);
@@ -661,7 +770,10 @@ export class HeadlessTrainer {
         avgConnections: complexity.avgConnections,
         maxNodes: complexity.maxNodes,
         maxConnections: complexity.maxConnections,
-        complexityScore: complexity.complexityScore
+        complexityScore: complexity.complexityScore,
+        // Curriculum
+        curriculumPhase: this.curriculumPhase,
+        obstacleCount: this.currentObstacleCount
       },
       eliteGenomes: this.eliteGenomes
     };
@@ -757,7 +869,10 @@ export class HeadlessTrainer {
       avgConnections: complexity.avgConnections,
       maxNodes: complexity.maxNodes,
       maxConnections: complexity.maxConnections,
-      complexityScore: complexity.complexityScore
+      complexityScore: complexity.complexityScore,
+      // Curriculum
+      curriculumPhase: this.curriculumPhase,
+      obstacleCount: this.currentObstacleCount
     };
   }
 

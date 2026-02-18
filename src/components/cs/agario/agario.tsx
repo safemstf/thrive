@@ -18,7 +18,7 @@ import {
 
 import {
   TerrainZone, Food, FoodCluster, Obstacle, Log, Blob, NeuralLayout,
-  BiomeConfig
+  BiomeConfig, TerrainBarrier
 } from './config/agario.types';
 
 import {
@@ -83,14 +83,17 @@ import {
   calculatePopulationPressure,
   getFoodIslands,
   resetFoodIslands,
-  FoodIsland
+  FoodIsland,
+  createTerrainBarriers,
+  createObstacles,
+  updateObstacles
 } from './utils/environment';
 
 import { HeaderSection } from "./components/HeaderSection";
 import { HUDComponent } from "./components/HUDComponent";
 import { LeaderboardComponent } from "./components/LeaderboardComponent";
 import { NeuralNetModalComponent } from "./components/NeuralNetModal";
-import { StatsDrawerComponent } from "./components/StatsDrawerComponent";
+// StatsDrawerComponent removed - stats now integrated into LeaderboardComponent
 import { ViewportControlsComponent } from "./components/ViewportControlsComponent";
 import { TrainingPanelComponent } from "./components/TrainingPanelComponent";
 import { createEngineeredVisionSystem } from "./utils/feature-engineering";
@@ -118,6 +121,7 @@ export default function AgarioDemo({
   const foodRef = useRef<Food[]>([]);
   const foodClustersRef = useRef<FoodCluster[]>([]);
   const obstaclesRef = useRef<Obstacle[]>([]);
+  const barriersRef = useRef<TerrainBarrier[]>([]);  // Non-lethal terrain topology
   const logsRef = useRef<Log[]>([]);
   const terrainZonesRef = useRef<TerrainZone[]>([]);
   const neatRef = useRef<Neat | null>(null);
@@ -293,15 +297,13 @@ export default function AgarioDemo({
       0  // Initial population pressure
     );
 
-    // 5.5 Initialize obstacles
-    obstaclesRef.current = [];
-    for (let i = 0; i < NUM_OBSTACLES; i++) {
-      obstaclesRef.current.push({
-        x: Math.random() * WORLD_WIDTH,
-        y: Math.random() * WORLD_HEIGHT,
-        radius: 20 + Math.random() * 20
-      });
-    }
+    // 5.5 Initialize obstacles (now includes moving obstacles!)
+    obstaclesRef.current = createObstacles(NUM_OBSTACLES, WORLD_WIDTH, WORLD_HEIGHT);
+
+    // 5.6 Initialize terrain barriers (mountains, ridges, reefs)
+    // These create navigation challenges and break "circle movement is optimal" strategy
+    barriersRef.current = createTerrainBarriers(WORLD_WIDTH, WORLD_HEIGHT);
+    console.log(`🏔️ Created ${barriersRef.current.length} terrain barriers`);
 
     // 6. Initialize logs
     logsRef.current = [];
@@ -387,6 +389,9 @@ export default function AgarioDemo({
     // Age food
     foodRef.current = ageFood(foodRef.current);
 
+    // Update moving obstacles - they require prediction to avoid!
+    obstaclesRef.current = updateObstacles(obstaclesRef.current, WORLD_WIDTH, WORLD_HEIGHT);
+
     // Update survival pressure
     if (tick % 200 === 0) {
       survivalPressureRef.current += SURVIVAL_PRESSURE_INCREASE;
@@ -452,7 +457,9 @@ export default function AgarioDemo({
         (x: number, y: number, range: number) =>
           getNearbyFood(x, y, range, spatialGridRef.current, GRID_SIZE),
         giveBirthWrapper,
-        visionSystem  // ✅ Pass the vision system
+        visionSystem,
+        0.15,  // Small heuristic blend for smoother live display (15%)
+        barriersRef.current  // Non-lethal terrain for navigation challenges
       );
 
       // Apply weak Coriolis effect - subtle curved trajectories
@@ -1224,7 +1231,8 @@ export default function AgarioDemo({
       logsRef.current,
       terrainZonesRef.current,
       renderCtx,
-      foodIslandsRef.current  // Pass food islands for visualization
+      foodIslandsRef.current,  // Pass food islands for visualization
+      barriersRef.current      // Non-lethal terrain topology
     );
   }, [followBest, followedBlobId, selectedBlob]);
 
@@ -1530,6 +1538,10 @@ export default function AgarioDemo({
               onFollowBlob={handleFollowBlob}
               onOpenTraining={handleToggleTrainingPanel}
               currentTick={tickCountRef.current}
+              speciesCount={stats.speciesCount}
+              totalBirths={stats.totalBirths}
+              totalDeaths={stats.totalDeaths}
+              population={stats.population}
             />
 
             <ViewportControlsComponent
@@ -1545,14 +1557,7 @@ export default function AgarioDemo({
           </CanvasContainer>
         </VideoSection>
 
-        <StatsDrawerComponent
-          expanded={drawerExpanded}
-          onToggle={handleToggleDrawer}
-          speciesCount={stats.speciesCount}
-          totalBirths={stats.totalBirths}
-          totalDeaths={stats.totalDeaths}
-          largestFamily={stats.largestFamily}
-        />
+        {/* StatsDrawer removed - stats now in LeaderboardComponent */}
       </MaxWidthWrapper>
 
       {selectedBlob && (
