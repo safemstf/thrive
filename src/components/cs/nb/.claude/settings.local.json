@@ -4,7 +4,15 @@
       "Bash(curl:*)",
       "Bash(python3:*)",
       "Bash(node:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build)",
+      "Bash(echo:*)",
+      "Bash(git -C \"C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\" log --oneline -20)",
+      "Bash(ls:*)",
+      "Bash(done)",
+      "Bash(powershell -Command \"\n$file = ''C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\\\\src\\\\components\\\\cs\\\\nb\\\\nb.rendering.tsx''\n$lines = Get-Content $file\n$before = $lines[0..1278]   # lines 1-1279 \\(0-indexed: 0..1278\\)\n$after = $lines[1840..]     # lines 1841+ \\(0-indexed: 1840..\\)\n$result = $before + $after\nSet-Content $file $result -Encoding UTF8\nWrite-Host ''Done. Total lines: '' + $result.Count\n\")",
+      "Bash(powershell -NoProfile -Command \"$f=''C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\\\\src\\\\components\\\\cs\\\\nb\\\\nb.rendering.tsx''; $l=Get-Content $f; $r=$l[0..1278]+$l[1840..\\($l.Length-1\\)]; Set-Content $f $r -Encoding UTF8; Write-Host \\(''Lines: ''+$r.Count\\)\")",
+      "Bash(powershell -NoProfile -Command \"$f=''C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\\\\src\\\\components\\\\cs\\\\nb\\\\nb.rendering.tsx''; $l=Get-Content $f; $r=$l[0..1278]+$l[1840..\\($l.Length-1\\)]; Set-Content -Path $f -Value $r -Encoding UTF8; Write-Host $r.Count\")"
     ]
   }
 }

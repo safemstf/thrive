@@ -237,17 +237,17 @@ class KeplerSolver {
   // Solve Kepler's equation: M = E - e*sin(E)
   private solveKeplerEquation(M: number, e: number, tolerance: number = 1e-8): number {
     let E = M; // Initial guess
-    
+
     // Newton-Raphson iteration
     for (let i = 0; i < 15; i++) {
       const f = E - e * Math.sin(E) - M;
       const fp = 1 - e * Math.cos(E);
       const delta = f / fp;
       E -= delta;
-      
+
       if (Math.abs(delta) < tolerance) break;
     }
-    
+
     return E;
   }
 
@@ -263,39 +263,39 @@ class KeplerSolver {
 
     // Specific orbital energy
     const energy = v * v / 2 - mu / r;
-    
+
     // Semi-major axis: a = -mu / (2 * E)
     const a = -mu / (2 * energy);
-    
+
     // Angular momentum vector: h = r × v
     const h = position.cross(velocity);
     const hMag = h.magnitude();
-    
+
     // Eccentricity vector: e = (v × h) / mu - r_hat
     const eVec = velocity.cross(h).divide(mu).subtract(position.normalize());
     const e = eVec.magnitude();
-    
+
     // Inclination: i = acos(h_z / |h|)
     const i = Math.acos(h.z / hMag);
-    
+
     // Node vector: n = k × h (where k is [0,0,1])
     const n = new Vector3(-h.y, h.x, 0);
     const nMag = n.magnitude();
-    
+
     // Longitude of ascending node: Ω
     let Omega = 0;
     if (nMag > 1e-10) {
       Omega = Math.acos(n.x / nMag);
       if (n.y < 0) Omega = 2 * Math.PI - Omega;
     }
-    
+
     // Argument of periapsis: ω
     let omega = 0;
     if (nMag > 1e-10 && e > 1e-10) {
       omega = Math.acos(n.dot(eVec) / (nMag * e));
       if (eVec.z < 0) omega = 2 * Math.PI - omega;
     }
-    
+
     // True anomaly: ν
     let nu = 0;
     if (e > 1e-10) {
@@ -306,19 +306,19 @@ class KeplerSolver {
       nu = Math.acos(n.dot(position) / (nMag * r));
       if (position.z < 0) nu = 2 * Math.PI - nu;
     }
-    
+
     // Eccentric anomaly: E
     const E = 2 * Math.atan2(
       Math.sqrt(1 - e) * Math.sin(nu / 2),
       Math.sqrt(1 + e) * Math.cos(nu / 2)
     );
-    
+
     // Mean anomaly: M = E - e * sin(E)
     const M = E - e * Math.sin(E);
-    
+
     // Orbital period: T = 2π * sqrt(a³ / μ)
     const T = 2 * Math.PI * Math.sqrt(Math.abs(a * a * a) / mu);
-    
+
     return {
       semiMajorAxis: a,
       eccentricity: e,
@@ -340,39 +340,39 @@ class KeplerSolver {
     currentTime: number
   ): { position: Vector3Data; velocity: Vector3Data } {
     const { semiMajorAxis: a, eccentricity: e, inclination: i,
-            longitudeAscNode: Omega, argPeriapsis: omega,
-            meanAnomalyAtEpoch: M0, epoch: t0, period: T } = orbit;
-    
+      longitudeAscNode: Omega, argPeriapsis: omega,
+      meanAnomalyAtEpoch: M0, epoch: t0, period: T } = orbit;
+
     // Mean motion: n = 2π / T
     const n = 2 * Math.PI / T;
-    
+
     // Time since epoch
     const dt = currentTime - t0;
-    
+
     // Current mean anomaly: M = M0 + n * dt
     const M = (M0 + n * dt) % (2 * Math.PI);
-    
+
     // Solve for eccentric anomaly
     const E = this.solveKeplerEquation(M, e);
-    
+
     // True anomaly
     const nu = 2 * Math.atan2(
       Math.sqrt(1 + e) * Math.sin(E / 2),
       Math.sqrt(1 - e) * Math.cos(E / 2)
     );
-    
+
     // Distance from primary
     const r = a * (1 - e * Math.cos(E));
-    
+
     // Position in orbital plane
     const x_orb = r * Math.cos(nu);
     const y_orb = r * Math.sin(nu);
-    
+
     // Velocity in orbital plane
     const v_factor = Math.sqrt(mu / (a * (1 - e * e)));
     const vx_orb = -v_factor * Math.sin(nu);
     const vy_orb = v_factor * (e + Math.cos(nu));
-    
+
     // Rotation matrices
     const cos_Omega = Math.cos(Omega);
     const sin_Omega = Math.sin(Omega);
@@ -380,26 +380,26 @@ class KeplerSolver {
     const sin_omega = Math.sin(omega);
     const cos_i = Math.cos(i);
     const sin_i = Math.sin(i);
-    
+
     // Transform to 3D space (perifocal to inertial frame)
     const P_x = cos_Omega * cos_omega - sin_Omega * sin_omega * cos_i;
     const P_y = sin_Omega * cos_omega + cos_Omega * sin_omega * cos_i;
     const P_z = sin_omega * sin_i;
-    
+
     const Q_x = -cos_Omega * sin_omega - sin_Omega * cos_omega * cos_i;
     const Q_y = -sin_Omega * sin_omega + cos_Omega * cos_omega * cos_i;
     const Q_z = cos_omega * sin_i;
-    
+
     // Position relative to primary
     const x_rel = P_x * x_orb + Q_x * y_orb;
     const y_rel = P_y * x_orb + Q_y * y_orb;
     const z_rel = P_z * x_orb + Q_z * y_orb;
-    
+
     // Velocity relative to primary
     const vx_rel = P_x * vx_orb + Q_x * vy_orb;
     const vy_rel = P_y * vx_orb + Q_y * vy_orb;
     const vz_rel = P_z * vx_orb + Q_z * vy_orb;
-    
+
     // Transform to world coordinates
     return {
       position: {
@@ -441,9 +441,9 @@ class PhysicsEngine {
     const bodyPos = Vector3.from(body.position);
     const primaryPos = Vector3.from(primaryBody.position);
     const a = bodyPos.distanceTo(primaryPos); // semi-major axis approximation
-    
+
     const massRatio = body.mass / primaryBody.mass;
-    
+
     // Laplace SOI: r_SOI = a * (m_sat / m_primary)^(2/5)
     return a * Math.pow(massRatio, 0.4);
   }
@@ -455,21 +455,21 @@ class PhysicsEngine {
     if (!body.parentId) {
       return undefined; // Top-level bodies (like the Sun) have no dominant body
     }
-    
+
     const parent = bodies.get(body.parentId);
     if (!parent) {
       return undefined;
     }
-    
+
     const bodyPos = Vector3.from(body.position);
     const parentPos = Vector3.from(parent.position);
     const distance = bodyPos.distanceTo(parentPos);
-    
+
     // Calculate parent's SOI if not already cached
     if (!parent.sphereOfInfluence) {
       // Find the parent's parent (grandparent) to calculate SOI
       const grandparent = parent.parentId ? bodies.get(parent.parentId) : null;
-      
+
       if (grandparent) {
         // Normal case: planet orbiting star, moon orbiting planet
         parent.sphereOfInfluence = this.calculateSOI(parent, grandparent);
@@ -479,12 +479,12 @@ class PhysicsEngine {
         parent.sphereOfInfluence = 1e15; // ~6700 AU
       }
     }
-    
+
     // Check if we're inside parent's SOI
     if (distance < parent.sphereOfInfluence) {
       return parent.id;
     }
-    
+
     // Outside parent's SOI - body is now in N-body regime
     return undefined;
   }
@@ -492,7 +492,7 @@ class PhysicsEngine {
   // Update SOI status for all bodies
   private updateSOIStatus(bodies: Map<string, SimulationBody>, currentTime: number): void {
     this.bodiesMapRef = bodies;
-    
+
     for (const body of bodies.values()) {
       // Skip fixed bodies (they don't orbit anything)
       if (body.isFixed) {
@@ -500,41 +500,41 @@ class PhysicsEngine {
         body.useKeplerOrbit = false;
         continue;
       }
-      
+
       const previousDominant = body.dominantBody;
       const newDominant = this.findDominantBody(body, bodies);
-      
+
       body.dominantBody = newDominant;
-      
+
       if (newDominant) {
         const dominant = bodies.get(newDominant)!;
         const bodyPos = Vector3.from(body.position);
         const domPos = Vector3.from(dominant.position);
         body.distanceFromDominant = bodyPos.distanceTo(domPos);
-        
+
         // If entering new SOI or don't have orbit yet, calculate orbital elements
         if (newDominant !== previousDominant || !body.keplerOrbit) {
           const mu = this.config.gravitationalConstant * dominant.mass;
           const relPos = bodyPos.subtract(domPos);
           const relVel = Vector3.from(body.velocity).subtract(Vector3.from(dominant.velocity));
-          
+
           body.keplerOrbit = this.keplerSolver.stateToElements(
             relPos,
             relVel,
             mu,
             currentTime
           );
-          
+
           console.log(`${body.name} entered ${dominant.name}'s SOI - orbital period: ${(body.keplerOrbit.period / 86400).toFixed(1)} days`);
         }
-        
+
         // Use Kepler orbit if we have valid elements
         body.useKeplerOrbit = !!body.keplerOrbit;
       } else {
         // Outside all SOIs - use N-body physics
         body.useKeplerOrbit = false;
         body.distanceFromDominant = undefined;
-        
+
         if (previousDominant) {
           console.log(`${body.name} left SOI - using N-body physics`);
         }
@@ -617,8 +617,9 @@ class PhysicsEngine {
     const updates: PhysicsUpdate[] = [];
     const bodyArray = Array.from(bodies.values());
 
-    // Update SOI status
-    this.updateSOIStatus(bodies, currentTime);
+    // SOI/Kepler patched conics disabled — causes orbital decay due to element conversion errors.
+    // Pure N-body Verlet at 3600s timestep is stable for the solar system.
+    // this.updateSOIStatus(bodies, currentTime);
 
     // Update spatial grid
     this.spatialGrid.clear();
@@ -720,7 +721,7 @@ class PhysicsEngine {
           mu,
           currentTime
         );
-        
+
         body.position = state.position;
         body.velocity = state.velocity;
         return;
@@ -766,17 +767,17 @@ class PhysicsEngine {
     if (!this.config.adaptiveTimeStep) return currentTimeStep;
 
     let minOrbitalPeriod = Infinity;
-    
+
     // Find shortest period from bodies using Kepler orbits
     for (const body of bodies.values()) {
       if (body.keplerOrbit) {
         minOrbitalPeriod = Math.min(minOrbitalPeriod, body.keplerOrbit.period);
       }
     }
-    
+
     // Time step should be ~1/100th of shortest orbital period
     const suggestedTimeStep = minOrbitalPeriod / 100;
-    
+
     const targetTimeStep = Math.max(
       this.config.minTimeStep,
       Math.min(this.config.maxTimeStep, suggestedTimeStep)

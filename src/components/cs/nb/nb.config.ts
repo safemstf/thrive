@@ -263,16 +263,63 @@ function capitalizeId(id: string) {
   return id.charAt(0).toUpperCase() + id.slice(1);
 }
 
+// Real orbital inclinations to ecliptic (degrees → radians).
+// Used to tilt each planet's initial position and velocity out of the XZ plane.
+const ORBITAL_INCLINATIONS: Record<string, number> = {
+  mercury: 7.00  * Math.PI / 180,
+  venus:   3.39  * Math.PI / 180,
+  earth:   0.00  * Math.PI / 180,  // ecliptic reference
+  mars:    1.85  * Math.PI / 180,
+  jupiter: 1.30  * Math.PI / 180,
+  saturn:  2.49  * Math.PI / 180,
+  uranus:  0.77  * Math.PI / 180,
+  neptune: 1.77  * Math.PI / 180,
+};
+
+// Spread planets around the orbit at different initial longitudes so they
+// don't all line up on the same side of the Sun at t=0.
+const INITIAL_LONGITUDES: Record<string, number> = {
+  mercury: 0,
+  venus:   0.8,   // ~46°
+  earth:   1.8,   // ~103°
+  mars:    3.2,   // ~183°
+  jupiter: 0.4,   // ~23°
+  saturn:  2.4,   // ~137°
+  uranus:  4.9,   // ~281°
+  neptune: 0.2,   // ~11°
+};
+
 function makePlanet(id: keyof typeof PLANETARY_CONSTANTS, overrides: Partial<CelestialBodyDefinition> = {}): CelestialBodyDefinition {
   const p = PLANETARY_CONSTANTS[id];
   const color = (DEFAULT_BODY_COLORS as Record<string, string>)[id] ?? '#888';
+
+  const incl = ORBITAL_INCLINATIONS[id] ?? 0;
+  const lon  = INITIAL_LONGITUDES[id]   ?? 0;
+  const a    = p.semiMajorAxis ?? 0;
+  const v    = p.orbitalVelocity ?? 0;
+
+  // Position: rotate the +X axis by longitude (around Y) then tilt by inclination (around Z)
+  const cosL = Math.cos(lon), sinL = Math.sin(lon);
+  const cosI = Math.cos(incl), sinI = Math.sin(incl);
+
+  // In ecliptic plane: (a·cosL, 0, a·sinL)
+  // Apply inclination tilt: Y component = a·sinL·sinI, Z = a·sinL·cosI
+  const px = a * cosL;
+  const py = a * sinL * sinI;
+  const pz = a * sinL * cosI;
+
+  // Velocity perpendicular to position in the inclined orbital plane
+  // Uninclined: (-v·sinL, 0, v·cosL) — then apply same Y tilt
+  const vx = -v * sinL;
+  const vy =  v * cosL * sinI;
+  const vz =  v * cosL * cosI;
 
   return {
     id,
     name: capitalizeId(id),
     type: 'planet',
-    position: { x: p.semiMajorAxis ?? 0, y: 0, z: 0 }, // place on +x axis
-    velocity: { x: 0, y: p.orbitalVelocity ?? 0, z: 0 },
+    position: { x: px, y: py, z: pz },
+    velocity: { x: vx, y: vy, z: vz },
     mass: p.mass,
     radius: p.radius,
     color,
@@ -289,6 +336,20 @@ function makePlanet(id: keyof typeof PLANETARY_CONSTANTS, overrides: Partial<Cel
   } as CelestialBodyDefinition;
 }
 
+// Moon orbital inclinations relative to parent's equatorial plane (degrees → radians).
+// These are the real values — they create the 3D feel of orbits tilted out of the plane.
+const MOON_INCLINATIONS: Record<string, number> = {
+  moon:      5.14  * Math.PI / 180,  // Earth's Moon, tilted to ecliptic
+  phobos:    1.08  * Math.PI / 180,  // almost equatorial
+  deimos:    1.79  * Math.PI / 180,
+  io:        0.05  * Math.PI / 180,  // nearly equatorial
+  europa:    0.47  * Math.PI / 180,
+  ganymede:  0.20  * Math.PI / 180,
+  callisto:  0.19  * Math.PI / 180,
+  titan:     0.35  * Math.PI / 180,
+  enceladus: 0.02  * Math.PI / 180,
+};
+
 function makeMoon(
   id: string,
   parentId: keyof typeof PLANETARY_CONSTANTS,
@@ -296,49 +357,68 @@ function makeMoon(
 ): CelestialBodyDefinition {
   const m = MOON_CONSTANTS[id];
   const parent = PLANETARY_CONSTANTS[parentId];
-  const sun = PLANETARY_CONSTANTS.sun;
 
-  const parentSemi = parent?.semiMajorAxis ?? 0;
+  const parentSemi    = parent?.semiMajorAxis ?? 0;
   const semiFromParent = m?.semiMajorAxisFromParent ?? 0;
   const parentOrbitalV = parent?.orbitalVelocity ?? 0;
 
-  // CRITICAL FIX: Vary the initial orbital phase for each moon
-  // Instead of placing all moons at 0°, distribute them around parent
+  // Spread moons at different initial phases around their parent
   const phaseMap: Record<string, number> = {
-    'moon': Math.PI / 2,        // 90° ahead of Earth
-    'phobos': 0,                // 0° (on X-axis)
-    'deimos': Math.PI,          // 180° opposite
-    'io': 0,
-    'europa': Math.PI / 2,
-    'ganymede': Math.PI,
-    'callisto': 3 * Math.PI / 2,
-    'titan': Math.PI / 4,
-    'enceladus': 3 * Math.PI / 4
+    moon:      Math.PI / 2,
+    phobos:    0,
+    deimos:    Math.PI,
+    io:        0,
+    europa:    Math.PI / 2,
+    ganymede:  Math.PI,
+    callisto:  3 * Math.PI / 2,
+    titan:     Math.PI / 4,
+    enceladus: 3 * Math.PI / 4,
   };
 
-  const phase = phaseMap[id] || 0;
+  const phase = phaseMap[id] ?? 0;
+  const incl  = MOON_INCLINATIONS[id] ?? 0;
 
-  // Calculate circular orbital velocity around parent
   const G = 6.67430e-11;
   const circularVelocity = Math.sqrt(G * parent.mass / semiFromParent);
 
-  // Position: moon at 'phase' angle from parent's position
-  // Parent is at (parentSemi, 0, 0)
-  // Moon orbits in XZ plane (same as planets orbit sun in XY)
-  const moonX = parentSemi + semiFromParent * Math.cos(phase);
-  const moonZ = semiFromParent * Math.sin(phase);
+  const cosP = Math.cos(phase), sinP = Math.sin(phase);
+  const cosI = Math.cos(incl),  sinI = Math.sin(incl);
 
-  // Velocity: parent's velocity + moon's perpendicular velocity
-  // Moon velocity direction is tangent to its orbit around parent
-  const moonVelX = -circularVelocity * Math.sin(phase);
-  const moonVelZ = circularVelocity * Math.cos(phase);
+  // Moon position relative to parent (in inclined orbital plane):
+  // base position in XZ plane, tilt Y by inclination
+  const relX =  semiFromParent * cosP;
+  const relY =  semiFromParent * sinP * sinI;
+  const relZ =  semiFromParent * sinP * cosI;
+
+  // Moon velocity relative to parent (perpendicular in inclined plane):
+  const relVx = -circularVelocity * sinP;
+  const relVy =  circularVelocity * cosP * sinI;
+  const relVz =  circularVelocity * cosP * cosI;
+
+  // Parent position and velocity in ecliptic (same formula as makePlanet)
+  const parentIncl = ORBITAL_INCLINATIONS[parentId] ?? 0;
+  const parentLon  = INITIAL_LONGITUDES[parentId]   ?? 0;
+  const cosPI = Math.cos(parentIncl), sinPI = Math.sin(parentIncl);
+  const cosPL = Math.cos(parentLon),  sinPL = Math.sin(parentLon);
+
+  // Parent position in ecliptic
+  const ppx = parentSemi * cosPL;
+  const ppy = parentSemi * sinPL * sinPI;
+  const ppz = parentSemi * sinPL * cosPI;
+
+  // Parent velocity vector in ecliptic — perpendicular to position, inclined by parentIncl
+  // (same formula as makePlanet: vx=-v*sinL, vy=v*cosL*sinI, vz=v*cosL*cosI)
+  const pvx = -parentOrbitalV * sinPL;
+  const pvy =  parentOrbitalV * cosPL * sinPI;
+  const pvz =  parentOrbitalV * cosPL * cosPI;
 
   return {
     id,
     name: capitalizeId(id),
     type: 'moon',
-    position: { x: moonX, y: 0, z: moonZ },
-    velocity: { x: moonVelX, y: parentOrbitalV, z: moonVelZ },
+    position: { x: ppx + relX, y: ppy + relY, z: ppz + relZ },
+    // Total velocity = parent heliocentric velocity + moon orbital velocity relative to parent
+    velocity: { x: pvx + relVx, y: pvy + relVy, z: pvz + relVz },
     mass: m?.mass ?? 1e16,
     radius: m?.radius ?? 1e3,
     color: DEFAULT_BODY_COLORS['moon'] ?? '#C0C0C0',
@@ -346,7 +426,7 @@ function makeMoon(
     parentId,
     childIds: [],
     isFixed: false,
-    useAnalyticalOrbit: false, // Patched conics handles this dynamically
+    useAnalyticalOrbit: false,
     rotationPeriod: m?.rotationPeriod,
     ...overrides
   } as CelestialBodyDefinition;
@@ -501,11 +581,11 @@ export interface PerformanceConfig {
 export const DEFAULT_PHYSICS: PhysicsConfig = {
   gravitationalConstant: 6.67430e-11,
   speedOfLight: 299792458,
-  timeStep: 86400, // 1 day in seconds
-  maxTimeStep: 86400 * 7, // 1 week
-  minTimeStep: 3600, // 1 hour
-  integrator: 'leapfrog',
-  adaptiveTimeStep: true,
+  timeStep: 3600, // 1 hour in seconds — fine enough for fast inner moons (Phobos: 7.65h orbit)
+  maxTimeStep: 86400 * 2, // 2 days
+  minTimeStep: 600, // 10 minutes
+  integrator: 'verlet',
+  adaptiveTimeStep: false,
   errorTolerance: 1e-6,
   algorithm: 'barnes-hut',
   barnesHutTheta: 0.5,
@@ -747,32 +827,31 @@ export const SANDBOX_SCENARIO: Scenario = {
   accuracy: 'educational'
 };
 
-// Galaxy Explorer scenario
+// Galaxy Explorer scenario — Milky Way
 export const GALAXY_EXPLORER_SCENARIO: Scenario = {
   id: 'galaxy-explorer',
-  name: 'Galaxy Explorer',
-  description: 'Fly through a procedurally generated galaxy — inspect star clusters, nebulae, and galactic dynamics.',
+  name: 'Milky Way Explorer',
+  description: 'Explore our home galaxy — fly over the four spiral arms, nuclear bar, 140 globular clusters, and the supermassive black hole Sagittarius A* at the core.',
   category: 'galaxy',
   difficulty: 'intermediate',
   bodies: [
-    // keep this intentionally light — populate procedurally at runtime (e.g. generate 10k stars)
+    // Sagittarius A* — the 4-million solar-mass black hole at the galactic center
     {
       id: 'central-blackhole',
-      name: 'Galactic Core (BH)',
+      name: 'Sagittarius A*',
       type: 'blackhole',
       position: { x: 0, y: 0, z: 0 },
       velocity: { x: 0, y: 0, z: 0 },
-      mass: 4e40,
-      radius: 1e9,
-      color: '#000000',
+      mass: 8e36,      // ~4 million solar masses (4e6 × 2e30 kg)
+      radius: 1.2e10,  // Schwarzschild radius ~12 million km
+      color: '#ff6622',
       albedo: 0,
       parentId: undefined,
       childIds: [],
       isFixed: true,
       useAnalyticalOrbit: false,
-      realWorldObject: 'Supermassive Black Hole'
+      realWorldObject: 'Sagittarius A*'
     }
-    // you would procedurally generate stellar population here
   ],
   initialCamera: {
     ...DEFAULT_CAMERA,
@@ -780,25 +859,27 @@ export const GALAXY_EXPLORER_SCENARIO: Scenario = {
     followBody: undefined
   },
   physicsConfig: {
-    timeStep: 3600 * 24, // coarse for galactic scales
+    timeStep: 3600 * 24 * 365, // 1 year per step for galactic timescales
     algorithm: 'barnes-hut'
   },
   visualConfig: {
     enableTrails: false,
     trailLength: 0,
-    showBodyLabels: false
+    showBodyLabels: true
   },
   learningObjectives: [
-    'Understand differences between planetary and galactic dynamics',
-    'Explore scale differences (AU vs ly)',
-    'Observe collective gravitational interactions'
+    'Identify the four major spiral arms: Perseus, Sagittarius, Norma, Scutum-Centaurus',
+    'Understand how the central bar drives spiral arm formation',
+    'Observe globular clusters orbiting in the galactic halo',
+    'Explore the nuclear star cluster surrounding Sagittarius A*',
+    'Appreciate the difference between galactic (kly) and solar system (AU) scales'
   ],
-  educationalContext: 'A galaxy scenario emphasizes emergent dynamics at very large scales, dominated by many-body interactions and dark-matter-like potentials.',
-  keyPhysicsConcepts: ['Many-body gravity', 'Dynamical friction', 'Orbital precession'],
+  educationalContext: 'The Milky Way is a barred spiral galaxy ~100,000 light-years across containing 200–400 billion stars. Our Sun sits in the Orion Spur, a minor arm between the Perseus and Sagittarius arms, about 26,000 light-years from the center. The central bar rotates as a solid body, driving the spiral arm pattern. About 150 globular clusters orbit in a spherical halo. At the very center sits Sagittarius A*, a supermassive black hole 4 million times the mass of the Sun, confirmed by observing stars orbiting it at thousands of km/s.',
+  keyPhysicsConcepts: ['Differential rotation', 'Flat rotation curves (dark matter)', 'Spiral density waves', 'Stellar populations (Pop I/II)', 'Globular cluster dynamics', 'Black hole accretion'],
   estimatedDuration: 600,
-  basedOnRealSystem: false,
-  dataSource: 'Procedural / simulated',
-  accuracy: 'entertainment'
+  basedOnRealSystem: true,
+  dataSource: 'Based on Milky Way structural data (ESA Gaia, NASA/ESA)',
+  accuracy: 'educational'
 };
 
 
@@ -978,15 +1059,9 @@ export const PARKER_SOLAR_SCENARIO: Scenario = {
   accuracy: 'educational'
 };
 
-// UPDATE PREDEFINED_SCENARIOS to include new scenarios
 export const PREDEFINED_SCENARIOS: Record<string, Scenario> = {
-  'solar-system': SOLAR_SYSTEM_SCENARIO,
-  'binary-star': BINARY_STAR_SCENARIO,
-  'sandbox': SANDBOX_SCENARIO,
-  'voyager-grand-tour': VOYAGER_GRAND_TOUR_SCENARIO,
-  'jwst-lagrange': JWST_L2_SCENARIO,
-  'parker-solar-probe': PARKER_SOLAR_SCENARIO,
-  'galaxy-explorer': GALAXY_EXPLORER_SCENARIO
+  'solar-system':   SOLAR_SYSTEM_SCENARIO,
+  'galaxy-explorer': GALAXY_EXPLORER_SCENARIO,
 };
 
 // ===== UTILITY CONSTANTS =====
