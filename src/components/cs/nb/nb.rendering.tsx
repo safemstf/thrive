@@ -526,6 +526,10 @@ class EnhancedCameraController {
     return this.targetSpherical.clone();
   }
 
+  public getCurrentRadius(): number {
+    return this.spherical.radius;
+  }
+
   public setTargetRadius(radius: number): void {
     const clamped = Math.max(this.minDistance, Math.min(this.maxDistance, radius));
     this.targetSpherical.radius = clamped;
