@@ -340,6 +340,8 @@ export interface UseNBodyRenderingProps {
   onBackgroundClick?: (event: MouseEvent) => void;
   /** Called when the rendering mode switches between solar-system and galaxy. */
   onGalaxyModeChange?: (isGalaxy: boolean) => void;
+  /** Called when the user clicks our Sun in galaxy view — triggers solar system navigation. */
+  onGalaxySunClick?: () => void;
 }
 
 // normalize trail fade types to the types expected by DynamicTrailSystem
@@ -1297,6 +1299,7 @@ export const useNBodyRendering = ({
   onBodyClick,
   onBackgroundClick,
   onGalaxyModeChange,
+  onGalaxySunClick,
 }: UseNBodyRenderingProps) => {
 
   const config = { ...DEFAULT_VISUAL, ...visualConfig };
@@ -1663,9 +1666,16 @@ export const useNBodyRendering = ({
     // Objects that belong to solar system view only
     if (asteroidBeltRef.current)   asteroidBeltRef.current.visible   = !isGalaxyMode;
     if (realStarfieldRef.current)  realStarfieldRef.current.getPoints().visible  = !isGalaxyMode;
-    if (milkyWayRef.current)       milkyWayRef.current.getMesh().visible          = !isGalaxyMode;
     if (deepSkyRef.current)        deepSkyRef.current.getGroup().visible           = !isGalaxyMode;
     if (exoplanetsRef.current)     exoplanetsRef.current.getGroup().visible        = !isGalaxyMode;
+
+    // MilkyWayDome: solar-system only. In galaxy mode the dome's FBM clouds fill
+    // the entire sky and overwhelm the galaxy renderer. GalaxyRenderer.cosmicDustMesh
+    // handles the deep-space background in galaxy mode.
+    if (milkyWayRef.current) {
+      milkyWayRef.current.getMesh().visible = !isGalaxyMode;
+      milkyWayRef.current.getMesh().scale.setScalar(1);
+    }
 
     // Camera + fog — only apply changes on mode transition
     const modeChanged = isGalaxyMode !== wasGalaxyModeRef.current;
@@ -2060,6 +2070,20 @@ export const useNBodyRendering = ({
 
     raycasterRef.current.setFromCamera(mouseRef.current, rs.camera);
 
+    // ── Galaxy mode: test against galaxy-specific clickable objects first ──
+    if (galaxyRendererRef.current?.group.visible) {
+      const galaxyTargets = galaxyRendererRef.current.getClickableMeshes();
+      for (const { mesh, id } of galaxyTargets) {
+        const hits = raycasterRef.current.intersectObject(mesh, true);
+        if (hits.length > 0) {
+          if (id === 'our-sun') {
+            onGalaxySunClick?.();
+          }
+          return; // consumed
+        }
+      }
+    }
+
     const meshes = Array.from(renderableBodiersRef.current.values())
       .filter(rb => rb.mesh)
       .map(rb => rb.mesh!)
@@ -2079,7 +2103,7 @@ export const useNBodyRendering = ({
     } else {
       onBackgroundClick?.(event);
     }
-  }, [containerRef, onBodyClick, onBackgroundClick]); // renderingStateRef is stable
+  }, [containerRef, onBodyClick, onBackgroundClick, onGalaxySunClick]); // renderingStateRef is stable
 
   // Event listeners
   useEffect(() => {

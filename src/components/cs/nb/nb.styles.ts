@@ -901,6 +901,261 @@ export const Tooltip = styled.div`
 
 
 /* ========================
+   Universe Explorer styles — full-bleed galaxy + solar-system explorer
+   All .ue-* classes live here so nb.tsx stays clean
+   ======================== */
+export const UniverseExplorerStyles = createGlobalStyle`
+  .ue-root {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 90vh;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #e2e8f0;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.8);
+  }
+  .ue-canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    touch-action: none;
+    -webkit-user-select: none; user-select: none;
+  }
+  .ue-canvas canvas {
+    width: 100% !important; height: 100% !important;
+    display: block; touch-action: none;
+  }
+
+  /* ── Loading veil ─────────────────────────────────────────── */
+  .ue-veil {
+    position: absolute; inset: 0; z-index: 200;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(0,0,5,0.88); backdrop-filter: blur(12px);
+    gap: 1rem;
+  }
+  .ue-spinner {
+    width: 36px; height: 36px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-top-color: #6366f1; border-radius: 50%;
+    animation: ue-spin 0.9s linear infinite;
+  }
+  @keyframes ue-spin { to { transform: rotate(360deg); } }
+  .ue-veil-label { font-size: 0.85rem; color: rgba(148,163,184,0.8); letter-spacing: 0.1em; }
+
+  /* ── World switcher (top-left) ──────────────────────────────── */
+  .ue-world-switcher {
+    position: absolute; top: 1rem; left: 1rem; z-index: 50;
+    display: flex; gap: 0.4rem;
+  }
+  .ue-world-btn {
+    padding: 0.35rem 0.85rem;
+    font-size: 0.75rem; font-weight: 500;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.55); color: rgba(203,213,225,0.7);
+    cursor: pointer; transition: all 0.18s; backdrop-filter: blur(8px);
+    letter-spacing: 0.02em; white-space: nowrap;
+  }
+  .ue-world-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .ue-world-btn.active {
+    border-color: rgba(99,102,241,0.7);
+    background: rgba(99,102,241,0.22); color: #a5b4fc;
+  }
+
+  /* ── Top-right icon buttons ─────────────────────────────────── */
+  .ue-top-right {
+    position: absolute; top: 1rem; right: 1rem; z-index: 50;
+    display: flex; gap: 0.4rem; margin-top: 2.5rem;
+  }
+  .ue-icon-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(0,0,0,0.55); color: rgba(203,213,225,0.8);
+    cursor: pointer; transition: all 0.18s; backdrop-filter: blur(8px);
+  }
+  .ue-icon-btn:hover { background: rgba(255,255,255,0.1); }
+
+  /* ── HUD ───────────────────────────────────────────────────── */
+  .ue-hud {
+    position: absolute; top: 5.5rem; right: 1rem; z-index: 40;
+    padding: 0.75rem 1rem;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+    font-size: 0.73rem; min-width: 180px;
+  }
+  .ue-hud.galaxy { border-color: rgba(99,102,241,0.25); }
+  .ue-hud-title {
+    font-size: 0.82rem; font-weight: 700; color: #fff;
+    margin-bottom: 0.55rem; letter-spacing: 0.03em;
+  }
+  .ue-hud-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.15rem 0; color: rgba(148,163,184,0.85);
+  }
+  .ue-hud-row span:last-child { color: #93c5fd; font-weight: 500; }
+
+  /* ── Bottom bar ────────────────────────────────────────────── */
+  .ue-bottom-bar {
+    position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%);
+    z-index: 50; display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(0,0,0,0.65); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 999px;
+    flex-wrap: wrap; justify-content: center; max-width: calc(100% - 2rem);
+  }
+  .ue-bar-btn {
+    padding: 0.3rem 0.75rem; font-size: 0.75rem; font-weight: 500;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05); color: rgba(203,213,225,0.85);
+    cursor: pointer; transition: all 0.16s; white-space: nowrap;
+  }
+  .ue-bar-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .ue-bar-btn.active {
+    background: rgba(99,102,241,0.22); border-color: rgba(99,102,241,0.6); color: #a5b4fc;
+  }
+  .ue-bar-btn.primary {
+    background: rgba(99,102,241,0.3); border-color: rgba(99,102,241,0.6); color: #c7d2fe;
+  }
+  .ue-bar-btn.primary:hover { background: rgba(99,102,241,0.5); }
+  .ue-speed-control { display: flex; align-items: center; gap: 0.5rem; }
+  .ue-speed-label { font-size: 0.7rem; color: rgba(148,163,184,0.7); white-space: nowrap; }
+  .ue-slider {
+    width: 80px; height: 4px;
+    -webkit-appearance: none; appearance: none;
+    background: rgba(255,255,255,0.12); border-radius: 2px; outline: none; cursor: pointer;
+  }
+  .ue-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #6366f1; cursor: pointer; border: 1px solid rgba(255,255,255,0.3);
+  }
+
+  /* ── Panels ────────────────────────────────────────────────── */
+  .ue-panel {
+    position: absolute; bottom: 4rem; left: 1rem; z-index: 60;
+    width: clamp(280px, 36vw, 420px); max-height: 65%; overflow-y: auto;
+    background: rgba(5,8,18,0.92); backdrop-filter: blur(18px);
+    border: 1px solid rgba(99,102,241,0.25); border-radius: 14px;
+    padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;
+    animation: ue-slideup 0.22s ease-out;
+    scrollbar-width: thin; scrollbar-color: rgba(99,102,241,0.3) transparent;
+  }
+  @keyframes ue-slideup {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .ue-panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.9rem; font-weight: 700; color: #fff;
+  }
+  .ue-panel-close {
+    background: none; border: none; color: rgba(148,163,184,0.6);
+    cursor: pointer; font-size: 0.9rem; padding: 0.2rem; transition: color 0.15s;
+  }
+  .ue-panel-close:hover { color: #fff; }
+  .ue-panel-desc { font-size: 0.75rem; color: rgba(148,163,184,0.75); line-height: 1.55; margin: 0; }
+  .ue-panel-tip {
+    font-size: 0.7rem; color: rgba(148,163,184,0.45);
+    border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.6rem; line-height: 1.5;
+  }
+
+  /* ── Galaxy POI grid ───────────────────────────────────────── */
+  .ue-poi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .ue-poi-card {
+    display: flex; flex-direction: column; align-items: flex-start;
+    gap: 0.2rem; padding: 0.6rem 0.75rem;
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; cursor: pointer; transition: all 0.18s; text-align: left; color: inherit;
+  }
+  .ue-poi-card:hover { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.45); }
+  .ue-poi-icon { font-size: 1.3rem; }
+  .ue-poi-name { font-size: 0.78rem; font-weight: 600; color: #e2e8f0; }
+  .ue-poi-desc { font-size: 0.65rem; color: rgba(148,163,184,0.65); line-height: 1.4; }
+
+  /* ── Body browser ──────────────────────────────────────────── */
+  .ue-body-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .ue-body-group-label {
+    font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: rgba(100,116,139,0.9); margin-bottom: 0.4rem;
+  }
+  .ue-body-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .ue-body-chip {
+    display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.25rem 0.5rem 0.25rem 0.4rem; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03);
+    transition: all 0.16s; cursor: pointer;
+  }
+  .ue-body-chip:hover { background: rgba(255,255,255,0.07); }
+  .ue-body-chip.selected { border-color: rgba(99,102,241,0.65); background: rgba(99,102,241,0.18); }
+  .ue-body-chip-name {
+    display: flex; align-items: center; gap: 0.35rem;
+    font-size: 0.75rem; color: #cbd5e1; cursor: pointer;
+  }
+  .ue-body-chip.selected .ue-body-chip-name { color: #c7d2fe; font-weight: 600; }
+  .ue-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .ue-eye-btn { font-size: 0.65rem; cursor: pointer; opacity: 0.5; transition: opacity 0.15s; padding: 0.1rem; }
+  .ue-eye-btn:hover { opacity: 1; }
+
+  /* ── Info panel ────────────────────────────────────────────── */
+  .ue-info-body {
+    font-size: 0.75rem; color: rgba(148,163,184,0.85); line-height: 1.6;
+    display: flex; flex-direction: column; gap: 0.6rem;
+  }
+  .ue-info-body h3 { color: #fff; font-size: 0.88rem; margin: 0; }
+  .ue-info-body p { margin: 0; }
+  .ue-info-body ul { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.3rem; }
+  .ue-info-body strong { color: #93c5fd; }
+  .ue-shortcuts {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem 1rem;
+    font-size: 0.68rem; color: rgba(100,116,139,0.9);
+    border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.6rem;
+  }
+
+  /* ── First-person overlay ──────────────────────────────────── */
+  .ue-fp-overlay { position: absolute; inset: 0; z-index: 100; pointer-events: none; }
+  .ue-fp-overlay > * { pointer-events: auto; }
+  .ue-fp-hint {
+    position: absolute; top: 1rem; left: 50%; transform: translateX(-50%);
+    font-size: 0.68rem; color: rgba(148,163,184,0.45); letter-spacing: 0.04em; pointer-events: none;
+  }
+  .ue-fp-exit {
+    position: absolute; top: 1rem; right: 1rem;
+    background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; color: #e2e8f0; padding: 0.3rem 0.8rem;
+    cursor: pointer; font-size: 0.75rem; backdrop-filter: blur(8px); transition: background 0.18s;
+  }
+  .ue-fp-exit:hover { background: rgba(255,255,255,0.1); }
+  .ue-fp-hud {
+    position: absolute; bottom: 1.5rem; left: 1.5rem;
+    font-family: 'JetBrains Mono','Fira Code','Courier New',monospace;
+    font-size: 0.68rem; color: rgba(147,197,253,0.6); line-height: 1.7;
+    pointer-events: none; text-shadow: 0 0 8px rgba(59,130,246,0.4);
+  }
+  .ue-crosshair {
+    position: absolute; top: 50%; left: 50%;
+    width: 5px; height: 5px; border-radius: 50%;
+    background: rgba(255,255,255,0.25); transform: translate(-50%,-50%);
+    box-shadow: 0 0 6px rgba(255,255,255,0.3); pointer-events: none;
+  }
+
+  /* ── Mobile ────────────────────────────────────────────────── */
+  @media (max-width: 600px) {
+    .ue-panel { width: calc(100vw - 2rem); left: 1rem; bottom: 4.5rem; }
+    .ue-poi-grid { grid-template-columns: 1fr; }
+    .ue-bottom-bar { gap: 0.35rem; padding: 0.4rem 0.6rem; }
+    .ue-bar-btn { padding: 0.28rem 0.55rem; font-size: 0.7rem; }
+    .ue-slider { width: 55px; }
+    .ue-hud { display: none; }
+  }
+`;
+
+/* ========================
    Default export (named exports are above)
    ======================== */
 export default {

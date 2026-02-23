@@ -1209,8 +1209,8 @@ export class GalaxyRenderer {
   private diskGlowMesh:   THREE.Mesh;     // full-disk spiral glow plane
   private bgGalaxyMesh:     THREE.Points;   // Andromeda, Magellanic Clouds, etc.
   private cosmicDustMesh:   THREE.Points;   // Background star/dust field (like solar system bg)
-  private cosmicDomeMesh:   THREE.Mesh;     // Inside-facing background sphere — wraps viewer in deep space
   private youAreHereMesh!:  THREE.Mesh;     // "You Are Here" — Orion Spur marker
+  private ourSunMesh!:      THREE.Mesh;     // Our Sun — clickable, leads to solar system
   private habitableMesh:    THREE.Points | null = null; // Earth-like world markers
   private time = 0;
 
@@ -1280,10 +1280,31 @@ export class GalaxyRenderer {
         vec2  p = gl_PointCoord - 0.5;
         float r = length(p);
         if (r > 0.5) discard;
-        float spike = exp(-r*r*30.0);
-        float halo  = exp(-r*r* 6.5) * 0.55;
-        float a     = clamp((spike+halo)*1.6, 0.0, 1.0);
-        gl_FragColor = vec4(vColor + vColor*spike*0.9, a * vAlpha);
+
+        // Bright core + soft halo
+        float core = exp(-r*r*45.0);
+        float glow = exp(-r*r* 9.0) * 0.48;
+
+        // 4-point diffraction spikes (cross pattern — like telescope optics / real star photos)
+        float ax = abs(p.x), ay = abs(p.y);
+        // Horizontal spike: very tight along Y, elongated along X
+        float spikeH = exp(-ay*ay*340.0) * exp(-ax*ax*10.0) * max(0.0, 1.0 - r*2.4) * 0.72;
+        // Vertical spike: very tight along X, elongated along Y
+        float spikeV = exp(-ax*ax*340.0) * exp(-ay*ay*10.0) * max(0.0, 1.0 - r*2.4) * 0.72;
+
+        // Diagonal sub-spikes at 45° (real diffraction rings, half intensity)
+        float d1 = abs(p.x - p.y), d2 = abs(p.x + p.y);
+        float diagH = exp(-d1*d1*260.0) * exp(-r*r*6.0) * 0.28;
+        float diagV = exp(-d2*d2*260.0) * exp(-r*r*6.0) * 0.28;
+
+        float total = core + glow + spikeH + spikeV + diagH + diagV;
+        float a     = clamp(total * 1.25, 0.0, 1.0);
+
+        // Hot white core blending into star color
+        vec3 col = mix(vec3(1.0, 0.97, 0.90), vColor, smoothstep(0.0, 0.18, r));
+        col += vColor * core * 1.0; // additive bloom on core
+
+        gl_FragColor = vec4(col, a * vAlpha);
       }
     `;
     // Static point vert (nebulae, dust, globulars, background — not animated)
@@ -1325,8 +1346,9 @@ export class GalaxyRenderer {
     const placeOnArm = (rad: number, arm: ArmDef, spreadMult = 1.0) => {
       const base   = th(rad, arm.start);
       const armF   = Math.min((rad - BUL_R) / (GR - BUL_R), 1.0);
-      // Major arms tighter, minor looser
-      const spread = (arm.major ? 0.28 : 0.55) * spreadMult * (0.12 + 0.88 * armF);
+      // Major arms: 0.38 (was 0.28 = too tight, 0.55 = too loose, 0.38 = natural scatter)
+      // Minor arms: 0.68 (more diffuse than major, but still traceable)
+      const spread = (arm.major ? 0.38 : 0.68) * spreadMult * (0.12 + 0.88 * armF);
       return base + (rng() - 0.5) * spread * Math.PI * 2;
     };
 
@@ -1364,7 +1386,7 @@ export class GalaxyRenderer {
       } else if (isOrion) {
         // Orion Spur: short stub at r=SUN_R±8000, near Perseus, 20° offset
         rad        = SUN_R * 0.70 + SUN_R * 0.60 * Math.pow(rng(), 1.3);
-        thetaFinal = th(rad, ORI) + (rng()-0.5) * 0.55;
+        thetaFinal = th(rad, ORI) + (rng()-0.5) * 0.65; // moderate scatter
         yFinal     = (rng()-0.5) * DISK_H * 1.4;
       } else {
         // Disk star on one of the four arms
@@ -1531,7 +1553,7 @@ export class GalaxyRenderer {
       const rad  = BUL_R*0.45 + GR*0.76 * Math.pow(rng(), 1.12);
       // 60% on major arms, 40% on minor (matching real MW H-II distribution)
       const arm  = rng() < 0.60 ? ARMS[Math.floor(rng()*2)] : ARMS[2 + Math.floor(rng()*2)];
-      const ang  = placeOnArm(rad, arm, 0.55);
+      const ang  = placeOnArm(rad, arm, 0.60); // slightly wider than star arms for organic feel
       hPos[i*3]   = Math.cos(ang) * rad;
       hPos[i*3+1] = (rng()-0.5) * DISK_H * 0.7;
       hPos[i*3+2] = Math.sin(ang) * rad;
@@ -1655,17 +1677,18 @@ export class GalaxyRenderer {
             float r   = length(uv);
             if(r > 0.5) discard;
             // Layered gaussian — bright centre, warm diffuse halo
-            float core  = exp(-r*r*85.0) * 3.2;
-            float inner = exp(-r*r*22.0) * 1.1;
-            float halo  = exp(-r*r* 5.5) * 0.38;
+            // Dimmed significantly — was blowing out the center white
+            float core  = exp(-r*r*85.0) * 1.4;
+            float inner = exp(-r*r*22.0) * 0.55;
+            float halo  = exp(-r*r* 5.5) * 0.20;
             float total = core + inner + halo;
             if(total < 0.004) discard;
             float p = 0.93 + 0.07*sin(time*0.22);
-            // White-hot centre → warm straw yellow → fades naturally
-            vec3 col = mix(vec3(1.0,0.98,0.88), vec3(1.0,0.88,0.50), smoothstep(0.0,0.08,r));
-            col       = mix(col,               vec3(0.90,0.68,0.28), smoothstep(0.06,0.28,r));
-            col      *= 1.0 - smoothstep(0.20, 0.50, r)*0.75;
-            gl_FragColor = vec4(col, clamp(total*p*0.72, 0.0, 0.88));
+            // Warm amber-gold bulge — old stellar population, not white-hot
+            vec3 col = mix(vec3(1.0,0.90,0.60), vec3(1.0,0.72,0.28), smoothstep(0.0,0.10,r));
+            col       = mix(col,               vec3(0.72,0.42,0.12), smoothstep(0.08,0.35,r));
+            col      *= 1.0 - smoothstep(0.22, 0.50, r)*0.80;
+            gl_FragColor = vec4(col, clamp(total*p*0.55, 0.0, 0.70));
           }
         `,
         transparent:true, blending:THREE.AdditiveBlending,
@@ -1702,10 +1725,13 @@ export class GalaxyRenderer {
 
     // =========================================================
     // 7. SGR A* GLOW BILLBOARD — always faces camera
-    // tight bright spike + warm gold diffuse — no purple, no giant halo
+    // Clean design: tight bright spike for the nuclear star cluster glow,
+    // warm gold-orange diffuse — no purple, no cross artifacts.
+    // The dark center of the galaxy is implied by the coreMesh's gaussian
+    // not filling the very center as brightly as the outer ring of the bulge.
     // =========================================================
     this.coreBillboard = new THREE.Mesh(
-      new THREE.PlaneGeometry(COR_R*10, COR_R*10),
+      new THREE.PlaneGeometry(COR_R*8, COR_R*8),
       new THREE.ShaderMaterial({
         uniforms: { time: { value: 0 } },
         vertexShader: `varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
@@ -1714,17 +1740,19 @@ export class GalaxyRenderer {
           void main(){
             vec2 uv=vUv-0.5; float r=length(uv);
             if(r>0.5) discard;
-            float spike = exp(-r*r*160.0)*5.0;
-            float inner = exp(-r*r* 40.0)*2.2;
-            float mid   = exp(-r*r* 10.0)*0.75;
-            float outer = exp(-r*r*  2.8)*0.18; // subtle diffuse only
-            float total = spike+inner+mid+outer;
-            if(total < 0.006) discard;
+            // Sharp central spike — Sgr A* itself
+            float spike = exp(-r*r*200.0)*4.5;
+            // Tight inner glow — nuclear star cluster
+            float inner = exp(-r*r* 55.0)*1.8;
+            // Soft diffuse — heated gas around Sgr A*
+            float mid   = exp(-r*r* 14.0)*0.65;
+            float total = spike+inner+mid;
+            if(total < 0.005) discard;
             float p = 0.88+0.12*sin(time*0.28);
-            // White core → warm gold → fades to near-black. No purple.
-            vec3 col = mix(vec3(1.0,0.99,0.95), vec3(1.0,0.82,0.30), smoothstep(0.0,0.06,r));
-            col       = mix(col,               vec3(0.85,0.44,0.10), smoothstep(0.06,0.22,r));
-            col       = mix(col,               vec3(0.12,0.04,0.01), smoothstep(0.18,0.48,r));
+            // White-hot core → warm gold → orange → fades out
+            vec3 col = mix(vec3(1.0,0.99,0.95), vec3(1.0,0.85,0.35), smoothstep(0.0,0.04,r));
+            col       = mix(col,               vec3(0.95,0.55,0.12), smoothstep(0.04,0.18,r));
+            col       = mix(col,               vec3(0.20,0.06,0.01), smoothstep(0.16,0.46,r));
             gl_FragColor = vec4(col, clamp(total*p, 0.0, 1.0));
           }
         `,
@@ -1974,98 +2002,23 @@ export class GalaxyRenderer {
     this.youAreHereMesh.renderOrder = 4;
 
     // =========================================================
-    // COSMIC BACKGROUND DOME — inside-facing sphere wrapping the viewer
-    // The same role as MilkyWayDome in solar system mode: every direction
-    // feels alive with depth. FBM noise creates cosmic-web filaments,
-    // distant galaxy cluster warmth, and deep-space nebulosity.
+    // 12. OUR SUN — visual corona + click target at Orion Spur position
+    // Visual size: 2,200 ly (coronaSize = displayRadius * 10 = 2,200 ly)
+    // IMPORTANT: keep visual small. youAreHereMesh (2,500 ly) is the click target
+    // so clicking works precisely without intercepting the whole viewport.
     // =========================================================
-    this.cosmicDomeMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(GR * 7, 48, 48),
-      new THREE.ShaderMaterial({
-        uniforms: { time: { value: 0 } },
-        vertexShader: `
-          varying vec3 vDir;
-          void main(){
-            vDir = normalize(position);
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `,
-        fragmentShader: `
-          varying vec3 vDir;
-          uniform float time;
+    this.ourSunMesh = createStarCoronaMesh(220, new THREE.Color(1.0, 0.95, 0.72));
+    this.ourSunMesh.position.set(yah_x, 0, yah_z);
+    this.ourSunMesh.renderOrder = 5;
+    this.ourSunMesh.userData.bodyId  = 'our-sun';
+    this.ourSunMesh.userData.isOurSun = true;
 
-          float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-          float noise(vec2 p){
-            vec2 i=floor(p), f=fract(p), u=f*f*(3.0-2.0*f);
-            return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),
-                       mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
-          }
-          float fbm(vec2 p){
-            float v=0.0, a=0.5;
-            for(int i=0;i<6;i++){
-              v += a*noise(p);
-              p  = p*2.1 + vec2(1.7,9.2);
-              a *= 0.5;
-            }
-            return v;
-          }
-
-          void main(){
-            vec3 d = normalize(vDir);
-
-            // Use spherical coords as 2D noise input — gives organic coverage
-            float lon = atan(d.z, d.x);
-            float lat = asin(clamp(d.y, -1.0, 1.0));
-            vec2 uv   = vec2(lon * 0.6, lat * 1.2);
-
-            float t = time * 0.005;
-
-            // Large-scale cosmic web filaments
-            float web   = fbm(uv * 1.8 + t * 0.3);
-            // Medium-scale galaxy cluster concentrations
-            float clust = fbm(uv * 3.5 - t * 0.15 + 5.3);
-            // Fine detail — individual galaxy smears
-            float fine  = fbm(uv * 7.0 + t * 0.1 + 2.1);
-
-            // Cosmic web: bright filaments, dark voids (just like real large-scale structure)
-            float structure = pow(web, 1.6) * 0.55
-                            + pow(clust, 2.0) * 0.30
-                            + fine * 0.08;
-
-            // Galactic plane: faint equatorial band (unresolved stars of other galaxies)
-            float band = exp(-lat*lat * 8.0) * 0.12;
-            structure += band;
-
-            structure = clamp(structure, 0.0, 1.0);
-            if(structure < 0.015) discard;
-
-            // Color palette: deep space indigo-black, filaments are faint blue-white,
-            // cluster nodes pick up warm amber (older stellar populations)
-            vec3 voidC   = vec3(0.0,   0.002, 0.010); // nearly black deep space
-            vec3 filC    = vec3(0.18,  0.28,  0.55);  // faint blue cosmic filament
-            vec3 clustC  = vec3(0.55,  0.42,  0.22);  // warm amber cluster nodes
-
-            vec3 col = mix(voidC, filC,   smoothstep(0.0,  0.5, web));
-            col      = mix(col,   clustC, smoothstep(0.55, 0.8, clust) * 0.45);
-            // Band is slightly warmer (distant galactic stars)
-            col      = mix(col,   vec3(0.70, 0.65, 0.55), band * 1.5);
-
-            // Very low opacity — adds depth without overpowering the galaxy
-            float a = structure * 0.18;
-            gl_FragColor = vec4(col, clamp(a, 0.0, 0.18));
-          }
-        `,
-        transparent: true,
-        side: THREE.BackSide,           // always renders from inside
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      })
-    );
-    this.cosmicDomeMesh.renderOrder = -5; // deepest — behind everything
+    // youAreHereMesh doubles as the click target — it's 2,500 ly, precise & already there
+    this.youAreHereMesh.userData.bodyId  = 'our-sun';
+    this.youAreHereMesh.userData.isOurSun = true;
 
     // ── Assemble ──────────────────────────────────────────────────────────────
     this.group.add(
-      this.cosmicDomeMesh,   // immersive background dome (deepest — wraps viewer)
       this.cosmicDustMesh,   // background star dust (fills deep space)
       this.bgGalaxyMesh,     // extragalactic background (deepest)
       this.diskGlowMesh,     // volumetric disk glow
@@ -2077,6 +2030,7 @@ export class GalaxyRenderer {
       this.coreMesh,         // nuclear star cluster
       this.coreBillboard,    // Sgr A* glow
       this.youAreHereMesh,   // YOU ARE HERE — Orion Spur
+      this.ourSunMesh,       // Our Sun — clickable
     );
     if (this.habitableMesh) this.group.add(this.habitableMesh); // Earth-like markers
     scene.add(this.group);
@@ -2122,7 +2076,6 @@ export class GalaxyRenderer {
     diskMat.uniforms.alpha.value = diskAlpha;
 
     (this.youAreHereMesh.material as THREE.ShaderMaterial).uniforms.time.value = t;
-    (this.cosmicDomeMesh.material as THREE.ShaderMaterial).uniforms.time.value = t;
 
     // Habitable mesh LOD (if built)
     if (this.habitableMesh) {
@@ -2131,13 +2084,32 @@ export class GalaxyRenderer {
       (this.habitableMesh.material as THREE.ShaderMaterial).uniforms.alpha.value = habAlpha;
     }
 
+    // Our Sun corona LOD: visible when camera is within 80,000 ly, fades in from 50,000
+    const sunAlpha = fadeIn(50_000, 80_000, camDist);
+    const sunMat = this.ourSunMesh.material as THREE.ShaderMaterial;
+    if (sunMat.uniforms?.time) sunMat.uniforms.time.value = t;
+    this.ourSunMesh.visible = sunAlpha > 0.01;
+    // Scale the corona with LOD fade
+    this.ourSunMesh.scale.setScalar(0.3 + 0.7 * sunAlpha);
+
     // ── Billboards always face camera ──────────────────────────────────────
     this.coreMesh.quaternion.copy(camera.quaternion);       // bulge halo billboard
     this.coreBillboard.quaternion.copy(camera.quaternion);  // Sgr A* spike
     this.youAreHereMesh.quaternion.copy(camera.quaternion);
+    this.ourSunMesh.quaternion.copy(camera.quaternion);     // Our Sun always faces camera
 
     // Bar rotates as solid body: omega = V_FLAT/BAR_R * 0.62
     this.barMesh.rotation.y = (0.015 / 27000) * 0.62 * t;
+  }
+
+  /** Returns visible clickable galaxy objects with their IDs (for raycasting in nb.rendering.tsx).
+   *  Uses youAreHereMesh (2,500 ly) as the click target — precisely sized, not a viewport-filling
+   *  giant plane like the full corona would be.
+   */
+  getClickableMeshes(): Array<{ mesh: THREE.Object3D; id: string }> {
+    // youAreHereMesh is always visible in galaxy mode — it's the "You Are Here" pulsing marker.
+    // It's 2,500 ly in diameter: small enough for precise raycasting.
+    return [{ mesh: this.youAreHereMesh, id: 'our-sun' }];
   }
 
   dispose(): void {
@@ -2145,7 +2117,7 @@ export class GalaxyRenderer {
       this.starsMesh, this.hiiMesh, this.dustMesh, this.globularMesh,
       this.coreMesh, this.barMesh, this.coreBillboard,
       this.diskGlowMesh, this.bgGalaxyMesh, this.cosmicDustMesh,
-      this.cosmicDomeMesh, this.youAreHereMesh,
+      this.youAreHereMesh, this.ourSunMesh,
     ]) {
       m.geometry.dispose();
       (m.material as THREE.Material).dispose();
