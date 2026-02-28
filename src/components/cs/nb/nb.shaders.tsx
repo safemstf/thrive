@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { SimulationBody } from './nb.logic';
+import { STAR_CATALOG, NAMED_STARS } from './nb.starCatalog';
 
 // ===== IMPROVED SHADERS =====
 
@@ -1212,6 +1213,7 @@ export class GalaxyRenderer {
   private youAreHereMesh!:  THREE.Mesh;     // "You Are Here" — Orion Spur marker
   private ourSunMesh!:      THREE.Mesh;     // Our Sun — clickable, leads to solar system
   private habitableMesh:    THREE.Points | null = null; // Earth-like world markers
+  private catalogStarsMesh!: THREE.Points;  // HYG real star catalog — clickable exploration targets
   private time = 0;
 
   constructor(scene: THREE.Scene) {
@@ -2017,20 +2019,165 @@ export class GalaxyRenderer {
     this.youAreHereMesh.userData.bodyId  = 'our-sun';
     this.youAreHereMesh.userData.isOurSun = true;
 
+    // =========================================================
+    // 13. HYG STAR CATALOG — real nearby stars placed across the galaxy
+    //
+    // Stars are spread using sqrt-scaling: scaledDist = K × √(realDist_ly)
+    //   K=3000 → Sirius (8.6 ly real) maps to 8,800 ly from Sol
+    //             Polaris (432 ly)     → 62,000 ly from Sol
+    //             Betelgeuse (498 ly)  → 67,000 ly from Sol
+    //             Rigel (860 ly)       → 87,000 ly from Sol
+    // This distributes the catalog across the full galaxy without pushing any
+    // star beyond the galaxy radius.
+    //
+    // Equatorial J2000 → galactic IAU rotation applied first so star positions
+    // respect the actual galactic geometry (e.g. Polaris is above the disk, not
+    // in it; Sirius is slightly below the galactic plane).
+    //
+    // Each point is individually raycaster-pickable via intersects[0].index.
+    // =========================================================
+    {
+      const PC_TO_LY = 3.26156;
+      const K_SPREAD = 3000; // sqrt-spread constant in ly
+
+      // IAU rotation matrix: heliocentric equatorial J2000 → galactic Cartesian
+      //   gal_X = toward galactic center  (l=0°, b=0°)
+      //   gal_Y = in-plane prograde        (l=90°, b=0°)
+      //   gal_Z = north galactic pole      (b=90°)
+      const EQ2GAL_0 = [-0.0548756, -0.8734371, -0.4838350];
+      const EQ2GAL_1 = [ 0.4941094, -0.4448296,  0.7469822];
+      const EQ2GAL_2 = [-0.8676661, -0.1980764,  0.4559838];
+
+      // Local galactic basis vectors in scene XZ at Sol's galactic position
+      //   gal_X (toward galactic center) → scene dir = (-cos_ori, 0, -sin_ori)
+      //   gal_Y (prograde tangential)    → scene dir = (-sin_ori, 0,  cos_ori)
+      //   gal_Z (north pole)             → scene Y axis
+      const cos_ori = yah_x / SUN_R;
+      const sin_ori = yah_z / SUN_R;
+
+      // B-V index → approximate RGB
+      const bvToRgb = (bv: number): [number, number, number] => {
+        if (bv === 99 || isNaN(bv) || bv > 90) return [1.0, 1.0, 1.0];
+        const t = Math.max(-0.4, Math.min(2.0, bv));
+        if (t < 0.0) {
+          const f = (t + 0.4) / 0.4;
+          return [0.60 + 0.40 * f, 0.70 + 0.30 * f, 1.0];
+        } else if (t < 0.6) {
+          const f = t / 0.6;
+          return [1.0, 1.0, 1.0 - 0.30 * f];
+        } else if (t < 1.5) {
+          const f = (t - 0.6) / 0.9;
+          return [1.0, 1.0 - 0.40 * f, 0.70 - 0.50 * f];
+        } else {
+          const f = Math.min(1, (t - 1.5) / 0.5);
+          return [1.0, 0.60 - 0.30 * f, 0.20 - 0.10 * f];
+        }
+      };
+
+      const isNamed = new Set<number>(Object.keys(NAMED_STARS).map(Number));
+
+      const NC = STAR_CATALOG.length;
+      const cPos = new Float32Array(NC * 3);
+      const cCol = new Float32Array(NC * 3);
+      const cSz  = new Float32Array(NC);
+
+      for (let i = 0; i < NC; i++) {
+        const [xp, yp, zp, mag, bv] = STAR_CATALOG[i];
+
+        if (i === 0) {
+          // Sol — render at exact galactic position (ourSunMesh overlaps here, that's fine)
+          cPos[i * 3] = yah_x; cPos[i * 3 + 1] = 0; cPos[i * 3 + 2] = yah_z;
+          cCol[i * 3] = 1.0;   cCol[i * 3 + 1] = 0.95; cCol[i * 3 + 2] = 0.72;
+          cSz[i] = 1200;
+          continue;
+        }
+
+        // Step 1: equatorial J2000 → galactic (in parsecs)
+        const gal_x = EQ2GAL_0[0]*xp + EQ2GAL_0[1]*yp + EQ2GAL_0[2]*zp;
+        const gal_y = EQ2GAL_1[0]*xp + EQ2GAL_1[1]*yp + EQ2GAL_1[2]*zp;
+        const gal_z = EQ2GAL_2[0]*xp + EQ2GAL_2[1]*yp + EQ2GAL_2[2]*zp;
+
+        // Step 2: real distance in ly
+        const realDist_ly = Math.sqrt(xp*xp + yp*yp + zp*zp) * PC_TO_LY;
+        if (realDist_ly < 0.001) { cPos[i*3]=yah_x; cPos[i*3+1]=0; cPos[i*3+2]=yah_z; continue; }
+
+        // Step 3: sqrt-spread → light-years in galactic frame
+        const spread = K_SPREAD / Math.sqrt(realDist_ly);
+        const lGX = gal_x * PC_TO_LY * spread; // along toward-gc direction
+        const lGY = gal_y * PC_TO_LY * spread; // along prograde direction
+        const lGZ = gal_z * PC_TO_LY * spread; // along north-pole direction
+
+        // Step 4: project galactic onto scene XZ (using local basis at Sol)
+        const off_x = lGX * (-cos_ori) + lGY * (-sin_ori);
+        const off_z = lGX * (-sin_ori) + lGY * ( cos_ori);
+        const off_y = lGZ * 0.08; // flatten heavily — most stars should stay near disk
+
+        cPos[i * 3]     = yah_x + off_x;
+        cPos[i * 3 + 1] = off_y;
+        cPos[i * 3 + 2] = yah_z + off_z;
+
+        // Color from B-V
+        const [cr, cg, cb] = bvToRgb(bv);
+        cCol[i * 3]     = cr;
+        cCol[i * 3 + 1] = cg;
+        cCol[i * 3 + 2] = cb;
+
+        // Size: brighter magnitude → larger point.
+        // Named stars (Sirius, Polaris, Betelgeuse…) are 2.5× bigger for findability.
+        const cappedMag = Math.max(-1.5, Math.min(6.5, mag));
+        const baseSize = 300 + (6.5 - cappedMag) * 100; // 300–1100 world units
+        cSz[i] = isNamed.has(i) ? baseSize * 2.5 : baseSize;
+      }
+
+      const catGeo = new THREE.BufferGeometry();
+      catGeo.setAttribute('position', new THREE.BufferAttribute(cPos, 3));
+      catGeo.setAttribute('color',    new THREE.BufferAttribute(cCol, 3));
+      catGeo.setAttribute('size',     new THREE.BufferAttribute(cSz,  1));
+
+      // Static vertex shader — no GPU rotation, these are fixed exploration beacons
+      const CAT_VERT = `
+        attribute float size;
+        varying   vec3  vColor;
+        varying   float vAlpha;
+        uniform   float alpha;
+        void main() {
+          vColor = color;
+          vAlpha = alpha;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = clamp(size * projectionMatrix[1][1] / (-mv.z) * 260.0, 1.5, 12.0);
+          gl_Position  = projectionMatrix * mv;
+        }
+      `;
+
+      this.catalogStarsMesh = new THREE.Points(catGeo,
+        new THREE.ShaderMaterial({
+          uniforms: { alpha: { value: 1.0 } },
+          vertexShader:   CAT_VERT,
+          fragmentShader: STAR_FRAG,
+          vertexColors: true,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      this.catalogStarsMesh.renderOrder = 6;
+    }
+
     // ── Assemble ──────────────────────────────────────────────────────────────
     this.group.add(
-      this.cosmicDustMesh,   // background star dust (fills deep space)
-      this.bgGalaxyMesh,     // extragalactic background (deepest)
-      this.diskGlowMesh,     // volumetric disk glow
-      this.dustMesh,         // dark dust lanes
-      this.hiiMesh,          // H-II emission nebulae
-      this.starsMesh,        // main stellar disk (GPU animated)
-      this.globularMesh,     // globular clusters
-      this.barMesh,          // central bar
-      this.coreMesh,         // nuclear star cluster
-      this.coreBillboard,    // Sgr A* glow
-      this.youAreHereMesh,   // YOU ARE HERE — Orion Spur
-      this.ourSunMesh,       // Our Sun — clickable
+      this.cosmicDustMesh,     // background star dust (fills deep space)
+      this.bgGalaxyMesh,       // extragalactic background (deepest)
+      this.diskGlowMesh,       // volumetric disk glow
+      this.dustMesh,           // dark dust lanes
+      this.hiiMesh,            // H-II emission nebulae
+      this.starsMesh,          // main stellar disk (GPU animated)
+      this.globularMesh,       // globular clusters
+      this.barMesh,            // central bar
+      this.coreMesh,           // nuclear star cluster
+      this.coreBillboard,      // Sgr A* glow
+      this.youAreHereMesh,     // YOU ARE HERE — Orion Spur
+      this.ourSunMesh,         // Our Sun — visual corona
+      this.catalogStarsMesh,   // HYG catalog — real stars, clickable exploration targets
     );
     if (this.habitableMesh) this.group.add(this.habitableMesh); // Earth-like markers
     scene.add(this.group);
@@ -2103,13 +2250,14 @@ export class GalaxyRenderer {
   }
 
   /** Returns visible clickable galaxy objects with their IDs (for raycasting in nb.rendering.tsx).
-   *  Uses youAreHereMesh (2,500 ly) as the click target — precisely sized, not a viewport-filling
-   *  giant plane like the full corona would be.
+   *  youAreHereMesh (2,500 ly) is the precise click target for our Sun.
+   *  catalogStarsMesh exposes all 8,930 HYG stars — raycaster hits[0].index gives the star index.
    */
   getClickableMeshes(): Array<{ mesh: THREE.Object3D; id: string }> {
-    // youAreHereMesh is always visible in galaxy mode — it's the "You Are Here" pulsing marker.
-    // It's 2,500 ly in diameter: small enough for precise raycasting.
-    return [{ mesh: this.youAreHereMesh, id: 'our-sun' }];
+    return [
+      { mesh: this.youAreHereMesh,   id: 'our-sun'       },
+      { mesh: this.catalogStarsMesh, id: 'catalog-stars' },
+    ];
   }
 
   dispose(): void {
@@ -2117,7 +2265,7 @@ export class GalaxyRenderer {
       this.starsMesh, this.hiiMesh, this.dustMesh, this.globularMesh,
       this.coreMesh, this.barMesh, this.coreBillboard,
       this.diskGlowMesh, this.bgGalaxyMesh, this.cosmicDustMesh,
-      this.youAreHereMesh, this.ourSunMesh,
+      this.youAreHereMesh, this.ourSunMesh, this.catalogStarsMesh,
     ]) {
       m.geometry.dispose();
       (m.material as THREE.Material).dispose();

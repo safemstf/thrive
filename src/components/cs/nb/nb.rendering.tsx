@@ -342,6 +342,9 @@ export interface UseNBodyRenderingProps {
   onGalaxyModeChange?: (isGalaxy: boolean) => void;
   /** Called when the user clicks our Sun in galaxy view — triggers solar system navigation. */
   onGalaxySunClick?: () => void;
+  /** Called when the user clicks a HYG catalog star in galaxy view.
+   *  starIndex is the index into STAR_CATALOG (0 = Sol, others = real HYG stars). */
+  onCatalogStarClick?: (starIndex: number) => void;
 }
 
 // normalize trail fade types to the types expected by DynamicTrailSystem
@@ -1300,6 +1303,7 @@ export const useNBodyRendering = ({
   onBackgroundClick,
   onGalaxyModeChange,
   onGalaxySunClick,
+  onCatalogStarClick,
 }: UseNBodyRenderingProps) => {
 
   const config = { ...DEFAULT_VISUAL, ...visualConfig };
@@ -2072,12 +2076,19 @@ export const useNBodyRendering = ({
 
     // ── Galaxy mode: test against galaxy-specific clickable objects first ──
     if (galaxyRendererRef.current?.group.visible) {
+      // Set Points click threshold in world units (ly). 600 ly ≈ click radius.
+      // Large enough to hit a dim star at galaxy scale, small enough to be precise.
+      raycasterRef.current.params.Points = { threshold: 600 };
+
       const galaxyTargets = galaxyRendererRef.current.getClickableMeshes();
       for (const { mesh, id } of galaxyTargets) {
         const hits = raycasterRef.current.intersectObject(mesh, true);
         if (hits.length > 0) {
           if (id === 'our-sun') {
             onGalaxySunClick?.();
+          } else if (id === 'catalog-stars') {
+            const starIndex = hits[0].index ?? -1;
+            if (starIndex >= 0) onCatalogStarClick?.(starIndex);
           }
           return; // consumed
         }
@@ -2103,7 +2114,7 @@ export const useNBodyRendering = ({
     } else {
       onBackgroundClick?.(event);
     }
-  }, [containerRef, onBodyClick, onBackgroundClick, onGalaxySunClick]); // renderingStateRef is stable
+  }, [containerRef, onBodyClick, onBackgroundClick, onGalaxySunClick, onCatalogStarClick]); // renderingStateRef is stable
 
   // Event listeners
   useEffect(() => {
