@@ -68,11 +68,15 @@ const MedicalModelsDemo = dynamic(() => import('@/components/cs/medicalModels/me
 const AgarioDemo = dynamic(() => import('@/components/cs/agario/agario'), {
   ssr: false,
   loading: () => <SimulationLoader>Loading agario Simulation...</SimulationLoader>
+});
 
+const TDVisualization = dynamic(() => import('@/components/cs/td/td'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading TD Visualization...</SimulationLoader>
 });
 
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'three-body' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks';
 type TabType = 'simulations' | 'algorithms';
 
 interface SimulationItem {
@@ -897,12 +901,12 @@ const allItems: SimulationItem[] = [
     category: 'simulations'
   },
   {
-    key: 'three-body',
-    label: '3-Body Explorer',
+    key: 'TD',
+    label: 'TD',
     icon: <RotateCw size={22} />,
     color: '#ef4444',
     description: '3-body problem chaos visualization',
-    comingSoon: true,
+    comingSoon: false,
     category: 'simulations'
   },
   {
@@ -1151,6 +1155,8 @@ export default function SimulationsPage() {
         return <ShortestPathAlgorithmDemo isRunning={isRunning} speed={speed} />;
       case 'predprey':
         return <AgarioDemo isRunning={isRunning} speed={speed} />;
+      case 'TD':
+        return <TDVisualization isRunning={isRunning} speed={speed} />;
       default:
         return (
           <PlaceholderContent>
