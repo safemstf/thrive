@@ -7,7 +7,7 @@ import styled, { keyframes, css } from 'styled-components';
 import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen,
-  Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check
+  Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check, Shield
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
@@ -75,8 +75,14 @@ const TDVisualization = dynamic(() => import('@/components/cs/td/td'), {
   loading: () => <SimulationLoader>Loading TD Visualization...</SimulationLoader>
 });
 
+const VirusCheckerDemo = dynamic(() => import('@/components/cs/virusChecker/virusChecker'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Virus Checker...</SimulationLoader>
+});
+
+
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker';
 type TabType = 'simulations' | 'algorithms';
 
 interface SimulationItem {
@@ -860,6 +866,14 @@ const allItems: SimulationItem[] = [
     category: 'algorithms'
   },
   {
+    key: 'virus-checker',
+    label: 'Virus Checker Tool',
+    icon: <Shield size={22} />,
+    color: '#3b82f6',
+    description: 'Check for viruses inside a file',
+    category: 'algorithms'
+  },
+  {
     key: 'disease',
     label: 'Epidemiological Models',
     icon: <Target size={22} />,
@@ -1157,6 +1171,9 @@ export default function SimulationsPage() {
         return <AgarioDemo isRunning={isRunning} speed={speed} />;
       case 'TD':
         return <TDVisualization isRunning={isRunning} speed={speed} />;
+      case 'virus-checker':
+        return <VirusCheckerDemo isRunning={isRunning} speed={speed} />;
+
       default:
         return (
           <PlaceholderContent>
