@@ -25,6 +25,7 @@ const GRID_ROWS   = 10;
 const TOTAL_FILES = GRID_COLS * GRID_ROWS;
 const FILE_SIZE   = 40;
 const FILE_GAP    = 6;
+const VISUAL_SCALE = 0.84;
 const INFECTION_RATE      = 0.09;
 const SCAN_PROGRESS_RATE  = 4;
 const QUARANTINE_DELAY_MS = 600;
@@ -85,6 +86,12 @@ const slideIn = keyframes`from{opacity:0;transform:translateY(-6px)}to{opacity:1
 const UI   = `'Inter', system-ui, -apple-system, sans-serif`;
 const MONO = `'JetBrains Mono', 'Fira Code', ui-monospace, monospace`;
 const BORDER = 'rgba(148,163,184,0.18)';
+const PHI_SPACE_1 = '0.5rem';
+const PHI_SPACE_2 = '0.809rem';
+const PHI_SPACE_3 = '1.309rem';
+const PHI_SPACE_4 = '2.118rem';
+const PHI_RADIUS_2 = '0.809rem';
+const PHI_RADIUS_3 = '1.309rem';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VERDICT HELPERS
@@ -158,9 +165,22 @@ const Root = styled.div`
 
 const Canvas = styled.canvas<{ $vis: boolean }>`
   position: absolute; inset: 0; display: block;
+  width: 100%;
+  height: 100%;
   transition: opacity 0.4s;
   opacity: ${p => p.$vis ? 1 : 0};
   pointer-events: none;
+`;
+
+const Stage = styled.div`
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  min-height: 0;
+  padding: clamp(0.75rem, 1.3vw, 1.35rem);
+  @media (max-width: 900px) {
+    padding: 0.65rem;
+  }
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,21 +189,59 @@ const Canvas = styled.canvas<{ $vis: boolean }>`
 
 const UploadWrap = styled.div`
   position: absolute; inset: 0; z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(360px, 540px);
+  gap: ${PHI_SPACE_3};
+  align-items: stretch;
+  padding: ${PHI_SPACE_3};
+  @media (max-width: 760px) {
+    grid-template-columns: 1fr;
+    padding: ${PHI_SPACE_2};
+  }
+`;
+
+const UploadVisual = styled.div`
+  position: relative;
+  overflow: hidden;
+  min-height: clamp(320px, 58vh, 760px);
+  border-radius: 22px;
+  border: 1px solid rgba(148,163,184,0.2);
+  background:
+    radial-gradient(circle at 18% 24%, rgba(59,130,246,0.14), transparent 38%),
+    radial-gradient(circle at 80% 72%, rgba(34,197,94,0.12), transparent 34%),
+    linear-gradient(180deg, rgba(248,250,252,0.4) 0%, rgba(241,245,249,0.24) 100%);
+  @media (max-width: 760px) {
+    min-height: 220px;
+  }
+`;
+
+const UploadPanel = styled.div`
+  width: 100%;
+  border-radius: 22px;
+  border: 1px solid rgba(148,163,184,0.2);
+  background: rgba(248,250,252,0.92);
+  backdrop-filter: blur(2px);
+  box-shadow: 0 18px 40px rgba(15,23,42,0.09);
+  justify-self: end;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 1.5rem; padding: 2rem;
+  gap: ${PHI_SPACE_4}; padding: ${PHI_SPACE_4};
+  @media (max-width: 760px) {
+    gap: ${PHI_SPACE_3};
+    padding: ${PHI_SPACE_3};
+  }
 `;
 
 const BrandRow = styled.div`
-  display: flex; flex-direction: column; align-items: center; gap: 0.45rem;
+  display: flex; flex-direction: column; align-items: center; gap: ${PHI_SPACE_1};
   animation: ${fadeIn} 0.4s ease;
 `;
 
 const LogoWrap = styled.div`
-  width: 52px; height: 52px; border-radius: 14px;
+  width: 58px; height: 58px; border-radius: ${PHI_RADIUS_3};
   background: linear-gradient(135deg, #3b82f6, #6366f1);
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 6px 20px rgba(59,130,246,0.35);
+  box-shadow: 0 10px 30px rgba(59,130,246,0.32);
 `;
 
 const BrandTitle = styled.h1`
@@ -200,15 +258,15 @@ const PrivacyPill = styled.div`
 `;
 
 const DropCard = styled.label<{ $drag: boolean }>`
-  width: min(460px, 100%);
+  width: min(560px, 100%);
   background: ${p => p.$drag ? 'rgba(59,130,246,0.03)' : 'white'};
   border: 2px dashed ${p => p.$drag ? '#3b82f6' : 'rgba(148,163,184,0.4)'};
-  border-radius: 20px;
+  border-radius: 24px;
   box-shadow: ${p => p.$drag
     ? '0 0 0 6px rgba(59,130,246,0.06), 0 12px 40px rgba(15,23,42,0.08)'
-    : '0 4px 24px rgba(15,23,42,0.06)'};
-  padding: 2.5rem 2rem;
-  display: flex; flex-direction: column; align-items: center; gap: 0.9rem;
+    : '0 10px 34px rgba(15,23,42,0.07)'};
+  padding: calc(${PHI_SPACE_4} * 1.1) ${PHI_SPACE_4};
+  display: flex; flex-direction: column; align-items: center; gap: ${PHI_SPACE_2};
   cursor: pointer;
   transition: all 0.2s ease;
   animation: ${fadeIn} 0.4s ease 0.1s both;
@@ -219,7 +277,7 @@ const DropCard = styled.label<{ $drag: boolean }>`
 `;
 
 const DropIconWrap = styled.div<{ $drag: boolean }>`
-  width: 60px; height: 60px; border-radius: 16px;
+  width: 68px; height: 68px; border-radius: ${PHI_RADIUS_3};
   background: ${p => p.$drag ? 'rgba(59,130,246,0.1)' : '#f1f5f9'};
   border: 1px solid ${p => p.$drag ? 'rgba(59,130,246,0.25)' : BORDER};
   display: flex; align-items: center; justify-content: center;
@@ -232,21 +290,21 @@ const DropSub   = styled.div`font-size: 0.76rem; color: #64748b; text-align: cen
 
 const DropButton = styled.div`
   display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.55rem 1.5rem; border-radius: 10px;
+  padding: ${PHI_SPACE_2} ${PHI_SPACE_4}; border-radius: ${PHI_RADIUS_2};
   background: linear-gradient(135deg, #3b82f6, #6366f1);
   color: white; font-size: 0.82rem; font-weight: 600;
-  box-shadow: 0 3px 10px rgba(59,130,246,0.35);
+  box-shadow: 0 8px 22px rgba(59,130,246,0.32);
 `;
 
 const PillRow = styled.div`
-  display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem;
-  max-width: 440px;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: ${PHI_SPACE_1};
+  max-width: 540px;
   animation: ${fadeIn} 0.4s ease 0.18s both;
 `;
 
 const Pill = styled.div`
   display: flex; align-items: center; gap: 0.3rem;
-  padding: 0.2rem 0.75rem; border-radius: 999px;
+  padding: 0.24rem ${PHI_SPACE_2}; border-radius: 999px;
   border: 1px solid ${BORDER};
   background: white;
   font-size: 0.68rem; color: #64748b;
@@ -259,7 +317,9 @@ const Pill = styled.div`
 
 const ScanWrap = styled.div`
   position: absolute; inset: 0; z-index: 30;
-  background: #f8fafc;
+  border-radius: 22px;
+  border: 1px solid rgba(148,163,184,0.2);
+  background: rgba(248,250,252,0.95);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   gap: 1.1rem;
@@ -294,6 +354,9 @@ const ToolRoot = styled.div`
   position: absolute; inset: 0;
   display: flex; flex-direction: column;
   overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid rgba(148,163,184,0.2);
+  box-shadow: 0 16px 40px rgba(15,23,42,0.08);
   background: #f8fafc;
   animation: ${slideIn} 0.3s ease;
 `;
@@ -304,13 +367,13 @@ const VerdictHeader = styled.div<{ $v: Verdict }>`
   flex-shrink: 0;
   background: ${p => VERDICT_CONFIG[p.$v].gradient};
   border-bottom: 1px solid ${p => VERDICT_CONFIG[p.$v].border};
-  padding: 0.9rem 1.25rem;
-  display: flex; align-items: center; gap: 1rem;
+  padding: ${PHI_SPACE_3} ${PHI_SPACE_4};
+  display: flex; align-items: center; gap: ${PHI_SPACE_3};
 `;
 
 const VerdictIconBox = styled.div<{ $v: Verdict }>`
   flex-shrink: 0;
-  width: 46px; height: 46px; border-radius: 12px;
+  width: 52px; height: 52px; border-radius: ${PHI_RADIUS_2};
   background: ${p => VERDICT_CONFIG[p.$v].iconBg};
   border: 1px solid ${p => VERDICT_CONFIG[p.$v].border};
   display: flex; align-items: center; justify-content: center;
@@ -326,12 +389,12 @@ const VerdictTitle = styled.div<{ $v: Verdict }>`
 
 const VerdictRec = styled.div<{ $v: Verdict }>`
   font-size: 0.74rem; color: ${p => VERDICT_CONFIG[p.$v].subtext};
-  margin-top: 0.12rem; line-height: 1.5;
+  margin-top: 0.2rem; line-height: 1.6;
 `;
 
 const VerdictMeta = styled.div`
   flex-shrink: 0; text-align: right;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem;
+  display: flex; flex-direction: column; align-items: flex-end; gap: ${PHI_SPACE_1};
 `;
 
 const FileBadge = styled.div`
@@ -353,7 +416,7 @@ const WarnChip = styled.span`
 
 const RescanBtn = styled.button`
   display: flex; align-items: center; gap: 0.35rem;
-  padding: 0.4rem 0.85rem; border-radius: 8px;
+  padding: ${PHI_SPACE_1} ${PHI_SPACE_3}; border-radius: ${PHI_RADIUS_2};
   border: 1px solid ${BORDER};
   background: rgba(255,255,255,0.8); backdrop-filter: blur(8px);
   color: #475569; font-size: 0.72rem; font-weight: 600; font-family: ${UI};
@@ -365,22 +428,33 @@ const RescanBtn = styled.button`
 
 const ContentArea = styled.div`
   flex: 1; display: flex; overflow: hidden; min-height: 0;
+  gap: ${PHI_SPACE_3};
+  padding: ${PHI_SPACE_3};
+  background: #f1f5f9;
+  @media (max-width: 1080px) {
+    flex-direction: column;
+  }
 `;
 
 // ── Left sidebar ──────────────────────────────────────────────────────────────
 
 const Sidebar = styled.div`
-  flex-shrink: 0; width: 230px;
+  flex-shrink: 0; width: min(280px, 30vw);
   background: white;
-  border-right: 1px solid ${BORDER};
+  border: 1px solid ${BORDER};
+  border-radius: ${PHI_RADIUS_3};
   display: flex; flex-direction: column;
   overflow-y: auto;
+  @media (max-width: 1080px) {
+    width: 100%;
+    max-height: 42%;
+  }
   &::-webkit-scrollbar { width: 3px; }
   &::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 2px; }
 `;
 
 const SideSection = styled.div`
-  padding: 0.75rem 0.9rem;
+  padding: ${PHI_SPACE_2} ${PHI_SPACE_3};
   border-bottom: 1px solid rgba(241,245,249,1);
 `;
 
@@ -439,12 +513,14 @@ const MainPanel = styled.div`
   flex: 1; display: flex; flex-direction: column;
   overflow: hidden; min-height: 0;
   background: white;
+  border: 1px solid ${BORDER};
+  border-radius: ${PHI_RADIUS_3};
 `;
 
 // Tab bar
 const TabBar = styled.div`
   flex-shrink: 0;
-  padding: 0 0.85rem;
+  padding: 0 ${PHI_SPACE_3};
   border-bottom: 1px solid ${BORDER};
   background: #fafbfc;
   display: flex; align-items: flex-end; gap: 0;
@@ -452,7 +528,7 @@ const TabBar = styled.div`
 
 const Tab = styled.button<{ $a: boolean }>`
   display: flex; align-items: center; gap: 0.35rem;
-  padding: 0.6rem 0.85rem 0.5rem;
+  padding: ${PHI_SPACE_2} ${PHI_SPACE_3} ${PHI_SPACE_1};
   border: none; border-bottom: 2px solid ${p => p.$a ? '#3b82f6' : 'transparent'};
   background: transparent;
   color: ${p => p.$a ? '#1e293b' : '#64748b'};
@@ -475,15 +551,15 @@ const TabContent = styled.div`flex: 1; display: flex; flex-direction: column; ov
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ScrollArea = styled.div`
-  flex: 1; overflow-y: auto; padding: 0.65rem 0.75rem;
-  display: flex; flex-direction: column; gap: 0.4rem;
+  flex: 1; overflow-y: auto; padding: ${PHI_SPACE_2} ${PHI_SPACE_3};
+  display: flex; flex-direction: column; gap: ${PHI_SPACE_1};
   &::-webkit-scrollbar { width: 4px; }
   &::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 2px; }
 `;
 
 const DismissBar = styled.div`
   flex-shrink: 0;
-  padding: 0.35rem 0.75rem;
+  padding: ${PHI_SPACE_1} ${PHI_SPACE_3};
   border-top: 1px solid ${BORDER};
   background: #fafbfc;
   display: flex; align-items: center; gap: 0.5rem;
@@ -501,7 +577,7 @@ const RestoreBtn = styled.button`
 
 // Detection card
 const Card = styled.div<{ $sev: Severity; $sel: boolean }>`
-  display: flex; border-radius: 10px;
+  display: flex; border-radius: ${PHI_RADIUS_2};
   border: 1px solid ${p => p.$sel
     ? (p.$sev === 'critical' || p.$sev === 'high' ? 'rgba(239,68,68,0.35)' :
        p.$sev === 'medium' ? 'rgba(234,179,8,0.35)' : 'rgba(59,130,246,0.3)')
@@ -513,7 +589,7 @@ const Card = styled.div<{ $sev: Severity; $sel: boolean }>`
   overflow: hidden; cursor: pointer;
   transition: all 0.15s;
   animation: ${fadeUp} 0.2s ease both;
-  &:hover { box-shadow: 0 3px 12px rgba(15,23,42,0.06); }
+  &:hover { box-shadow: 0 6px 16px rgba(15,23,42,0.07); }
   position: relative;
 `;
 
@@ -522,7 +598,7 @@ const CardBar = styled.div<{ $sev: Severity }>`
   background: ${p => SEV_BAR[p.$sev]};
 `;
 
-const CardBody = styled.div`flex: 1; padding: 0.6rem 0.7rem; min-width: 0;`;
+const CardBody = styled.div`flex: 1; padding: ${PHI_SPACE_2} ${PHI_SPACE_3}; min-width: 0;`;
 
 const CardHead = styled.div`display: flex; align-items: flex-start; gap: 0.45rem; margin-bottom: 0.18rem;`;
 const CardName = styled.div`flex: 1; font-size: 0.77rem; font-weight: 600; color: #1e293b; line-height: 1.35; word-break: break-word;`;
@@ -621,7 +697,7 @@ const NavBt     = styled.button<{ $dim?: boolean }>`
 `;
 const HexOff    = styled.span`flex: 1; text-align: center; font-size: 0.6rem; color: #475569; font-family: ${MONO};`;
 const SelBar    = styled.div`flex-shrink: 0; padding: 0.25rem 0.7rem; background: rgba(59,130,246,0.08); border-bottom: 1px solid rgba(59,130,246,0.15); font-size: 0.66rem; color: #60a5fa; display: flex; align-items: center; gap: 0.4rem;`;
-const HexScroll = styled.div`flex: 1; overflow-y: auto; padding: 0.25rem 0.5rem; &::-webkit-scrollbar{width:3px} &::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.07);border-radius:2px}`;
+const HexScroll = styled.div`flex: 1; overflow-y: auto; @media (max-width: 1080px) {    width: 100%;   max-height: 42%;  } padding: 0.25rem 0.5rem; &::-webkit-scrollbar{width:3px} &::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.07);border-radius:2px}`;
 const HexRw     = styled.div`display: flex; align-items: center; gap: 0.28rem; line-height: 1.7; font-size: 0.59rem; &:hover{background:rgba(255,255,255,0.02)}`;
 const HexAddr   = styled.span`color: #1e3a5f; min-width: 48px; flex-shrink: 0; user-select: none; font-family: ${MONO};`;
 const HexBG     = styled.span`display: flex; gap: 0.16rem; font-family: ${MONO};`;
@@ -797,6 +873,7 @@ interface VirusCheckerProps { isRunning: boolean; speed: number; }
 
 export default function VirusCheckerDemo({ isRunning, speed }: VirusCheckerProps) {
   const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const visualRef    = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animRef      = useRef<number>(0);
   const lastTickRef  = useRef(Date.now());
@@ -845,45 +922,56 @@ export default function VirusCheckerDemo({ isRunning, speed }: VirusCheckerProps
 
   // ── Canvas (light theme) ──────────────────────────────────────────────────
   const render = useCallback(() => {
-    const c = canvasRef.current, cont = containerRef.current;
-    if (!c || !cont) return;
+    const c = canvasRef.current;
+    if (!c) return;
     const ctx = c.getContext('2d');
     if (!ctx) return;
-    const W = c.width, H = c.height;
+    const dpr = typeof window !== 'undefined' ? Math.max(1, window.devicePixelRatio || 1) : 1;
+    const W = c.clientWidth;
+    const H = c.clientHeight;
+    const targetW = Math.max(1, Math.floor(W * dpr));
+    const targetH = Math.max(1, Math.floor(H * dpr));
+    if (c.width !== targetW || c.height !== targetH) {
+      c.width = targetW;
+      c.height = targetH;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0,0,W,H);
     ctx.fillStyle = '#f8fafc'; ctx.fillRect(0,0,W,H);
     ctx.strokeStyle = 'rgba(0,0,0,0.022)'; ctx.lineWidth = 1;
     for (let x=0;x<W;x+=44){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
     for (let y=0;y<H;y+=44){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
 
-    const gW=GRID_COLS*(FILE_SIZE+FILE_GAP)-FILE_GAP, gH=GRID_ROWS*(FILE_SIZE+FILE_GAP)-FILE_GAP;
+    const fileSize = FILE_SIZE * VISUAL_SCALE;
+    const fileGap = FILE_GAP * VISUAL_SCALE;
+    const gW=GRID_COLS*(fileSize+fileGap)-fileGap, gH=GRID_ROWS*(fileSize+fileGap)-fileGap;
     const ox=(W-gW)/2, oy=(H-gH)/2;
 
     if (isRunning && scanIdxRef.current < filesRef.current.length) {
-      const col=scanIdxRef.current%GRID_COLS, bx=ox+col*(FILE_SIZE+FILE_GAP);
-      const grad=ctx.createLinearGradient(bx-12,0,bx+FILE_SIZE+12,0);
+      const col=scanIdxRef.current%GRID_COLS, bx=ox+col*(fileSize+fileGap);
+      const grad=ctx.createLinearGradient(bx-12,0,bx+fileSize+12,0);
       grad.addColorStop(0,'transparent'); grad.addColorStop(0.5,'rgba(59,130,246,0.06)'); grad.addColorStop(1,'transparent');
-      ctx.fillStyle=grad; ctx.fillRect(bx-12,oy-4,FILE_SIZE+24,gH+8);
+      ctx.fillStyle=grad; ctx.fillRect(bx-12,oy-4,fileSize+24,gH+8);
     }
 
     filesRef.current.forEach((f,i)=>{
       const col=i%GRID_COLS, row=Math.floor(i/GRID_COLS);
-      const x=ox+col*(FILE_SIZE+FILE_GAP), y=oy+row*(FILE_SIZE+FILE_GAP);
+      const x=ox+col*(fileSize+fileGap), y=oy+row*(fileSize+fileGap);
       f.x=x; f.y=y;
       const cs=STATUS_COLORS[f.status];
       if (cs.glow!=='transparent'){ctx.shadowBlur=10;ctx.shadowColor=cs.glow;}
       ctx.fillStyle=cs.bg; ctx.strokeStyle=cs.border; ctx.lineWidth=f.id===activeRef.current?1.5:1;
       ctx.beginPath();
       // @ts-ignore
-      ctx.roundRect(x,y,FILE_SIZE,FILE_SIZE,4); ctx.fill(); ctx.stroke(); ctx.shadowBlur=0;
+      ctx.roundRect(x,y,fileSize,fileSize,Math.max(3,4*VISUAL_SCALE)); ctx.fill(); ctx.stroke(); ctx.shadowBlur=0;
       if (f.status==='scanning'&&f.scanProgress>0){
         ctx.fillStyle='rgba(59,130,246,0.55)';
         ctx.beginPath();
         // @ts-ignore
-        ctx.roundRect(x+2,y+FILE_SIZE-5,(FILE_SIZE-4)*f.scanProgress,3,1); ctx.fill();
+        ctx.roundRect(x+2*VISUAL_SCALE,y+fileSize-5*VISUAL_SCALE,(fileSize-4*VISUAL_SCALE)*f.scanProgress,3*VISUAL_SCALE,1); ctx.fill();
       }
-      ctx.fillStyle=cs.text; ctx.font='7px system-ui,sans-serif'; ctx.textAlign='center';
-      ctx.fillText(f.extension.slice(0,4),x+FILE_SIZE/2,y+FILE_SIZE/2+3);
+      ctx.fillStyle=cs.text; ctx.font=`${Math.max(6, Math.round(7*VISUAL_SCALE))}px system-ui,sans-serif`; ctx.textAlign='center';
+      ctx.fillText(f.extension.slice(0,4),x+fileSize/2,y+fileSize/2+3*VISUAL_SCALE);
     });
     ctx.textAlign='left';
   }, [isRunning]);
@@ -929,13 +1017,18 @@ export default function VirusCheckerDemo({ isRunning, speed }: VirusCheckerProps
   },[animate]);
 
   useEffect(()=>{
-    const cont=containerRef.current; if(!cont) return;
+    const cont=visualRef.current; if(!cont) return;
     const obs=new ResizeObserver(e=>{
       const{width,height}=e[0].contentRect;
-      const c=canvasRef.current; if(c){c.width=width;c.height=height;}
+      const c=canvasRef.current;
+      if(c){
+        const dpr = typeof window !== 'undefined' ? Math.max(1, window.devicePixelRatio || 1) : 1;
+        c.width = Math.max(1, Math.floor(width * dpr));
+        c.height = Math.max(1, Math.floor(height * dpr));
+      }
     });
     obs.observe(cont); return ()=>obs.disconnect();
-  },[]);
+  },[mode]);
 
   const handleFile = useCallback(async(file: File)=>{
     if(file.size>50*1024*1024){setError('File exceeds 50 MB limit.');setTimeout(()=>setError(null),4000);return;}
@@ -995,12 +1088,16 @@ export default function VirusCheckerDemo({ isRunning, speed }: VirusCheckerProps
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
-      <Canvas ref={canvasRef} $vis={mode==='demo'} />
+      <Stage>
 
       {/* ── UPLOAD ──────────────────────────────────────────────────────── */}
       {mode==='demo' && (
         <UploadWrap>
-          <BrandRow>
+          <UploadVisual aria-hidden="true" ref={visualRef}>
+            <Canvas ref={canvasRef} $vis={true} />
+          </UploadVisual>
+          <UploadPanel>
+            <BrandRow>
             <LogoWrap><Shield size={24} color="white" /></LogoWrap>
             <BrandTitle>File Safety Scanner</BrandTitle>
             <PrivacyPill>100% private — file never leaves your device</PrivacyPill>
@@ -1025,6 +1122,8 @@ export default function VirusCheckerDemo({ isRunning, speed }: VirusCheckerProps
               <Pill key={m}>{m}</Pill>
             ))}
           </PillRow>
+        </UploadPanel>
+
         </UploadWrap>
       )}
 
@@ -1257,7 +1356,14 @@ export default function VirusCheckerDemo({ isRunning, speed }: VirusCheckerProps
         </ToolRoot>
       )}
 
+      </Stage>
       {error && <ErrToast>⚠ {error}</ErrToast>}
     </Root>
   );
 }
+
+
+
+
+
+

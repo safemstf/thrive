@@ -8,7 +8,7 @@ import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen,
   Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check, Shield,
-  Lock, Fingerprint, FileSearch, Code2,
+  Lock, Fingerprint, FileSearch, Code2, Sheet
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
@@ -83,7 +83,7 @@ const VirusCheckerDemo = dynamic(() => import('@/components/cs/virusChecker/viru
 
 
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer';
 type TabType = 'simulations' | 'algorithms' | 'tools';
 
 interface SimulationItem {
@@ -975,6 +975,15 @@ const allItems: SimulationItem[] = [
     description: 'Shortest path algorithms comparison',
     category: 'algorithms'
   },
+    {
+    key: 'invoice-digitalizer',
+    label: 'Invoice Digitalizer',
+    icon: <Code2 size={22} />,
+    color: '#10b981',
+    description: 'Convert scanned invoices into structured data using OCR and AI parsing',
+    comingSoon: true,
+    category: 'tools',
+  },
   {
     key: 'password-checker',
     label: 'Password Strength',
@@ -1005,9 +1014,9 @@ const allItems: SimulationItem[] = [
   {
     key: 'encoder-decoder',
     label: 'Encode / Decode',
-    icon: <Code2 size={22} />,
+    icon: <Sheet size={22} />,
     color: '#10b981',
-    description: 'Base64, URL, HTML, hex, and binary encoding and decoding utilities',
+    description: 'Convert invoices into structured data using OCR and AI parsing',
     comingSoon: true,
     category: 'tools',
   },
