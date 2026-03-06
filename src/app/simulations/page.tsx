@@ -81,6 +81,10 @@ const VirusCheckerDemo = dynamic(() => import('@/components/cs/virusChecker/viru
   loading: () => <SimulationLoader>Loading Virus Checker...</SimulationLoader>
 });
 
+const InvoiceDigitalizerDemo = dynamic(() => import('@/components/invoiceDigitalizer/invoiceDigitalizer'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Invoice Digitalizer...</SimulationLoader>
+});
 
 // Types
 type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer';
@@ -981,7 +985,7 @@ const allItems: SimulationItem[] = [
     icon: <Code2 size={22} />,
     color: '#10b981',
     description: 'Convert scanned invoices into structured data using OCR and AI parsing',
-    comingSoon: true,
+    comingSoon: false,
     category: 'tools',
   },
   {
@@ -1223,7 +1227,8 @@ export default function SimulationsPage() {
         return <TDVisualization isRunning={isRunning} speed={speed} />;
       case 'virus-checker':
         return <VirusCheckerDemo isRunning={isRunning} speed={speed} />;
-
+      case 'invoice-digitalizer':
+        return <InvoiceDigitalizerDemo />;
       default:
         return (
           <PlaceholderContent>
@@ -1249,9 +1254,9 @@ export default function SimulationsPage() {
       <ContentWrapper>
         <FadingElements $theater={theaterMode}>
           <PageHeader>
-            <PageTitle>Computational Simulations</PageTitle>
+            <PageTitle>Computation Tools & Models</PageTitle>
             <PageSubtitle>
-              Professional-grade algorithms and simulations for research and education
+              Professional-grade tools, algorithms and simulations for research, business and education
             </PageSubtitle>
           </PageHeader>
 
