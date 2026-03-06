@@ -1418,11 +1418,11 @@ export const MOCK_PORTFOLIOS: Record<string, Portfolio> = {
     createdAt: new Date('2024-02-05'),
     lastActiveAt: new Date('2024-03-10')
   },
-  'kristin_knits': {
+  'Memphis_knits': {
     id: '8',
     userId: '8',
-    username: 'kristin_knits',
-    name: 'Kristin Meyer',
+    username: 'Memphis_knits',
+    name: 'Memphis Meyer',
     title: 'Fiber Artist & Pattern Designer',
     tagline: 'Stitching warmth into every creation',
     bio: 'Fiber artist specializing in hand-knitting, crochet, and sustainable textile design. My patterns have been published in leading craft magazines, and I run an online community for over 20,000 makers. Dedicated to eco-friendly practices and teaching traditional techniques with a modern twist.',
@@ -1436,12 +1436,12 @@ export const MOCK_PORTFOLIOS: Record<string, Portfolio> = {
     specializations: ['Knitting', 'Crochet', 'Pattern Design', 'Sustainable Materials'],
     tags: ['Fiber Arts', 'Handmade', 'Crafts', 'Sustainability'],
     socialLinks: {
-      website: 'https://kristin-knits.com',
-      instagram: 'https://instagram.com/kristin_knits',
-      etsy: 'https://etsy.com/shop/kristinknits',
-      pinterest: 'https://pinterest.com/kristin_knits'
+      website: 'https://Memphis-knits.com',
+      instagram: 'https://instagram.com/Memphis_knits',
+      etsy: 'https://etsy.com/shop/Memphisknits',
+      pinterest: 'https://pinterest.com/Memphis_knits'
     },
-    contactEmail: 'kristin@example.com',
+    contactEmail: 'Memphis@example.com',
     showContactInfo: true,
     settings: {
       allowReviews: true,
@@ -1473,11 +1473,11 @@ export const MOCK_PORTFOLIOS: Record<string, Portfolio> = {
     createdAt: new Date('2024-01-30'),
     lastActiveAt: new Date('2024-03-11')
   },
-  'hannah_hunts': {
+  'serene _hunts': {
     id: '9',
     userId: '9',
-    username: 'hannah_hunts',
-    name: 'Hannah Green',
+    username: 'serene _hunts',
+    name: 'serene  Green',
     title: 'Wildlife Photographer & Conservationist',
     tagline: 'Capturing nature, protecting its future',
     bio: 'Wildlife photographer and conservationist dedicated to documenting endangered species and ecosystems. My work has been featured in National Geographic and exhibited internationally. Actively involved in conservation projects and workshops teaching ethical wildlife photography.',
@@ -1491,12 +1491,12 @@ export const MOCK_PORTFOLIOS: Record<string, Portfolio> = {
     specializations: ['Wildlife Photography', 'Conservation', 'Expeditions', 'Storytelling'],
     tags: ['Photography', 'Nature', 'Wildlife', 'Conservation'],
     socialLinks: {
-      website: 'https://hannah-hunts.com',
-      instagram: 'https://instagram.com/hannah_hunts',
-      twitter: 'https://twitter.com/hannah_hunts',
-      linkedin: 'https://linkedin.com/in/hannahgreen'
+      website: 'https://serene -hunts.com',
+      instagram: 'https://instagram.com/serene _hunts',
+      twitter: 'https://twitter.com/serene _hunts',
+      linkedin: 'https://linkedin.com/in/serene green'
     },
-    contactEmail: 'hannah@example.com',
+    contactEmail: 'serene @example.com',
     showContactInfo: true,
     settings: {
       allowReviews: true,

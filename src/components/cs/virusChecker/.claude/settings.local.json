@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc --noEmit)",
+      "Bash(grep -rn \"styled-components\\\\|keyframes\\\\|css\\\\`\" \"C:/Users/safeb/OneDrive/Documents/GitHub/thrive/src/components/cs/shortestPath/\")",
+      "Bash(findstr /i \"virusChecker\")",
+      "Bash(Select-String -Pattern \"virusChecker\")",
+      "Bash(npx tsc --noEmit --project \"C:/Users/safeb/OneDrive/Documents/GitHub/thrive/tsconfig.json\")"
+    ]
+  }
+}

@@ -7,7 +7,8 @@ import styled, { keyframes, css } from 'styled-components';
 import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen,
-  Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check, Shield
+  Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check, Shield,
+  Lock, Fingerprint, FileSearch, Code2,
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
@@ -82,8 +83,8 @@ const VirusCheckerDemo = dynamic(() => import('@/components/cs/virusChecker/viru
 
 
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker';
-type TabType = 'simulations' | 'algorithms';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder';
+type TabType = 'simulations' | 'algorithms' | 'tools';
 
 interface SimulationItem {
   key: SimulationType;
@@ -694,17 +695,20 @@ const PlaceholderContent = styled.div`
 `;
 
 const StatusBar = styled.div<{ $theater?: boolean }>`
-  position: ${({ $theater }) => $theater ? 'fixed' : 'absolute'};
-  top: 1.5rem;
-  right: ${({ $theater }) => $theater ? '14rem' : '1rem'};
+  /* Theater mode: fixed overlay top-right; normal mode: flow element below controls */
+  position: ${({ $theater }) => $theater ? 'fixed' : 'relative'};
+  top: ${({ $theater }) => $theater ? '1.5rem' : 'auto'};
+  right: ${({ $theater }) => $theater ? '14rem' : 'auto'};
   display: flex;
+  justify-content: center;
   gap: 0.75rem;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
   font-weight: 600;
-  z-index: 2100;
-  opacity: ${({ $theater }) => $theater ? '1' : '0.55'};
-  
+  z-index: ${({ $theater }) => $theater ? '2100' : 'auto'};
+  opacity: ${({ $theater }) => $theater ? '1' : '0.8'};
+  margin: ${({ $theater }) => $theater ? '0' : '0.25rem 0 1.5rem'};
+
   .status-item {
     display: flex;
     align-items: center;
@@ -716,12 +720,12 @@ const StatusBar = styled.div<{ $theater?: boolean }>`
     backdrop-filter: blur(10px);
     color: ${({ $theater }) => $theater ? '#e2e8f0' : '#475569'};
   }
-  
+
   .status-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    
+
     &.running {
       background: #10b981;
       animation: ${pulse} 2s ease-in-out infinite;
@@ -867,11 +871,11 @@ const allItems: SimulationItem[] = [
   },
   {
     key: 'virus-checker',
-    label: 'Virus Checker Tool',
+    label: 'Virus Checker',
     icon: <Shield size={22} />,
     color: '#3b82f6',
-    description: 'Check for viruses inside a file',
-    category: 'algorithms'
+    description: 'Scan files for viruses and malware using signature-based detection and heuristic analysis',
+    category: 'tools'
   },
   {
     key: 'disease',
@@ -970,13 +974,49 @@ const allItems: SimulationItem[] = [
     color: '#0ea5e9',
     description: 'Shortest path algorithms comparison',
     category: 'algorithms'
-  }
+  },
+  {
+    key: 'password-checker',
+    label: 'Password Strength',
+    icon: <Lock size={22} />,
+    color: '#f97316',
+    description: 'Analyse password entropy, detect common patterns, and estimate crack time',
+    comingSoon: true,
+    category: 'tools',
+  },
+  {
+    key: 'hash-generator',
+    label: 'Hash & Verify',
+    icon: <Fingerprint size={22} />,
+    color: '#8b5cf6',
+    description: 'Compute MD5, SHA-1, SHA-256, and SHA-512 hashes and verify file integrity',
+    comingSoon: true,
+    category: 'tools',
+  },
+  {
+    key: 'metadata-viewer',
+    label: 'File Metadata',
+    icon: <FileSearch size={22} />,
+    color: '#0ea5e9',
+    description: 'Inspect EXIF, document properties, and embedded metadata without uploading',
+    comingSoon: true,
+    category: 'tools',
+  },
+  {
+    key: 'encoder-decoder',
+    label: 'Encode / Decode',
+    icon: <Code2 size={22} />,
+    color: '#10b981',
+    description: 'Base64, URL, HTML, hex, and binary encoding and decoding utilities',
+    comingSoon: true,
+    category: 'tools',
+  },
 ];
 
 // Main Component
 export default function SimulationsPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('simulations');
-  const [activeSimulation, setActiveSimulation] = useState<SimulationType>('disease');
+  const [activeTab, setActiveTab] = useState<TabType>('tools');
+  const [activeSimulation, setActiveSimulation] = useState<SimulationType>('virus-checker');
   const [isRunning, setIsRunning] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -992,6 +1032,7 @@ export default function SimulationsPage() {
 
   const simulationItems = allItems.filter(item => item.category === 'simulations');
   const algorithmItems = allItems.filter(item => item.category === 'algorithms');
+  const toolItems = allItems.filter(item => item.category === 'tools');
 
   // FPS Tracking - Throttled updates
   useEffect(() => {
@@ -1208,6 +1249,13 @@ export default function SimulationsPage() {
           <TabContainer>
             <TabWrapper>
               <TabButton
+                $active={activeTab === 'tools'}
+                onClick={() => setActiveTab('tools')}
+              >
+                <Shield size={18} />
+                Tools
+              </TabButton>
+              <TabButton
                 $active={activeTab === 'simulations'}
                 onClick={() => setActiveTab('simulations')}
               >
@@ -1225,7 +1273,7 @@ export default function SimulationsPage() {
           </TabContainer>
 
           <ItemsGrid>
-            {(activeTab === 'simulations' ? simulationItems : algorithmItems).map(item => {
+            {(activeTab === 'simulations' ? simulationItems : activeTab === 'algorithms' ? algorithmItems : toolItems).map(item => {
               const isActive = activeSimulation === item.key;
               return (
                 <ItemCard
@@ -1327,21 +1375,23 @@ export default function SimulationsPage() {
           </TheaterControls>
         )}
 
+        <StatusBar $theater={theaterMode}>
+          <div className="status-item">
+            <div className={`status-dot ${isRunning ? 'running' : 'paused'}`} />
+            {isRunning ? 'Running' : 'Paused'}
+          </div>
+          <div className="status-item">
+            Speed: {speed.toFixed(1)}x
+          </div>
+          <div className="status-item">
+            FPS: {fps}
+          </div>
+        </StatusBar>
+
         <SimulationWindow ref={simulationWindowRef} $fullscreen={theaterMode}>
           {activeItem && (
             <>
-              <StatusBar $theater={theaterMode}>
-                <div className="status-item">
-                  <div className={`status-dot ${isRunning ? 'running' : 'paused'}`} />
-                  {isRunning ? 'Running' : 'Paused'}
-                </div>
-                <div className="status-item">
-                  Speed: {speed.toFixed(1)}x
-                </div>
-                <div className="status-item">
-                  FPS: {fps}
-                </div>
-              </StatusBar>
+
 
               <PerformancePanel $show={showPerformance} $theater={theaterMode}>
                 <div className="metric">
