@@ -868,6 +868,15 @@ const allItems: SimulationItem[] = [
     category: 'algorithms'
   },
   {
+    key: 'invoice-digitalizer',
+    label: 'Invoice Digitalizer',
+    icon: <Code2 size={22} />,
+    color: '#10b981',
+    description: 'Convert scanned invoices into structured data using OCR and AI parsing',
+    comingSoon: false,
+    category: 'tools',
+  },
+  {
     key: 'virus-checker',
     label: 'Virus Checker',
     icon: <Shield size={22} />,
@@ -975,15 +984,7 @@ const allItems: SimulationItem[] = [
     description: 'Shortest path algorithms comparison',
     category: 'algorithms'
   },
-  {
-    key: 'invoice-digitalizer',
-    label: 'Invoice Digitalizer',
-    icon: <Code2 size={22} />,
-    color: '#10b981',
-    description: 'Convert scanned invoices into structured data using OCR and AI parsing',
-    comingSoon: false,
-    category: 'tools',
-  },
+
   {
     key: 'password-checker',
     label: 'Password Strength',
