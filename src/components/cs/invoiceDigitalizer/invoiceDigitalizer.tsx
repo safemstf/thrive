@@ -863,6 +863,8 @@ const VENDOR_NOISE_PATTERNS = [
   /^(salesman|sales\s+rep|freight|ship\s+via|signed\s+by|customer\s+job)\b/i,
   /ending\s+in\s+\d{4}/i,          // payment card lines "Visa ending in 6292"
   /^(authorized|auth\s*:|approved|amount\s*:)/i,
+  /^\d{4}-\d{6,}/,                 // account/PO numbers like "2269-1140268 12/10/2025"
+  /^[TtFf]:\s*[\d(+]/,            // telephone "T: 8176850220" / fax "F: (817)..."
 ];
 
 function isNoiseLine(line: string): boolean {
@@ -885,6 +887,10 @@ function cleanVendorName(raw: string): string {
   return raw
     .replace(/^[©®™\s\-_*#|]+/, "")
     .replace(/[©®™\s\-_*#|]+$/, "")
+    // Strip URL prefixes: "Ww.", "www." -> "USPS" from "Ww. USPS, com"
+    .replace(/^(?:ww+w?\.?\s*)+/i, "")
+    // Strip domain suffixes: ", com", ".com", " gov" etc.
+    .replace(/[,\s]*\b(com|org|net|gov|edu)\s*$/i, "")
     // Truncate at embedded street addresses ("3325 Clay Avenue" appended to company name)
     .replace(/\s+\d{3,5}\s+(?=[A-Za-z]).*/i, "")
     .replace(/\s{2,}/g, " ")
@@ -967,7 +973,7 @@ function findLabeledValueFromBottom(lines: string[], ...keywords: string[]): num
     if (kwRe.test(lines[i])) {
       // A "pure value" line is just a currency amount with no label text
       const isPureValue = (s: string) => /^\s*[$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}\s*$/.test(s);
-      for (const offset of [1, -1, 2]) {
+      for (const offset of [1, -1, 2, -2, 3]) {
         const j = i + offset;
         if (j < 0 || j >= lines.length) continue;
         if (isPureValue(lines[j])) {
@@ -1024,32 +1030,62 @@ function extractItems(bodyLines: string[], footerLines: string[]): ReceiptItem[]
 
     // Strip leading table-row numeric prefixes: row#, qty, backorder qty (including negative qty like -17)
     // Requires 2+ consecutive signed-integer tokens to avoid stripping "2% Milk" or "1-Day Shipping"
+    const beforeNumericStrip = rawName;
     const stripped = rawName.replace(/^(-?\d{1,4}\s+){2,}/, "").trim();
     if (stripped.length >= 2) {
       rawName = stripped;
-      // Strip leading catalog/part codes (uppercase alphanumeric, 5+ chars, no spaces)
-      rawName = rawName.replace(/^[A-Z][A-Z0-9]{4,}\s+/g, "").trim();
-      // Strip leading 2-5 char all-uppercase vendor codes (e.g. "COP", "NSI", "ACE")
-      const afterVendorCode = rawName.replace(/^[A-Z]{2,5}\s+/, "").trim();
-      if (afterVendorCode.length >= 3 && /[a-zA-Z]/.test(afterVendorCode)) {
-        rawName = afterVendorCode;
+      // ONLY strip catalog/vendor codes when we actually removed leading numeric tokens.
+      // Without this guard, material-type prefixes like "PVC", "BARE", "HDPE" would be wrongly
+      // stripped from items that happen to start with those 2-5-char uppercase sequences.
+      if (rawName !== beforeNumericStrip) {
+        // Strip leading catalog/part codes (uppercase alphanumeric, 5+ chars, no spaces)
+        rawName = rawName.replace(/^[A-Z][A-Z0-9]{4,}\s+/g, "").trim();
+        // Strip leading 2-5 char all-uppercase vendor codes (e.g. "COP", "NSI", "ACE")
+        const afterVendorCode = rawName.replace(/^[A-Z]{2,5}\s+/, "").trim();
+        if (afterVendorCode.length >= 3 && /[a-zA-Z]/.test(afterVendorCode)) {
+          rawName = afterVendorCode;
+        }
       }
     }
     // Strip leading 1-2 char unit code merged from previous table row (e.g. "T 550 PVC...")
     // Only when followed immediately by a digit then uppercase content (table qty column)
-    rawName = rawName.replace(/^[A-Z]{1,2}\s+(?=\d{1,4}\s+[A-Z]{2,})/, "").trim();
+    rawName = rawName.replace(/^[A-Z]{1,2}\s+(?=\d{1,5}\s+[A-Z]{2,})/, "").trim();
     // After stripping merged unit code, strip a single leading qty token followed by uppercase description
-    rawName = rawName.replace(/^\d{1,4}\s+(?=[A-Z]{2,})/, "").trim();
+    // Use \d{1,5} to handle 5-digit quantities (e.g. 11600 ft of conduit)
+    const beforeQtyStrip = rawName;
+    rawName = rawName.replace(/^\d{1,5}\s+(?=[A-Z]{2,})/, "").trim();
+    // After removing a leading qty, long catalog codes (≥5 chars) may now be at the front — strip them.
+    // We limit to ≥5-char codes to avoid falsely stripping 2-4-char product type prefixes like "PVC",
+    // "BARE", "ACSR" that are part of legitimate item descriptions (not vendor abbreviations).
+    if (rawName !== beforeQtyStrip) {
+      rawName = rawName.replace(/^[A-Z][A-Z0-9]{4,}\s+/g, "").trim();
+    }
+    // Strip invisible Unicode chars that pdfjs sometimes emits (zero-width space, soft hyphen, BOM, etc.)
+    // These can silently prevent the $ regex anchor from matching the true end of the string.
+    rawName = rawName.replace(/[\u00AD\u200B-\u200D\u200F\u2028\u2029\uFEFF\u00A0]/g, " ").replace(/\s{2,}/g, " ").trim();
+    // Strip trailing dollar sign OCR artifact (e.g. "BARE CU 4 SOL 200 M$", "...CLAMP $")
+    rawName = rawName.replace(/\s*\$\s*$/, "").trim();
+    // Strip trailing "qty unit" columns merged into name (e.g. "550 C", "200 M", "10 EA")
+    // Catches cases where the qty/unit PDF columns land after the description text
+    rawName = rawName.replace(/\s+\d{1,4}\s+[A-Z]{1,3}\s*$/, "").trim();
     // Strip trailing consecutive uppercase unit codes (e.g. " M M", " C §", " T")
     rawName = rawName.replace(/(\s+[A-Z§]{1,3})+\s*$/, "").trim();
+    // Fallback: strip isolated 1-2 char uppercase word at very end (catches " C", " EA" missed above)
+    rawName = rawName.replace(/\s+[A-Z]{1,2}$/, "").trim();
     // Strip trailing standalone numeric token (residual qty column, e.g. "CONDUIT 550")
     rawName = rawName.replace(/\s+\d+\s*$/, "").trim();
     // Strip trailing noise like "$ -", "$ 0.0", "0.0" at end
     rawName = rawName.replace(/\s+\$?\s*-\s*$/, "").replace(/\s+\$?\s*0\.0+\s*$/, "").trim();
     // Filter unit-price annotation lines: "1@ each", "2 x each", "1 ® each"
     if (/^\d+\s*[@®x×]\s*(each|ea\.?)\s*$/i.test(rawName)) continue;
+    // Filter label-value lines like "Weight: 0 1b oz" or "Quantity: 5"
+    if (/^[A-Za-z ]{2,25}:\s/.test(rawName)) continue;
+    // Filter pure size/unit labels: "160Z" (OCR for 16oz), "12OZ", "16 OZ", "VENTI" etc.
+    if (rawName.length <= 7 && /^\d+\s*[0OoZz]+$/.test(rawName)) continue;
+    // Filter pure numeric tokens that survived (e.g. "1160" alone after all stripping)
+    if (/^\d+$/.test(rawName)) continue;
 
-    if (rawName.length < 2) continue;
+    if (rawName.length < 3) continue;
     // Skip lines where the name is mostly non-alpha (OCR garbage)
     const alphaRatio = (rawName.match(/[a-zA-Z]/g)?.length ?? 0) / rawName.length;
     if (alphaRatio < 0.25 && rawName.length > 4) continue;
@@ -1069,9 +1105,15 @@ function detectDocType(lines: string[], fileNameHint = ""): DocType {
   const head = lines.slice(0, 15).join(" ").toLowerCase();
   const fn = fileNameHint.toLowerCase();
   if (/\binvoice\b/.test(head)) return "invoice";
+  if (/\bticket\s*#/.test(head)) return "invoice";  // distributor "Ticket # 42-77549-01"
   if (/\b(order\s+confirmation|purchase\s+order|p\.?o\.?\s*#|order\s+placed|order\s*#\s*\d{3}-\d)/i.test(head)) return "order";
   if (/\b(receipt|thank\s+you\s+for\s+your\s+(purchase|order|business))\b/.test(head)) return "receipt";
+  if (/\bstore\s+#\s*\d+/i.test(head)) return "receipt";  // Starbucks "Store #11567"
   if (/\b(bill|statement\s+of\s+account)\b/.test(head)) return "invoice";
+  // Postal / shipping receipts
+  if (/\b(usps|united\s+states\s+postal\s+service|post\s+office|postage|priority\s+mail|first[\s-]?class\s+mail|click\s*-?\s*n\s*-?\s*ship)\b/i.test(head)) return "receipt";
+  // Gas / fuel / petroleum station receipts (often mis-tagged as invoice because they use "invoice" layout)
+  if (/\b(petroleum|fuel|gallons?|unleaded|diesel|pump\s+#|price\s+per\s+gal|per\s+gallon)\b/i.test(head)) return "receipt";
   // Filename hints
   if (/order\s*(confirmation|detail|summary)/.test(fn)) return "order";
   if (/invoice/.test(fn)) return "invoice";
@@ -1150,6 +1192,35 @@ function parseInvoice(
   // If subtotal > total, they're likely swapped
   if (saneSubtotal !== undefined && saneTotal !== undefined && saneSubtotal > saneTotal) {
     [saneSubtotal, saneTotal] = [saneTotal, saneSubtotal];
+  }
+
+  // Subtotal fallback: in multi-column PDFs the "Sub Total" label and value can land in
+  // completely different line-groups (e.g. Elliott Electric: labels left-column, values right-column
+  // many lines apart). If we have total and tax, derive subtotal algebraically.
+  if (saneSubtotal === undefined && saneTotal !== undefined) {
+    const derived = parseFloat((saneTotal - (saneTax ?? 0) - (gratuity ?? 0)).toFixed(2));
+    if (derived > 0) saneSubtotal = derived;
+  }
+
+  // Consistency check: if subtotal + tax + tip does NOT equal total (rounding beyond ±0.02),
+  // re-derive subtotal from total. This catches cases like Cafe To Go where the receipt shows
+  // a base price as "subtotal" but the actual subtotal-before-tip is different (e.g., includes tax).
+  if (saneSubtotal !== undefined && saneTotal !== undefined) {
+    const expected = parseFloat((saneTotal - (saneTax ?? 0) - (gratuity ?? 0)).toFixed(2));
+    if (Math.abs(expected - saneSubtotal) > 0.02) {
+      saneSubtotal = expected > 0 ? expected : saneSubtotal;
+    }
+  }
+
+  // Last resort: if no total was found at all (e.g. multi-column distributor PDFs where the
+  // "Invoice Total" column can't be associated with its label), estimate from item prices.
+  // Only do this when we have multiple items — single-item docs are more likely to have a parse miss.
+  if (saneTotal === undefined && items.length >= 2) {
+    const itemSum = parseFloat(items.reduce((acc, i) => acc + i.price, 0).toFixed(2));
+    if (itemSum > 0) {
+      saneSubtotal = saneSubtotal ?? itemSum;
+      saneTotal = parseFloat((itemSum + (saneTax ?? 0) + (gratuity ?? 0)).toFixed(2));
+    }
   }
 
   return { id, fileName, fileHash, vendor, date, invoiceNumber, docType, items, subtotal: saneSubtotal, tax: saneTax, gratuity, total: saneTotal, rawText: text, confidence, previewUrl };

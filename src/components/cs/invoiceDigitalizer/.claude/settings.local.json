@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm install pdfjs-dist)",
-      "Bash(npx tsc --noEmit --skipLibCheck)"
+      "Bash(npx tsc --noEmit --skipLibCheck)",
+      "Bash(npx tsc --noEmit --project tsconfig.json)",
+      "Bash(npx tsc --noEmit)"
     ]
   }
 }
