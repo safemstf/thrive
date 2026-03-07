@@ -229,8 +229,7 @@ const TabButton = styled.button<{ $active: boolean }>`
   padding: 0.875rem 1.75rem;
   border: none;
   border-radius: 10px;
-  background: ${({ $active }) =>
-    $active ? 'linear-gradient(135deg, #ffffff, #f5f0e8)' : 'transparent'};
+  background: #f5f0e8';
   color: ${({ $active }) => ($active ? '#1a1208' : '#7a6e5f')};
   font-family: 'DM Sans', system-ui, sans-serif;
   font-weight: 600;
@@ -274,7 +273,7 @@ const ItemCard = styled.div<{
   position: relative;
   padding: 1.5rem;
   padding-left: 1.75rem;
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,240,232,0.96));
+  background: #f5f0e8;
   border-radius: 16px;
   border: 1px solid ${({ $active, $color }) =>
     $active ? ($color || '#2563eb') : 'rgba(26,18,8,0.1)'};
@@ -662,7 +661,6 @@ const SimulationWindow = styled.div<{ $fullscreen?: boolean }>`
 const SimulationContent = styled.div<{ $theater?: boolean }>`
   width: 100%;
   height: 100%;
-  min-height: ${({ $theater }) => $theater ? '100vh' : '550px'};
   display: flex;
   align-items: center;
   justify-content: center;
