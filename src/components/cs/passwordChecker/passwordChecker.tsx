@@ -524,6 +524,8 @@ const PasswordRow = styled.div`
 
 const PasswordInput = styled.input`
   flex:1;border:none;background:transparent;
+  padding: 0.3rem;
+  border-radius:4px;
   font-family:${T.mono};font-size:1rem;color:${T.ink};
   outline:none;letter-spacing:0.05em;min-width:0;
   &::placeholder{color:${T.inkFaint};letter-spacing:0;font-family:${T.sans};font-size:0.85rem;}
@@ -968,7 +970,7 @@ export default function PasswordChecker() {
                 <HibpSub>{hibpSubs[hibpState]}</HibpSub>
               </HibpText>
               {(hibpState==='idle'||hibpState==='error') && (
-                <HibpBtn onClick={handleHibp} disabled={hibpState==='loading'}>
+                <HibpBtn onClick={handleHibp}>
                   Check breach
                 </HibpBtn>
               )}
