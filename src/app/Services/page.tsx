@@ -86,6 +86,11 @@ const InvoiceDigitalizerDemo = dynamic(() => import('@/components/cs/invoiceDigi
   loading: () => <SimulationLoader>Loading Invoice Digitalizer...</SimulationLoader>
 });
 
+const PasswordStrengthDemo = dynamic(() => import('@/components/cs/passwordChecker/passwordChecker'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Password Strength Checker...</SimulationLoader>
+});
+
 // Types
 type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer';
 type TabType = 'simulations' | 'algorithms' | 'tools';
@@ -991,7 +996,7 @@ const allItems: SimulationItem[] = [
     icon: <Lock size={22} />,
     color: '#f97316',
     description: 'Analyse password entropy, detect common patterns, and estimate crack time',
-    comingSoon: true,
+    comingSoon: false,
     category: 'tools',
   },
   {
@@ -1226,7 +1231,9 @@ export default function SimulationsPage() {
       case 'invoice-digitalizer':
         return <InvoiceDigitalizerDemo />;
       case 'virus-checker':
-        return <VirusCheckerDemo isRunning={isRunning} speed={speed} />;
+        return <VirusCheckerDemo />;
+      case 'password-checker':
+          return<PasswordStrengthDemo />;
       default:
         return (
           <PlaceholderContent>
