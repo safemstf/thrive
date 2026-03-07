@@ -883,7 +883,7 @@ const allItems: SimulationItem[] = [
     color: '#3b82f6',
     description: 'Scan files for viruses and malware using signature-based detection and heuristic analysis',
     category: 'tools',
-    comingSoon: true,
+    comingSoon: false,
 
   },
   {
