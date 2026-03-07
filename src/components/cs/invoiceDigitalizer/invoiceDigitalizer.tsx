@@ -14,12 +14,16 @@ interface ReceiptItem {
   price: number;
 }
 
+type DocType = "invoice" | "receipt" | "order" | "unknown";
+
 interface ReceiptData {
   id: string;
   fileName: string;
   fileHash: string;
   vendor?: string;
   date?: string;
+  invoiceNumber?: string;
+  docType?: DocType;
   items: ReceiptItem[];
   subtotal?: number;
   tax?: number;
@@ -32,7 +36,7 @@ interface ReceiptData {
   previewUrl?: string;
 }
 
-type ProcessingStatus = "idle" | "hashing" | "rotating" | "ocr" | "parsing" | "done" | "error";
+type ProcessingStatus = "idle" | "hashing" | "pdf" | "rotating" | "ocr" | "parsing" | "done" | "error";
 
 interface FileEntry {
   file: File;
@@ -308,7 +312,7 @@ const StatusIcon = styled.div<{ $status: ProcessingStatus }>`
     p.$status === "error" ? T.red :
     T.accent};
 
-  svg { animation: ${p => (["hashing","rotating","ocr","parsing"].includes(p.$status) ? spinAnim : "none")} 1s linear infinite; }
+  svg { animation: ${p => (["hashing","pdf","rotating","ocr","parsing"].includes(p.$status) ? spinAnim : "none")} 1s linear infinite; }
 `;
 
 const DupBadge = styled.span`
@@ -666,6 +670,74 @@ async function normalizeImageToCanvas(file: File): Promise<HTMLCanvasElement> {
 }
 
 /**
+ * Extract content from a PDF file.
+ * - Text-layer PDFs: extract text directly (fast, 100% accurate).
+ * - Scanned PDFs: render each page to a canvas for Tesseract OCR.
+ * Returns an array of per-page results (one invoice may span multiple pages).
+ */
+async function extractPdfContent(
+  file: File,
+  onProgress: (p: number) => void,
+): Promise<{ text: string; canvas?: HTMLCanvasElement }[]> {
+  const pdfjsLib = await import("pdfjs-dist");
+  // Configure worker — Turbopack/Webpack 5 will bundle it as a separate chunk
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url,
+  ).toString();
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const results: { text: string; canvas?: HTMLCanvasElement }[] = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    onProgress(Math.round(((pageNum - 1) / pdf.numPages) * 60));
+    const page = await pdf.getPage(pageNum);
+
+    // Attempt to pull the text layer (works for digital/print PDFs)
+    const textContent = await page.getTextContent();
+    const rawItems = textContent.items as Array<{ str: string; transform: number[] }>;
+
+    // Group text items by their Y coordinate (with a small tolerance so items
+    // on the same visual line share a bucket), then sort within each line by X.
+    // This reconstructs the original line structure that the parser expects.
+    const Y_SNAP = 4; // pixels — items within 4px of each other share a line
+    const lineMap = new Map<number, Array<{ str: string; x: number }>>();
+    for (const item of rawItems) {
+      if (!item.str.trim()) continue;
+      const yKey = Math.round(item.transform[5] / Y_SNAP) * Y_SNAP;
+      if (!lineMap.has(yKey)) lineMap.set(yKey, []);
+      lineMap.get(yKey)!.push({ str: item.str, x: item.transform[4] });
+    }
+    // Higher Y → higher on the page (PDF coordinate origin is bottom-left)
+    const text = Array.from(lineMap.entries())
+      .sort((a, b) => b[0] - a[0])
+      .map(([, items]) =>
+        items.sort((a, b) => a.x - b.x).map(i => i.str).join("  ")
+      )
+      .filter(line => line.trim().length > 0)
+      .join("\n");
+
+    if (text.trim().length > 80) {
+      // Sufficient text layer — skip OCR for this page
+      results.push({ text });
+    } else {
+      // Scanned page — render to canvas and let Tesseract handle it
+      const scale = 2.0; // 2x for better OCR quality
+      const viewport = page.getViewport({ scale });
+      const pageCanvas = document.createElement("canvas");
+      pageCanvas.width  = viewport.width;
+      pageCanvas.height = viewport.height;
+      await page.render({ canvas: pageCanvas, viewport }).promise;
+      results.push({ text: "", canvas: pageCanvas });
+    }
+  }
+
+  onProgress(65);
+  return results;
+}
+
+/**
  * Score how "receipt-like" a block of text is.
  * Counts occurrences of common receipt keywords and currency patterns.
  * Used as a tiebreaker when two rotations have similar OCR confidence.
@@ -741,32 +813,120 @@ async function ocrWithBestRotation(
 }
 
 // ─────────────────────────────────────────────────────────────
-// RECEIPT PARSING
+// RECEIPT PARSING — multi-pass, structure-aware engine
 // ─────────────────────────────────────────────────────────────
-const CURRENCY_RE = /\$?\s*(\d{1,4}(?:,\d{3})*(?:\.\d{2}))/;
 
-function parseCurrency(str: string): number | undefined {
-  const m = str.match(CURRENCY_RE);
-  if (!m) return undefined;
-  return parseFloat(m[1].replace(/,/g, ""));
+/** Fix common single-character OCR substitutions that appear in numeric contexts. */
+function normalizeOcrText(raw: string): string {
+  return raw
+    // O/o → 0 when surrounded by digits
+    .replace(/(\d)[Oo](\d)/g, "$10$2")
+    // l/I → 1 when surrounded by digits or a decimal point
+    .replace(/(\d)[lI](\d)/g, "$11$2")
+    .replace(/(\d)[lI](\.)/g, "$11$2")
+    // Pipe character is almost always a 1 in Tesseract output
+    .replace(/\|/g, "1")
+    // B → 8 inside digit runs (e.g. "1B.50" → "18.50")
+    .replace(/(\d)[Bb](\d)/g, "$18$2");
 }
 
 /**
- * Attempts to find a labeled value in an array of lines.
- * Returns the first match for any of the given keywords.
+ * Split lines into three document zones.
+ * Totals/summary lines are virtually always in the footer; vendor is in the header.
  */
-function findLabeledValue(lines: string[], ...keywords: string[]): number | undefined {
-  const pattern = new RegExp(`(${keywords.join("|")})\\D{0,15}?(\\d{1,4}(?:,\\d{3})*\\.\\d{2})`, "i");
-  for (const line of lines) {
-    const m = line.match(pattern);
-    if (m) return parseFloat(m[2].replace(/,/g, ""));
+function splitIntoZones(lines: string[]): { header: string[]; body: string[]; footer: string[] } {
+  const n = lines.length;
+  const headerEnd    = Math.min(Math.max(Math.ceil(n * 0.2), 3), 10);
+  const footerStart  = Math.max(Math.floor(n * 0.72), n - 12, headerEnd + 1);
+  return {
+    header: lines.slice(0, headerEnd),
+    body:   lines.slice(headerEnd, footerStart),
+    footer: lines.slice(footerStart),
+  };
+}
+
+const VENDOR_NOISE_PATTERNS = [
+  /duplicate\s+receipt/i, /\*+\s*duplicate/i, /copy\s+of\s+receipt/i,
+  /merchant\s+copy/i, /customer\s+copy/i, /cardholder\s+copy/i,
+  /reprint/i, /re-?print/i, /not\s+a\s+receipt/i, /void/i,
+  /thank\s+you/i, /welcome\s+to/i, /please\s+(come\s+again|retain|keep)/i,
+  /^receipt\s*(#|\d|$)/i, /^invoice\s*(#|\d|$)/i,
+  /^\*+$/, /^[-=_]+$/, /^[#*|=\-\s]{4,}$/,
+  // Document header / section labels — never a vendor name
+  /^order\s*(summary|confirmation|detail|status|history|number|#)/i,
+  /^original\s+invoice/i,
+  /^purchase\s+order/i,
+  /^(bill|ship|sold|remit|deliver)\s+to\b/i,
+  /^(invoice|receipt|statement|order)\s*(date|number|num|#|no\.?)\b/i,
+  /^page\s+\d+/i,
+  /^account\s+(number|#|no)\b/i,
+  /^order\s*#/i,
+  /^ticket\s*#/i,
+  /^p\.?o\.?\s*(#|number|no\.?)\b/i,
+  /^(subtotal|sub[\s-]total|total|tax|balance|amount|grand\s+total)\b/i,
+  /^(qty|quantity|description|item|unit|price|amount|ext\.?\s*price)\b/i,
+  /^order\s+placed\b/i,            // Amazon "Order placed December 16..."
+  /^(suite|ste|floor|fl\.?|unit)\s+\d+/i, // address fragments
+  /^(item|catalog|vendor|ship|backorder)\s+(number|code|qty|quantity)\b/i,
+  /^(salesman|sales\s+rep|freight|ship\s+via|signed\s+by|customer\s+job)\b/i,
+];
+
+function isNoiseLine(line: string): boolean {
+  if (!line || line.length < 2 || line.length > 80) return true;
+  if (VENDOR_NOISE_PATTERNS.some(p => p.test(line))) return true;
+  if (/^\d+\s+\w/.test(line)) return true;
+  if (/[A-Za-z]{2,},?\s+[A-Z]{2}\s+\d{5}(-\d{4})?/.test(line)) return true;
+  if (/^[A-Z]{2}\s+\d{5}/.test(line)) return true;
+  if (/(\(\d{3}\)|\d{3}[-.\s])\d{3}[-.\s]\d{4}/.test(line)) return true;
+  if (/www\.|http|\.com|\.net|@/.test(line.toLowerCase())) return true;
+  if (/^[^a-zA-Z0-9]+$/.test(line)) return true;
+  if (/^[A-Z]{2,}$/.test(line.trim())) return true;
+  if (/^[A-Z]+\s+[A-Z]+$/.test(line.trim()) && !/\d/.test(line)) return true;
+  // Long sentence-like lines (order confirmation text, legal notices)
+  if (line.length > 55 && /order\s*#|\border\s+placed\b/i.test(line)) return true;
+  return false;
+}
+
+function cleanVendorName(raw: string): string {
+  return raw
+    .replace(/^[©®™\s\-_*#|]+/, "")
+    .replace(/[©®™\s\-_*#|]+$/, "")
+    // Truncate at embedded street addresses ("3325 Clay Avenue" appended to company name)
+    .replace(/\s+\d{3,5}\s+(?=[A-Za-z]).*/i, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** Business entity suffixes that strongly signal a company name. */
+const BUSINESS_SUFFIX_RE = /\b(LLC|Inc\.?|Ltd\.?|Corp\.?|Co\.?|LLP|PLC|Restaurant|Cafe|Caf[eé]|Bakery|Market|Store|Shop|Bar|Grill|Hotel|Inn|Pub|Diner|Bistro|Kitchen|Foods|Group|Services|Solutions|Associates)\b/i;
+
+function extractVendor(headerLines: string[], allLines: string[]): string | undefined {
+  const pool = [...headerLines, ...allLines.slice(0, 4)];
+
+  // Priority 1: line with a recognisable business suffix
+  for (const line of pool) {
+    const trimmed = line.trim();
+    if (isNoiseLine(trimmed)) continue;
+    const cleaned = cleanVendorName(trimmed);
+    if (BUSINESS_SUFFIX_RE.test(cleaned) && cleaned.length >= 3) return cleaned;
   }
-  return undefined;
+
+  // Priority 2: first non-noise line with ≥3 consecutive letters
+  const candidates: string[] = [];
+  for (const line of pool) {
+    const trimmed = line.trim();
+    if (isNoiseLine(trimmed)) continue;
+    const cleaned = cleanVendorName(trimmed);
+    if (cleaned.length >= 2) candidates.push(cleaned);
+    if (candidates.length >= 3) break;
+  }
+  return candidates.find(c => /[a-zA-Z]{3,}/.test(c)) ?? candidates[0];
 }
 
 function extractDateFromLines(lines: string[]): string | undefined {
   const datePatterns = [
-    /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/,
+    /\b(\d{4}[-\/]\d{1,2}[-\/]\d{1,2})\b/,                                         // ISO: 2024-01-15
+    /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/,                                     // 01/15/2024 or 1-15-24
     /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{2,4}\b/i,
     /\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{2,4}\b/i,
   ];
@@ -776,7 +936,8 @@ function extractDateFromLines(lines: string[]): string | undefined {
       if (m) {
         try {
           const d = new Date(m[0]);
-          if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+          if (!isNaN(d.getTime()) && d.getFullYear() > 2000 && d.getFullYear() < 2100)
+            return d.toISOString().split("T")[0];
         } catch { /* skip */ }
       }
     }
@@ -784,138 +945,205 @@ function extractDateFromLines(lines: string[]): string | undefined {
   return undefined;
 }
 
-/**
- * Phrases that appear at the top of receipts but are NOT the vendor name.
- * These are printed by POS systems and should be completely ignored.
- */
-const VENDOR_NOISE_PATTERNS = [
-  /duplicate\s+receipt/i,
-  /\*+\s*duplicate/i,
-  /copy\s+of\s+receipt/i,
-  /merchant\s+copy/i,
-  /customer\s+copy/i,
-  /cardholder\s+copy/i,
-  /reprint/i,
-  /re-?print/i,
-  /not\s+a\s+receipt/i,
-  /void/i,
-  /thank\s+you/i,
-  /welcome\s+to/i,
-  /please\s+(come\s+again|retain|keep)/i,
-  /^receipt\s*(#|\d|$)/i,
-  /^invoice\s*(#|\d|$)/i,
-  /^\*+$/,                   // lines of asterisks
-  /^[-=_]+$/,                // lines of dashes/equals
-  /^[#*|=\-\s]{4,}$/,       // purely decorative separator lines
-];
+/** Currency regex — matches $1,234.56 / £12.34 / 12.34 */
+const CURRENCY_RE = /[$£€¥]?\s*(\d{1,4}(?:[,]\d{3})*\.\d{2})/;
+const CURRENCY_RE_G = /[$£€¥]?\s*(\d{1,4}(?:[,]\d{3})*\.\d{2})/g;
 
 /**
- * A line is a bad vendor candidate if it:
- *  - matches a noise pattern above
- *  - looks like a street address (starts with a number)
- *  - looks like a phone number
- *  - looks like a URL or email
- *  - is purely punctuation / symbols
- *  - is very short (1 char) or very long (>70 chars)
- *  - is a single all-caps word that is clearly a city/state/location token
- *    (e.g. "ROSEMEADE", "DALLAS", "TX") — real store names have ≥2 words
- *    OR contain digits (e.g. "Store #11567" is fine)
+ * Search lines from the BOTTOM UP for a labeled total value.
+ * Also handles the pattern where the label and value are on separate consecutive lines.
  */
-function isNoiseLine(line: string): boolean {
-  if (!line || line.length < 2 || line.length > 70) return true;
-  if (VENDOR_NOISE_PATTERNS.some(p => p.test(line))) return true;
-  // Addresses: start with digits followed by a word (e.g. "123 Main St")
-  if (/^\d+\s+\w/.test(line)) return true;
-  // City, State ZIP — e.g. "CARROLLTON, TX 75007" or "Dallas TX 75001-9999"
-  if (/[A-Za-z]{2,},?\s+[A-Z]{2}\s+\d{5}(-\d{4})?/.test(line)) return true;
-  // Bare state+zip with no business context — e.g. "TX 75007-99"
-  if (/^[A-Z]{2}\s+\d{5}/.test(line)) return true;
-  // Phone numbers
-  if (/(\(\d{3}\)|\d{3}[-.\s])\d{3}[-.\s]\d{4}/.test(line)) return true;
-  // URLs / emails
-  if (/www\.|http|\.com|\.net|@/.test(line.toLowerCase())) return true;
-  // Purely symbolic / decorative
-  if (/^[^a-zA-Z0-9]+$/.test(line)) return true;
-  // Single all-caps word with no digits — location tokens (e.g. "ROSEMEADE", "DALLAS", "TX")
-  if (/^[A-Z]{2,}$/.test(line.trim())) return true;
-  // Two all-caps words that look like City State (e.g. "FORT WORTH")
-  // but NOT if they contain digits (store numbers are fine)
-  if (/^[A-Z]+\s+[A-Z]+$/.test(line.trim()) && !/\d/.test(line)) return true;
-  return false;
-}
+function findLabeledValueFromBottom(lines: string[], ...keywords: string[]): number | undefined {
+  const pattern = new RegExp(
+    `(${keywords.map(k => k.replace(/[-\s]/g, "[\\s\\-]")).join("|")})` +
+    `[^\\d]{0,30}?([\\d]{1,4}(?:[,]\\d{3})*\\.\\d{2})`,
+    "i",
+  );
 
-/**
- * Clean up a vendor candidate: remove OCR noise characters, normalize spaces,
- * and strip leading/trailing punctuation.
- */
-function cleanVendorName(raw: string): string {
-  return raw
-    .replace(/^[©®™\s\-_*#|]+/, "")   // leading OCR noise / symbols
-    .replace(/[©®™\s\-_*#|]+$/, "")   // trailing noise
-    .replace(/\s{2,}/g, " ")           // collapse multiple spaces
-    .trim();
-}
+  for (let i = lines.length - 1; i >= 0; i--) {
+    // Try same-line match
+    const m = lines[i].match(pattern);
+    if (m) return parseFloat(m[2].replace(/,/g, ""));
 
-/**
- * Extract vendor name — scan the first ~10 lines and pick the best candidate.
- * Prefers lines that look like real business names over header noise.
- */
-function extractVendor(lines: string[]): string | undefined {
-  const candidates: string[] = [];
-
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
-    const raw = lines[i].trim();
-    if (isNoiseLine(raw)) continue;
-    const cleaned = cleanVendorName(raw);
-    if (cleaned.length >= 2) candidates.push(cleaned);
-    // Stop after collecting 3 candidates — vendor is near the top
-    if (candidates.length >= 3) break;
+    // Try label-on-this-line, value-on-next-line
+    // Also handles "Sub Total: $" where the currency symbol is on the label line with no value
+    const kwRe = new RegExp(`^\\s*(${keywords.map(k => k.replace(/[-\s]/g, "[\\s\\-]")).join("|")})\\s*:?\\s*[$£€¥]?\\s*$`, "i");
+    if (kwRe.test(lines[i]) && i + 1 < lines.length) {
+      const vm = lines[i + 1].match(CURRENCY_RE);
+      if (vm) return parseFloat(vm[1].replace(/,/g, ""));
+    }
   }
-
-  // Prefer the first candidate that contains a letter sequence ≥3 chars
-  // (filters out stray single-word OCR artifacts)
-  for (const c of candidates) {
-    if (/[a-zA-Z]{3,}/.test(c)) return c;
-  }
-
-  return candidates[0];
+  return undefined;
 }
 
-function extractReceipt(text: string, fileName: string, id: string, fileHash: string, confidence: number, previewUrl?: string): ReceiptData {
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+/** Keywords that mark a summary/footer line or payment line — not a line item. */
+const SUMMARY_KW = /\b(subtotal|sub[\s-]?total|total|tax|vat|gst|hst|tip|gratuity|service\s+charge|change|cash|balance|amount\s+due|balance\s+due|grand\s+total|paid|discount|coupon|savings|credit|visa|mastercard|amex|discover|american\s+express|debit\s+card|credit\s+card|payment|cheque|check\s+#?|approved|auth\s*:|authorized|received|signature|terms\s+and\s+conditions|please\s+(pay|visit|retain)|remit\s+to)\b/i;
 
-  const vendor = extractVendor(lines);
-  const date   = extractDateFromLines(lines) ?? new Date().toISOString().split("T")[0];
-
-  const subtotal = findLabeledValue(lines, "subtotal", "sub total", "sub-total");
-  const tax      = findLabeledValue(lines, "tax", "vat", "gst", "hst");
-  const gratuity = findLabeledValue(lines, "tip", "gratuity", "service charge");
-  const total    = findLabeledValue(lines, "total", "amount due", "balance due", "grand total");
-
-  // Build item list: lines that have a price but aren't summary lines
-  const summaryKeywords = /subtotal|sub-total|total|tax|vat|gst|hst|tip|gratuity|service|change|cash|balance|amount|paid/i;
+/**
+ * Extract line items from body + footer lines.
+ * Handles common formats:
+ *   - "Item name         $12.34"
+ *   - "2 x Widget        $24.68"
+ *   - "Widget  2 @ $12.34"
+ *   - "12.34  Item name"  (price-first)
+ */
+function extractItems(bodyLines: string[], footerLines: string[]): ReceiptItem[] {
   const items: ReceiptItem[] = [];
   const seen = new Set<string>();
 
-  for (const line of lines) {
-    const m = line.match(CURRENCY_RE);
-    if (!m) continue;
-    const price = parseFloat(m[1].replace(/,/g, ""));
-    if (isNaN(price) || price <= 0) continue;
+  for (const line of [...bodyLines, ...footerLines]) {
+    if (SUMMARY_KW.test(line)) continue;
 
-    const rawName = line.replace(CURRENCY_RE, "").replace(/[#*|]+/g, "").trim();
+    // Collect all currency amounts on this line
+    const prices: number[] = [];
+    CURRENCY_RE_G.lastIndex = 0;
+    let cm: RegExpExecArray | null;
+    while ((cm = CURRENCY_RE_G.exec(line)) !== null) {
+      const v = parseFloat(cm[1].replace(/,/g, ""));
+      if (v > 0 && v < 5_000) prices.push(v); // cap at $5k — higher = OCR garbage
+    }
+    if (prices.length === 0) continue;
+
+    // Use the last price on the line (most likely the final item price)
+    const price = prices[prices.length - 1];
+
+    // Build the item name: remove all price-like patterns and cleanup
+    let rawName = line
+      .replace(/[$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}/g, "")  // strip prices
+      .replace(/\b\d+\s*[xX@]\s*[\d.]+/g, "")                   // strip "2 x 5.00" multipliers
+      .replace(/[#*|=_]+/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
     if (rawName.length < 2) continue;
-    if (summaryKeywords.test(rawName)) continue;
+    // Skip very long names — almost certainly legal boilerplate with an incidental price
+    if (rawName.length > 80) continue;
 
-    // De-dupe items within the same receipt
-    const key = `${rawName.toLowerCase()}:${price}`;
+    // Strip leading table-row numeric prefixes: row#, qty, backorder qty (including negative qty like -17)
+    // Requires 2+ consecutive signed-integer tokens to avoid stripping "2% Milk" or "1-Day Shipping"
+    const stripped = rawName.replace(/^(-?\d{1,4}\s+){2,}/, "").trim();
+    if (stripped.length >= 2) {
+      rawName = stripped;
+      // Strip leading catalog/part codes (uppercase alphanumeric, 5+ chars, no spaces)
+      rawName = rawName.replace(/^[A-Z][A-Z0-9]{4,}\s+/g, "").trim();
+      // Strip leading 2-5 char all-uppercase vendor codes (e.g. "COP", "NSI", "ACE")
+      const afterVendorCode = rawName.replace(/^[A-Z]{2,5}\s+/, "").trim();
+      if (afterVendorCode.length >= 3 && /[a-zA-Z]/.test(afterVendorCode)) {
+        rawName = afterVendorCode;
+      }
+    }
+    // Strip leading 1-2 char unit code merged from previous table row (e.g. "T 550 PVC...")
+    // Only when followed immediately by a digit then alphabetic content
+    rawName = rawName.replace(/^[A-Z]{1,2}\s+(?=\d{1,4}\s+[A-Za-z])/, "").trim();
+    // Strip trailing consecutive uppercase unit codes (e.g. " M M", " C §", " T")
+    rawName = rawName.replace(/(\s+[A-Z§]{1,3})+\s*$/, "").trim();
+    // Strip trailing noise like "$ -", "$ 0.0", "0.0" at end
+    rawName = rawName.replace(/\s+\$?\s*-\s*$/, "").replace(/\s+\$?\s*0\.0+\s*$/, "").trim();
+
+    if (rawName.length < 2) continue;
+    // Skip lines where the name is mostly non-alpha (OCR garbage)
+    const alphaRatio = (rawName.match(/[a-zA-Z]/g)?.length ?? 0) / rawName.length;
+    if (alphaRatio < 0.25 && rawName.length > 4) continue;
+
+    const key = `${rawName.toLowerCase().slice(0, 30)}:${price.toFixed(2)}`;
     if (seen.has(key)) continue;
     seen.add(key);
 
     items.push({ name: rawName, price });
   }
 
-  return { id, fileName, fileHash, vendor, date, items, subtotal, tax, gratuity, total, rawText: text, confidence, previewUrl };
+  return items;
+}
+
+/** Detect whether this document is an invoice, receipt, order confirmation, etc. */
+function detectDocType(lines: string[], fileNameHint = ""): DocType {
+  const head = lines.slice(0, 15).join(" ").toLowerCase();
+  const fn = fileNameHint.toLowerCase();
+  if (/\binvoice\b/.test(head)) return "invoice";
+  if (/\b(order\s+confirmation|purchase\s+order|p\.?o\.?\s*#|order\s+placed|order\s*#\s*\d{3}-\d)/i.test(head)) return "order";
+  if (/\b(receipt|thank\s+you\s+for\s+your\s+(purchase|order|business))\b/.test(head)) return "receipt";
+  if (/\b(bill|statement\s+of\s+account)\b/.test(head)) return "invoice";
+  // Filename hints
+  if (/order\s*(confirmation|detail|summary)/.test(fn)) return "order";
+  if (/invoice/.test(fn)) return "invoice";
+  if (/receipt/.test(fn)) return "receipt";
+  return "unknown";
+}
+
+/**
+ * Extract the document reference number (invoice#, order#, receipt#, PO#, etc.)
+ * Returns the first plausible identifier found in the first ~20 lines.
+ */
+function extractInvoiceNumber(lines: string[]): string | undefined {
+  const patterns = [
+    /invoice\s*(?:no\.?|number|num|#)?\s*:?\s*([A-Z0-9][\w\-\/]{2,19})/i,
+    /inv\s*[-#]?\s*:?\s*([A-Z0-9][\w\-\/]{2,19})/i,
+    /ticket\s*#?\s*:?\s*([A-Z0-9][\w\-\/]{2,19})/i,
+    // Amazon-style order numbers: 111-4686048-4355406
+    /order\s*#?\s*:?\s*(\d{3}-\d{7,}-\d{7,})/i,
+    /(?:order|po|p\.?o\.?)\s*(?:no\.?|number|#)?\s*:?\s*([A-Z0-9][\w\-\/]{3,20})/i,
+    /(?:receipt|transaction|txn|ref)\s*(?:no\.?|number|#)?\s*:?\s*([A-Z0-9][\w\-]{3,20})/i,
+  ];
+  for (const line of lines.slice(0, 20)) {
+    for (const pat of patterns) {
+      const m = line.match(pat);
+      if (m?.[1] && /\d/.test(m[1])) return m[1].trim();
+    }
+  }
+  return undefined;
+}
+
+function parseInvoice(
+  text: string,
+  fileName: string,
+  id: string,
+  fileHash: string,
+  confidence: number,
+  previewUrl?: string,
+): ReceiptData {
+  const normalized = normalizeOcrText(text);
+  const lines = normalized.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const { header, body, footer } = splitIntoZones(lines);
+
+  const vendor        = extractVendor(header, lines);
+  const date          = extractDateFromLines(lines) ?? new Date().toISOString().split("T")[0];
+  const docType       = detectDocType(lines, fileName);
+  const invoiceNumber = extractInvoiceNumber(lines);
+
+  // Search footer from bottom-up (most reliable position for totals)
+  const allLines = [...body, ...footer];
+  const subtotal = findLabeledValueFromBottom(allLines, "subtotal", "sub total", "sub-total");
+  const tax      = findLabeledValueFromBottom(allLines, "tax", "vat", "gst", "hst");
+  const gratuity = findLabeledValueFromBottom(allLines, "tip", "gratuity", "service charge");
+  const total    = findLabeledValueFromBottom(
+    allLines,
+    "total", "amount due", "balance due", "grand total", "amount paid", "total due",
+  );
+
+  const items = extractItems(body, footer);
+
+  // ── Sanity check: cross-validate totals against each other ──
+  // If a value is clearly implausible given the others, discard it.
+  let saneTax = tax;
+  let saneSubtotal = subtotal;
+  let saneTotal = total;
+
+  // Tax should never exceed the total or be more than 50% of subtotal
+  if (saneTax !== undefined && saneTotal !== undefined && saneTax >= saneTotal) saneTax = undefined;
+  if (saneTax !== undefined && saneSubtotal !== undefined && saneTax > saneSubtotal * 0.5) saneTax = undefined;
+
+  // If we have subtotal + tax + gratuity but no total, infer it
+  if (saneTotal === undefined && saneSubtotal !== undefined) {
+    const inferred = saneSubtotal + (saneTax ?? 0) + (gratuity ?? 0);
+    if (inferred > 0) saneTotal = parseFloat(inferred.toFixed(2));
+  }
+
+  // If subtotal > total, they're likely swapped
+  if (saneSubtotal !== undefined && saneTotal !== undefined && saneSubtotal > saneTotal) {
+    [saneSubtotal, saneTotal] = [saneTotal, saneSubtotal];
+  }
+
+  return { id, fileName, fileHash, vendor, date, invoiceNumber, docType, items, subtotal: saneSubtotal, tax: saneTax, gratuity, total: saneTotal, rawText: text, confidence, previewUrl };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -939,6 +1167,7 @@ function fmtCurrency(v: number | undefined): string {
 const STATUS_LABEL: Record<ProcessingStatus, string> = {
   idle:     "Queued",
   hashing:  "Hashing…",
+  pdf:      "Extracting PDF…",
   rotating: "Detecting orientation…",
   ocr:      "Running OCR…",
   parsing:  "Parsing…",
@@ -1011,15 +1240,17 @@ export default function InvoiceDigitalizer() {
 
   // ── Duplicate check ─────────────────────────────────────────
   const addFiles = useCallback(async (newFiles: File[]) => {
-    const imageFiles = newFiles.filter(f => f.type.startsWith("image/"));
-    if (!imageFiles.length) return;
+    const validFiles = newFiles.filter(f =>
+      f.type.startsWith("image/") || f.type === "application/pdf"
+    );
+    if (!validFiles.length) return;
 
-    const entries: FileEntry[] = imageFiles.map(f => ({
+    const entries: FileEntry[] = validFiles.map(f => ({
       file: f,
       id: uid(),
       status: "idle" as ProcessingStatus,
       progress: 0,
-      previewUrl: URL.createObjectURL(f),
+      previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
     }));
 
     // Hash new files and detect cross-batch duplicates
@@ -1096,20 +1327,55 @@ export default function InvoiceDigitalizer() {
         }
         seenHashes.set(hash, entry.id);
 
-        // 2. Normalize orientation via EXIF
-        updateEntry({ status: "rotating", progress: 15 });
-        const canvas = await normalizeImageToCanvas(entry.file);
+        if (entry.file.type === "application/pdf") {
+          // ── PDF path ────────────────────────────────────────────
+          updateEntry({ status: "pdf", progress: 10 });
 
-        // 3. OCR with rotation fallback
-        updateEntry({ status: "ocr", progress: 20 });
-        const { text, confidence } = await ocrWithBestRotation(canvas, p => {
-          updateEntry({ progress: 20 + Math.round(p * 0.65) });
-        });
+          const pages = await extractPdfContent(entry.file, p => {
+            updateEntry({ progress: 10 + Math.round(p * 0.5) });
+          });
 
-        // 4. Parse
-        updateEntry({ status: "parsing", progress: 88 });
-        const receipt = extractReceipt(text, entry.file.name, entry.id, hash, confidence, entry.previewUrl);
-        newReceipts.push(receipt);
+          // Merge all pages: use text-layer pages directly; OCR canvas pages
+          const textParts: string[] = [];
+          let totalConfidence = 100;
+          let ocrPageCount = 0;
+
+          for (let pi = 0; pi < pages.length; pi++) {
+            const pg = pages[pi];
+            if (pg.text) {
+              textParts.push(pg.text);
+            } else if (pg.canvas) {
+              updateEntry({ status: "ocr", progress: 60 + Math.round((pi / pages.length) * 25) });
+              const { text: ocrText, confidence } = await ocrWithBestRotation(pg.canvas, () => {});
+              textParts.push(ocrText);
+              totalConfidence = Math.min(totalConfidence, confidence);
+              ocrPageCount++;
+            }
+          }
+
+          const fullText = textParts.join("\n");
+          const confidence = ocrPageCount === 0 ? 100 : totalConfidence;
+
+          updateEntry({ status: "parsing", progress: 88 });
+          const receipt = parseInvoice(fullText, entry.file.name, entry.id, hash, confidence, entry.previewUrl);
+          newReceipts.push(receipt);
+        } else {
+          // ── Image path ───────────────────────────────────────────
+          // 2. Normalize orientation via EXIF
+          updateEntry({ status: "rotating", progress: 15 });
+          const canvas = await normalizeImageToCanvas(entry.file);
+
+          // 3. OCR with rotation fallback
+          updateEntry({ status: "ocr", progress: 20 });
+          const { text, confidence } = await ocrWithBestRotation(canvas, p => {
+            updateEntry({ progress: 20 + Math.round(p * 0.65) });
+          });
+
+          // 4. Parse
+          updateEntry({ status: "parsing", progress: 88 });
+          const receipt = parseInvoice(text, entry.file.name, entry.id, hash, confidence, entry.previewUrl);
+          newReceipts.push(receipt);
+        }
 
         updateEntry({ status: "done", progress: 100 });
       } catch (err) {
@@ -1130,15 +1396,17 @@ export default function InvoiceDigitalizer() {
     // Summary sheet
     const summary = wb.addWorksheet("Expense Summary");
     summary.columns = [
-      { header: "Date",        key: "date",        width: 14 },
-      { header: "Vendor",      key: "vendor",      width: 28 },
-      { header: "Items",       key: "description", width: 45 },
-      { header: "Subtotal",    key: "subtotal",    width: 13 },
-      { header: "Tax",         key: "tax",         width: 11 },
-      { header: "Tip / Svc",   key: "tip",         width: 11 },
-      { header: "Total",       key: "total",       width: 13 },
-      { header: "Confidence",  key: "confidence",  width: 12 },
-      { header: "Source File", key: "fileName",    width: 28 },
+      { header: "Type",          key: "docType",     width: 10 },
+      { header: "Date",          key: "date",        width: 14 },
+      { header: "Vendor",        key: "vendor",      width: 28 },
+      { header: "Invoice #",     key: "invoiceNum",  width: 16 },
+      { header: "Items",         key: "description", width: 45 },
+      { header: "Subtotal",      key: "subtotal",    width: 13 },
+      { header: "Tax",           key: "tax",         width: 11 },
+      { header: "Tip / Svc",     key: "tip",         width: 11 },
+      { header: "Total",         key: "total",       width: 13 },
+      { header: "Confidence",    key: "confidence",  width: 12 },
+      { header: "Source File",   key: "fileName",    width: 28 },
     ];
 
     // Style header row
@@ -1154,8 +1422,10 @@ export default function InvoiceDigitalizer() {
       .filter(r => !r.isDuplicate)
       .forEach((r, idx) => {
         const row = summary.addRow({
+          docType:     r.docType ?? "unknown",
           date:        r.date,
           vendor:      r.vendor ?? "(unknown)",
+          invoiceNum:  r.invoiceNumber ?? "—",
           description: r.items.map(i => i.name).join(", "),
           subtotal:    r.subtotal,
           tax:         r.tax,
@@ -1184,7 +1454,7 @@ export default function InvoiceDigitalizer() {
       totRow.getCell("vendor").value = "TOTAL";
       totRow.getCell("vendor").font = { bold: true };
       ["subtotal","tax","tip","total"].forEach((col, ci) => {
-        const colLetter = ["D","E","F","G"][ci];
+        const colLetter = ["F","G","H","I"][ci];
         const cell = totRow.getCell(col);
         cell.value = { formula: `SUM(${colLetter}2:${colLetter}${dataLen + 1})` } as any;
         cell.numFmt = currFmt;
@@ -1226,6 +1496,27 @@ export default function InvoiceDigitalizer() {
     saveAs(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "expense-report.xlsx");
   };
 
+  // ── JSON Export ─────────────────────────────────────────────
+  const exportToJson = () => {
+    const data = receipts
+      .filter(r => !r.isDuplicate)
+      .map(r => ({
+        docType:       r.docType ?? "unknown",
+        date:          r.date,
+        vendor:        r.vendor ?? null,
+        invoiceNumber: r.invoiceNumber ?? null,
+        items:         r.items,
+        subtotal:      r.subtotal ?? null,
+        tax:           r.tax ?? null,
+        gratuity:      r.gratuity ?? null,
+        total:         r.total ?? null,
+        confidence:    r.confidence !== undefined ? Math.round(r.confidence) : null,
+        fileName:      r.fileName,
+      }));
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    saveAs(blob, "expense-report.json");
+  };
+
   // ── Inline editing helpers ───────────────────────────────────
   const updateReceiptField = (id: string, field: keyof ReceiptData, value: any) => {
     setReceipts(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
@@ -1259,9 +1550,9 @@ export default function InvoiceDigitalizer() {
         <Header>
           <HeaderLeft>
             <Title>Invoice Digitalizer</Title>
-            <Subtitle>OCR-powered expense extraction with Excel export</Subtitle>
+            <Subtitle>OCR-powered expense extraction · PDF &amp; image support · Excel export</Subtitle>
           </HeaderLeft>
-          <HeaderBadge>v2.0 · local processing</HeaderBadge>
+          <HeaderBadge>v3.0 · local processing</HeaderBadge>
         </Header>
 
         {/* ── DROP ZONE ──────────────────────────────────────── */}
@@ -1279,20 +1570,20 @@ export default function InvoiceDigitalizer() {
           </DropIcon>
           {fileEntries.length === 0 ? (
             <>
-              <DropTitle>Drop receipt images here</DropTitle>
+              <DropTitle>Drop invoices or receipts here</DropTitle>
               <DropSub>
-                Supports JPG, PNG, HEIC, WebP · Multiple files · Auto-rotates sideways images<br />
-                Duplicate detection · Inline editing · Excel export
+                Supports PDF, JPG, PNG, HEIC, WebP · Multiple files · Auto-rotates sideways images<br />
+                PDF text extraction · Duplicate detection · Inline editing · Excel export
               </DropSub>
             </>
           ) : (
-            <DropSub>Drop more images to add to the queue</DropSub>
+            <DropSub>Drop more files to add to the queue</DropSub>
           )}
           <input
             id="inv-file-input"
             ref={inputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             multiple
             style={{ display: "none" }}
             onChange={e => {
@@ -1308,8 +1599,19 @@ export default function InvoiceDigitalizer() {
             {fileEntries.map(entry => (
               <QueueItem key={entry.id} $status={entry.status} $dup={!!entry.isDuplicate}>
                 <Thumb>
-                  {entry.previewUrl && <img src={entry.previewUrl} alt={entry.file.name} />}
-                  {["hashing","rotating","ocr","parsing"].includes(entry.status) && <ScanOverlay />}
+                  {entry.previewUrl
+                    ? <img src={entry.previewUrl} alt={entry.file.name} />
+                    : (
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="22" height="26" viewBox="0 0 22 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M13 1H3C1.9 1 1 1.9 1 3v20c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9l-8-8z" stroke={T.inkFaint} strokeWidth="1.5" strokeLinejoin="round"/>
+                          <path d="M13 1v8h8" stroke={T.inkFaint} strokeWidth="1.5" strokeLinejoin="round"/>
+                          <text x="4" y="21" fontSize="5" fontWeight="700" fill={T.inkFaint} fontFamily="monospace">PDF</text>
+                        </svg>
+                      </div>
+                    )
+                  }
+                  {["hashing","pdf","rotating","ocr","parsing"].includes(entry.status) && <ScanOverlay />}
                 </Thumb>
 
                 <QueueInfo>
@@ -1366,10 +1668,16 @@ export default function InvoiceDigitalizer() {
             </Btn>
 
             {receipts.length > 0 && (
-              <Btn onClick={exportToExcel}>
-                <IconDownload />
-                Export to Excel
-              </Btn>
+              <>
+                <Btn onClick={exportToExcel}>
+                  <IconDownload />
+                  Export to Excel
+                </Btn>
+                <Btn onClick={exportToJson}>
+                  <IconDownload />
+                  Export to JSON
+                </Btn>
+              </>
             )}
 
             <Btn
@@ -1415,10 +1723,14 @@ export default function InvoiceDigitalizer() {
                   {avgConf}%
                 </SumValue>
               </SumStat>
-              <div style={{ marginLeft: "auto" }}>
+              <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
                 <Btn onClick={exportToExcel} style={{ color: T.cream, borderColor: "rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.08)" }}>
                   <IconDownload />
-                  Download Report
+                  Excel
+                </Btn>
+                <Btn onClick={exportToJson} style={{ color: T.cream, borderColor: "rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.08)" }}>
+                  <IconDownload />
+                  JSON
                 </Btn>
               </div>
             </SummaryBar>
@@ -1447,6 +1759,17 @@ export default function InvoiceDigitalizer() {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.25rem" }}>
                       <CardMeta>{r.date}</CardMeta>
+                      {r.docType && r.docType !== "unknown" && (
+                        <span style={{
+                          fontSize: "0.65rem", fontWeight: 600, letterSpacing: "0.04em",
+                          textTransform: "uppercase", padding: "1px 6px", borderRadius: "4px",
+                          background: r.docType === "invoice" ? "rgba(37,99,235,0.1)" : r.docType === "receipt" ? "rgba(22,163,74,0.1)" : "rgba(161,98,7,0.1)",
+                          color: r.docType === "invoice" ? "#2563eb" : r.docType === "receipt" ? "#16a34a" : "#a16207",
+                        }}>{r.docType}</span>
+                      )}
+                      {r.invoiceNumber && (
+                        <span style={{ fontSize: "0.7rem", color: T.inkLight, fontFamily: "monospace" }}>#{r.invoiceNumber}</span>
+                      )}
                       {r.isDuplicate && <DupBadge>duplicate</DupBadge>}
                       {r.confidence !== undefined && (
                         <ConfidencePill $pct={Math.round(r.confidence)}>

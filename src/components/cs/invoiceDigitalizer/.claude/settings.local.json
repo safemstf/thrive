@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install pdfjs-dist)",
+      "Bash(npx tsc --noEmit --skipLibCheck)"
+    ]
+  }
+}
