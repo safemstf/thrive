@@ -81,7 +81,7 @@ const VirusCheckerDemo = dynamic(() => import('@/components/cs/virusChecker/viru
   loading: () => <SimulationLoader>Loading Virus Checker...</SimulationLoader>
 });
 
-const InvoiceDigitalizerDemo = dynamic(() => import('@/components/invoiceDigitalizer/invoiceDigitalizer'), {
+const InvoiceDigitalizerDemo = dynamic(() => import('@/components/cs/invoiceDigitalizer/invoiceDigitalizer'), {
   ssr: false,
   loading: () => <SimulationLoader>Loading Invoice Digitalizer...</SimulationLoader>
 });

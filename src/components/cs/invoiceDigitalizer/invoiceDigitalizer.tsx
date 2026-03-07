@@ -1258,7 +1258,7 @@ export default function InvoiceDigitalizer() {
         {/* ── HEADER ─────────────────────────────────────────── */}
         <Header>
           <HeaderLeft>
-            <Title>Receipt Digitalizer</Title>
+            <Title>Invoice Digitalizer</Title>
             <Subtitle>OCR-powered expense extraction with Excel export</Subtitle>
           </HeaderLeft>
           <HeaderBadge>v2.0 · local processing</HeaderBadge>
