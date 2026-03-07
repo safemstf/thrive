@@ -1,4 +1,4 @@
-// src/app/simulations/page.tsx - Enhanced Professional Simulation Platform
+// src/app/services/page.tsx - Enhanced Professional Simulation Platform
 'use client';
 // cladogram simulation with longest subsequences and phylogenetic trees
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -873,7 +873,9 @@ const allItems: SimulationItem[] = [
     icon: <Shield size={22} />,
     color: '#3b82f6',
     description: 'Scan files for viruses and malware using signature-based detection and heuristic analysis',
-    category: 'tools'
+    category: 'tools',
+    comingSoon: true,
+
   },
   {
     key: 'disease',
@@ -973,7 +975,7 @@ const allItems: SimulationItem[] = [
     description: 'Shortest path algorithms comparison',
     category: 'algorithms'
   },
-    {
+  {
     key: 'invoice-digitalizer',
     label: 'Invoice Digitalizer',
     icon: <Code2 size={22} />,
@@ -1219,10 +1221,11 @@ export default function SimulationsPage() {
         return <AgarioDemo isRunning={isRunning} speed={speed} />;
       case 'TD':
         return <TDVisualization isRunning={isRunning} speed={speed} />;
-      case 'virus-checker':
-        return <VirusCheckerDemo isRunning={isRunning} speed={speed} />;
+
       case 'invoice-digitalizer':
         return <InvoiceDigitalizerDemo />;
+      case 'virus-checker':
+        return <VirusCheckerDemo isRunning={isRunning} speed={speed} />;
       default:
         return (
           <PlaceholderContent>

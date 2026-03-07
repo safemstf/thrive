@@ -22,7 +22,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
   const isDashboard = pathname?.startsWith('/dashboard') ?? false;
   const isAdmin = pathname?.startsWith('/admin') ?? false;
   const isApiTest = pathname?.startsWith('/dashboard/api-test') ?? false;
-  const isMatrixRoute = pathname?.startsWith('/simulations') ?? false;
+  const isMatrixRoute = pathname?.startsWith('/Services') ?? false;
 
   useEffect(() => {
     setIsFullscreen(Boolean(isDashboard || isAdmin || isApiTest));
@@ -92,9 +92,9 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                 types: []
               },
               {
-                id: 'simulations',
-                title: 'Simulations',
-                href: '/simulations',
+                id: 'services',
+                title: 'Services',
+                href: '/Services',
                 icon: <Code size={16} />,
                 types: []
               },

@@ -98,7 +98,7 @@ export function Taskbar(props: TaskbarProps) {
             justifyContent: 'space-around',
             alignItems: 'center',
             padding: '0.75rem 1rem',
-            background: 'var(--color-background-secondary)',
+            background: '#f5f0e8',
             borderTop: '1px solid var(--color-border-light)',
             gap: '0.5rem'
           }}

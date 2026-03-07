@@ -82,7 +82,7 @@ const getNavLinks = (isAuthenticated: boolean, isAdmin: boolean): NavLink[] => {
     const links: NavLink[] = [
         { href: '/', label: 'Home' },
         { href: '/thrive', label: 'Assessments' },
-        { href: '/simulations', label: 'Simulations' },
+        { href: '/Services', label: 'Services' },
         { href: '/talkohtaco', label: "Talk Oh—Taco" },
         { href: '/homerank', label: "Home Rank" },
         
