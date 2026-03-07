@@ -5,6 +5,8 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import Tesseract from "tesseract.js";
 import styled, { keyframes, createGlobalStyle } from "styled-components";
+import { Upload } from 'lucide-react';
+
 
 // ─────────────────────────────────────────────────────────────
 // TYPES
@@ -862,13 +864,15 @@ const VENDOR_NOISE_PATTERNS = [
   /^account\s+(number|#|no)\b/i,
   /^order\s*#/i,
   /^ticket\s*#/i,
-  /^p\.?o\.?\s*(#|number|no\.?)\b/i,
+  /^p\.?o\.?\s*(#|number|no\.?|box)\b/i,  // also catches "P.O. BOX 206562"
   /^(subtotal|sub[\s-]total|total|tax|balance|amount|grand\s+total)\b/i,
   /^(qty|quantity|description|item|unit|price|amount|ext\.?\s*price)\b/i,
   /^order\s+placed\b/i,            // Amazon "Order placed December 16..."
   /^(suite|ste|floor|fl\.?|unit)\s+\d+/i, // address fragments
   /^(item|catalog|vendor|ship|backorder)\s+(number|code|qty|quantity)\b/i,
   /^(salesman|sales\s+rep|freight|ship\s+via|signed\s+by|customer\s+job)\b/i,
+  /ending\s+in\s+\d{4}/i,          // payment card lines "Visa ending in 6292"
+  /^(authorized|auth\s*:|approved|amount\s*:)/i,
 ];
 
 function isNoiseLine(line: string): boolean {
@@ -965,12 +969,21 @@ function findLabeledValueFromBottom(lines: string[], ...keywords: string[]): num
     const m = lines[i].match(pattern);
     if (m) return parseFloat(m[2].replace(/,/g, ""));
 
-    // Try label-on-this-line, value-on-next-line
-    // Also handles "Sub Total: $" where the currency symbol is on the label line with no value
+    // Try label-on-this-line, value-on a neighboring line.
+    // PDF text elements for the same row can land at slightly different Y coordinates,
+    // so the value may appear at i+1 (lower Y in sorted array) or i-1 (higher Y).
+    // Also handles "Sub Total: $" where a trailing currency symbol has no accompanying digits.
     const kwRe = new RegExp(`^\\s*(${keywords.map(k => k.replace(/[-\s]/g, "[\\s\\-]")).join("|")})\\s*:?\\s*[$£€¥]?\\s*$`, "i");
-    if (kwRe.test(lines[i]) && i + 1 < lines.length) {
-      const vm = lines[i + 1].match(CURRENCY_RE);
-      if (vm) return parseFloat(vm[1].replace(/,/g, ""));
+    if (kwRe.test(lines[i])) {
+      // A "pure value" line is just a currency amount with no label text
+      const isPureValue = (s: string) => /^\s*[$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}\s*$/.test(s);
+      for (const offset of [1, -1, 2]) {
+        const j = i + offset;
+        if (j < 0 || j >= lines.length) continue;
+        if (isPureValue(lines[j])) {
+          return parseFloat(lines[j].replace(/[,$£€¥\s]/g, ""));
+        }
+      }
     }
   }
   return undefined;
@@ -1033,12 +1046,18 @@ function extractItems(bodyLines: string[], footerLines: string[]): ReceiptItem[]
       }
     }
     // Strip leading 1-2 char unit code merged from previous table row (e.g. "T 550 PVC...")
-    // Only when followed immediately by a digit then alphabetic content
-    rawName = rawName.replace(/^[A-Z]{1,2}\s+(?=\d{1,4}\s+[A-Za-z])/, "").trim();
+    // Only when followed immediately by a digit then uppercase content (table qty column)
+    rawName = rawName.replace(/^[A-Z]{1,2}\s+(?=\d{1,4}\s+[A-Z]{2,})/, "").trim();
+    // After stripping merged unit code, strip a single leading qty token followed by uppercase description
+    rawName = rawName.replace(/^\d{1,4}\s+(?=[A-Z]{2,})/, "").trim();
     // Strip trailing consecutive uppercase unit codes (e.g. " M M", " C §", " T")
     rawName = rawName.replace(/(\s+[A-Z§]{1,3})+\s*$/, "").trim();
+    // Strip trailing standalone numeric token (residual qty column, e.g. "CONDUIT 550")
+    rawName = rawName.replace(/\s+\d+\s*$/, "").trim();
     // Strip trailing noise like "$ -", "$ 0.0", "0.0" at end
     rawName = rawName.replace(/\s+\$?\s*-\s*$/, "").replace(/\s+\$?\s*0\.0+\s*$/, "").trim();
+    // Filter unit-price annotation lines: "1@ each", "2 x each", "1 ® each"
+    if (/^\d+\s*[@®x×]\s*(each|ea\.?)\s*$/i.test(rawName)) continue;
 
     if (rawName.length < 2) continue;
     // Skip lines where the name is mostly non-alpha (OCR garbage)
@@ -1178,13 +1197,6 @@ const STATUS_LABEL: Record<ProcessingStatus, string> = {
 // ─────────────────────────────────────────────────────────────
 // ICONS (inline SVG — no dep)
 // ─────────────────────────────────────────────────────────────
-const IconUpload = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-    <polyline points="17 8 12 3 7 8"/>
-    <line x1="12" y1="3" x2="12" y2="15"/>
-  </svg>
-);
 
 const IconScan = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1566,7 +1578,7 @@ export default function InvoiceDigitalizer() {
           onDrop={onDrop}
         >
           <DropIcon $active={isDrag}>
-            <IconUpload />
+            <Upload />
           </DropIcon>
           {fileEntries.length === 0 ? (
             <>

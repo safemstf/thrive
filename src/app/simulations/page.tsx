@@ -135,15 +135,15 @@ const SimulationLoader = styled.div`
   justify-content: center;
   height: 100%;
   min-height: 300px;
-  color: #64748b;
-  font-family: 'Inter', system-ui, sans-serif;
-  
+  color: #7a6e5f;
+  font-family: 'DM Sans', system-ui, sans-serif;
+
   &::before {
     content: '';
     width: 32px;
     height: 32px;
-    border: 2px solid #e2e8f0;
-    border-top: 2px solid #3b82f6;
+    border: 2px solid #e8e0d0;
+    border-top: 2px solid #2563eb;
     border-radius: 50%;
     margin-bottom: 1rem;
     animation: ${spin} 1s linear infinite;
@@ -152,7 +152,7 @@ const SimulationLoader = styled.div`
 
 const PageContainer = styled.div`
   min-height: 100vh;
-  background: linear-gradient(135deg, #fafbfc 0%, #f8fafc 50%, #f1f5f9 100%);
+  background: #faf7f2;
   position: relative;
   overflow-x: hidden;
 `;
@@ -186,15 +186,11 @@ const PageHeader = styled.div`
 const PageTitle = styled.h1`
   font-size: 3rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #1e293b, #475569, #64748b);
-  background-size: 200% 200%;
-  animation: ${shimmer} 3s ease infinite;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #1a1208;
   margin-bottom: 1rem;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'DM Serif Display', Georgia, serif;
   letter-spacing: -0.025em;
-  
+
   @media (max-width: 768px) {
     font-size: 2.25rem;
   }
@@ -202,11 +198,11 @@ const PageTitle = styled.h1`
 
 const PageSubtitle = styled.p`
   font-size: 1.125rem;
-  color: #64748b;
+  color: #7a6e5f;
   max-width: 600px;
   margin: 0 auto;
   line-height: 1.6;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
 `;
 
 const TabContainer = styled.div`
@@ -217,12 +213,12 @@ const TabContainer = styled.div`
 
 const TabWrapper = styled.div`
   display: flex;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(250, 247, 242, 0.95);
+  border: 1px solid rgba(26, 18, 8, 0.1);
   border-radius: 14px;
   padding: 5px;
   backdrop-filter: blur(12px);
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 6px 24px rgba(26, 18, 8, 0.06);
   transition: all 0.3s ease;
 `;
 
@@ -234,9 +230,9 @@ const TabButton = styled.button<{ $active: boolean }>`
   border: none;
   border-radius: 10px;
   background: ${({ $active }) =>
-    $active ? 'linear-gradient(135deg, #ffffff, #f8fafc)' : 'transparent'};
-  color: ${({ $active }) => ($active ? '#1e293b' : '#64748b')};
-  font-family: 'Inter', system-ui, sans-serif;
+    $active ? 'linear-gradient(135deg, #ffffff, #f5f0e8)' : 'transparent'};
+  color: ${({ $active }) => ($active ? '#1a1208' : '#7a6e5f')};
+  font-family: 'DM Sans', system-ui, sans-serif;
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
@@ -245,16 +241,16 @@ const TabButton = styled.button<{ $active: boolean }>`
   ${({ $active }) =>
     $active &&
     css`
-      box-shadow: 0 3px 10px rgba(59, 130, 246, 0.12);
+      box-shadow: 0 3px 10px rgba(26, 18, 8, 0.08);
       transform: translateY(-1px);
     `}
 
   &:hover {
     background: ${({ $active }) =>
     $active
-      ? 'linear-gradient(135deg, #ffffff, #f1f5f9)'
-      : 'rgba(59, 130, 246, 0.06)'};
-    color: ${({ $active }) => ($active ? '#1e293b' : '#3b82f6')};
+      ? 'linear-gradient(135deg, #ffffff, #ede8df)'
+      : 'rgba(37, 99, 235, 0.06)'};
+    color: ${({ $active }) => ($active ? '#1a1208' : '#2563eb')};
     transform: translateY(-1px);
   }
 `;
@@ -278,16 +274,16 @@ const ItemCard = styled.div<{
   position: relative;
   padding: 1.5rem;
   padding-left: 1.75rem;
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.96));
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,240,232,0.96));
   border-radius: 16px;
   border: 1px solid ${({ $active, $color }) =>
-    $active ? ($color || '#3b82f6') : 'rgba(148,163,184,0.18)'};
+    $active ? ($color || '#2563eb') : 'rgba(26,18,8,0.1)'};
   cursor: ${({ $comingSoon }) => ($comingSoon ? 'default' : 'pointer')};
   opacity: ${({ $comingSoon }) => ($comingSoon ? 0.6 : 1)};
   box-shadow: ${({ $active, $color }) =>
     $active
-      ? `0 8px 32px ${$color || '#3b82f6'}25, 0 0 0 1px ${$color || '#3b82f6'}20`
-      : '0 4px 16px rgba(15,23,42,0.05)'};
+      ? `0 8px 32px ${$color || '#2563eb'}25, 0 0 0 1px ${$color || '#2563eb'}20`
+      : '0 4px 16px rgba(26,18,8,0.04)'};
   backdrop-filter: blur(8px);
   transform: translateY(0);
   transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
@@ -301,7 +297,7 @@ const ItemCard = styled.div<{
     top: 0;
     bottom: 0;
     width: 4px;
-    background: ${({ $active, $color }) => $active ? ($color || '#3b82f6') : 'transparent'};
+    background: ${({ $active, $color }) => $active ? ($color || '#2563eb') : 'transparent'};
     border-radius: 16px 0 0 16px;
     transition: background 0.25s ease;
   }
@@ -315,19 +311,19 @@ const ItemCard = styled.div<{
     $active &&
     css`
       transform: translateY(-2px);
-      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(248,250,252,0.98));
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(245,240,232,0.98));
     `}
 
   &:hover {
     transform: ${({ $comingSoon }) => ($comingSoon ? 'none' : 'translateY(-4px)')};
     box-shadow: ${({ $comingSoon, $color }) =>
     $comingSoon
-      ? '0 4px 16px rgba(15,23,42,0.05)'
-      : `0 12px 40px ${$color || '#3b82f6'}18`};
-    border-color: ${({ $comingSoon, $color }) => ($comingSoon ? 'rgba(148,163,184,0.18)' : ($color || '#3b82f6'))};
-    
+      ? '0 4px 16px rgba(26,18,8,0.04)'
+      : `0 12px 40px ${$color || '#2563eb'}18`};
+    border-color: ${({ $comingSoon, $color }) => ($comingSoon ? 'rgba(26,18,8,0.1)' : ($color || '#2563eb'))};
+
     &::before {
-      background: ${({ $comingSoon, $color }) => $comingSoon ? 'transparent' : ($color || '#3b82f6')};
+      background: ${({ $comingSoon, $color }) => $comingSoon ? 'transparent' : ($color || '#2563eb')};
     }
   }
 `;
@@ -360,20 +356,20 @@ const ComingSoonBadge = styled.div`
   border-radius: 999px;
   font-size: 0.7rem;
   font-weight: 600;
-  background: #f1f5f9;
-  color: #64748b;
-  border: 1px solid #e2e8f0;
-  font-family: 'Inter', system-ui, sans-serif;
+  background: #f0ebe1;
+  color: #7a6e5f;
+  border: 1px solid rgba(26, 18, 8, 0.12);
+  font-family: 'DM Sans', system-ui, sans-serif;
   letter-spacing: 0.02em;
 `;
 
 const ItemTitle = styled.h3<{ $comingSoon?: boolean }>`
   font-weight: 700;
   font-size: 1.05rem;
-  color: ${({ $comingSoon }) => ($comingSoon ? '#94a3b8' : '#1e293b')};
+  color: ${({ $comingSoon }) => ($comingSoon ? '#a09080' : '#1a1208')};
   line-height: 1.3;
   margin-bottom: 0.375rem;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
 `;
 
 const ItemHeader = styled.div`
@@ -404,11 +400,11 @@ const ItemContent = styled.div`
 
 
 const ItemDescription = styled.p`
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
   margin: 0;
   font-size: 0.825rem;
   line-height: 1.5;
-  color: #64748b;
+  color: #7a6e5f;
 `;
 
 const FadingElements = styled.div<{ $theater: boolean }>`
@@ -483,23 +479,23 @@ const ControlButton = styled.button<{
     ${({ $variant, $active, $theater }) => {
     if ($theater) return $active ? 'rgba(59, 130, 246, 0.5)' : 'rgba(148, 163, 184, 0.3)';
     if ($variant === 'danger') return '#f87171';
-    if ($active) return '#3b82f6';
-    return '#e2e8f0';
+    if ($active) return '#2563eb';
+    return 'rgba(26, 18, 8, 0.12)';
   }};
   background: ${({ $variant, $active, $theater }) => {
     if ($theater) return $active ? 'rgba(59, 130, 246, 0.25)' : 'rgba(51, 65, 85, 0.8)';
     if ($variant === 'danger') return '#fef2f2';
     if ($active) return '#eff6ff';
-    return 'white';
+    return '#faf7f2';
   }};
   color: ${({ $variant, $active, $theater }) => {
     if ($theater) return '#e2e8f0';
     if ($variant === 'danger') return '#dc2626';
     if ($active) return '#2563eb';
-    return '#475569';
+    return '#3d3120';
   }};
 
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
@@ -515,11 +511,11 @@ const ControlButton = styled.button<{
     if ($theater) return $active ? 'rgba(59, 130, 246, 0.35)' : 'rgba(71, 85, 105, 0.9)';
     if ($variant === 'danger') return '#fee2e2';
     if ($active) return '#dbeafe';
-    return '#f8fafc';
+    return '#f0ebe1';
   }};
     transform: translateY(-1px);
     box-shadow: 0 4px 12px
-      ${({ $variant, $theater }) => ($theater ? 'rgba(59, 130, 246, 0.3)' : ($variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(59, 130, 246, 0.12)'))};
+      ${({ $variant, $theater }) => ($theater ? 'rgba(59, 130, 246, 0.3)' : ($variant === 'danger' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(37, 99, 235, 0.12)'))};
     border-color: ${({ $theater }) => ($theater ? 'rgba(59, 130, 246, 0.5)' : '')};
   }
 
@@ -556,27 +552,27 @@ const SpeedControl = styled.div<{ $theater?: boolean }>`
   gap: 0.75rem;
   padding: 0.875rem 1.5rem;
   border-radius: 8px;
-  border: 1px solid ${({ $theater }) => $theater ? 'rgba(148, 163, 184, 0.3)' : '#e2e8f0'};
-  background: ${({ $theater }) => $theater ? 'rgba(51, 65, 85, 0.8)' : 'white'};
+  border: 1px solid ${({ $theater }) => $theater ? 'rgba(148, 163, 184, 0.3)' : 'rgba(26, 18, 8, 0.12)'};
+  background: ${({ $theater }) => $theater ? 'rgba(51, 65, 85, 0.8)' : '#faf7f2'};
   flex-direction: ${({ $theater }) => $theater ? 'column' : 'row'};
   width: ${({ $theater }) => $theater ? '100%' : 'auto'};
-  
+
   span {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'DM Sans', system-ui, sans-serif;
     font-weight: 600;
     font-size: 0.875rem;
-    color: ${({ $theater }) => $theater ? '#e2e8f0' : '#475569'};
+    color: ${({ $theater }) => $theater ? '#e2e8f0' : '#3d3120'};
     text-align: center;
   }
-  
+
   input[type="range"] {
     width: ${({ $theater }) => $theater ? '100%' : '120px'};
     height: 4px;
-    background: ${({ $theater }) => $theater ? 'rgba(148, 163, 184, 0.3)' : '#e2e8f0'};
+    background: ${({ $theater }) => $theater ? 'rgba(148, 163, 184, 0.3)' : '#e8e0d0'};
     border-radius: 2px;
     outline: none;
     -webkit-appearance: none;
-    
+
     &::-webkit-slider-thumb {
       -webkit-appearance: none;
       width: 18px;
@@ -586,15 +582,15 @@ const SpeedControl = styled.div<{ $theater?: boolean }>`
       cursor: pointer;
       transition: transform 0.2s ease;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-      
+
       &:hover {
         transform: scale(1.1);
       }
     }
   }
-  
+
   .value {
-    color: ${({ $theater }) => $theater ? '#60a5fa' : '#3b82f6'};
+    color: ${({ $theater }) => $theater ? '#60a5fa' : '#2563eb'};
     font-weight: 700;
     text-align: center;
   }
@@ -682,16 +678,16 @@ const SimulationContent = styled.div<{ $theater?: boolean }>`
 
 const PlaceholderContent = styled.div`
   text-align: center;
-  color: #64748b;
-  font-family: 'Inter', system-ui, sans-serif;
-  
+  color: #7a6e5f;
+  font-family: 'DM Sans', system-ui, sans-serif;
+
   h3 {
-    color: #1e293b;
+    color: #1a1208;
     font-size: 1.5rem;
     font-weight: 600;
     margin-bottom: 1rem;
   }
-  
+
   p {
     font-size: 0.875rem;
     line-height: 1.6;
@@ -718,11 +714,11 @@ const StatusBar = styled.div<{ $theater?: boolean }>`
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 0.875rem;
-    background: ${({ $theater }) => $theater ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)'};
-    border: 1px solid ${({ $theater }) => $theater ? 'rgba(59, 130, 246, 0.3)' : 'rgba(148, 163, 184, 0.2)'};
+    background: ${({ $theater }) => $theater ? 'rgba(15, 23, 42, 0.9)' : 'rgba(250, 247, 242, 0.95)'};
+    border: 1px solid ${({ $theater }) => $theater ? 'rgba(59, 130, 246, 0.3)' : 'rgba(26, 18, 8, 0.1)'};
     border-radius: 8px;
     backdrop-filter: blur(10px);
-    color: ${({ $theater }) => $theater ? '#e2e8f0' : '#475569'};
+    color: ${({ $theater }) => $theater ? '#e2e8f0' : '#3d3120'};
   }
 
   .status-dot {
@@ -789,19 +785,19 @@ const InfoPanel = styled.div<{ $show: boolean; $theater?: boolean }>`
   z-index: 2100;
   
   h4 {
-    color: ${({ $theater }) => $theater ? '#e2e8f0' : '#1e293b'};
+    color: ${({ $theater }) => $theater ? '#e2e8f0' : '#1a1208'};
     font-size: 0.875rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
   
   p {
-    color: ${({ $theater }) => $theater ? '#94a3b8' : '#64748b'};
+    color: ${({ $theater }) => $theater ? '#94a3b8' : '#7a6e5f'};
     font-size: 0.75rem;
     line-height: 1.5;
     margin: 0;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
 `;
 
@@ -827,7 +823,7 @@ const HintTitle = styled.h3`
   color: #e2e8f0;
   font-size: 1.25rem;
   margin-bottom: 1.5rem;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
   font-weight: 600;
 `;
 
@@ -842,7 +838,7 @@ const HintItem = styled.div`
   align-items: center;
   color: #94a3b8;
   font-size: 0.875rem;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'DM Sans', system-ui, sans-serif;
   
   .key {
     background: rgba(59, 130, 246, 0.2);
@@ -1247,9 +1243,7 @@ export default function SimulationsPage() {
 
   return (
     <PageContainer>
-      <MatrixBackground>
-        <MatrixRain fontSize={32} layers={3} />
-      </MatrixBackground>
+      <MatrixRain />
 
       <ContentWrapper>
         <FadingElements $theater={theaterMode}>
