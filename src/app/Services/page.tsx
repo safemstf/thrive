@@ -1026,7 +1026,7 @@ const allItems: SimulationItem[] = [
 // Main Component
 export default function SimulationsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('tools');
-  const [activeSimulation, setActiveSimulation] = useState<SimulationType>('virus-checker');
+  const [activeSimulation, setActiveSimulation] = useState<SimulationType>('invoice-digitalizer');
   const [isRunning, setIsRunning] = useState(true);
   const [speed, setSpeed] = useState(1);
   const [soundEnabled, setSoundEnabled] = useState(false);
