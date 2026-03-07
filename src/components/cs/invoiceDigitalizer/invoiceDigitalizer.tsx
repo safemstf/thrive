@@ -5,7 +5,7 @@ import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import Tesseract from "tesseract.js";
 import styled, { keyframes, createGlobalStyle } from "styled-components";
-import { Upload } from 'lucide-react';
+import { ImageUp } from 'lucide-react';
 
 
 // ─────────────────────────────────────────────────────────────
@@ -92,30 +92,30 @@ const checkPop = keyframes`
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────
 const T = {
-  ink:       "#1a1208",
-  inkMid:    "#3d3120",
-  inkLight:  "#7a6e5f",
-  inkFaint:  "#b8ad9e",
-  cream:     "#faf7f2",
+  ink: "#1a1208",
+  inkMid: "#3d3120",
+  inkLight: "#7a6e5f",
+  inkFaint: "#b8ad9e",
+  cream: "#faf7f2",
   creamDark: "#f0ebe1",
   creamDeep: "#e4ddd0",
-  rule:      "rgba(26,18,8,0.1)",
-  ruleMid:   "rgba(26,18,8,0.06)",
-  accent:    "#2563eb",
-  accentBg:  "rgba(37,99,235,0.07)",
-  green:     "#16a34a",
-  greenBg:   "rgba(22,163,74,0.08)",
-  amber:     "#b45309",
-  amberBg:   "rgba(180,83,9,0.08)",
-  red:       "#dc2626",
-  redBg:     "rgba(220,38,38,0.08)",
-  serif:     `'DM Serif Display', Georgia, serif`,
-  mono:      `'DM Mono', 'Fira Code', ui-monospace, monospace`,
-  sans:      `'DM Sans', system-ui, sans-serif`,
-  shadow:    "0 1px 3px rgba(26,18,8,0.08), 0 4px 16px rgba(26,18,8,0.06)",
-  shadowLg:  "0 8px 32px rgba(26,18,8,0.12)",
-  radius:    "12px",
-  radiusSm:  "7px",
+  rule: "rgba(26,18,8,0.1)",
+  ruleMid: "rgba(26,18,8,0.06)",
+  accent: "#2563eb",
+  accentBg: "rgba(37,99,235,0.07)",
+  green: "#16a34a",
+  greenBg: "rgba(22,163,74,0.08)",
+  amber: "#b45309",
+  amberBg: "rgba(180,83,9,0.08)",
+  red: "#dc2626",
+  redBg: "rgba(220,38,38,0.08)",
+  serif: `'DM Serif Display', Georgia, serif`,
+  mono: `'DM Mono', 'Fira Code', ui-monospace, monospace`,
+  sans: `'DM Sans', system-ui, sans-serif`,
+  shadow: "0 1px 3px rgba(26,18,8,0.08), 0 4px 16px rgba(26,18,8,0.06)",
+  shadowLg: "0 8px 32px rgba(26,18,8,0.12)",
+  radius: "12px",
+  radiusSm: "7px",
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -196,16 +196,6 @@ const DropZone = styled.label<{ $active: boolean; $hasFiles: boolean }>`
   }
 `;
 
-const DropIcon = styled.div<{ $active: boolean }>`
-  width: 52px;
-  height: 52px;
-  border-radius: ${T.radius};
-  background: ${p => (p.$active ? T.accent : T.ink)};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-`;
 
 const DropTitle = styled.div`
   font-size: 0.9rem;
@@ -237,9 +227,9 @@ const QueueItem = styled.div<{ $status: ProcessingStatus; $dup: boolean }>`
   background: white;
   border: 1px solid ${p =>
     p.$dup ? T.amberBg :
-    p.$status === "error" ? T.redBg :
-    p.$status === "done" ? "rgba(22,163,74,0.15)" :
-    T.rule};
+      p.$status === "error" ? T.redBg :
+        p.$status === "done" ? "rgba(22,163,74,0.15)" :
+          T.rule};
   box-shadow: ${T.shadow};
   animation: ${fadeSlideUp} 0.25s ease both;
   transition: border-color 0.2s;
@@ -307,14 +297,14 @@ const StatusIcon = styled.div<{ $status: ProcessingStatus }>`
   flex-shrink: 0;
   background: ${p =>
     p.$status === "done" ? T.greenBg :
-    p.$status === "error" ? T.redBg :
-    T.accentBg};
+      p.$status === "error" ? T.redBg :
+        T.accentBg};
   color: ${p =>
     p.$status === "done" ? T.green :
-    p.$status === "error" ? T.red :
-    T.accent};
+      p.$status === "error" ? T.red :
+        T.accent};
 
-  svg { animation: ${p => (["hashing","pdf","rotating","ocr","parsing"].includes(p.$status) ? spinAnim : "none")} 1s linear infinite; }
+  svg { animation: ${p => (["hashing", "pdf", "rotating", "ocr", "parsing"].includes(p.$status) ? spinAnim : "none")} 1s linear infinite; }
 `;
 
 const DupBadge = styled.span`
@@ -370,7 +360,7 @@ const Btn = styled.button<{ $primary?: boolean; $ghost?: boolean }>`
 
   &:hover:not(:disabled) {
     background: ${p =>
-      p.$primary ? T.inkMid : T.creamDark};
+    p.$primary ? T.inkMid : T.creamDark};
     transform: translateY(-1px);
     box-shadow: ${p => (p.$primary ? T.shadowLg : T.shadow)};
   }
@@ -659,8 +649,8 @@ async function normalizeImageToCanvas(file: File): Promise<HTMLCanvasElement> {
   const ctx = canvas.getContext("2d")!;
 
   const needsSwap = rotation === 90 || rotation === -90;
-  canvas.width  = needsSwap ? bitmap.height : bitmap.width;
-  canvas.height = needsSwap ? bitmap.width  : bitmap.height;
+  canvas.width = needsSwap ? bitmap.height : bitmap.width;
+  canvas.height = needsSwap ? bitmap.width : bitmap.height;
 
   ctx.save();
   ctx.translate(canvas.width / 2, canvas.height / 2);
@@ -728,7 +718,7 @@ async function extractPdfContent(
       const scale = 2.0; // 2x for better OCR quality
       const viewport = page.getViewport({ scale });
       const pageCanvas = document.createElement("canvas");
-      pageCanvas.width  = viewport.width;
+      pageCanvas.width = viewport.width;
       pageCanvas.height = viewport.height;
       await page.render({ canvas: pageCanvas, viewport }).promise;
       results.push({ text: "", canvas: pageCanvas });
@@ -778,8 +768,8 @@ async function ocrWithBestRotation(
       rotCanvas = document.createElement("canvas");
       const ctx = rotCanvas.getContext("2d")!;
       const needsSwap = deg === 90 || deg === 270;
-      rotCanvas.width  = needsSwap ? canvas.height : canvas.width;
-      rotCanvas.height = needsSwap ? canvas.width  : canvas.height;
+      rotCanvas.width = needsSwap ? canvas.height : canvas.width;
+      rotCanvas.height = needsSwap ? canvas.width : canvas.height;
       ctx.save();
       ctx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
       ctx.rotate((deg * Math.PI) / 180);
@@ -838,11 +828,11 @@ function normalizeOcrText(raw: string): string {
  */
 function splitIntoZones(lines: string[]): { header: string[]; body: string[]; footer: string[] } {
   const n = lines.length;
-  const headerEnd    = Math.min(Math.max(Math.ceil(n * 0.2), 3), 10);
-  const footerStart  = Math.max(Math.floor(n * 0.72), n - 12, headerEnd + 1);
+  const headerEnd = Math.min(Math.max(Math.ceil(n * 0.2), 3), 10);
+  const footerStart = Math.max(Math.floor(n * 0.72), n - 12, headerEnd + 1);
   return {
     header: lines.slice(0, headerEnd),
-    body:   lines.slice(headerEnd, footerStart),
+    body: lines.slice(headerEnd, footerStart),
     footer: lines.slice(footerStart),
   };
 }
@@ -1124,17 +1114,17 @@ function parseInvoice(
   const lines = normalized.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const { header, body, footer } = splitIntoZones(lines);
 
-  const vendor        = extractVendor(header, lines);
-  const date          = extractDateFromLines(lines) ?? new Date().toISOString().split("T")[0];
-  const docType       = detectDocType(lines, fileName);
+  const vendor = extractVendor(header, lines);
+  const date = extractDateFromLines(lines) ?? new Date().toISOString().split("T")[0];
+  const docType = detectDocType(lines, fileName);
   const invoiceNumber = extractInvoiceNumber(lines);
 
   // Search footer from bottom-up (most reliable position for totals)
   const allLines = [...body, ...footer];
   const subtotal = findLabeledValueFromBottom(allLines, "subtotal", "sub total", "sub-total");
-  const tax      = findLabeledValueFromBottom(allLines, "tax", "vat", "gst", "hst");
+  const tax = findLabeledValueFromBottom(allLines, "tax", "vat", "gst", "hst");
   const gratuity = findLabeledValueFromBottom(allLines, "tip", "gratuity", "service charge");
-  const total    = findLabeledValueFromBottom(
+  const total = findLabeledValueFromBottom(
     allLines,
     "total", "amount due", "balance due", "grand total", "amount paid", "total due",
   );
@@ -1184,14 +1174,14 @@ function fmtCurrency(v: number | undefined): string {
 }
 
 const STATUS_LABEL: Record<ProcessingStatus, string> = {
-  idle:     "Queued",
-  hashing:  "Hashing…",
-  pdf:      "Extracting PDF…",
+  idle: "Queued",
+  hashing: "Hashing…",
+  pdf: "Extracting PDF…",
   rotating: "Detecting orientation…",
-  ocr:      "Running OCR…",
-  parsing:  "Parsing…",
-  done:     "Done",
-  error:    "Failed",
+  ocr: "Running OCR…",
+  parsing: "Parsing…",
+  done: "Done",
+  error: "Failed",
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -1200,41 +1190,41 @@ const STATUS_LABEL: Record<ProcessingStatus, string> = {
 
 const IconScan = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
-    <rect x="7" y="7" width="10" height="10" rx="1"/>
+    <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" />
+    <rect x="7" y="7" width="10" height="10" rx="1" />
   </svg>
 );
 
 const IconDownload = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-    <polyline points="7 10 12 15 17 10"/>
-    <line x1="12" y1="15" x2="12" y2="3"/>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 
 const IconX = ({ size = 14 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
 
 const IconCheck = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12"/>
+    <polyline points="20 6 9 17 4 12" />
   </svg>
 );
 
 const IconSpinner = ({ size = 13 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
   </svg>
 );
 
 const IconEdit = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
   </svg>
 );
 
@@ -1243,9 +1233,9 @@ const IconEdit = () => (
 // ─────────────────────────────────────────────────────────────
 export default function InvoiceDigitalizer() {
   const [fileEntries, setFileEntries] = useState<FileEntry[]>([]);
-  const [receipts,    setReceipts]    = useState<ReceiptData[]>([]);
-  const [processing,  setProcessing]  = useState(false);
-  const [editingId,   setEditingId]   = useState<string | null>(null);
+  const [receipts, setReceipts] = useState<ReceiptData[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isDragRef = useRef(false);
   const [isDrag, setIsDrag] = useState(false);
@@ -1358,7 +1348,7 @@ export default function InvoiceDigitalizer() {
               textParts.push(pg.text);
             } else if (pg.canvas) {
               updateEntry({ status: "ocr", progress: 60 + Math.round((pi / pages.length) * 25) });
-              const { text: ocrText, confidence } = await ocrWithBestRotation(pg.canvas, () => {});
+              const { text: ocrText, confidence } = await ocrWithBestRotation(pg.canvas, () => { });
               textParts.push(ocrText);
               totalConfidence = Math.min(totalConfidence, confidence);
               ocrPageCount++;
@@ -1408,17 +1398,17 @@ export default function InvoiceDigitalizer() {
     // Summary sheet
     const summary = wb.addWorksheet("Expense Summary");
     summary.columns = [
-      { header: "Type",          key: "docType",     width: 10 },
-      { header: "Date",          key: "date",        width: 14 },
-      { header: "Vendor",        key: "vendor",      width: 28 },
-      { header: "Invoice #",     key: "invoiceNum",  width: 16 },
-      { header: "Items",         key: "description", width: 45 },
-      { header: "Subtotal",      key: "subtotal",    width: 13 },
-      { header: "Tax",           key: "tax",         width: 11 },
-      { header: "Tip / Svc",     key: "tip",         width: 11 },
-      { header: "Total",         key: "total",       width: 13 },
-      { header: "Confidence",    key: "confidence",  width: 12 },
-      { header: "Source File",   key: "fileName",    width: 28 },
+      { header: "Type", key: "docType", width: 10 },
+      { header: "Date", key: "date", width: 14 },
+      { header: "Vendor", key: "vendor", width: 28 },
+      { header: "Invoice #", key: "invoiceNum", width: 16 },
+      { header: "Items", key: "description", width: 45 },
+      { header: "Subtotal", key: "subtotal", width: 13 },
+      { header: "Tax", key: "tax", width: 11 },
+      { header: "Tip / Svc", key: "tip", width: 11 },
+      { header: "Total", key: "total", width: 13 },
+      { header: "Confidence", key: "confidence", width: 12 },
+      { header: "Source File", key: "fileName", width: 28 },
     ];
 
     // Style header row
@@ -1434,17 +1424,17 @@ export default function InvoiceDigitalizer() {
       .filter(r => !r.isDuplicate)
       .forEach((r, idx) => {
         const row = summary.addRow({
-          docType:     r.docType ?? "unknown",
-          date:        r.date,
-          vendor:      r.vendor ?? "(unknown)",
-          invoiceNum:  r.invoiceNumber ?? "—",
+          docType: r.docType ?? "unknown",
+          date: r.date,
+          vendor: r.vendor ?? "(unknown)",
+          invoiceNum: r.invoiceNumber ?? "—",
           description: r.items.map(i => i.name).join(", "),
-          subtotal:    r.subtotal,
-          tax:         r.tax,
-          tip:         r.gratuity,
-          total:       r.total,
-          confidence:  r.confidence !== undefined ? `${Math.round(r.confidence)}%` : "—",
-          fileName:    r.fileName,
+          subtotal: r.subtotal,
+          tax: r.tax,
+          tip: r.gratuity,
+          total: r.total,
+          confidence: r.confidence !== undefined ? `${Math.round(r.confidence)}%` : "—",
+          fileName: r.fileName,
         });
 
         const fill = idx % 2 === 0
@@ -1452,7 +1442,7 @@ export default function InvoiceDigitalizer() {
           : { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFFFFFFF" } };
 
         row.fill = fill;
-        ["subtotal","tax","tip","total"].forEach(col => {
+        ["subtotal", "tax", "tip", "total"].forEach(col => {
           const cell = row.getCell(col);
           if (cell.value !== null && cell.value !== undefined) cell.numFmt = currFmt;
         });
@@ -1465,8 +1455,8 @@ export default function InvoiceDigitalizer() {
       const totRow = summary.addRow({});
       totRow.getCell("vendor").value = "TOTAL";
       totRow.getCell("vendor").font = { bold: true };
-      ["subtotal","tax","tip","total"].forEach((col, ci) => {
-        const colLetter = ["F","G","H","I"][ci];
+      ["subtotal", "tax", "tip", "total"].forEach((col, ci) => {
+        const colLetter = ["F", "G", "H", "I"][ci];
         const cell = totRow.getCell(col);
         cell.value = { formula: `SUM(${colLetter}2:${colLetter}${dataLen + 1})` } as any;
         cell.numFmt = currFmt;
@@ -1494,13 +1484,13 @@ export default function InvoiceDigitalizer() {
       });
 
       if (r.subtotal !== undefined) sheet.addRow({ name: "Subtotal", price: r.subtotal }).getCell("price").numFmt = currFmt;
-      if (r.tax      !== undefined) sheet.addRow({ name: "Tax",      price: r.tax      }).getCell("price").numFmt = currFmt;
-      if (r.gratuity !== undefined) sheet.addRow({ name: "Tip/Svc",  price: r.gratuity }).getCell("price").numFmt = currFmt;
-      if (r.total    !== undefined) {
+      if (r.tax !== undefined) sheet.addRow({ name: "Tax", price: r.tax }).getCell("price").numFmt = currFmt;
+      if (r.gratuity !== undefined) sheet.addRow({ name: "Tip/Svc", price: r.gratuity }).getCell("price").numFmt = currFmt;
+      if (r.total !== undefined) {
         const row = sheet.addRow({ name: "TOTAL", price: r.total });
-        row.getCell("name").font  = { bold: true };
+        row.getCell("name").font = { bold: true };
         row.getCell("price").numFmt = currFmt;
-        row.getCell("price").font   = { bold: true };
+        row.getCell("price").font = { bold: true };
       }
     });
 
@@ -1513,17 +1503,17 @@ export default function InvoiceDigitalizer() {
     const data = receipts
       .filter(r => !r.isDuplicate)
       .map(r => ({
-        docType:       r.docType ?? "unknown",
-        date:          r.date,
-        vendor:        r.vendor ?? null,
+        docType: r.docType ?? "unknown",
+        date: r.date,
+        vendor: r.vendor ?? null,
         invoiceNumber: r.invoiceNumber ?? null,
-        items:         r.items,
-        subtotal:      r.subtotal ?? null,
-        tax:           r.tax ?? null,
-        gratuity:      r.gratuity ?? null,
-        total:         r.total ?? null,
-        confidence:    r.confidence !== undefined ? Math.round(r.confidence) : null,
-        fileName:      r.fileName,
+        items: r.items,
+        subtotal: r.subtotal ?? null,
+        tax: r.tax ?? null,
+        gratuity: r.gratuity ?? null,
+        total: r.total ?? null,
+        confidence: r.confidence !== undefined ? Math.round(r.confidence) : null,
+        fileName: r.fileName,
       }));
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     saveAs(blob, "expense-report.json");
@@ -1537,8 +1527,8 @@ export default function InvoiceDigitalizer() {
   // ── Drag & drop ─────────────────────────────────────────────
   const onDragEnter = (e: React.DragEvent) => { e.preventDefault(); setIsDrag(true); };
   const onDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDrag(false); };
-  const onDragOver  = (e: React.DragEvent) => { e.preventDefault(); };
-  const onDrop      = (e: React.DragEvent) => {
+  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); };
+  const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDrag(false);
     addFiles(Array.from(e.dataTransfer.files));
@@ -1547,8 +1537,8 @@ export default function InvoiceDigitalizer() {
   // Summary stats
   const activeReceipts = receipts.filter(r => !r.isDuplicate);
   const grandTotal = activeReceipts.reduce((s, r) => s + (r.total ?? 0), 0);
-  const totalTax   = activeReceipts.reduce((s, r) => s + (r.tax ?? 0), 0);
-  const avgConf    = activeReceipts.length
+  const totalTax = activeReceipts.reduce((s, r) => s + (r.tax ?? 0), 0);
+  const avgConf = activeReceipts.length
     ? Math.round(activeReceipts.reduce((s, r) => s + (r.confidence ?? 0), 0) / activeReceipts.length)
     : 0;
 
@@ -1577,9 +1567,8 @@ export default function InvoiceDigitalizer() {
           onDragOver={onDragOver}
           onDrop={onDrop}
         >
-          <DropIcon $active={isDrag}>
-            <Upload />
-          </DropIcon>
+          <ImageUp />
+
           {fileEntries.length === 0 ? (
             <>
               <DropTitle>Drop invoices or receipts here</DropTitle>
@@ -1616,14 +1605,14 @@ export default function InvoiceDigitalizer() {
                     : (
                       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
                         <svg width="22" height="26" viewBox="0 0 22 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M13 1H3C1.9 1 1 1.9 1 3v20c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9l-8-8z" stroke={T.inkFaint} strokeWidth="1.5" strokeLinejoin="round"/>
-                          <path d="M13 1v8h8" stroke={T.inkFaint} strokeWidth="1.5" strokeLinejoin="round"/>
+                          <path d="M13 1H3C1.9 1 1 1.9 1 3v20c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9l-8-8z" stroke={T.inkFaint} strokeWidth="1.5" strokeLinejoin="round" />
+                          <path d="M13 1v8h8" stroke={T.inkFaint} strokeWidth="1.5" strokeLinejoin="round" />
                           <text x="4" y="21" fontSize="5" fontWeight="700" fill={T.inkFaint} fontFamily="monospace">PDF</text>
                         </svg>
                       </div>
                     )
                   }
-                  {["hashing","pdf","rotating","ocr","parsing"].includes(entry.status) && <ScanOverlay />}
+                  {["hashing", "pdf", "rotating", "ocr", "parsing"].includes(entry.status) && <ScanOverlay />}
                 </Thumb>
 
                 <QueueInfo>
@@ -1649,10 +1638,10 @@ export default function InvoiceDigitalizer() {
 
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                   <StatusIcon $status={entry.status}>
-                    {entry.status === "done"  ? <IconCheck /> :
-                     entry.status === "error" ? <IconX size={11} /> :
-                     entry.status === "idle"  ? null :
-                     <IconSpinner />}
+                    {entry.status === "done" ? <IconCheck /> :
+                      entry.status === "error" ? <IconX size={11} /> :
+                        entry.status === "idle" ? null :
+                          <IconSpinner />}
                   </StatusIcon>
                   <RemoveBtn
                     title="Remove"
