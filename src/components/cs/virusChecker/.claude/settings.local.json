@@ -5,7 +5,10 @@
       "Bash(grep -rn \"styled-components\\\\|keyframes\\\\|css\\\\`\" \"C:/Users/safeb/OneDrive/Documents/GitHub/thrive/src/components/cs/shortestPath/\")",
       "Bash(findstr /i \"virusChecker\")",
       "Bash(Select-String -Pattern \"virusChecker\")",
-      "Bash(npx tsc --noEmit --project \"C:/Users/safeb/OneDrive/Documents/GitHub/thrive/tsconfig.json\")"
+      "Bash(npx tsc --noEmit --project \"C:/Users/safeb/OneDrive/Documents/GitHub/thrive/tsconfig.json\")",
+      "Bash(python -c \":*)",
+      "Bash(pip install pypdf --quiet)",
+      "Bash(python -c \"import sys; [print\\(l\\) for l in sys.stdin.read\\(\\).replace\\(''\\\\ufb03'',''ffi''\\).splitlines\\(\\)]\")"
     ]
   }
 }

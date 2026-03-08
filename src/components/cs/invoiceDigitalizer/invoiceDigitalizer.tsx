@@ -690,6 +690,9 @@ async function extractPdfContent(
     const textContent = await page.getTextContent();
     const rawItems = textContent.items as Array<{ str: string; transform: number[] }>;
 
+    // Get page width in PDF user-space units for column-split heuristic
+    const { width: pageWidth } = page.getViewport({ scale: 1.0 });
+
     // Group text items by their Y coordinate (with a small tolerance so items
     // on the same visual line share a bucket), then sort within each line by X.
     // This reconstructs the original line structure that the parser expects.
@@ -701,12 +704,45 @@ async function extractPdfContent(
       if (!lineMap.has(yKey)) lineMap.set(yKey, []);
       lineMap.get(yKey)!.push({ str: item.str, x: item.transform[4] });
     }
+
+    // Render each Y-level group into one or more text lines.
+    // ONLY split rows where every item is digit-free (pure text) — this means
+    // only column-header rows ("Item Number Ship Qty...") and two-column label
+    // rows ("Ship To:  Sold To:") are ever split. Item rows always have at least
+    // one digit (price, quantity, catalog code) so they are never affected.
+    function renderYGroup(items: Array<{ str: string; x: number }>): string {
+      const sorted = items.sort((a, b) => a.x - b.x);
+      const span = sorted.length > 1 ? sorted[sorted.length - 1].x - sorted[0].x : 0;
+      // allAlpha: no item contains any digit — safe guard against splitting item rows
+      const allAlpha = sorted.every(i => !/\d/.test(i.str));
+
+      // Case 1 — Table column-header row: ≥5 pure-text items spanning >55% of page
+      const isTableHeader = sorted.length >= 5 && span > pageWidth * 0.55 && allAlpha;
+      // Case 2 — Two-column form label row: "Ship To:  Sold To:", "Item:  Date:", etc.
+      const isTwoColumnLabel = sorted.length >= 2 && span > pageWidth * 0.40 && allAlpha;
+
+      if (isTableHeader || isTwoColumnLabel) {
+        const GAP_THRESHOLD = pageWidth * 0.07; // gap > 7% of page width = column break
+        const segments: string[] = [];
+        let seg: string[] = [sorted[0].str];
+        for (let k = 1; k < sorted.length; k++) {
+          if (sorted[k].x - sorted[k - 1].x > GAP_THRESHOLD) {
+            segments.push(seg.join(" "));
+            seg = [];
+          }
+          seg.push(sorted[k].str);
+        }
+        if (seg.length) segments.push(seg.join(" "));
+        return segments.join("\n");
+      }
+
+      return sorted.map(i => i.str).join("  ");
+    }
+
     // Higher Y → higher on the page (PDF coordinate origin is bottom-left)
     const text = Array.from(lineMap.entries())
       .sort((a, b) => b[0] - a[0])
-      .map(([, items]) =>
-        items.sort((a, b) => a.x - b.x).map(i => i.str).join("  ")
-      )
+      .map(([, items]) => renderYGroup(items))
       .filter(line => line.trim().length > 0)
       .join("\n");
 
@@ -849,9 +885,13 @@ const VENDOR_NOISE_PATTERNS = [
   /^original\s+invoice/i,
   /^purchase\s+order/i,
   /^(bill|ship|sold|remit|deliver)\s+to\b/i,
+  // Transaction type labels on distributor/wholesale invoices — not the vendor name
+  /^(cash|charge|credit|house)\s+(sale|account|ticket)$/i,
+  // Country names that appear in shipping/billing addresses (e.g. Amazon order PDFs)
+  /^(united\s+states|united\s+kingdom|canada|australia|mexico|germany|france)$/i,
   /^(invoice|receipt|statement|order)\s*(date|number|num|#|no\.?)\b/i,
   /^page\s+\d+/i,
-  /^account\s+(number|#|no)\b/i,
+  /^account\s+(number|no\b|#)/i,   // "ACCOUNT #/NAME" — fixed: no \b after # (# followed by / has no word boundary)
   /^order\s*#/i,
   /^ticket\s*#/i,
   /^p\.?o\.?\s*(#|number|no\.?|box)\b/i,  // also catches "P.O. BOX 206562"
@@ -863,8 +903,15 @@ const VENDOR_NOISE_PATTERNS = [
   /^(salesman|sales\s+rep|freight|ship\s+via|signed\s+by|customer\s+job)\b/i,
   /ending\s+in\s+\d{4}/i,          // payment card lines "Visa ending in 6292"
   /^(authorized|auth\s*:|approved|amount\s*:)/i,
+  // Payment terminal output lines: "Visa Credit: XXXX9236 Authorized: ... Amount: $x"
+  /(visa|mastercard|amex|discover|american\s+express)\s+(credit|debit)\s*:/i,
+  /x{4,}\d{4}/i,                   // masked card numbers like "XXXXXXXXXXXX9236"
+  // Amazon / e-commerce estimated tax lines and line-wrap fragments
+  /^estimated\s+(tax|shipping|delivery)\b/i,
+  /^collected\s*:/i,               // second half of "Estimated tax to be\ncollected: $x.xx"
   /^\d{4}-\d{6,}/,                 // account/PO numbers like "2269-1140268 12/10/2025"
   /^[TtFf]:\s*[\d(+]/,            // telephone "T: 8176850220" / fax "F: (817)..."
+  /^please\b/i,                   // instruction lines "PLEASE SHOW INVOICE NO. AND REMIT TO:"
 ];
 
 function isNoiseLine(line: string): boolean {
@@ -877,7 +924,14 @@ function isNoiseLine(line: string): boolean {
   if (/www\.|http|\.com|\.net|@/.test(line.toLowerCase())) return true;
   if (/^[^a-zA-Z0-9]+$/.test(line)) return true;
   if (/^[A-Z]{2,}$/.test(line.trim())) return true;
-  if (/^[A-Z]+\s+[A-Z]+$/.test(line.trim()) && !/\d/.test(line)) return true;
+  // Filter two-word all-caps lines ONLY when they're known noise phrases, not company names
+  if (/^[A-Z]+\s+[A-Z]+$/.test(line.trim()) && !/\d/.test(line)) {
+    if (/^(MERCHANT|CUSTOMER|CARDHOLDER|STORE)\s+(COPY|RECEIPT|TICKET)$|^(NOT\s+A|VOID|DUPLICATE)\s+\w+$|^(THANK\s+YOU|WELCOME\s+TO)$/i.test(line.trim())) return true;
+  }
+  // Table column header rows: line contains 4+ column-header vocabulary words
+  // Catches "Number Quantity Quantity Num...", "Item Ship Qty Description Price" etc.
+  const colHeaderHits = (line.match(/\b(item|number|qty|quantity|ship|backorder|catalog|vendor|code|description|price|unit|extended|amount|weight|uom|disc(?:ount)?)\b/gi) ?? []).length;
+  if (colHeaderHits >= 4) return true;
   // Long sentence-like lines (order confirmation text, legal notices)
   if (line.length > 55 && /order\s*#|\border\s+placed\b/i.test(line)) return true;
   return false;
@@ -894,19 +948,57 @@ function cleanVendorName(raw: string): string {
     // Truncate at embedded street addresses ("3325 Clay Avenue" appended to company name)
     .replace(/\s+\d{3,5}\s+(?=[A-Za-z]).*/i, "")
     .replace(/\s{2,}/g, " ")
+    // Strip trailing punctuation left by domain-suffix removal ("Amazon." → "Amazon")
+    .replace(/[.,;:]+$/, "")
     .trim();
 }
 
 /** Business entity suffixes that strongly signal a company name. */
-const BUSINESS_SUFFIX_RE = /\b(LLC|Inc\.?|Ltd\.?|Corp\.?|Co\.?|LLP|PLC|Restaurant|Cafe|Caf[eé]|Bakery|Market|Store|Shop|Bar|Grill|Hotel|Inn|Pub|Diner|Bistro|Kitchen|Foods|Group|Services|Solutions|Associates)\b/i;
+const BUSINESS_SUFFIX_RE = /\b(LLC|Inc\.?|Ltd\.?|Corp\.?|Co\.?|LLP|PLC|Restaurant|Cafe|Caf[eé]|Bakery|Market|Store|Shop|Bar|Grill|Hotel|Inn|Pub|Diner|Bistro|Kitchen|Foods|Group|Services|Solutions|Associates|Supply|Electric|Electrical|Hardware|Plumbing|Lumber|Wholesale|Distribut\w*|Industrial|Mechanical|Contracting|Equipment|Rentals?|Auto|Motors?|Tire|Flooring|Roofing|Painting|Excavating)\b/i;
 
 function extractVendor(headerLines: string[], allLines: string[]): string | undefined {
-  const pool = [...headerLines, ...allLines.slice(0, 4)];
+  // Search header zone + first 15 lines of doc; large logos push company name text down
+  const pool = [...new Set([...headerLines, ...allLines.slice(0, 15)])];
+
+  // Build a set of lines that are customer/recipient names — they follow "Ship To:", "Sold To:",
+  // "Bill To:" labels and must NOT be mistaken for the vendor (Elliott Electric pattern).
+  const recipientLabelRe = /^\s*(ship|sold|bill|deliver|remit)\s+to\s*:?\s*$/i;
+  const recipientLines = new Set<string>();
+  // When a column-merged line is added as a recipient, also add each double-space-
+  // separated segment individually so isRecipient() can match partial column values.
+  // e.g. "FIRE STATION WACO #4  12/10/2025" → also adds "FIRE STATION WACO #4"
+  const addRecipient = (s: string) => {
+    const t = s.trim();
+    if (!t) return;
+    recipientLines.add(t);
+    t.split(/\s{2,}/).forEach(part => { if (part.trim()) recipientLines.add(part.trim()); });
+  };
+  for (let i = 0; i < allLines.length - 2; i++) {
+    if (recipientLabelRe.test(allLines[i])) {
+      // Skip the next 2 lines (name + possibly first address line)
+      addRecipient(allLines[i + 1] ?? "");
+      addRecipient(allLines[i + 2] ?? "");
+    }
+  }
+
+  const isRecipient = (line: string) => recipientLines.has(line.trim());
+
+  // Priority 0: explicit "Sold by:" / "Vendor:" field — beats all heuristics
+  // Catches Amazon "Sold by: Amazon.com" and similar e-commerce invoices
+  const soldByRe = /^(?:sold\s+by|fulfilled\s+by|vendor|seller|merchant|supplier)\s*:\s*(.+)$/i;
+  for (const line of allLines) {
+    const m = line.match(soldByRe);
+    if (m) {
+      const name = cleanVendorName(m[1].trim());
+      if (name.length >= 2 && !/^(amazon\.com|n\/a|unknown)$/i.test(name)) return name;
+      if (/^amazon/i.test(name)) return "Amazon";
+    }
+  }
 
   // Priority 1: line with a recognisable business suffix
   for (const line of pool) {
     const trimmed = line.trim();
-    if (isNoiseLine(trimmed)) continue;
+    if (isNoiseLine(trimmed) || isRecipient(trimmed)) continue;
     const cleaned = cleanVendorName(trimmed);
     if (BUSINESS_SUFFIX_RE.test(cleaned) && cleaned.length >= 3) return cleaned;
   }
@@ -915,7 +1007,7 @@ function extractVendor(headerLines: string[], allLines: string[]): string | unde
   const candidates: string[] = [];
   for (const line of pool) {
     const trimmed = line.trim();
-    if (isNoiseLine(trimmed)) continue;
+    if (isNoiseLine(trimmed) || isRecipient(trimmed)) continue;
     const cleaned = cleanVendorName(trimmed);
     if (cleaned.length >= 2) candidates.push(cleaned);
     if (candidates.length >= 3) break;
@@ -945,25 +1037,34 @@ function extractDateFromLines(lines: string[]): string | undefined {
   return undefined;
 }
 
-/** Currency regex — matches $1,234.56 / £12.34 / 12.34 */
-const CURRENCY_RE = /[$£€¥]?\s*(\d{1,4}(?:[,]\d{3})*\.\d{2})/;
-const CURRENCY_RE_G = /[$£€¥]?\s*(\d{1,4}(?:[,]\d{3})*\.\d{2})/g;
+/** Currency regex — matches -$1,234.56 / ($12.34) / £12.34 / 12.34 */
+const CURRENCY_RE   = /(-?\s*[$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}|\([$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}\))/;
+const CURRENCY_RE_G = /(-?\s*[$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}|\([$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}\))/g;
+
+/** Parse a monetary string including negative-sign prefix and accounting parentheses notation. */
+function parseMoney(s: string): number {
+  const t = s.trim();
+  const paren = t.match(/^\([$£€¥]?\s*([\d,]+\.\d{2})\)$/);
+  if (paren) return -parseFloat(paren[1].replace(/,/g, ''));
+  return parseFloat(t.replace(/[,$£€¥\s]+/g, ''));
+}
 
 /**
  * Search lines from the BOTTOM UP for a labeled total value.
  * Also handles the pattern where the label and value are on separate consecutive lines.
  */
 function findLabeledValueFromBottom(lines: string[], ...keywords: string[]): number | undefined {
+  // Two alternations: paren-format (group 2) → negative; plain/minus (group 3) → sign-preserving
   const pattern = new RegExp(
     `(${keywords.map(k => k.replace(/[-\s]/g, "[\\s\\-]")).join("|")})` +
-    `[^\\d]{0,30}?([\\d]{1,4}(?:[,]\\d{3})*\\.\\d{2})`,
+    `[^\\d(]{0,30}?(?:\\(([\\d]{1,4}(?:[,]\\d{3})*\\.\\d{2})\\)|(-?[\\d]{1,4}(?:[,]\\d{3})*\\.\\d{2}))`,
     "i",
   );
 
   for (let i = lines.length - 1; i >= 0; i--) {
     // Try same-line match
     const m = lines[i].match(pattern);
-    if (m) return parseFloat(m[2].replace(/,/g, ""));
+    if (m) return m[2] ? -parseFloat(m[2].replace(/,/g, "")) : parseFloat(m[3].replace(/,/g, ""));
 
     // Try label-on-this-line, value-on a neighboring line.
     // PDF text elements for the same row can land at slightly different Y coordinates,
@@ -971,13 +1072,15 @@ function findLabeledValueFromBottom(lines: string[], ...keywords: string[]): num
     // Also handles "Sub Total: $" where a trailing currency symbol has no accompanying digits.
     const kwRe = new RegExp(`^\\s*(${keywords.map(k => k.replace(/[-\s]/g, "[\\s\\-]")).join("|")})\\s*:?\\s*[$£€¥]?\\s*$`, "i");
     if (kwRe.test(lines[i])) {
-      // A "pure value" line is just a currency amount with no label text
-      const isPureValue = (s: string) => /^\s*[$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}\s*$/.test(s);
+      // A "pure value" line is just a currency amount with no label text (incl. negative / paren notation)
+      const isPureValue = (s: string) =>
+        /^\s*-?\s*[$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}\s*$/.test(s) ||
+        /^\s*\([$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}\)\s*$/.test(s);
       for (const offset of [1, -1, 2, -2, 3]) {
         const j = i + offset;
         if (j < 0 || j >= lines.length) continue;
         if (isPureValue(lines[j])) {
-          return parseFloat(lines[j].replace(/[,$£€¥\s]/g, ""));
+          return parseMoney(lines[j]);
         }
       }
     }
@@ -1008,8 +1111,8 @@ function extractItems(bodyLines: string[], footerLines: string[]): ReceiptItem[]
     CURRENCY_RE_G.lastIndex = 0;
     let cm: RegExpExecArray | null;
     while ((cm = CURRENCY_RE_G.exec(line)) !== null) {
-      const v = parseFloat(cm[1].replace(/,/g, ""));
-      if (v > 0 && v < 5_000) prices.push(v); // cap at $5k — higher = OCR garbage
+      const v = parseMoney(cm[1]);
+      if (v !== 0 && Math.abs(v) < 5_000) prices.push(v); // allow negatives (discounts/credits); cap abs at $5k
     }
     if (prices.length === 0) continue;
 
@@ -1018,7 +1121,8 @@ function extractItems(bodyLines: string[], footerLines: string[]): ReceiptItem[]
 
     // Build the item name: remove all price-like patterns and cleanup
     let rawName = line
-      .replace(/[$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}/g, "")  // strip prices
+      .replace(/\([$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}\)/g, "")  // strip (amount) paren-format prices
+      .replace(/[$£€¥]?\s*\d{1,4}(?:[,]\d{3})*\.\d{2}/g, "")        // strip regular prices
       .replace(/\b\d+\s*[xX@]\s*[\d.]+/g, "")                   // strip "2 x 5.00" multipliers
       .replace(/[#*|=_]+/g, " ")
       .replace(/\s{2,}/g, " ")
@@ -1179,14 +1283,14 @@ function parseInvoice(
   let saneSubtotal = subtotal;
   let saneTotal = total;
 
-  // Tax should never exceed the total or be more than 50% of subtotal
-  if (saneTax !== undefined && saneTotal !== undefined && saneTax >= saneTotal) saneTax = undefined;
-  if (saneTax !== undefined && saneSubtotal !== undefined && saneTax > saneSubtotal * 0.5) saneTax = undefined;
+  // Tax should never exceed the total or be more than 50% of subtotal (use abs for credit notes)
+  if (saneTax !== undefined && saneTotal !== undefined && Math.abs(saneTax) >= Math.abs(saneTotal)) saneTax = undefined;
+  if (saneTax !== undefined && saneSubtotal !== undefined && Math.abs(saneTax) > Math.abs(saneSubtotal) * 0.5) saneTax = undefined;
 
   // If we have subtotal + tax + gratuity but no total, infer it
   if (saneTotal === undefined && saneSubtotal !== undefined) {
     const inferred = saneSubtotal + (saneTax ?? 0) + (gratuity ?? 0);
-    if (inferred > 0) saneTotal = parseFloat(inferred.toFixed(2));
+    if (isFinite(inferred)) saneTotal = parseFloat(inferred.toFixed(2));
   }
 
   // If subtotal > total, they're likely swapped
@@ -1199,7 +1303,7 @@ function parseInvoice(
   // many lines apart). If we have total and tax, derive subtotal algebraically.
   if (saneSubtotal === undefined && saneTotal !== undefined) {
     const derived = parseFloat((saneTotal - (saneTax ?? 0) - (gratuity ?? 0)).toFixed(2));
-    if (derived > 0) saneSubtotal = derived;
+    if (isFinite(derived)) saneSubtotal = derived;
   }
 
   // Consistency check: if subtotal + tax + tip does NOT equal total (rounding beyond ±0.02),
@@ -1208,7 +1312,7 @@ function parseInvoice(
   if (saneSubtotal !== undefined && saneTotal !== undefined) {
     const expected = parseFloat((saneTotal - (saneTax ?? 0) - (gratuity ?? 0)).toFixed(2));
     if (Math.abs(expected - saneSubtotal) > 0.02) {
-      saneSubtotal = expected > 0 ? expected : saneSubtotal;
+      saneSubtotal = isFinite(expected) ? expected : saneSubtotal;
     }
   }
 
@@ -1217,7 +1321,7 @@ function parseInvoice(
   // Only do this when we have multiple items — single-item docs are more likely to have a parse miss.
   if (saneTotal === undefined && items.length >= 2) {
     const itemSum = parseFloat(items.reduce((acc, i) => acc + i.price, 0).toFixed(2));
-    if (itemSum > 0) {
+    if (itemSum !== 0) {
       saneSubtotal = saneSubtotal ?? itemSum;
       saneTotal = parseFloat((itemSum + (saneTax ?? 0) + (gratuity ?? 0)).toFixed(2));
     }
@@ -1241,7 +1345,7 @@ function fmtBytes(bytes: number): string {
 
 function fmtCurrency(v: number | undefined): string {
   if (v === undefined) return "—";
-  return `$${v.toFixed(2)}`;
+  return v < 0 ? `-$${Math.abs(v).toFixed(2)}` : `$${v.toFixed(2)}`;
 }
 
 const STATUS_LABEL: Record<ProcessingStatus, string> = {
@@ -1489,7 +1593,7 @@ export default function InvoiceDigitalizer() {
     headerRow.height = 22;
     headerRow.alignment = { vertical: "middle" };
 
-    const currFmt = '"$"#,##0.00';
+    const currFmt = '"$"#,##0.00;"-$"#,##0.00';
 
     receipts
       .filter(r => !r.isDuplicate)

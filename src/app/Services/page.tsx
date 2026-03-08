@@ -91,6 +91,11 @@ const PasswordStrengthDemo = dynamic(() => import('@/components/cs/passwordCheck
   loading: () => <SimulationLoader>Loading Password Strength Checker...</SimulationLoader>
 });
 
+const HashGeneratorDemo = dynamic(() => import('@/components/cs/hashGenerator/hashGenerator'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Hash & Verify...</SimulationLoader>
+});
+
 // Types
 type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer';
 type TabType = 'simulations' | 'algorithms' | 'tools';
@@ -1005,7 +1010,7 @@ const allItems: SimulationItem[] = [
     icon: <Fingerprint size={22} />,
     color: '#8b5cf6',
     description: 'Compute MD5, SHA-1, SHA-256, and SHA-512 hashes and verify file integrity',
-    comingSoon: true,
+    comingSoon: false,
     category: 'tools',
   },
   {
@@ -1233,7 +1238,9 @@ export default function SimulationsPage() {
       case 'virus-checker':
         return <VirusCheckerDemo />;
       case 'password-checker':
-          return<PasswordStrengthDemo />;
+        return <PasswordStrengthDemo />;
+      case 'hash-generator':
+        return <HashGeneratorDemo />;
       default:
         return (
           <PlaceholderContent>
