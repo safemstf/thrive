@@ -8,7 +8,7 @@ import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen,
   Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check, Shield,
-  Lock, Fingerprint, FileSearch, Code2, Sheet
+  Lock, Fingerprint, FileSearch, Code2, Sheet, X
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
@@ -96,8 +96,14 @@ const HashGeneratorDemo = dynamic(() => import('@/components/cs/hashGenerator/ha
   loading: () => <SimulationLoader>Loading Hash & Verify...</SimulationLoader>
 });
 
+const SQLBreachDemo = dynamic(() => import('@/components/cs/sqlBreach/sqlBreach'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading SQL Breach Simulation...</SimulationLoader>
+});
+
+
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach';
 type TabType = 'simulations' | 'algorithms' | 'tools';
 
 interface SimulationItem {
@@ -239,7 +245,7 @@ const TabButton = styled.button<{ $active: boolean }>`
   padding: 0.875rem 1.75rem;
   border: none;
   border-radius: 10px;
-  background: #f5f0e8';
+  background: #f5f0e8;
   color: ${({ $active }) => ($active ? '#1a1208' : '#7a6e5f')};
   font-family: 'DM Sans', system-ui, sans-serif;
   font-weight: 600;
@@ -648,9 +654,84 @@ const TheaterControls = styled(ControlsContainer) <{ $theater: boolean }>`
   `}
 `;
 
-const SimulationWindow = styled.div<{ $fullscreen?: boolean }>`
-  background: ${({ $fullscreen }) => $fullscreen ? '#000000' : 'white'};
-  border: ${({ $fullscreen }) => $fullscreen ? 'none' : '1px solid rgba(148, 163, 184, 0.2)'};
+/** Auto-hiding bottom pill bar shown in theater/fullscreen mode */
+const TheaterBar = styled.div<{ $visible: boolean }>`
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  background: rgba(10, 14, 26, 0.92);
+  backdrop-filter: blur(20px);
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  opacity: ${({ $visible }) => ($visible ? 1 : 0)};
+  pointer-events: ${({ $visible }) => ($visible ? 'auto' : 'none')};
+  transition: opacity 0.35s ease;
+  white-space: nowrap;
+`;
+
+const TheaterBarBtn = styled.button<{ $active?: boolean; $danger?: boolean }>`
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid ${({ $active, $danger }) =>
+    $danger ? 'rgba(239,68,68,0.45)' : $active ? 'rgba(59,130,246,0.55)' : 'rgba(148,163,184,0.22)'};
+  background: ${({ $active, $danger }) =>
+    $danger ? 'rgba(239,68,68,0.18)' : $active ? 'rgba(59,130,246,0.22)' : 'rgba(51,65,85,0.65)'};
+  color: ${({ $danger, $active }) => $danger ? '#f87171' : $active ? '#93c5fd' : '#cbd5e1'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 120ms ease, transform 120ms ease, border-color 120ms ease;
+  &:hover {
+    background: ${({ $active, $danger }) =>
+      $danger ? 'rgba(239,68,68,0.32)' : $active ? 'rgba(59,130,246,0.36)' : 'rgba(71,85,105,0.88)'};
+    transform: scale(1.1);
+  }
+`;
+
+const TheaterBarDivider = styled.div`
+  width: 1px;
+  height: 22px;
+  background: rgba(148, 163, 184, 0.18);
+  flex-shrink: 0;
+  margin: 0 0.125rem;
+`;
+
+const TheaterSpeedWrap = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.25rem;
+
+  input[type='range'] {
+    width: 72px;
+    height: 3px;
+    accent-color: #3b82f6;
+    cursor: pointer;
+  }
+
+  span {
+    font-family: 'DM Mono', 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #60a5fa;
+    min-width: 30px;
+    text-align: right;
+  }
+`;
+
+const SimulationWindow = styled.div<{ $fullscreen?: boolean; $isTool?: boolean; $cursorHidden?: boolean }>`
+  background: ${({ $fullscreen, $isTool }) => $fullscreen ? '#000000' : $isTool ? 'transparent' : 'white'};
+  border: ${({ $fullscreen, $isTool }) => $fullscreen || $isTool ? 'none' : '1px solid rgba(148, 163, 184, 0.2)'};
   border-radius: ${({ $fullscreen }) => $fullscreen ? '0' : '16px'};
   min-height: ${({ $fullscreen }) => $fullscreen ? '100vh' : 'auto'};
   display: flex;
@@ -659,27 +740,26 @@ const SimulationWindow = styled.div<{ $fullscreen?: boolean }>`
   position: ${({ $fullscreen }) => $fullscreen ? 'fixed' : 'relative'};
   inset: ${({ $fullscreen }) => $fullscreen ? '0' : 'auto'};
   overflow: hidden;
-  box-shadow: ${({ $fullscreen }) => $fullscreen ? 'none' : '0 4px 20px rgba(0, 0, 0, 0.05)'};
+  box-shadow: ${({ $fullscreen, $isTool }) => $fullscreen || $isTool ? 'none' : '0 4px 20px rgba(0, 0, 0, 0.05)'};
   z-index: ${({ $fullscreen }) => $fullscreen ? '2000' : '1'};
-  
+  cursor: ${({ $cursorHidden }) => $cursorHidden ? 'none' : 'auto'};
+
   &:fullscreen {
     background: #000000;
     padding: 0;
   }
 `;
 
-const SimulationContent = styled.div<{ $theater?: boolean }>`
+const SimulationContent = styled.div<{ $theater?: boolean; $isTool?: boolean }>`
   width: 100%;
-  height: 100%;
   display: flex;
-  align-items: center;
+  align-items: ${({ $isTool }) => $isTool ? 'flex-start' : 'center'};
   justify-content: center;
-  background: #ffffff;
+  background: transparent;
   position: relative;
 
   > * {
     width: 100%;
-    height: 100%;
     background: transparent;
   }
 `;
@@ -1031,6 +1111,16 @@ const allItems: SimulationItem[] = [
     comingSoon: true,
     category: 'tools',
   },
+  {
+    key: 'sql-breach',
+    label: 'SQL Breach',
+    icon: <Shield size={22} />,
+    color: '#ef4444',
+    description: 'Simulate and analyze SQL injection vulnerabilities',
+    comingSoon: false,
+    category: 'tools',
+  },
+
 ];
 
 // Main Component
@@ -1045,10 +1135,12 @@ export default function SimulationsPage() {
   const [showPerformance, setShowPerformance] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [fps, setFps] = useState(60);
+  const [showTheaterBar, setShowTheaterBar] = useState(true);
 
   const fpsRef = useRef<number[]>([]);
   const lastFrameTimeRef = useRef(performance.now());
   const simulationWindowRef = useRef<HTMLDivElement>(null);
+  const theaterHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const simulationItems = allItems.filter(item => item.category === 'simulations');
   const algorithmItems = allItems.filter(item => item.category === 'algorithms');
@@ -1181,6 +1273,30 @@ export default function SimulationsPage() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [theaterMode]);
 
+  // Auto-hide theater bar after 3s of inactivity
+  useEffect(() => {
+    if (!theaterMode) {
+      if (theaterHideTimerRef.current) clearTimeout(theaterHideTimerRef.current);
+      setShowTheaterBar(true);
+      return;
+    }
+
+    const showBar = () => {
+      setShowTheaterBar(true);
+      if (theaterHideTimerRef.current) clearTimeout(theaterHideTimerRef.current);
+      theaterHideTimerRef.current = setTimeout(() => setShowTheaterBar(false), 3000);
+    };
+
+    showBar();
+    window.addEventListener('mousemove', showBar);
+    window.addEventListener('touchstart', showBar);
+    return () => {
+      window.removeEventListener('mousemove', showBar);
+      window.removeEventListener('touchstart', showBar);
+      if (theaterHideTimerRef.current) clearTimeout(theaterHideTimerRef.current);
+    };
+  }, [theaterMode]);
+
   const handleItemClick = (item: SimulationItem) => {
     if (!item.comingSoon) {
       setActiveSimulation(item.key);
@@ -1196,6 +1312,7 @@ export default function SimulationsPage() {
   }, []);
 
   const activeItem = allItems.find(item => item.key === activeSimulation);
+  const isToolItem = activeItem?.category === 'tools';
 
   const renderSimulation = () => {
     switch (activeSimulation) {
@@ -1241,6 +1358,8 @@ export default function SimulationsPage() {
         return <PasswordStrengthDemo />;
       case 'hash-generator':
         return <HashGeneratorDemo />;
+      case 'sql-breach':
+        return <SQLBreachDemo />;
       default:
         return (
           <PlaceholderContent>
@@ -1336,7 +1455,7 @@ export default function SimulationsPage() {
           </ItemsGrid>
         </FadingElements>
 
-        {activeItem && !activeItem.comingSoon && !theaterMode && (
+        {activeItem && !activeItem.comingSoon && !theaterMode && !isToolItem && (
           <TheaterControls $theater={false}>
             <ControlButton
               onClick={() => setIsRunning(!isRunning)}
@@ -1399,20 +1518,22 @@ export default function SimulationsPage() {
           </TheaterControls>
         )}
 
-        <StatusBar $theater={theaterMode}>
-          <div className="status-item">
-            <div className={`status-dot ${isRunning ? 'running' : 'paused'}`} />
-            {isRunning ? 'Running' : 'Paused'}
-          </div>
-          <div className="status-item">
-            Speed: {speed.toFixed(1)}x
-          </div>
-          <div className="status-item">
-            FPS: {fps}
-          </div>
-        </StatusBar>
+        {!isToolItem && (
+          <StatusBar $theater={theaterMode}>
+            <div className="status-item">
+              <div className={`status-dot ${isRunning ? 'running' : 'paused'}`} />
+              {isRunning ? 'Running' : 'Paused'}
+            </div>
+            <div className="status-item">
+              Speed: {speed.toFixed(1)}x
+            </div>
+            <div className="status-item">
+              FPS: {fps}
+            </div>
+          </StatusBar>
+        )}
 
-        <SimulationWindow ref={simulationWindowRef} $fullscreen={theaterMode}>
+        <SimulationWindow ref={simulationWindowRef} $fullscreen={theaterMode} $isTool={isToolItem} $cursorHidden={theaterMode && !showTheaterBar}>
           {activeItem && (
             <>
 
@@ -1433,28 +1554,27 @@ export default function SimulationsPage() {
                 <p>{activeItem.description}</p>
               </InfoPanel>
 
-              <SimulationContent $theater={theaterMode}>
+              <SimulationContent $theater={theaterMode} $isTool={isToolItem}>
                 {renderSimulation()}
               </SimulationContent>
 
-              {theaterMode && (
-                <TheaterControls $theater>
-                  <ControlButton
+              {theaterMode && !isToolItem && (
+                <TheaterBar $visible={showTheaterBar}>
+                  <TheaterBarBtn
+                    $danger={isRunning}
                     onClick={() => setIsRunning(!isRunning)}
-                    $variant={isRunning ? 'danger' : 'primary'}
-                    $theater
+                    title={isRunning ? 'Pause' : 'Play'}
                   >
-                    {isRunning ? <Pause size={18} /> : <Play size={18} />}
-                    {isRunning ? 'Pause' : 'Run'}
-                  </ControlButton>
+                    {isRunning ? <Pause size={15} /> : <Play size={15} />}
+                  </TheaterBarBtn>
 
-                  <ControlButton onClick={handleReset} $theater>
-                    <RotateCcw size={18} />
-                    Reset
-                  </ControlButton>
+                  <TheaterBarBtn onClick={handleReset} title="Reset">
+                    <RotateCcw size={15} />
+                  </TheaterBarBtn>
 
-                  <SpeedControl $theater>
-                    <span>Speed</span>
+                  <TheaterBarDivider />
+
+                  <TheaterSpeedWrap>
                     <input
                       type="range"
                       min={0.1}
@@ -1463,49 +1583,44 @@ export default function SimulationsPage() {
                       value={speed}
                       onChange={(e) => setSpeed(parseFloat(e.target.value))}
                     />
-                    <div className="value">{speed.toFixed(1)}x</div>
-                  </SpeedControl>
+                    <span>{speed.toFixed(1)}x</span>
+                  </TheaterSpeedWrap>
 
-                  <ControlButton
-                    onClick={() => setTheaterMode(false)}
-                    title="Exit Fullscreen (ESC)"
-                    $theater
-                  >
-                    <Eye size={18} />
-                    Exit
-                  </ControlButton>
+                  <TheaterBarDivider />
 
-                  <ControlButton
-                    onClick={() => setShowPerformance(!showPerformance)}
+                  <TheaterBarBtn
                     $active={showPerformance}
-                    $theater
+                    onClick={() => setShowPerformance(!showPerformance)}
+                    title="Performance"
                   >
-                    <Gauge size={18} />
-                  </ControlButton>
+                    <Gauge size={15} />
+                  </TheaterBarBtn>
 
-                  <ControlButton
-                    onClick={() => setShowInfo(!showInfo)}
+                  <TheaterBarBtn
                     $active={showInfo}
-                    $theater
+                    onClick={() => setShowInfo(!showInfo)}
+                    title="Info"
                   >
-                    <Info size={18} />
-                  </ControlButton>
+                    <Info size={15} />
+                  </TheaterBarBtn>
 
-                  <ControlButton
-                    onClick={() => setSoundEnabled(!soundEnabled)}
+                  <TheaterBarBtn
                     $active={soundEnabled}
-                    $theater
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    title={soundEnabled ? 'Mute' : 'Sound'}
                   >
-                    {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-                  </ControlButton>
+                    {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                  </TheaterBarBtn>
 
-                  <ControlButton
-                    onClick={() => setShowKeyboardHints(true)}
-                    $theater
+                  <TheaterBarDivider />
+
+                  <TheaterBarBtn
+                    onClick={() => setTheaterMode(false)}
+                    title="Exit Fullscreen (Esc)"
                   >
-                    <HelpCircle size={18} />
-                  </ControlButton>
-                </TheaterControls>
+                    <X size={15} />
+                  </TheaterBarBtn>
+                </TheaterBar>
               )}
             </>
           )}

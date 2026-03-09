@@ -1,10 +1,9 @@
 'use client'
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
-  RotateCcw, Palette, Grid3X3, Shuffle, ChevronDown, 
-  Layers, Activity, Sparkles, Hash, Timer, Zap
+  RotateCcw, Grid3X3, Shuffle, Play, Pause,
 } from "lucide-react";
-import styled, { keyframes, css } from "styled-components";
+import styled, { keyframes, css, createGlobalStyle } from "styled-components";
 
 // ============================================================================
 // TYPES & DATA
@@ -21,18 +20,39 @@ interface LifeSimulationProps {
   speed?: number;
 }
 
+// Canvas stays dark so cells are visible; UI uses the cream theme tokens
+const CANVAS_BG = '#0f1117';
+
+const T = {
+  ink:       '#1a1208',
+  inkMid:    '#3d3120',
+  inkLight:  '#7a6e5f',
+  inkFaint:  '#b8ad9e',
+  cream:     '#faf7f2',
+  creamDark: '#f0ebe1',
+  creamDeep: '#e4ddd0',
+  rule:      'rgba(26,18,8,0.10)',
+  ruleMid:   'rgba(26,18,8,0.06)',
+  accent:    '#2563eb',
+  accentBg:  'rgba(37,99,235,0.07)',
+  green:     '#16a34a',
+  greenBg:   'rgba(22,163,74,0.08)',
+  amber:     '#b45309',
+  amberBg:   'rgba(180,83,9,0.08)',
+  red:       '#dc2626',
+  serif:     `'DM Serif Display', Georgia, serif`,
+  mono:      `'DM Mono', 'Fira Code', ui-monospace, monospace`,
+  sans:      `'DM Sans', system-ui, sans-serif`,
+  shadow:    '0 1px 3px rgba(26,18,8,0.08), 0 4px 16px rgba(26,18,8,0.06)',
+  shadowLg:  '0 8px 32px rgba(26,18,8,0.12)',
+  radius:    '12px',
+  radiusSm:  '7px',
+};
+
+// Keep a COLORS alias for the Renderer (only canvas-internal rendering uses this)
 const COLORS = {
-  bg1: '#0a0e1a',
-  bg2: '#1a1a2e',
-  surface: 'rgba(0,0,0,0.5)',
-  textPrimary: '#e6eef8',
-  textMuted: '#94a3b8',
-  accent: '#3b82f6',
-  accentSoft: '#60a5fa',
-  purple: '#a78bfa',
-  success: '#22c55e',
-  warn: '#fbbf24',
-  borderAccent: 'rgba(59, 130, 246, 0.15)'
+  bg1:     CANVAS_BG,
+  accent:  T.accent,
 };
 
 const RULES: Record<Variant, RuleSet> = {
@@ -63,10 +83,25 @@ const VARIANT_LABELS: Record<Variant, string> = {
 };
 
 const COLOR_LABELS: Record<ColorMode, string> = {
-  none: "Solid",
-  age: "Age",
-  rainbow: "Rainbow",
-  heat: "Heat"
+  none: "Solid", age: "Age", rainbow: "Rainbow", heat: "Heat",
+};
+
+const VARIANT_NOTATION: Record<Variant, string> = {
+  conway:   'B3/S23',
+  highlife: 'B36/S23',
+  daynight: 'B3678/S34678',
+  seeds:    'B2/S—',
+  coral:    'B3/S45678',
+  amoeba:   'B357/S1358',
+};
+
+const VARIANT_DESCRIPTIONS: Record<Variant, string> = {
+  conway:   'The 1970 original. A cell is born with exactly 3 neighbors and survives with 2 or 3. Produces gliders, oscillators, and stable "still-life" structures.',
+  highlife: 'Like Conway but also allows birth with 6 neighbors. Notable for the Replicator — a pattern that creates a complete copy of itself.',
+  daynight: 'Live and dead cells follow symmetric rules, so the grid looks identical when inverted. Produces complex, high-density, symmetric growth.',
+  seeds:    'Every cell dies immediately — no cell ever survives. New cells appear only with exactly 2 neighbors, producing explosive short-lived clouds.',
+  coral:    'Cells born with 3 neighbors but survive with 4–8. Grows slowly, filling gaps and forming dense, stable masses resembling coral.',
+  amoeba:   'Erratic birth and survival conditions produce chaotic blob-like structures that stretch and contract unpredictably each generation.',
 };
 
 // ============================================================================
@@ -263,78 +298,218 @@ class Renderer {
 }
 
 // ============================================================================
-// STYLED COMPONENTS
+// STYLED COMPONENTS — cream / ink theme
 // ============================================================================
 
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+const GlobalStyle = createGlobalStyle`
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
 `;
 
 const pulse = keyframes`
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  50%       { opacity: 0.45; }
 `;
 
-const Container = styled.div`
-  position: absolute;
-  inset: 0;
+// Root — normal document flow, scrollable (fixes the "not rendered" bug)
+const Root = styled.div`
   width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, ${COLORS.bg1} 0%, ${COLORS.bg2} 50%, ${COLORS.bg1} 100%);
+  min-height: 580px;
+  overflow-y: auto;
+  background: ${T.cream};
+  font-family: ${T.sans};
+  color: ${T.ink};
+  -webkit-font-smoothing: antialiased;
+  padding: clamp(1.25rem, 3vw, 2rem) clamp(1rem, 3vw, 1.75rem);
   display: flex;
   flex-direction: column;
-  padding: 1.5rem;
-  gap: 1rem;
-  overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-                radial-gradient(circle at 70% 70%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
-    pointer-events: none;
-  }
+  gap: 1.1rem;
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: ${T.creamDeep}; border-radius: 2px; }
 `;
 
-const TopSection = styled.div`
+const Header = styled.header`
+  padding-bottom: 1.1rem;
+  border-bottom: 2px solid ${T.ink};
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+`;
+
+const Title = styled.h1`
+  font-family: ${T.serif};
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 0.2rem;
+  color: ${T.ink};
+`;
+
+const Subtitle = styled.p`
+  font-size: 0.8rem;
+  color: ${T.inkLight};
+  margin: 0;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+`;
+
+const HeaderRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+`;
+
+const HeaderBadge = styled.div`
+  font-family: ${T.mono};
+  font-size: 0.6rem;
+  color: ${T.inkFaint};
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid ${T.creamDeep};
+  border-radius: 999px;
+  background: ${T.creamDark};
+  white-space: nowrap;
+`;
+
+const RuleNotation = styled.div`
+  font-family: ${T.mono};
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: ${T.accent};
+  padding: 0.28rem 0.65rem;
+  border: 1px solid rgba(37,99,235,0.25);
+  border-radius: 999px;
+  background: ${T.accentBg};
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+`;
+
+// Body: sidebar | main
+const Body = styled.div`
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 228px 1fr;
   gap: 1rem;
-  flex: 1;
-  min-height: 0;
-  animation: ${fadeIn} 0.5s ease-out;
+  align-items: start;
+  @media (max-width: 720px) { grid-template-columns: 1fr; }
 `;
 
-const CanvasPanel = styled.div`
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid ${COLORS.borderAccent};
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+// Sidebar
+const Sidebar = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+`;
+
+const SideCard = styled.div`
+  background: white;
+  border: 1px solid ${T.rule};
+  border-radius: ${T.radius};
+  box-shadow: ${T.shadow};
+  overflow: hidden;
+`;
+
+const SideHead = styled.div`
+  padding: 0.48rem 0.85rem;
+  background: ${T.creamDark};
+  border-bottom: 1px solid ${T.ruleMid};
+  font-family: ${T.mono};
+  font-size: 0.57rem;
+  font-weight: 600;
+  color: ${T.inkFaint};
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+`;
+
+const VariantBtn = styled.button<{ $active: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.85rem;
+  border: none;
+  border-bottom: 1px solid ${T.ruleMid};
+  background: ${p => p.$active ? T.accentBg : 'transparent'};
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s;
+  &:last-child { border-bottom: none; }
+  &:hover { background: ${p => p.$active ? T.accentBg : T.creamDark}; }
+`;
+
+const VDot = styled.div<{ $active: boolean }>`
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: ${p => p.$active ? T.accent : T.inkFaint};
+  transition: background 0.12s;
+`;
+
+const VLabel = styled.div`
+  font-size: 0.73rem;
+  font-weight: 500;
+  color: ${T.ink};
+  line-height: 1.25;
+`;
+
+const VNote = styled.div`
+  font-size: 0.59rem;
+  color: ${T.inkFaint};
+  font-family: ${T.mono};
+  margin-top: 0.06rem;
+`;
+
+const PatternGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.3rem;
+  padding: 0.5rem;
+`;
+
+const PatternBtn = styled.button`
+  padding: 0.38rem 0.5rem;
+  border: 1px solid ${T.rule};
+  border-radius: ${T.radiusSm};
+  background: ${T.creamDark};
+  color: ${T.inkLight};
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: ${T.sans};
+  transition: all 0.12s;
+  &:hover { background: ${T.accentBg}; color: ${T.accent}; border-color: rgba(37,99,235,0.22); }
+`;
+
+const DescBox = styled.div`
+  padding: 0.7rem 0.85rem;
+  background: ${T.creamDark};
+  border: 1px solid ${T.rule};
+  border-radius: ${T.radiusSm};
+  font-size: 0.7rem;
+  color: ${T.inkLight};
+  line-height: 1.65;
+`;
+
+// Main column: canvas + controls + stats
+const MainCol = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+`;
+
+const CanvasWrap = styled.div`
+  background: #0f1117;
+  border-radius: ${T.radius};
+  border: 1px solid ${T.rule};
+  box-shadow: ${T.shadowLg};
   position: relative;
   overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.35), transparent);
-    background-size: 200% 100%;
-    animation: ${shimmer} 3s linear infinite;
-  }
+  height: 420px;
 `;
 
 const Canvas = styled.canvas`
@@ -345,225 +520,123 @@ const Canvas = styled.canvas`
   &:active { cursor: grabbing; }
 `;
 
-const StatsPanel = styled.div`
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid ${COLORS.borderAccent};
-  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-`;
-
-const PanelHeader = styled.div`
-  padding: 1rem 1.25rem;
-  background: rgba(0,0,0,0.28);
-  border-bottom: 1px solid rgba(59, 130, 246, 0.08);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: ${COLORS.accentSoft};
-  svg { width: 16px; height: 16px; }
-`;
-
-const StatsContent = styled.div`
-  flex: 1;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  overflow-y: auto;
-  
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-  &::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.22); border-radius: 2px; }
-`;
-
-const StatCard = styled.div`
-  background: rgba(0,0,0,0.28);
-  border-radius: 12px;
-  border: 1px solid rgba(59, 130, 246, 0.08);
-  padding: 0.875rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    background: rgba(59, 130, 246, 0.06);
-    border-color: rgba(59, 130, 246, 0.12);
-  }
-`;
-
-const StatLabel = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  color: ${COLORS.textMuted};
-  svg { width: 14px; height: 14px; color: ${COLORS.accentSoft}; }
-`;
-
-const StatValue = styled.div<{ $color?: string }>`
-  font-size: 1.1rem;
-  font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
-  color: ${p => p.$color || COLORS.textPrimary};
-`;
-
-const PulseIndicator = styled.div<{ $active: boolean }>`
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: ${p => p.$active ? COLORS.success : COLORS.warn};
-  animation: ${p => p.$active ? css`${pulse} 2s ease-in-out infinite` : 'none'};
-`;
-
-const BottomSection = styled.div`
-  height: 70px;
-  display: flex;
-  gap: 1rem;
-  animation: ${fadeIn} 0.6s ease-out;
-`;
-
-const ControlsCard = styled.div`
-  flex: 1;
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-radius: 14px;
-  border: 1px solid ${COLORS.borderAccent};
-  padding: 0 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-`;
-
-const ControlBtn = styled.button<{ $active?: boolean }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1rem;
-  border-radius: 10px;
-  border: 1px solid rgba(59, 130, 246, 0.18);
-  background: ${p => p.$active ? 'rgba(59, 130, 246, 0.1)' : 'rgba(0,0,0,0.28)'};
-  color: ${p => p.$active ? COLORS.accentSoft : COLORS.textMuted};
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: inherit;
-  
-  &:hover {
-    transform: translateY(-2px);
-    background: rgba(59, 130, 246, 0.15);
-    color: ${COLORS.accentSoft};
-    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
-  }
-  
-  svg { width: 16px; height: 16px; }
-`;
-
-const Divider = styled.div`
-  width: 1px;
-  height: 32px;
-  background: rgba(59, 130, 246, 0.15);
-`;
-
-const DropdownContainer = styled.div`
-  position: relative;
-`;
-
-const DropdownMenu = styled.div<{ $show: boolean }>`
-  position: absolute;
-  bottom: calc(100% + 12px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, rgba(10,14,26,0.98) 0%, rgba(26,26,46,0.98) 100%);
-  backdrop-filter: blur(16px);
-  border-radius: 12px;
-  border: 1px solid ${COLORS.borderAccent};
-  padding: 0.5rem;
-  min-width: 160px;
-  opacity: ${p => p.$show ? 1 : 0};
-  visibility: ${p => p.$show ? 'visible' : 'hidden'};
-  transform: translateX(-50%) ${p => p.$show ? 'translateY(0)' : 'translateY(8px)'};
-  transition: all 0.2s ease;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  z-index: 100;
-`;
-
-const DropdownItem = styled.button<{ $active?: boolean }>`
-  display: block;
-  width: 100%;
-  padding: 0.625rem 0.875rem;
-  border: none;
-  border-radius: 8px;
-  background: ${p => p.$active ? 'rgba(59, 130, 246, 0.15)' : 'transparent'};
-  color: ${p => p.$active ? COLORS.accentSoft : COLORS.textMuted};
-  font-size: 0.8rem;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s ease;
-  
-  &:hover {
-    background: rgba(59, 130, 246, 0.1);
-    color: ${COLORS.accentSoft};
-  }
-`;
-
-const PatternGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.375rem;
-`;
-
-const PatternBtn = styled.button`
-  padding: 0.5rem 0.75rem;
-  border: none;
-  border-radius: 6px;
-  background: rgba(0,0,0,0.3);
-  color: ${COLORS.textMuted};
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s ease;
-  
-  &:hover {
-    background: rgba(139, 92, 246, 0.15);
-    color: ${COLORS.purple};
-  }
-`;
-
 const ZoomIndicator = styled.div`
   position: absolute;
-  bottom: 1rem;
-  right: 1rem;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  border: 1px solid rgba(59, 130, 246, 0.15);
-  color: ${COLORS.textMuted};
-  font-size: 0.75rem;
-  font-family: 'JetBrains Mono', monospace;
+  bottom: 0.65rem;
+  right: 0.65rem;
+  background: rgba(15,17,23,0.8);
+  padding: 0.25rem 0.5rem;
+  border-radius: ${T.radiusSm};
+  border: 1px solid rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.45);
+  font-size: 0.62rem;
+  font-family: ${T.mono};
   font-weight: 600;
 `;
 
 const HintText = styled.div`
   position: absolute;
-  bottom: 1rem;
+  bottom: 0.65rem;
   left: 50%;
   transform: translateX(-50%);
-  color: rgba(148, 163, 184, 0.4);
-  font-size: 0.7rem;
+  color: rgba(255,255,255,0.16);
+  font-size: 0.62rem;
+  font-family: ${T.sans};
+  white-space: nowrap;
+  pointer-events: none;
+`;
+
+const ControlsRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  background: white;
+  border: 1px solid ${T.rule};
+  border-radius: ${T.radius};
+  box-shadow: ${T.shadow};
+  padding: 0.5rem 0.85rem;
+`;
+
+const ControlBtn = styled.button<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: ${T.radiusSm};
+  border: 1px solid ${p => p.$active ? 'rgba(37,99,235,0.3)' : T.rule};
+  background: ${p => p.$active ? T.accentBg : T.creamDark};
+  color: ${p => p.$active ? T.accent : T.inkMid};
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: ${T.sans};
+  white-space: nowrap;
+  &:hover {
+    background: ${p => p.$active ? T.accentBg : T.creamDeep};
+    color: ${p => p.$active ? T.accent : T.ink};
+    box-shadow: ${T.shadow};
+  }
+  svg { width: 12px; height: 12px; }
+`;
+
+const CDivider = styled.div`
+  width: 1px;
+  height: 20px;
+  background: ${T.rule};
+  flex-shrink: 0;
+`;
+
+const CLabel = styled.span`
+  font-size: 0.62rem;
+  color: ${T.inkFaint};
+  font-family: ${T.mono};
+  white-space: nowrap;
+`;
+
+const PulseIndicator = styled.div<{ $active: boolean }>`
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: ${p => p.$active ? T.green : T.amber};
+  animation: ${p => p.$active ? css`${pulse} 2s ease-in-out infinite` : 'none'};
+  flex-shrink: 0;
+`;
+
+const StatsRow = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+`;
+
+const StatChip = styled.div`
+  flex: 1;
+  min-width: 90px;
+  background: white;
+  border: 1px solid ${T.rule};
+  border-radius: ${T.radiusSm};
+  box-shadow: ${T.shadow};
+  padding: 0.45rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+`;
+
+const StatLabel = styled.div`
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: ${T.inkFaint};
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: ${T.mono};
+`;
+
+const StatVal = styled.div<{ $color?: string }>`
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: ${T.mono};
+  color: ${p => p.$color || T.ink};
 `;
 
 // ============================================================================
@@ -587,10 +660,6 @@ export default function LifeSimulation({ isDark = true, isRunning = true, speed 
   const [showGrid, setShowGrid] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 800 });
-
-  const [showVariantMenu, setShowVariantMenu] = useState(false);
-  const [showColorMenu, setShowColorMenu] = useState(false);
-  const [showPatternMenu, setShowPatternMenu] = useState(false);
 
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ x: 0, y: 0 });
@@ -715,12 +784,10 @@ export default function LifeSimulation({ isDark = true, isRunning = true, speed 
       setPopulation(simRef.current.getGrid().countPopulation());
       if (rendererRef.current) rendererRef.current.render(simRef.current.getGrid());
     }
-    setShowPatternMenu(false);
   };
 
   const handleChangeVariant = (v: Variant) => {
     setVariant(v);
-    setShowVariantMenu(false);
     setTimeout(() => {
       const result = initSimulation();
       if (result) {
@@ -780,112 +847,105 @@ export default function LifeSimulation({ isDark = true, isRunning = true, speed 
     return () => canvas.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
 
-  useEffect(() => {
-    const handleClick = () => { setShowVariantMenu(false); setShowColorMenu(false); setShowPatternMenu(false); };
-    if (showVariantMenu || showColorMenu || showPatternMenu) {
-      setTimeout(() => window.addEventListener('click', handleClick, { once: true }), 0);
-    }
-  }, [showVariantMenu, showColorMenu, showPatternMenu]);
-
   return (
-    <Container>
-      <TopSection>
-        <CanvasPanel ref={containerRef}>
-          <Canvas
-            ref={canvasRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          />
-          {zoom !== 1 && <ZoomIndicator>{(zoom * 100).toFixed(0)}%</ZoomIndicator>}
-          <HintText>Scroll to zoom • Drag to pan</HintText>
-        </CanvasPanel>
+    <Root>
+      <GlobalStyle />
 
-        <StatsPanel>
-          <PanelHeader>
-            <Activity /> Live Statistics
-            <div style={{ marginLeft: 'auto' }}><PulseIndicator $active={isPlaying} /></div>
-          </PanelHeader>
-          <StatsContent>
-            <StatCard>
-              <StatLabel><Hash /> Generation</StatLabel>
-              <StatValue $color={COLORS.accentSoft}>{generation.toLocaleString()}</StatValue>
-            </StatCard>
-            <StatCard>
-              <StatLabel><Sparkles /> Population</StatLabel>
-              <StatValue $color={COLORS.success}>{population.toLocaleString()}</StatValue>
-            </StatCard>
-            <StatCard>
-              <StatLabel><Layers /> Rules</StatLabel>
-              <StatValue $color={COLORS.purple}>{VARIANT_LABELS[variant].split(' ')[0]}</StatValue>
-            </StatCard>
-            <StatCard>
-              <StatLabel><Palette /> Colors</StatLabel>
-              <StatValue>{COLOR_LABELS[colorMode]}</StatValue>
-            </StatCard>
-            <StatCard>
-              <StatLabel><Zap /> Speed</StatLabel>
-              <StatValue>{speed}×</StatValue>
-            </StatCard>
-            <StatCard>
-              <StatLabel><Timer /> Density</StatLabel>
-              <StatValue>{((population / (canvasDimensions.width * canvasDimensions.height / (cellSize * cellSize))) * 100).toFixed(1)}%</StatValue>
-            </StatCard>
-          </StatsContent>
-        </StatsPanel>
-      </TopSection>
+      <Header>
+        <div>
+          <Title>Conway's Game of Life</Title>
+          <Subtitle>Cellular automaton — emergent complexity from simple rules</Subtitle>
+        </div>
+        <HeaderRight>
+          <RuleNotation>{VARIANT_NOTATION[variant]}</RuleNotation>
+          <HeaderBadge>B/S Notation</HeaderBadge>
+        </HeaderRight>
+      </Header>
 
-      <BottomSection>
-        <ControlsCard>
-          <ControlBtn onClick={handleReset}><Shuffle size={16} /> Randomize</ControlBtn>
-          <ControlBtn onClick={resetView}><RotateCcw size={16} /> Reset View</ControlBtn>
-          <ControlBtn $active={showGrid} onClick={() => setShowGrid(!showGrid)}><Grid3X3 size={16} /> Grid</ControlBtn>
-          
-          <Divider />
+      <Body>
+        <Sidebar>
+          <SideCard>
+            <SideHead>Rule Variants</SideHead>
+            {(Object.keys(RULES) as Variant[]).map(v => (
+              <VariantBtn key={v} $active={variant === v} onClick={() => handleChangeVariant(v)}>
+                <VDot $active={variant === v} />
+                <div>
+                  <VLabel>{VARIANT_LABELS[v]}</VLabel>
+                  <VNote>{VARIANT_NOTATION[v]}</VNote>
+                </div>
+              </VariantBtn>
+            ))}
+          </SideCard>
 
-          <DropdownContainer>
-            <ControlBtn $active={showVariantMenu} onClick={(e) => { e.stopPropagation(); setShowVariantMenu(!showVariantMenu); setShowColorMenu(false); setShowPatternMenu(false); }}>
-              <Layers size={16} /> {VARIANT_LABELS[variant].split(' ')[0]} <ChevronDown size={14} />
-            </ControlBtn>
-            <DropdownMenu $show={showVariantMenu}>
-              {(Object.keys(RULES) as Variant[]).map(v => (
-                <DropdownItem key={v} $active={variant === v} onClick={(e) => { e.stopPropagation(); handleChangeVariant(v); }}>
-                  {VARIANT_LABELS[v]}
-                </DropdownItem>
+          <SideCard>
+            <SideHead>Seed Patterns</SideHead>
+            <PatternGrid>
+              {PATTERNS.map(p => (
+                <PatternBtn key={p.name} onClick={() => handleLoadPattern(p)}>
+                  {p.name}
+                </PatternBtn>
               ))}
-            </DropdownMenu>
-          </DropdownContainer>
+            </PatternGrid>
+          </SideCard>
 
-          <DropdownContainer>
-            <ControlBtn $active={showColorMenu} onClick={(e) => { e.stopPropagation(); setShowColorMenu(!showColorMenu); setShowVariantMenu(false); setShowPatternMenu(false); }}>
-              <Palette size={16} /> {COLOR_LABELS[colorMode]} <ChevronDown size={14} />
-            </ControlBtn>
-            <DropdownMenu $show={showColorMenu}>
-              {(Object.keys(COLOR_LABELS) as ColorMode[]).map(c => (
-                <DropdownItem key={c} $active={colorMode === c} onClick={(e) => { e.stopPropagation(); setColorMode(c); setShowColorMenu(false); }}>
-                  {COLOR_LABELS[c]}
-                </DropdownItem>
-              ))}
-            </DropdownMenu>
-          </DropdownContainer>
+          <DescBox>{VARIANT_DESCRIPTIONS[variant]}</DescBox>
+        </Sidebar>
 
-          <DropdownContainer>
-            <ControlBtn $active={showPatternMenu} onClick={(e) => { e.stopPropagation(); setShowPatternMenu(!showPatternMenu); setShowVariantMenu(false); setShowColorMenu(false); }}>
-              <Sparkles size={16} /> Patterns <ChevronDown size={14} />
+        <MainCol>
+          <CanvasWrap ref={containerRef}>
+            <Canvas
+              ref={canvasRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+            />
+            {zoom !== 1 && <ZoomIndicator>{(zoom * 100).toFixed(0)}%</ZoomIndicator>}
+            <HintText>Scroll to zoom · Drag to pan</HintText>
+          </CanvasWrap>
+
+          <ControlsRow>
+            <PulseIndicator $active={isPlaying} />
+            <ControlBtn onClick={() => setIsPlaying(p => !p)}>
+              {isPlaying ? <Pause /> : <Play />}
+              {isPlaying ? 'Pause' : 'Play'}
             </ControlBtn>
-            <DropdownMenu $show={showPatternMenu} style={{ minWidth: '200px' }}>
-              <PatternGrid>
-                {PATTERNS.map(p => (
-                  <PatternBtn key={p.name} onClick={(e) => { e.stopPropagation(); handleLoadPattern(p); }}>
-                    {p.name}
-                  </PatternBtn>
-                ))}
-              </PatternGrid>
-            </DropdownMenu>
-          </DropdownContainer>
-        </ControlsCard>
-      </BottomSection>
-    </Container>
+            <ControlBtn onClick={handleReset}><Shuffle /> Randomize</ControlBtn>
+            <ControlBtn onClick={resetView}><RotateCcw /> Reset View</ControlBtn>
+            <ControlBtn $active={showGrid} onClick={() => setShowGrid(g => !g)}>
+              <Grid3X3 /> Grid
+            </ControlBtn>
+            <CDivider />
+            <CLabel>Color</CLabel>
+            {(Object.keys(COLOR_LABELS) as ColorMode[]).map(c => (
+              <ControlBtn key={c} $active={colorMode === c} onClick={() => setColorMode(c)}>
+                {COLOR_LABELS[c]}
+              </ControlBtn>
+            ))}
+          </ControlsRow>
+
+          <StatsRow>
+            <StatChip>
+              <StatLabel>Generation</StatLabel>
+              <StatVal $color={T.accent}>{generation.toLocaleString()}</StatVal>
+            </StatChip>
+            <StatChip>
+              <StatLabel>Population</StatLabel>
+              <StatVal $color={T.green}>{population.toLocaleString()}</StatVal>
+            </StatChip>
+            <StatChip>
+              <StatLabel>Speed</StatLabel>
+              <StatVal>{speed}×</StatVal>
+            </StatChip>
+            <StatChip>
+              <StatLabel>Density</StatLabel>
+              <StatVal $color={T.amber}>
+                {((population / (canvasDimensions.width * canvasDimensions.height / (cellSize * cellSize))) * 100).toFixed(1)}%
+              </StatVal>
+            </StatChip>
+          </StatsRow>
+        </MainCol>
+      </Body>
+    </Root>
   );
 }
