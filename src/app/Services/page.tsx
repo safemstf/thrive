@@ -8,7 +8,7 @@ import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen,
   Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check, Shield,
-  Lock, Fingerprint, FileSearch, Code2, Sheet, X
+  Lock, Fingerprint, FileSearch, Code2, Sheet, X, Briefcase
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
@@ -37,7 +37,7 @@ const LifeSimulation = dynamic(() => import('@/components/cs/life/life'), {
 
 const AdvancedBacteremiaSimulator = dynamic(() => import('@/components/cs/bacteria/bacteria'), {
   ssr: false,
-  loading: () => <SimulationLoader>Loading Bacteria & Phages...</SimulationLoader>
+  loading: () => <SimulationLoader>Loading Bacterial Evolution...</SimulationLoader>
 });
 
 const NetworkProtocolSimulation = dynamic(() => import('@/components/cs/networkProtocol/np'), {
@@ -68,7 +68,7 @@ const MedicalModelsDemo = dynamic(() => import('@/components/cs/medicalModels/me
 
 const AgarioDemo = dynamic(() => import('@/components/cs/agario/agario'), {
   ssr: false,
-  loading: () => <SimulationLoader>Loading agario Simulation...</SimulationLoader>
+  loading: () => <SimulationLoader>Loading Ecosystem Simulation...</SimulationLoader>
 });
 
 const TDVisualization = dynamic(() => import('@/components/cs/td/td'), {
@@ -101,9 +101,14 @@ const SQLBreachDemo = dynamic(() => import('@/components/cs/sqlBreach/sqlBreach'
   loading: () => <SimulationLoader>Loading SQL Breach Simulation...</SimulationLoader>
 });
 
+const VirtualRecruiterDemo = dynamic(() => import('@/components/cs/virtualRecruiter/virtualRecruiter'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Virtual Recruiter...</SimulationLoader>
+});
+
 
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach' | 'virtual-recruiter';
 type TabType = 'simulations' | 'algorithms' | 'tools';
 
 interface SimulationItem {
@@ -986,10 +991,10 @@ const allItems: SimulationItem[] = [
   },
   {
     key: 'bacteria-phage',
-    label: 'Bacteria & Phages',
+    label: 'Bacterial Evolution',
     icon: <Droplet size={22} />,
     color: '#059669',
-    description: 'Bacterial colony interactions with bacteriophage',
+    description: 'Watch antibiotic resistance evolve in real time via natural selection',
     category: 'simulations'
   },
   {
@@ -1117,6 +1122,15 @@ const allItems: SimulationItem[] = [
     icon: <Shield size={22} />,
     color: '#ef4444',
     description: 'Simulate and analyze SQL injection vulnerabilities',
+    comingSoon: false,
+    category: 'tools',
+  },
+  {
+    key: 'virtual-recruiter',
+    label: 'Virtual Recruiter',
+    icon: <Briefcase size={22} />,
+    color: '#0369a1',
+    description: 'Upload your resume — get an ATS score, keyword match against any JD, and instant job search links',
     comingSoon: false,
     category: 'tools',
   },
@@ -1332,7 +1346,7 @@ export default function SimulationsPage() {
       case 'medical-models':
         return <MedicalModelsDemo isDark={false} isRunning={isRunning} speed={speed} />;
       case 'bacteria-phage':
-        return <AdvancedBacteremiaSimulator initialRunning={isRunning} initialSpeed={speed} isDark={false} />;
+        return <AdvancedBacteremiaSimulator initialRunning={isRunning} initialSpeed={speed} isDark={false} isTheaterMode={theaterMode} />;
       case 'amdahl':
         return <AmdahlsLawSimulator isRunning={isRunning} speed={speed} isDark={false} />;
       case 'wireless':
@@ -1346,7 +1360,7 @@ export default function SimulationsPage() {
       case 'Shortest-Path-Networks':
         return <ShortestPathAlgorithmDemo isRunning={isRunning} speed={speed} />;
       case 'predprey':
-        return <AgarioDemo isRunning={isRunning} speed={speed} />;
+        return <AgarioDemo isRunning={isRunning} speed={speed} isTheaterMode={theaterMode} />;
       case 'TD':
         return <TDVisualization isRunning={isRunning} speed={speed} />;
 
@@ -1360,6 +1374,8 @@ export default function SimulationsPage() {
         return <HashGeneratorDemo />;
       case 'sql-breach':
         return <SQLBreachDemo />;
+      case 'virtual-recruiter':
+        return <VirtualRecruiterDemo />;
       default:
         return (
           <PlaceholderContent>

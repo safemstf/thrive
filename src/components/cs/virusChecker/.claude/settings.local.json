@@ -8,7 +8,11 @@
       "Bash(npx tsc --noEmit --project \"C:/Users/safeb/OneDrive/Documents/GitHub/thrive/tsconfig.json\")",
       "Bash(python -c \":*)",
       "Bash(pip install pypdf --quiet)",
-      "Bash(python -c \"import sys; [print\\(l\\) for l in sys.stdin.read\\(\\).replace\\(''\\\\ufb03'',''ffi''\\).splitlines\\(\\)]\")"
+      "Bash(python -c \"import sys; [print\\(l\\) for l in sys.stdin.read\\(\\).replace\\(''\\\\ufb03'',''ffi''\\).splitlines\\(\\)]\")",
+      "Read(//c/Users/safeb/OneDrive/Documents/GitHub/thrive/**)",
+      "Bash(npx tsc --noEmit --project tsconfig.json)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(npx tsc --noEmit --project \"C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\\\\tsconfig.json\")"
     ]
   }
 }

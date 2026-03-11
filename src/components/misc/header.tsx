@@ -1042,12 +1042,12 @@ export function Header({
               </NavLinkItem>
 
               <NavLinkItem
-                href="/simulations"
-                $active={pathname === '/simulations'}
+                href="/Services"
+                $active={pathname === '/Services'}
                 onClick={closeRightSidebar}
               >
                 <Code size={20} />
-                Simulations
+                Services
               </NavLinkItem>
 
               <NavLinkItem

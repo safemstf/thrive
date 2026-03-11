@@ -1,770 +1,1167 @@
-// bacteria.tsx - Streamlined Bacteremia Simulator (Embedded Component)
-// Clean version without duplicate headers/controls - integrates with parent simulation page
+'use client'
 
-import React, { useRef, useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
-import styled, { keyframes } from 'styled-components';
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import {
-  RefreshCw, AlertCircle, Target, Activity,
-  Droplets, Wind, Shield, Heart, TrendingUp,
-  ChevronDown, Beaker, Syringe
+  PlayCircle, PauseCircle, RefreshCw, Activity,
+  BarChart3, Settings, X, Dna, FlaskConical, Zap
 } from "lucide-react";
-
 import {
-  BacterialSpecies,
-  SimulationStats,
-  PatientVitals,
-  BACTERIAL_PROFILES,
-  ANTIBIOTIC_PROFILES,
-  CardiovascularState,
-  InflammatoryState,
-  ADVANCED_CONFIG
-} from './bacteria.types';
+  Chart as ChartJS, LineElement, CategoryScale,
+  LinearScale, PointElement, Tooltip, Legend
+} from "chart.js";
+import { Line } from "react-chartjs-2";
+import styled, { createGlobalStyle } from "styled-components";
 
-import {
-  calculateOrganDamage,
-  formatTime,
-  getHealthColor,
-  getSeverityColor,
-} from './bacteria.utils';
+ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
-import { SimulationController } from './bacteria.logic';
+// ─── NBody-style overlay styles ───────────────────────────────────────────────
+const BacteriaOverlayStyles = createGlobalStyle`
+  .bac-root {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 65vh;
+    background: #030712;
+    border-radius: 12px;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .bac-root.theater {
+    aspect-ratio: unset;
+    max-height: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+  .bac-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+    display: block;
+  }
+  .bac-canvas:active { cursor: grabbing; }
 
-// ============= CONSTANTS =============
-const TIME_SCALE = 0.1;
-const FPS_TARGET = 60;
-const ANIMATION_SMOOTHING = 0.15;
+  /* ── top-left mode chips ── */
+  .bac-mode-switcher {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 50;
+    display: flex;
+    gap: 0.3rem;
+  }
+  .bac-mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.28rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.62);
+    color: rgba(255,255,255,0.6);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+    font-family: inherit;
+  }
+  .bac-mode-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .bac-mode-btn.active {
+    border-color: #22c55e;
+    background: rgba(34,197,94,0.18);
+    color: #4ade80;
+  }
 
-// ============= STYLED COMPONENTS =============
-const pulse = keyframes`
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-`;
+  /* ── top-right icon buttons ── */
+  .bac-top-right {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 50;
+    display: flex;
+    gap: 0.3rem;
+  }
+  .bac-icon-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.62);
+    color: rgba(255,255,255,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.15s;
+  }
+  .bac-icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .bac-icon-btn.active {
+    background: rgba(34,197,94,0.18);
+    border-color: rgba(34,197,94,0.45);
+    color: #4ade80;
+  }
 
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
+  /* ── HUD (top-right stats) ── */
+  .bac-hud {
+    position: absolute;
+    top: 3rem;
+    right: 0.75rem;
+    z-index: 40;
+    min-width: 150px;
+    background: rgba(3,7,18,0.84);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.73rem;
+    color: rgba(255,255,255,0.5);
+  }
+  .bac-hud-title {
+    font-weight: 700;
+    font-size: 0.78rem;
+    color: #e2e8f0;
+    margin-bottom: 0.45rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .bac-hud-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.13rem 0;
+    gap: 0.6rem;
+  }
+  .bac-hud-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 0.3rem 0;
+  }
 
-const Container = styled.div`
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background: #0f172a;
-  overflow: hidden;
-`;
+  /* ── resistance legend bar ── */
+  .bac-legend {
+    position: absolute;
+    bottom: 3.5rem;
+    left: 0.75rem;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(3,7,18,0.75);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 8px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.62rem;
+    color: rgba(255,255,255,0.45);
+  }
+  .bac-legend-bar {
+    width: 80px;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(to right, #3b82f6, #06b6d4, #22c55e, #eab308, #ef4444);
+  }
 
-const Canvas = styled.canvas`
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-`;
+  /* ── bottom pill bar ── */
+  .bac-bottom-bar {
+    position: absolute;
+    bottom: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(3,7,18,0.86);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px;
+    padding: 0.35rem 0.55rem;
+    white-space: nowrap;
+  }
+  .bac-bar-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+    padding: 0.28rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: rgba(255,255,255,0.55);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .bac-bar-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .bac-bar-btn.primary { background: #22c55e; color: #fff; border-color: rgba(34,197,94,0.4); }
+  .bac-bar-btn.primary:hover { background: #16a34a; }
+  .bac-bar-btn.danger { background: rgba(239,68,68,0.18); color: #f87171; border-color: rgba(239,68,68,0.25); }
+  .bac-bar-btn.active { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.35); color: #4ade80; }
+  .bac-bar-btn.warn  { background: rgba(234,179,8,0.15); border-color: rgba(234,179,8,0.3); color: #facc15; }
+  .bac-bar-divider {
+    width: 1px; height: 20px;
+    background: rgba(255,255,255,0.1);
+    margin: 0 0.1rem;
+    flex-shrink: 0;
+  }
+  .bac-speed-control {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .bac-slider {
+    width: 56px; height: 4px;
+    cursor: pointer;
+    accent-color: #22c55e;
+  }
+  .bac-speed-label {
+    color: rgba(255,255,255,0.4);
+    font-size: 0.68rem;
+    font-family: monospace;
+    min-width: 1.6rem;
+    text-align: right;
+  }
 
-const StatsOverlay = styled.div`
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  padding: 1rem;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.15);
-  color: #e2e8f0;
-  font-size: 0.8rem;
-  font-family: 'JetBrains Mono', monospace;
-  z-index: 10;
-  min-width: 200px;
-  animation: ${fadeIn} 0.3s ease;
-`;
+  /* ── popup panel ── */
+  .bac-panel {
+    position: absolute;
+    bottom: 3.5rem;
+    left: 0.75rem;
+    z-index: 60;
+    width: clamp(240px, 34vw, 380px);
+    background: rgba(3,7,18,0.94);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(34,197,94,0.16);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .bac-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: #e2e8f0;
+  }
+  .bac-panel-close {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    padding: 0.2rem;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    transition: all 0.15s;
+  }
+  .bac-panel-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .bac-panel-body {
+    padding: 0.65rem 0.85rem;
+    max-height: 48vh;
+    overflow-y: auto;
+  }
+  .bac-panel-body::-webkit-scrollbar { width: 3px; }
+  .bac-panel-body::-webkit-scrollbar-track { background: transparent; }
+  .bac-panel-body::-webkit-scrollbar-thumb { background: rgba(34,197,94,0.4); border-radius: 2px; }
 
-const StatRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.375rem 0;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-  
-  &:last-child {
-    border-bottom: none;
+  /* param rows */
+  .bac-param-row { padding: 0.45rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .bac-param-row:last-child { border-bottom: none; }
+  .bac-param-header {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.75rem; color: rgba(255,255,255,0.6); margin-bottom: 0.28rem;
+  }
+  .bac-param-val { color: #4ade80; font-weight: 700; font-family: monospace; }
+  .bac-param-slider {
+    width: 100%; height: 4px; accent-color: #22c55e; cursor: pointer; display: block;
+  }
+  .bac-param-slider:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* genetics — resistance histogram */
+  .bac-hist { display: flex; align-items: flex-end; gap: 2px; height: 48px; margin-top: 0.4rem; }
+  .bac-hist-bar {
+    flex: 1; border-radius: 2px 2px 0 0; min-height: 2px;
+    transition: height 0.3s;
+  }
+  .bac-hist-labels {
+    display: flex; justify-content: space-between;
+    font-size: 0.58rem; color: rgba(255,255,255,0.3);
+    margin-top: 0.2rem;
+  }
+
+  /* stats grid */
+  .bac-stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; margin-bottom: 0.65rem;
+  }
+  .bac-stat-card {
+    padding: 0.55rem; background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 8px;
+  }
+  .bac-stat-label {
+    font-size: 0.62rem; color: #94a3b8; font-weight: 700; margin-bottom: 0.18rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .bac-stat-value { font-size: 1.25rem; font-weight: 800; line-height: 1; }
+  .bac-stat-change { font-size: 0.62rem; color: #64748b; margin-top: 0.18rem; }
+
+  /* zoom badge */
+  .bac-zoom {
+    position: absolute; bottom: 3.5rem; right: 0.75rem;
+    background: rgba(0,0,0,0.65); padding: 0.18rem 0.45rem;
+    border-radius: 8px; font-size: 0.65rem; font-family: monospace;
+    color: #64748b; z-index: 40;
   }
 `;
 
-const StatLabel = styled.span`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #94a3b8;
-  font-size: 0.75rem;
+// ─── Mobile fullscreen overlay ─────────────────────────────────────────────────
+const FullscreenOverlay = styled.div<{ $show: boolean }>`
+  position: fixed; inset: 0; background: #030712;
+  z-index: 10000; display: ${({ $show }) => ($show ? 'flex' : 'none')};
+  flex-direction: column;
+`;
+const FullscreenCanvas = styled.canvas`
+  width: 100%; height: 100%; cursor: grab; touch-action: none;
+  &:active { cursor: grabbing; }
+`;
+const FullscreenControls = styled.div`
+  position: absolute; bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%); display: flex; gap: 0.5rem;
+  background: rgba(0,0,0,0.95); padding: 0.75rem; border-radius: 999px;
+  border: 1px solid rgba(34,197,94,0.4); z-index: 100;
+`;
+const FullscreenButton = styled.button<{ $primary?: boolean }>`
+  width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
+  background: ${({ $primary }) => ($primary ? '#16a34a' : 'rgba(51,65,85,0.8)')};
+  color: white; display: flex; align-items: center; justify-content: center;
+`;
+const ExitButton = styled.button`
+  position: absolute; top: calc(1rem + env(safe-area-inset-top)); right: 1rem;
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(34,197,94,0.4);
+  background: rgba(0,0,0,0.9); color: white; display: flex; align-items: center;
+  justify-content: center; cursor: pointer; z-index: 100;
 `;
 
-const StatValue = styled.span<{ $color?: string }>`
-  font-weight: 700;
-  color: ${p => p.$color || '#e2e8f0'};
-`;
-
-const ControlsOverlay = styled.div`
-  position: absolute;
-  bottom: 1.25rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 0.5rem;
-  background: rgba(15, 23, 42, 0.9);
-  backdrop-filter: blur(16px);
-  padding: 0.5rem;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  z-index: 10;
-`;
-
-const ControlBtn = styled.button<{ $active?: boolean }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  border: none;
-  background: ${p => p.$active ? 'rgba(99, 102, 241, 0.25)' : 'rgba(51, 65, 85, 0.6)'};
-  color: ${p => p.$active ? '#a5b4fc' : '#e2e8f0'};
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-  
-  &:hover {
-    background: rgba(99, 102, 241, 0.3);
-  }
-`;
-
-const DropdownContainer = styled.div`
-  position: relative;
-`;
-
-const DropdownMenu = styled.div<{ $show: boolean }>`
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(16px);
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  padding: 0.5rem;
-  min-width: 160px;
-  opacity: ${p => p.$show ? 1 : 0};
-  visibility: ${p => p.$show ? 'visible' : 'hidden'};
-  transition: all 0.2s ease;
-  z-index: 100;
-`;
-
-const DropdownItem = styled.button<{ $active?: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: none;
-  border-radius: 6px;
-  background: ${p => p.$active ? 'rgba(99, 102, 241, 0.2)' : 'transparent'};
-  color: ${p => p.$active ? '#a5b4fc' : '#e2e8f0'};
-  font-size: 0.75rem;
-  text-align: left;
-  cursor: pointer;
-  font-family: inherit;
-  
-  &:hover {
-    background: rgba(99, 102, 241, 0.15);
-  }
-`;
-
-const TimeDisplay = styled.div`
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  padding: 0.625rem 0.875rem;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.15);
-  color: #60a5fa;
-  font-size: 0.8rem;
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 600;
-  z-index: 10;
-`;
-
-const PulseIndicator = styled.div<{ $active: boolean; $color?: string }>`
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: ${p => p.$active ? (p.$color || '#22c55e') : '#6b7280'};
-  animation: ${p => p.$active ? pulse : 'none'} 2s ease-in-out infinite;
-`;
-
-const ErrorOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.95);
-  z-index: 100;
-`;
-
-const ErrorCard = styled.div`
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 16px;
-  padding: 2rem;
-  text-align: center;
-  max-width: 400px;
-  color: #e2e8f0;
-`;
-
-// ============= ERROR BOUNDARY =============
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
+// ─── Simulation types ──────────────────────────────────────────────────────────
+interface Bacterium {
+  id: number;
+  x: number; y: number;
+  vx: number; vy: number;
+  resistance: number; // 0.0 – 1.0
+  energy: number;
+  generation: number;
+  age: number;
 }
 
-class SimulationErrorBoundary extends Component<
-  { children: ReactNode; onReset: () => void },
-  ErrorBoundaryState
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+type SimMode = 'mega-plate' | 'uniform';
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
+// MEGA-plate zone definitions (left → right = low → high antibiotic)
+const ZONES = [
+  { label: '0×',      minResist: 0.00, bg: 'rgba(59,130,246,0.05)'  },
+  { label: '1×MIC',  minResist: 0.20, bg: 'rgba(16,185,129,0.06)' },
+  { label: '10×MIC', minResist: 0.42, bg: 'rgba(234,179,8,0.07)'  },
+  { label: '100×MIC',minResist: 0.65, bg: 'rgba(239,68,68,0.09)'  },
+  { label: '1000×MIC',minResist: 0.87,bg: 'rgba(220,38,38,0.14)'  },
+];
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Bacteremia Simulation Error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <ErrorOverlay>
-          <ErrorCard>
-            <AlertCircle size={48} color="#ef4444" style={{ marginBottom: '1rem' }} />
-            <h3 style={{ color: '#ef4444', marginBottom: '0.5rem' }}>Simulation Error</h3>
-            <p style={{ color: '#94a3b8', marginBottom: '1rem', fontSize: '0.875rem' }}>
-              {this.state.error?.message || 'Unknown error occurred'}
-            </p>
-            <ControlBtn onClick={() => {
-              this.setState({ hasError: false, error: null });
-              this.props.onReset();
-            }}>
-              <RefreshCw size={14} /> Reset
-            </ControlBtn>
-          </ErrorCard>
-        </ErrorOverlay>
-      );
-    }
-    return this.props.children;
-  }
+// Resistance → color (blue → cyan → green → yellow → red)
+function resistColor(r: number): string {
+  const stops: [number, number, number][] = [
+    [59, 130, 246],   // 0.0 blue
+    [6,  182, 212],   // 0.25 cyan
+    [34, 197, 94],    // 0.5 green
+    [234,179, 8],     // 0.75 yellow
+    [239, 68, 68],    // 1.0 red
+  ];
+  const t = Math.max(0, Math.min(1, r)) * (stops.length - 1);
+  const i = Math.floor(t);
+  const f = t - i;
+  const a = stops[Math.min(i, stops.length - 1)];
+  const b = stops[Math.min(i + 1, stops.length - 1)];
+  return `rgb(${Math.round(a[0]+f*(b[0]-a[0]))},${Math.round(a[1]+f*(b[1]-a[1]))},${Math.round(a[2]+f*(b[2]-a[2]))})`;
 }
 
-// ============= MAIN COMPONENT =============
-interface SimulatorProps {
+// ─── Component ─────────────────────────────────────────────────────────────────
+interface BacteriaSimProps {
   isDark?: boolean;
   initialRunning?: boolean;
   initialSpeed?: number;
+  isTheaterMode?: boolean;
 }
 
-export default function AdvancedBacteremiaSimulator({ 
-  isDark = true, 
-  initialRunning = false, 
-  initialSpeed = 1
-}: SimulatorProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number>(0);
-  const lastUpdateTimeRef = useRef(Date.now());
-  const accumulatedTimeRef = useRef(0);
-  const simulationController = useRef<SimulationController>(new SimulationController());
-  
-  const [isRunning, setIsRunning] = useState(initialRunning);
-  const [speed, setSpeed] = useState(initialSpeed);
-  const [simulationTime, setSimulationTime] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [canvasDimensions, setCanvasDimensions] = useState({ width: 1200, height: 600 });
-  
-  const [showSpeciesMenu, setShowSpeciesMenu] = useState(false);
-  const [showAntibioticMenu, setShowAntibioticMenu] = useState(false);
-  
-  const [selectedSpecies, setSelectedSpecies] = useState<BacterialSpecies[]>(["S_aureus", "E_coli"]);
-  const [selectedAntibiotics, setSelectedAntibiotics] = useState<string[]>([]);
-  const [initialBacterialLoad] = useState(25);
-  const [immuneCompetence] = useState(100);
-  const [bloodFlowRate, setBloodFlowRate] = useState(5);
-  
-  const [stats, setStats] = useState<SimulationStats>({
-    totalBacteria: 0,
-    bacterialSpeciesCount: new Map(),
-    uniqueStrains: 0,
-    dominantStrain: '',
-    averageResistance: 0,
-    biofilmCoverage: 0,
-    totalBiofilmBiomass: 0,
-    phageCount: 0,
-    lysogenicBacteria: 0,
-    viscosity: 1.0,
-    sepsisScore: 0,
-    bacteremia: false,
-    clottingRisk: 0,
-    cytokineStorm: false,
-    SIRS_criteria: 0,
-    qSOFA_score: 0,
-    DIC_risk: 0
-  });
+export default function AdvancedBacteremiaSimulator({
+  isDark = false,
+  initialRunning = false,
+  initialSpeed = 1,
+  isTheaterMode = false,
+}: BacteriaSimProps) {
+  const canvasRef       = useRef<HTMLCanvasElement>(null);
+  const theaterCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bacteriaRef     = useRef<Bacterium[]>([]);
+  const nextIdRef       = useRef(0);
 
-  const [patientVitals, setPatientVitals] = useState<PatientVitals>({
-    heartRate: 75,
-    bloodPressure: { systolic: 120, diastolic: 80, MAP: 93 },
-    temperature: 37.0,
-    respiratoryRate: 16,
-    oxygenSaturation: 98,
-    pO2: 95,
-    pCO2: 40,
-    pH: 7.4,
-    HCO3: 24,
-    baseExcess: 0,
-    whiteBloodCells: {
-      total: 7.5,
-      differential: { neutrophils: 60, lymphocytes: 30, monocytes: 6, eosinophils: 3, basophils: 1 }
-    },
-    crp: 5.0,
-    procalcitonin: 0.05,
-    lactate: 1.0,
-    glucose: 5.0,
-    creatinine: 1.0,
-    bilirubin: 1.0,
-    troponin: 0,
-    organFunction: { heart: 100, lungs: 100, kidneys: 100, liver: 100, brain: 100 },
-    SOFA_score: 0,
-    overallHealth: 100
-  });
+  const PHYSICS_W = 1200;
+  const PHYSICS_H = 675;
+  const MAX_POP   = 1400;
 
-  const [cardiovascularState, setCardiovascularState] = useState<CardiovascularState | null>(null);
+  // ── Animation timing
+  const animRef       = useRef<number | null>(null);
+  const lastTimeRef   = useRef<number | null>(null);
+  const accumRef      = useRef(0);
+  const SIM_STEP_MS   = 1000 / 30; // 30 ticks/s
+  const lastRenderRef = useRef<number | null>(null);
+  const TARGET_FRAME_MS = 1000 / 60;
 
-  const VESSEL_CENTER_Y = canvasDimensions.height / 2;
-  const VESSEL_RADIUS = canvasDimensions.height * 0.35;
+  // ── Hot-path refs
+  const isRunningRef      = useRef(false);
+  const speedRef          = useRef(initialSpeed);
+  const simModeRef        = useRef<SimMode>('mega-plate');
+  const antibioticOnRef   = useRef(true);
+  const mutationRateRef   = useRef(0.018);
+  const abStrengthRef     = useRef(5);
 
-  // Sync with parent props
-  useEffect(() => {
-    setIsRunning(initialRunning);
-  }, [initialRunning]);
+  // ── State (UI)
+  const [isRunning,     setIsRunning]    = useState(false);
+  const [speed,         setSpeed]        = useState(initialSpeed);
+  const [simMode,       setSimMode]      = useState<SimMode>('mega-plate');
+  const [antibioticOn,  setAntibioticOn] = useState(true);
+  const [mutationRate,  setMutationRate] = useState(0.018);
+  const [abStrength,    setAbStrength]   = useState(5);
+  const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
+  const [activePanel,   setActivePanel]  = useState<'none'|'parameters'|'genetics'|'statistics'>('none');
+  const [hudVisible,    setHudVisible]   = useState(true);
+  const [zoomLevel,     setZoomLevel]    = useState(1);
 
-  useEffect(() => {
-    setSpeed(initialSpeed);
-  }, [initialSpeed]);
+  // ── Stats
+  const statsRef = useRef({ total: 0, maxRes: 0, generation: 0, mutations: 0, colonized: 0 });
+  const [stats, setStats] = useState(statsRef.current);
+  const totalMutRef = useRef(0);
+  const maxGenRef   = useRef(0);
+  const tickRef     = useRef(0);
 
-  // Responsive canvas
-  useEffect(() => {
-    const handleResize = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setCanvasDimensions({ width: rect.width, height: rect.height });
-      }
-    };
+  // ── History (for chart + histogram)
+  const historyRef  = useRef<{ t: number; total: number; zones: number[] }[]>([]);
+  const [history,   setHistory]   = useState<typeof historyRef.current>([]);
+  const [histogram, setHistogram] = useState<number[]>(new Array(10).fill(0));
 
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+  // Keep refs in sync
+  useEffect(() => { isRunningRef.current    = isRunning;    }, [isRunning]);
+  useEffect(() => { speedRef.current        = speed;        }, [speed]);
+  useEffect(() => { simModeRef.current      = simMode;      }, [simMode]);
+  useEffect(() => { antibioticOnRef.current = antibioticOn; }, [antibioticOn]);
+  useEffect(() => { mutationRateRef.current = mutationRate; }, [mutationRate]);
+  useEffect(() => { abStrengthRef.current   = abStrength;   }, [abStrength]);
+
+  // Prop sync
+  useEffect(() => { setIsRunning(initialRunning); }, [initialRunning]);
+  useEffect(() => { setSpeed(initialSpeed);       }, [initialSpeed]);
+
+  // ── Pan / zoom
+  const panOffsetRef = useRef({ x: 0, y: 0 });
+  const zoomLevelRef = useRef(1);
+  const [isPanning,   setIsPanning]   = useState(false);
+  const panStartRef   = useRef({ x: 0, y: 0 });
+  const touchDistRef  = useRef(0);
+  const lastZoomRef   = useRef(1);
+
+  // ── Init bacteria
+  const initBacteria = useCallback(() => {
+    nextIdRef.current  = 0;
+    totalMutRef.current = 0;
+    maxGenRef.current   = 0;
+    historyRef.current  = [];
+    tickRef.current     = 0;
+
+    const bac: Bacterium[] = [];
+    const count = 80;
+    for (let i = 0; i < count; i++) {
+      bac.push({
+        id:         nextIdRef.current++,
+        x:          Math.random() * PHYSICS_W * 0.18,
+        y:          Math.random() * PHYSICS_H,
+        vx:         (Math.random() - 0.5) * 2,
+        vy:         (Math.random() - 0.5) * 2,
+        resistance: Math.random() * 0.08,
+        energy:     Math.random(),
+        generation: 0,
+        age:        0,
+      });
+    }
+    bacteriaRef.current = bac;
+    setHistory([]);
+    setStats({ total: count, maxRes: 0, generation: 0, mutations: 0, colonized: 1 });
   }, []);
 
-  // Initialize simulation
-  const initializeSimulation = useCallback(() => {
-    try {
-      simulationController.current = new SimulationController();
-      
-      const totalBacteria = initialBacterialLoad;
-      selectedSpecies.forEach((species, index) => {
-        const count = Math.floor(totalBacteria / selectedSpecies.length) + 
-                     (index < totalBacteria % selectedSpecies.length ? 1 : 0);
-        
-        for (let i = 0; i < count; i++) {
-          const x = canvasDimensions.width * (0.2 + Math.random() * 0.6);
-          const y = VESSEL_CENTER_Y + (Math.random() - 0.5) * VESSEL_RADIUS * 1.2;
-          const z = (Math.random() - 0.5) * VESSEL_RADIUS * 0.8;
-          simulationController.current.addBacterium(species, x, y, z, bloodFlowRate);
+  const resetView = useCallback(() => {
+    panOffsetRef.current = { x: 0, y: 0 };
+    zoomLevelRef.current = 1;
+    setZoomLevel(1);
+  }, []);
+
+  // ── Core update (hot path — no state reads)
+  const updateFixed = useCallback(() => {
+    const bac       = bacteriaRef.current;
+    const mRate     = mutationRateRef.current;
+    const abOn      = antibioticOnRef.current;
+    const abStr     = abStrengthRef.current;
+    const mode      = simModeRef.current;
+    const spd       = speedRef.current;
+    const W         = PHYSICS_W;
+    const H         = PHYSICS_H;
+
+    const survivors: Bacterium[] = [];
+    const newBac:    Bacterium[] = [];
+    let mutations = 0;
+    let maxGen = maxGenRef.current;
+
+    for (let bi = 0; bi < bac.length; bi++) {
+      const b = bac[bi];
+
+      // Random walk
+      b.vx += (Math.random() - 0.5) * 0.7 * spd;
+      b.vy += (Math.random() - 0.5) * 0.7 * spd;
+      const s = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      const maxS = 2.8 * spd;
+      if (s > maxS) { b.vx = b.vx / s * maxS; b.vy = b.vy / s * maxS; }
+      b.x += b.vx; b.y += b.vy;
+      if (b.x < 2) { b.x = 2; b.vx = Math.abs(b.vx); }
+      if (b.x > W - 2) { b.x = W - 2; b.vx = -Math.abs(b.vx); }
+      if (b.y < 2) { b.y = 2; b.vy = Math.abs(b.vy); }
+      if (b.y > H - 2) { b.y = H - 2; b.vy = -Math.abs(b.vy); }
+      b.age++;
+
+      // Antibiotic killing
+      let dead = false;
+      if (abOn) {
+        let minResist = 0;
+        if (mode === 'mega-plate') {
+          const zi = Math.min(Math.floor(b.x / (W / ZONES.length)), ZONES.length - 1);
+          minResist = ZONES[zi].minResist;
+        } else {
+          minResist = abStr * 0.09;
         }
-      });
-      
-      const baseCellCount = Math.floor(immuneCompetence / 8);
-      for (let i = 0; i < baseCellCount; i++) {
-        simulationController.current.addImmuneCell(
-          Math.random() * canvasDimensions.width,
-          VESSEL_CENTER_Y + (Math.random() - 0.5) * VESSEL_RADIUS,
-          bloodFlowRate
-        );
+        if (b.resistance < minResist) {
+          const deficit  = minResist - b.resistance;
+          const killProb = Math.min(0.11 * deficit * abStr, 0.28);
+          if (Math.random() < killProb) dead = true;
+        }
       }
-      
-      setSimulationTime(0);
-      accumulatedTimeRef.current = 0;
-      setError(null);
-      
-      setCardiovascularState({
-        heartRate: patientVitals.heartRate,
-        strokeVolume: 70,
-        cardiacOutput: 5.25,
-        meanArterialPressure: patientVitals.bloodPressure.MAP,
-        systemicVascularResistance: 1200,
-        arterialTone: 0.5,
-        venousTone: 0.5,
-        capillaryPermeability: 0.1,
-        endothelialFunction: 1.0,
-        bloodFlowRate: bloodFlowRate,
-        oxygenDelivery: 1000,
-        tissueHypoxia: 0
-      });
-      
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to initialize');
-    }
-  }, [selectedSpecies, initialBacterialLoad, bloodFlowRate, immuneCompetence, canvasDimensions, patientVitals, VESSEL_CENTER_Y, VESSEL_RADIUS]);
+      if (!dead && b.age > 700 + Math.random() * 500) dead = true;
+      if (dead) continue;
 
-  // Update simulation
-  const updateSimulation = useCallback(() => {
-    try {
-      const now = Date.now();
-      const realDeltaTime = (now - lastUpdateTimeRef.current) / 1000;
-      lastUpdateTimeRef.current = now;
-      
-      accumulatedTimeRef.current += realDeltaTime;
-      
-      const fixedTimeStep = 1 / FPS_TARGET;
-      while (accumulatedTimeRef.current >= fixedTimeStep) {
-        const simulationDeltaTime = fixedTimeStep * speed * TIME_SCALE;
-        
-        const cardiovascularResult = simulationController.current.updateCardiovascular(
-          patientVitals, bloodFlowRate, simulationDeltaTime
-        );
-        
-        setCardiovascularState(cardiovascularResult.cardiovascularState);
-        setBloodFlowRate(cardiovascularResult.bloodFlowRate);
-        
-        simulationController.current.update(
-          simulationDeltaTime, VESSEL_RADIUS, VESSEL_CENTER_Y, canvasDimensions.width
-        );
-        
-        const simStats = simulationController.current.getStats();
-        setStats(prev => ({
-          ...simStats,
-          viscosity: prev.viscosity + (simStats.viscosity - prev.viscosity) * ANIMATION_SMOOTHING,
-          sepsisScore: prev.sepsisScore + (simStats.sepsisScore - prev.sepsisScore) * ANIMATION_SMOOTHING,
-        }));
-        
-        const newVitals = simulationController.current.updatePatientVitals(
-          patientVitals, simStats, simulationDeltaTime
-        );
-        setPatientVitals(newVitals);
-        
-        setSimulationTime(prev => prev + simulationDeltaTime);
-        accumulatedTimeRef.current -= fixedTimeStep;
+      // Energy + replication
+      b.energy += 0.009 + Math.random() * 0.005;
+      if (b.energy >= 1.0 && survivors.length + bac.length + newBac.length < MAX_POP) {
+        b.energy = 0.05;
+        let childRes = b.resistance + (Math.random() - 0.5) * 2 * mRate;
+        childRes = Math.max(0, Math.min(1, childRes));
+        if (Math.abs(childRes - b.resistance) > mRate * 0.4) mutations++;
+        const child: Bacterium = {
+          id:         nextIdRef.current++,
+          x:          b.x + (Math.random() - 0.5) * 5,
+          y:          b.y + (Math.random() - 0.5) * 5,
+          vx:         (Math.random() - 0.5) * 2,
+          vy:         (Math.random() - 0.5) * 2,
+          resistance: childRes,
+          energy:     0.1 + Math.random() * 0.2,
+          generation: b.generation + 1,
+          age:        0,
+        };
+        if (child.generation > maxGen) maxGen = child.generation;
+        newBac.push(child);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Update failed');
-      setIsRunning(false);
-    }
-  }, [speed, patientVitals, canvasDimensions, bloodFlowRate, VESSEL_CENTER_Y, VESSEL_RADIUS]);
 
-  // Render
-  const render = useCallback(() => {
+      survivors.push(b);
+    }
+
+    bacteriaRef.current = [...survivors, ...newBac];
+    totalMutRef.current += mutations;
+    maxGenRef.current    = maxGen;
+    tickRef.current++;
+  }, []);
+
+  // ── Render
+  const render = useCallback((canvas: HTMLCanvasElement | null) => {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const W   = canvas.width  / dpr;
+    const H   = canvas.height / dpr;
+    const mode  = simModeRef.current;
+    const abOn  = antibioticOnRef.current;
+    const bac   = bacteriaRef.current;
+    const scaleX = W / PHYSICS_W;
+    const scaleY = H / PHYSICS_H;
+    const zoneW  = W / ZONES.length;
+
+    ctx.fillStyle = '#030712';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    // Zone backgrounds
+    if (mode === 'mega-plate' && abOn) {
+      ZONES.forEach((zone, i) => {
+        ctx.fillStyle = zone.bg;
+        ctx.fillRect(i * zoneW, 0, zoneW, H);
+        // Divider
+        if (i > 0) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 5]);
+          ctx.beginPath();
+          ctx.moveTo(i * zoneW, 0);
+          ctx.lineTo(i * zoneW, H);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        // Zone label
+        ctx.fillStyle = 'rgba(255,255,255,0.14)';
+        ctx.font = `${Math.max(9, Math.round(W * 0.009))}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(zone.label, i * zoneW + zoneW / 2, H - 6);
+      });
+    } else if (mode === 'uniform' && abOn) {
+      ctx.fillStyle = 'rgba(239,68,68,0.055)';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Bacteria
+    for (const b of bac) {
+      const sx = b.x * scaleX;
+      const sy = b.y * scaleY;
+      ctx.fillStyle = resistColor(b.resistance);
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }, []);
+
+  // ── Sync stats to state
+  const syncStats = useCallback(() => {
+    const bac = bacteriaRef.current;
+    let maxRes = 0;
+    const colonized = new Set<number>();
+    const hist = new Array(10).fill(0);
+    for (const b of bac) {
+      if (b.resistance > maxRes) maxRes = b.resistance;
+      const zi = Math.min(Math.floor(b.x / (PHYSICS_W / ZONES.length)), ZONES.length - 1);
+      colonized.add(zi);
+      const bucket = Math.min(Math.floor(b.resistance * 10), 9);
+      hist[bucket]++;
+    }
+    const s = {
+      total:     bac.length,
+      maxRes,
+      generation: maxGenRef.current,
+      mutations:  totalMutRef.current,
+      colonized:  colonized.size,
+    };
+    statsRef.current = s;
+    setStats(s);
+    setHistogram(hist);
+  }, []);
+
+  // ── Animation loop
+  useEffect(() => {
+    let frameId: number;
+    const loop = (time: number) => {
+      if (!isRunningRef.current) {
+        frameId = requestAnimationFrame(loop);
+        return;
+      }
+      if (lastTimeRef.current === null) {
+        lastTimeRef.current   = time;
+        lastRenderRef.current = time;
+      }
+      const delta = time - lastTimeRef.current;
+      lastTimeRef.current = time;
+      accumRef.current += delta;
+
+      let steps = 0;
+      while (accumRef.current >= SIM_STEP_MS) {
+        updateFixed();
+        accumRef.current -= SIM_STEP_MS;
+        if (++steps > 8) { accumRef.current = 0; break; }
+      }
+
+      if (lastRenderRef.current === null || time - lastRenderRef.current >= TARGET_FRAME_MS) {
+        lastRenderRef.current = time;
+        const canvas = isMobileFullscreen ? theaterCanvasRef.current : canvasRef.current;
+        render(canvas);
+        syncStats();
+
+        // Record history every 30 ticks
+        if (tickRef.current % 30 === 0) {
+          const bac = bacteriaRef.current;
+          const zones = new Array(ZONES.length).fill(0);
+          for (const b of bac) {
+            const zi = Math.min(Math.floor(b.x / (PHYSICS_W / ZONES.length)), ZONES.length - 1);
+            zones[zi]++;
+          }
+          historyRef.current = [...historyRef.current.slice(-120), {
+            t: tickRef.current, total: bac.length, zones,
+          }];
+          setHistory([...historyRef.current]);
+        }
+      }
+      frameId = requestAnimationFrame(loop);
+    };
+    frameId = requestAnimationFrame(loop);
+    return () => {
+      cancelAnimationFrame(frameId);
+      lastTimeRef.current   = null;
+      accumRef.current      = 0;
+      lastRenderRef.current = null;
+    };
+  }, [updateFixed, render, syncStats, isMobileFullscreen]);
+
+  // ── Main canvas sizing
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const delta  = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.max(0.5, Math.min(3, zoomLevelRef.current * delta));
+    zoomLevelRef.current = newZoom;
+    setZoomLevel(newZoom);
+  }, []);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
-    
-    const time = Date.now() / 1000;
-    
-    // Dark background
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(0, 0, canvasDimensions.width, canvasDimensions.height);
-    
-    // Subtle flow lines
-    ctx.strokeStyle = 'rgba(59, 130, 246, 0.03)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 5; i++) {
-      const offset = (time * 50 + i * 100) % canvasDimensions.width;
-      ctx.beginPath();
-      ctx.moveTo(offset - canvasDimensions.width, VESSEL_CENTER_Y);
-      ctx.lineTo(offset, VESSEL_CENTER_Y);
-      ctx.stroke();
-    }
-    
-    // Vessel walls
-    const inflammation = Math.min(1, stats.sepsisScore / 100);
-    const heartPulse = cardiovascularState ? 
-      0.5 + Math.sin(time * (cardiovascularState.heartRate / 60) * Math.PI * 2) * 0.5 : 0;
-    
-    const wallHue = 60 - inflammation * 30;
-    const wallSat = 30 + inflammation * 40;
-    const wallLight = 25 + inflammation * 15 + heartPulse * 5;
-    
-    ctx.strokeStyle = `hsl(${wallHue}, ${wallSat}%, ${wallLight}%)`;
-    ctx.lineWidth = 2 + stats.viscosity + inflammation * 2 + heartPulse;
-    
-    // Upper wall
-    ctx.beginPath();
-    for (let x = 0; x <= canvasDimensions.width; x += 10) {
-      const y = VESSEL_CENTER_Y - VESSEL_RADIUS + Math.sin(x / 100 + time) * 2;
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    
-    // Lower wall
-    ctx.beginPath();
-    for (let x = 0; x <= canvasDimensions.width; x += 10) {
-      const y = VESSEL_CENTER_Y + VESSEL_RADIUS + Math.sin(x / 100 + time + Math.PI) * 2;
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    
-    // Blood flow particles
-    if (cardiovascularState) {
-      const flowIntensity = cardiovascularState.bloodFlowRate / 10;
-      ctx.globalAlpha = flowIntensity * 0.3;
-      for (let i = 0; i < 20; i++) {
-        const particleX = (time * 100 * flowIntensity + i * 50) % (canvasDimensions.width + 100) - 50;
-        const particleY = VESSEL_CENTER_Y + Math.sin(particleX / 50 + i) * VESSEL_RADIUS * 0.8;
-        ctx.fillStyle = `hsl(0, 60%, ${50 + flowIntensity * 20}%)`;
-        ctx.beginPath();
-        ctx.arc(particleX, particleY, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-    
-    // Render entities
-    simulationController.current.render(ctx, VESSEL_CENTER_Y, VESSEL_RADIUS);
-  }, [canvasDimensions, stats, cardiovascularState, VESSEL_CENTER_Y, VESSEL_RADIUS]);
-
-  // Animation loop
-  const animate = useCallback(() => {
-    if (isRunning) {
-      updateSimulation();
-      render();
-      animationRef.current = requestAnimationFrame(animate);
-    }
-  }, [isRunning, updateSimulation, render]);
-
-  useEffect(() => {
-    initializeSimulation();
-  }, [initializeSimulation]);
-
-  useEffect(() => {
-    if (isRunning) {
-      lastUpdateTimeRef.current = Date.now();
-      animationRef.current = requestAnimationFrame(animate);
-    } else {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      render(); // Render static frame when paused
-    }
+    const updateSize = () => {
+      const container = canvas.parentElement;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const dpr  = window.devicePixelRatio || 1;
+      canvas.width  = rect.width  * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.scale(dpr, dpr);
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      window.removeEventListener('resize', updateSize);
+      canvas.removeEventListener('wheel', handleWheel);
     };
-  }, [isRunning, animate, render]);
+  }, [handleWheel]);
 
-  const handleReset = () => {
-    setIsRunning(false);
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    setTimeout(() => {
-      initializeSimulation();
-      render();
-    }, 100);
-  };
-
-  const handleToggleSpecies = (species: BacterialSpecies) => {
-    if (selectedSpecies.includes(species)) {
-      if (selectedSpecies.length > 1) {
-        setSelectedSpecies(selectedSpecies.filter(s => s !== species));
-      }
-    } else {
-      setSelectedSpecies([...selectedSpecies, species]);
-    }
-  };
-
-  const handleToggleAntibiotic = (antibiotic: string) => {
-    if (selectedAntibiotics.includes(antibiotic)) {
-      setSelectedAntibiotics(selectedAntibiotics.filter(a => a !== antibiotic));
-      simulationController.current.removeAntibiotic(antibiotic);
-    } else {
-      setSelectedAntibiotics([...selectedAntibiotics, antibiotic]);
-      const profile = ANTIBIOTIC_PROFILES[antibiotic as keyof typeof ANTIBIOTIC_PROFILES];
-      simulationController.current.addAntibiotic(antibiotic, profile?.therapeuticRange?.max || 100);
-    }
-  };
-
-  // Close menus on outside click
+  // ── Mobile fullscreen canvas sizing
   useEffect(() => {
-    const handleClick = () => {
-      setShowSpeciesMenu(false);
-      setShowAntibioticMenu(false);
+    if (!isMobileFullscreen) return;
+    const canvas = theaterCanvasRef.current;
+    if (!canvas) return;
+    const updateSize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = window.innerWidth  * dpr;
+      canvas.height = window.innerHeight * dpr;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.scale(dpr, dpr);
     };
-    if (showSpeciesMenu || showAntibioticMenu) {
-      setTimeout(() => window.addEventListener('click', handleClick, { once: true }), 0);
-    }
-  }, [showSpeciesMenu, showAntibioticMenu]);
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, [isMobileFullscreen]);
 
-  const getSeverityColor = (value: number, thresholds: { low: number; high: number }) => {
-    if (value < thresholds.low) return '#22c55e';
-    if (value < thresholds.high) return '#f59e0b';
-    return '#ef4444';
+  // ── Init on mount / param change
+  useEffect(() => {
+    initBacteria();
+    setTimeout(() => render(canvasRef.current), 50);
+  }, [initBacteria]);
+
+  const handleReset = useCallback(() => {
+    setIsRunning(false);
+    initBacteria();
+    resetView();
+  }, [initBacteria, resetView]);
+
+  // ── Mouse / touch handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    setIsPanning(true);
+    panStartRef.current = { x: e.clientX - panOffsetRef.current.x, y: e.clientY - panOffsetRef.current.y };
+  }, []);
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning) return;
+    const np = { x: e.clientX - panStartRef.current.x, y: e.clientY - panStartRef.current.y };
+    panOffsetRef.current = np;
+  }, [isPanning]);
+  const handleMouseUp = useCallback(() => setIsPanning(false), []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      touchDistRef.current = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+      lastZoomRef.current  = zoomLevelRef.current;
+    } else {
+      setIsPanning(true);
+      panStartRef.current = { x: e.touches[0].clientX - panOffsetRef.current.x, y: e.touches[0].clientY - panOffsetRef.current.y };
+    }
+  }, []);
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+      const nz   = Math.max(0.5, Math.min(3, lastZoomRef.current * (dist / (touchDistRef.current || 1))));
+      zoomLevelRef.current = nz; setZoomLevel(nz);
+    } else if (isPanning) {
+      panOffsetRef.current = { x: e.touches[0].clientX - panStartRef.current.x, y: e.touches[0].clientY - panStartRef.current.y };
+    }
+  }, [isPanning]);
+  const handleTouchEnd = useCallback(() => { setIsPanning(false); touchDistRef.current = 0; }, []);
+
+  // ── Chart data
+  const chartData = {
+    labels: history.map(d => `T${d.t}`),
+    datasets: [
+      { label: 'Total', data: history.map(d => d.total), borderColor: '#22c55e', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0, tension: 0.4 },
+      { label: 'Zone 1+', data: history.map(d => (d.zones[1] || 0) + (d.zones[2] || 0) + (d.zones[3] || 0) + (d.zones[4] || 0)), borderColor: '#eab308', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, tension: 0.4 },
+      { label: 'Zone 3+', data: history.map(d => (d.zones[3] || 0) + (d.zones[4] || 0)), borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, tension: 0.4 },
+    ],
+  };
+  const chartOptions = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: true, position: 'top' as const, labels: { boxWidth: 10, padding: 8, font: { size: 9 }, color: '#94a3b8' } } },
+    scales: {
+      x: { display: false },
+      y: { display: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#94a3b8', font: { size: 9 } } },
+    },
+    animation: { duration: 0 },
   };
 
+  // ── Histogram max
+  const histMax = Math.max(1, ...histogram);
+
+  // Resistance bucket colors
+  const bucketColors = [
+    '#3b82f6','#1e9fce','#0cb6d4','#0ec9a0','#22c55e',
+    '#84cc16','#eab308','#f97316','#ef4444','#dc2626',
+  ];
+
+  // ── JSX ──────────────────────────────────────────────────────────────────────
   return (
-    <SimulationErrorBoundary onReset={handleReset}>
-      <Container ref={containerRef}>
-        <Canvas
+    <>
+      <BacteriaOverlayStyles />
+
+      <div className={`bac-root${isTheaterMode ? ' theater' : ''}`}>
+
+        {/* Canvas */}
+        <canvas
+          className="bac-canvas"
           ref={canvasRef}
-          width={canvasDimensions.width}
-          height={canvasDimensions.height}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         />
 
-        {/* Stats Overlay */}
-        <StatsOverlay>
-          <div style={{ 
-            fontWeight: 700, 
-            marginBottom: '0.75rem', 
-            color: '#60a5fa',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.85rem'
-          }}>
-            <Activity size={14} />
-            Live Metrics
-            <PulseIndicator $active={isRunning} $color="#60a5fa" />
+        {/* Top-left: mode chips */}
+        <div className="bac-mode-switcher">
+          {(['mega-plate', 'uniform'] as SimMode[]).map(m => (
+            <button
+              key={m}
+              className={`bac-mode-btn${simMode === m ? ' active' : ''}`}
+              onClick={() => { setSimMode(m); handleReset(); }}
+            >
+              {m === 'mega-plate' ? <><FlaskConical size={11} /> MEGA Plate</> : <><Zap size={11} /> Uniform</>}
+            </button>
+          ))}
+        </div>
+
+        {/* Top-right: HUD toggle */}
+        <div className="bac-top-right">
+          <button
+            className={`bac-icon-btn${hudVisible ? ' active' : ''}`}
+            onClick={() => setHudVisible(v => !v)}
+            title="Toggle HUD"
+          >
+            <Activity size={15} />
+          </button>
+        </div>
+
+        {/* HUD */}
+        {hudVisible && (
+          <div className="bac-hud">
+            <div className="bac-hud-title">
+              <span style={{ color: '#22c55e' }}>🦠</span> Evolution
+            </div>
+            <div className="bac-hud-divider" />
+            <div className="bac-hud-row">
+              <span>Population</span>
+              <span style={{ color: '#4ade80', fontWeight: 700 }}>{stats.total}</span>
+            </div>
+            <div className="bac-hud-row">
+              <span>Max Resistance</span>
+              <span style={{ color: resistColor(stats.maxRes), fontWeight: 700 }}>
+                {(stats.maxRes * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div className="bac-hud-row">
+              <span>Generation</span>
+              <span style={{ color: '#a78bfa', fontWeight: 700 }}>{stats.generation}</span>
+            </div>
+            <div className="bac-hud-divider" />
+            <div className="bac-hud-row">
+              <span>Zones colonised</span>
+              <span style={{ color: '#facc15', fontWeight: 700 }}>{stats.colonized} / {ZONES.length}</span>
+            </div>
+            <div className="bac-hud-row">
+              <span>Mutations</span>
+              <span style={{ color: '#f87171', fontWeight: 700 }}>{stats.mutations.toLocaleString()}</span>
+            </div>
           </div>
-          
-          <StatRow>
-            <StatLabel><Target size={12} /> Bacteria</StatLabel>
-            <StatValue $color={getSeverityColor(stats.totalBacteria, { low: 20, high: 80 })}>
-              {stats.totalBacteria} CFU
-            </StatValue>
-          </StatRow>
-          
-          <StatRow>
-            <StatLabel><TrendingUp size={12} /> Sepsis Score</StatLabel>
-            <StatValue $color={getSeverityColor(stats.sepsisScore, { low: 25, high: 60 })}>
-              {stats.sepsisScore.toFixed(1)}%
-            </StatValue>
-          </StatRow>
-          
-          <StatRow>
-            <StatLabel><Heart size={12} /> Health</StatLabel>
-            <StatValue $color={getHealthColor(patientVitals.overallHealth, { good: 70, warning: 40 })}>
-              {patientVitals.overallHealth.toFixed(0)}%
-            </StatValue>
-          </StatRow>
-          
-          <StatRow>
-            <StatLabel><Droplets size={12} /> Viscosity</StatLabel>
-            <StatValue>{stats.viscosity.toFixed(1)} cP</StatValue>
-          </StatRow>
-          
-          <StatRow>
-            <StatLabel><Wind size={12} /> Flow</StatLabel>
-            <StatValue>{bloodFlowRate.toFixed(1)} cm/s</StatValue>
-          </StatRow>
-          
-          <StatRow>
-            <StatLabel><Shield size={12} /> Biofilm</StatLabel>
-            <StatValue>{(stats.biofilmCoverage * 100).toFixed(1)}%</StatValue>
-          </StatRow>
-        </StatsOverlay>
-
-        {/* Simulation Time */}
-        <TimeDisplay>
-          {formatTime(simulationTime)}
-        </TimeDisplay>
-
-        {/* Controls */}
-        <ControlsOverlay>
-          <ControlBtn onClick={handleReset}>
-            <RefreshCw size={14} /> Reset
-          </ControlBtn>
-          
-          <DropdownContainer>
-            <ControlBtn 
-              $active={showSpeciesMenu}
-              onClick={(e) => { e.stopPropagation(); setShowSpeciesMenu(!showSpeciesMenu); setShowAntibioticMenu(false); }}
-            >
-              <Beaker size={14} /> Species <ChevronDown size={12} />
-            </ControlBtn>
-            <DropdownMenu $show={showSpeciesMenu}>
-              {(Object.keys(BACTERIAL_PROFILES) as BacterialSpecies[]).map(species => (
-                <DropdownItem
-                  key={species}
-                  $active={selectedSpecies.includes(species)}
-                  onClick={(e) => { e.stopPropagation(); handleToggleSpecies(species); }}
-                >
-                  <div style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: selectedSpecies.includes(species) ? '#22c55e' : '#475569'
-                  }} />
-                  {BACTERIAL_PROFILES[species].name}
-                </DropdownItem>
-              ))}
-            </DropdownMenu>
-          </DropdownContainer>
-          
-          <DropdownContainer>
-            <ControlBtn 
-              $active={showAntibioticMenu || selectedAntibiotics.length > 0}
-              onClick={(e) => { e.stopPropagation(); setShowAntibioticMenu(!showAntibioticMenu); setShowSpeciesMenu(false); }}
-            >
-              <Syringe size={14} /> 
-              Antibiotics {selectedAntibiotics.length > 0 && `(${selectedAntibiotics.length})`}
-              <ChevronDown size={12} />
-            </ControlBtn>
-            <DropdownMenu $show={showAntibioticMenu}>
-              {Object.keys(ANTIBIOTIC_PROFILES).map(antibiotic => (
-                <DropdownItem
-                  key={antibiotic}
-                  $active={selectedAntibiotics.includes(antibiotic)}
-                  onClick={(e) => { e.stopPropagation(); handleToggleAntibiotic(antibiotic); }}
-                >
-                  <div style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: selectedAntibiotics.includes(antibiotic) ? '#f59e0b' : '#475569'
-                  }} />
-                  {antibiotic.replace(/_/g, ' ')}
-                </DropdownItem>
-              ))}
-            </DropdownMenu>
-          </DropdownContainer>
-        </ControlsOverlay>
-
-        {/* Error display */}
-        {error && (
-          <ErrorOverlay>
-            <ErrorCard>
-              <AlertCircle size={32} color="#ef4444" style={{ marginBottom: '0.75rem' }} />
-              <p style={{ color: '#94a3b8', marginBottom: '1rem', fontSize: '0.875rem' }}>{error}</p>
-              <ControlBtn onClick={() => { setError(null); handleReset(); }}>
-                <RefreshCw size={14} /> Reset
-              </ControlBtn>
-            </ErrorCard>
-          </ErrorOverlay>
         )}
-      </Container>
-    </SimulationErrorBoundary>
+
+        {/* Resistance legend */}
+        <div className="bac-legend">
+          <span>Sensitive</span>
+          <div className="bac-legend-bar" />
+          <span>Resistant</span>
+        </div>
+
+        {/* Bottom pill bar */}
+        <div className="bac-bottom-bar">
+          <button
+            className={`bac-bar-btn${isRunning ? ' danger' : ' primary'}`}
+            onClick={() => setIsRunning(v => !v)}
+          >
+            {isRunning ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
+            {isRunning ? 'Pause' : 'Evolve'}
+          </button>
+
+          <button className="bac-bar-btn" onClick={handleReset}>
+            <RefreshCw size={14} /> Reset
+          </button>
+
+          <div className="bac-bar-divider" />
+
+          <button
+            className={`bac-bar-btn${antibioticOn ? ' warn' : ''}`}
+            onClick={() => setAntibioticOn(v => !v)}
+          >
+            <FlaskConical size={14} />
+            {antibioticOn ? 'Antibiotic ON' : 'Antibiotic OFF'}
+          </button>
+
+          <div className="bac-bar-divider" />
+
+          <div className="bac-speed-control">
+            <span className="bac-speed-label">{speed}×</span>
+            <input
+              type="range" className="bac-slider"
+              min={1} max={5} step={1} value={speed}
+              onChange={e => setSpeed(Number(e.target.value))}
+            />
+          </div>
+
+          <div className="bac-bar-divider" />
+
+          <button
+            className={`bac-bar-btn${activePanel === 'parameters' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'parameters' ? 'none' : 'parameters')}
+          >
+            <Settings size={14} /> Params
+          </button>
+
+          <button
+            className={`bac-bar-btn${activePanel === 'genetics' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'genetics' ? 'none' : 'genetics')}
+          >
+            <Dna size={14} /> Genetics
+          </button>
+
+          <button
+            className={`bac-bar-btn${activePanel === 'statistics' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'statistics' ? 'none' : 'statistics')}
+          >
+            <BarChart3 size={14} /> Stats
+          </button>
+        </div>
+
+        {/* Parameters panel */}
+        {activePanel === 'parameters' && (
+          <div className="bac-panel">
+            <div className="bac-panel-header">
+              <Settings size={15} /> Parameters
+              <button className="bac-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
+            </div>
+            <div className="bac-panel-body">
+              <div className="bac-param-row">
+                <div className="bac-param-header">
+                  <span>Mutation Rate</span>
+                  <span className="bac-param-val">{(mutationRate * 100).toFixed(1)}%</span>
+                </div>
+                <input type="range" className="bac-param-slider"
+                  min={0.002} max={0.08} step={0.002} value={mutationRate}
+                  onChange={e => setMutationRate(Number(e.target.value))} />
+              </div>
+              <div className="bac-param-row">
+                <div className="bac-param-header">
+                  <span>Antibiotic Strength</span>
+                  <span className="bac-param-val">{abStrength}×</span>
+                </div>
+                <input type="range" className="bac-param-slider"
+                  min={1} max={10} step={1} value={abStrength}
+                  onChange={e => setAbStrength(Number(e.target.value))} disabled={!antibioticOn} />
+              </div>
+              <div className="bac-param-row" style={{ paddingTop: '0.5rem', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>
+                <span style={{ color: '#4ade80', fontWeight: 700 }}>Tip: </span>
+                Turn off antibiotic to watch unconstrained growth, then turn it back on to see natural selection eliminate sensitive strains.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Genetics panel — resistance histogram */}
+        {activePanel === 'genetics' && (
+          <div className="bac-panel">
+            <div className="bac-panel-header">
+              <Dna size={15} /> Resistance Distribution
+              <button className="bac-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
+            </div>
+            <div className="bac-panel-body">
+              <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', marginBottom: '0.5rem' }}>
+                Population by resistance level ({stats.total} bacteria)
+              </div>
+              <div className="bac-hist">
+                {histogram.map((count, i) => (
+                  <div
+                    key={i}
+                    className="bac-hist-bar"
+                    style={{
+                      height: `${Math.round((count / histMax) * 100)}%`,
+                      background: bucketColors[i],
+                      opacity: 0.85,
+                    }}
+                    title={`${(i * 10)}–${(i + 1) * 10}%: ${count}`}
+                  />
+                ))}
+              </div>
+              <div className="bac-hist-labels">
+                <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+              </div>
+
+              <div style={{ marginTop: '0.85rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                {[
+                  { label: 'Sensitive (0–20%)', count: histogram.slice(0,2).reduce((a,b)=>a+b,0), color: '#3b82f6' },
+                  { label: 'Low resist (20–40%)', count: histogram.slice(2,4).reduce((a,b)=>a+b,0), color: '#06b6d4' },
+                  { label: 'Mid resist (40–60%)', count: histogram.slice(4,6).reduce((a,b)=>a+b,0), color: '#22c55e' },
+                  { label: 'High resist (60–80%)', count: histogram.slice(6,8).reduce((a,b)=>a+b,0), color: '#eab308' },
+                  { label: 'Super-resistant (80+%)', count: histogram.slice(8).reduce((a,b)=>a+b,0), color: '#ef4444' },
+                ].map(row => (
+                  <div key={row.label} style={{ padding: '0.35rem 0.45rem', background: 'rgba(0,0,0,0.35)', borderRadius: '6px', border: `1px solid ${row.color}25` }}>
+                    <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', marginBottom: '0.1rem' }}>{row.label}</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: row.color }}>{row.count}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Statistics panel */}
+        {activePanel === 'statistics' && (
+          <div className="bac-panel">
+            <div className="bac-panel-header">
+              <BarChart3 size={15} /> Statistics
+              <button className="bac-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
+            </div>
+            <div className="bac-panel-body">
+              <div className="bac-stats-grid">
+                <div className="bac-stat-card">
+                  <div className="bac-stat-label">Population</div>
+                  <div className="bac-stat-value" style={{ color: '#4ade80' }}>{stats.total}</div>
+                  <div className="bac-stat-change">of {MAX_POP} max</div>
+                </div>
+                <div className="bac-stat-card">
+                  <div className="bac-stat-label">Max Resistance</div>
+                  <div className="bac-stat-value" style={{ color: resistColor(stats.maxRes) }}>
+                    {(stats.maxRes * 100).toFixed(0)}%
+                  </div>
+                  <div className="bac-stat-change">{ZONES.filter(z => z.minResist <= stats.maxRes).length} zones reachable</div>
+                </div>
+                <div className="bac-stat-card">
+                  <div className="bac-stat-label">Generations</div>
+                  <div className="bac-stat-value" style={{ color: '#a78bfa' }}>{stats.generation}</div>
+                  <div className="bac-stat-change">max lineage depth</div>
+                </div>
+                <div className="bac-stat-card">
+                  <div className="bac-stat-label">Mutations</div>
+                  <div className="bac-stat-value" style={{ color: '#f87171' }}>{stats.mutations.toLocaleString()}</div>
+                  <div className="bac-stat-change">total events</div>
+                </div>
+              </div>
+              <div style={{ height: '130px', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', padding: '0.5rem', border: '1px solid rgba(34,197,94,0.1)' }}>
+                <Line data={chartData} options={chartOptions} />
+              </div>
+              <div style={{ marginTop: '0.4rem', fontSize: '0.62rem', color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>
+                Green = total · Yellow = in antibiotic zones · Red = high-resistance zones
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Zoom badge */}
+        <div className="bac-zoom">{(zoomLevel * 100).toFixed(0)}%</div>
+      </div>
+
+      {/* ── Mobile fullscreen overlay ── */}
+      <FullscreenOverlay $show={isMobileFullscreen}>
+        <FullscreenCanvas
+          ref={theaterCanvasRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        />
+        <div style={{
+          position: 'absolute', top: '1rem', left: '1rem', zIndex: 50,
+          background: 'rgba(3,7,18,0.82)', backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(34,197,94,0.18)', borderRadius: '10px',
+          padding: '0.6rem 0.75rem', fontSize: '0.73rem', color: 'rgba(255,255,255,0.5)', minWidth: '140px',
+        }}>
+          <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#e2e8f0', marginBottom: '0.35rem' }}>
+            🦠 Generation {stats.generation}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.1rem 0' }}>
+            <span>Population</span><span style={{ color: '#4ade80', fontWeight: 700 }}>{stats.total}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.1rem 0' }}>
+            <span>Max Resist</span><span style={{ color: resistColor(stats.maxRes), fontWeight: 700 }}>{(stats.maxRes * 100).toFixed(0)}%</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.1rem 0', borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: '0.2rem', paddingTop: '0.3rem' }}>
+            <span>Zones</span><span style={{ color: '#facc15', fontWeight: 700 }}>{stats.colonized}/{ZONES.length}</span>
+          </div>
+        </div>
+        <FullscreenControls>
+          <FullscreenButton $primary onClick={() => setIsRunning(v => !v)}>
+            {isRunning ? <PauseCircle size={20} /> : <PlayCircle size={20} />}
+          </FullscreenButton>
+          <FullscreenButton onClick={handleReset}><RefreshCw size={20} /></FullscreenButton>
+        </FullscreenControls>
+        <ExitButton onClick={() => { setIsMobileFullscreen(false); setIsRunning(false); }}>
+          <X size={20} />
+        </ExitButton>
+      </FullscreenOverlay>
+    </>
   );
 }

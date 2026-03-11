@@ -1,4 +1,84 @@
-import styled from "styled-components";
+import styled, { createGlobalStyle } from "styled-components";
+
+// ─── NBody-style overlay styles ──────────────────────────────────────────────
+export const AgarioOverlayStyles = createGlobalStyle`
+  .agario-root {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 65vh;
+    background: #0a0e1a;
+    border-radius: 12px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .agario-root.theater {
+    aspect-ratio: unset;
+    max-height: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+  .agario-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: #0a0e1a;
+    cursor: grab;
+  }
+  .agario-canvas:active { cursor: grabbing; }
+  .agario-bar {
+    position: absolute;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(59,130,246,0.28);
+    border-radius: 99px;
+    padding: 0.3rem 0.6rem;
+    pointer-events: auto;
+    z-index: 30;
+    white-space: nowrap;
+  }
+  .agario-bar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.32rem 0.8rem;
+    border-radius: 99px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s, background 0.15s;
+  }
+  .agario-bar-btn:hover { color: #e2e8f0; background: rgba(255,255,255,0.07); }
+  .agario-bar-btn.primary { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.35); color: #60a5fa; }
+  .agario-bar-btn.active  { background: rgba(34,197,94,0.15);  border-color: rgba(34,197,94,0.35);  color: #4ade80; }
+  .agario-bar-divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(255,255,255,0.12);
+    flex-shrink: 0;
+    margin: 0 0.15rem;
+  }
+  .agario-speed-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #3b82f6;
+    min-width: 28px;
+    text-align: center;
+  }
+`;
 
 const Container = styled.div`
   width: 100%;

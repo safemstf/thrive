@@ -17,103 +17,358 @@ import {
   Legend
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import styled from 'styled-components';
+import styled, { createGlobalStyle } from 'styled-components';
 import { DISEASE_PROFILES, type Agent, type SimulationMode } from './disease.types';
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
-// Styled Components
-const Container = styled.div<{ $theater?: boolean }>`
-  width: 100%;
-  min-height: ${({ $theater }) => $theater ? '100vh' : '100vh'};
-  background: ${({ $theater }) => $theater ? 'transparent' : 'linear-gradient(to bottom, #0a0e1a, #1a1a2e)'};
-  color: #e6eef8;
-  padding: ${({ $theater }) => $theater ? '0' : '2rem 1rem'};
-  box-sizing: border-box;
-  position: relative;
+// ─── NBody-style overlay styles ──────────────────────────────────────────────
+const DiseaseOverlayStyles = createGlobalStyle`
+  .dis-root {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 65vh;
+    background: #0a0e1a;
+    border-radius: 12px;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .dis-root.theater {
+    aspect-ratio: unset;
+    max-height: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+  .dis-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+    display: block;
+  }
+  .dis-canvas:active { cursor: grabbing; }
 
-  @media (max-width: 768px) {
-    padding: ${({ $theater }) => $theater ? '0' : '1rem 0.75rem'};
+  /* ── top-left disease chips ── */
+  .dis-model-switcher {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 50;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    max-width: calc(100% - 6rem);
+  }
+  .dis-model-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.28rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.62);
+    color: rgba(255,255,255,0.65);
+    font-size: 0.7rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    backdrop-filter: blur(8px);
+    font-family: inherit;
+  }
+  .dis-model-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .dis-model-btn.active {
+    border-color: var(--dis-color, #3b82f6);
+    background: color-mix(in srgb, var(--dis-color, #3b82f6) 20%, rgba(0,0,0,0.6));
+    color: #fff;
+  }
+  .dis-model-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── top-right icon buttons ── */
+  .dis-top-right {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 50;
+    display: flex;
+    gap: 0.3rem;
+  }
+  .dis-icon-btn {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.62);
+    color: rgba(255,255,255,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.15s;
+  }
+  .dis-icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .dis-icon-btn.active {
+    background: rgba(59,130,246,0.2);
+    border-color: rgba(59,130,246,0.5);
+    color: #3b82f6;
+  }
+
+  /* ── HUD panel (top-right stats) ── */
+  .dis-hud {
+    position: absolute;
+    top: 3rem;
+    right: 0.75rem;
+    z-index: 40;
+    min-width: 145px;
+    background: rgba(5,8,18,0.82);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 10px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.73rem;
+    color: rgba(255,255,255,0.55);
+  }
+  .dis-hud-title {
+    font-weight: 700;
+    font-size: 0.78rem;
+    color: #e2e8f0;
+    margin-bottom: 0.45rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .dis-hud-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.13rem 0;
+    gap: 0.6rem;
+  }
+  .dis-hud-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.07);
+    margin: 0.3rem 0;
+  }
+
+  /* ── bottom pill bar ── */
+  .dis-bottom-bar {
+    position: absolute;
+    bottom: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(4,7,16,0.84);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 999px;
+    padding: 0.35rem 0.55rem;
+    white-space: nowrap;
+  }
+  .dis-bar-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+    padding: 0.28rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: rgba(255,255,255,0.55);
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+  .dis-bar-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .dis-bar-btn.primary { background: #3b82f6; color: #fff; border-color: rgba(59,130,246,0.4); }
+  .dis-bar-btn.primary:hover { background: #2563eb; }
+  .dis-bar-btn.danger { background: rgba(239,68,68,0.18); color: #f87171; border-color: rgba(239,68,68,0.25); }
+  .dis-bar-btn.active { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.35); color: #a5b4fc; }
+  .dis-bar-divider {
+    width: 1px; height: 20px;
+    background: rgba(255,255,255,0.1);
+    margin: 0 0.1rem;
+    flex-shrink: 0;
+  }
+  .dis-speed-control {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .dis-slider {
+    width: 56px; height: 4px;
+    cursor: pointer;
+    accent-color: #3b82f6;
+  }
+  .dis-speed-label {
+    color: rgba(255,255,255,0.45);
+    font-size: 0.68rem;
+    font-family: monospace;
+    min-width: 1.6rem;
+    text-align: right;
+  }
+
+  /* ── popup panel (bottom-left) ── */
+  .dis-panel {
+    position: absolute;
+    bottom: 3.5rem;
+    left: 0.75rem;
+    z-index: 60;
+    width: clamp(240px, 34vw, 380px);
+    background: rgba(6,10,22,0.93);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(59,130,246,0.18);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .dis-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: #e2e8f0;
+  }
+  .dis-panel-close {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    padding: 0.2rem;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    transition: all 0.15s;
+  }
+  .dis-panel-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .dis-panel-body {
+    padding: 0.6rem 0.85rem;
+    max-height: 48vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  .dis-panel-body::-webkit-scrollbar { width: 3px; }
+  .dis-panel-body::-webkit-scrollbar-track { background: transparent; }
+  .dis-panel-body::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.4); border-radius: 2px; }
+
+  /* param rows */
+  .dis-param-row {
+    padding: 0.45rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .dis-param-row:last-child { border-bottom: none; }
+  .dis-param-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 0.28rem;
+  }
+  .dis-param-val { color: #3b82f6; font-weight: 700; font-family: monospace; }
+  .dis-param-slider {
+    width: 100%; height: 4px;
+    accent-color: #3b82f6;
+    cursor: pointer;
+    display: block;
+  }
+  .dis-param-slider:disabled { opacity: 0.45; cursor: not-allowed; }
+  .dis-param-select {
+    width: 100%;
+    margin-top: 0.28rem;
+    padding: 0.35rem 0.45rem;
+    background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.22);
+    border-radius: 6px;
+    color: #e2e8f0;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .dis-param-select:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* intervention grid */
+  .dis-intervention-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+  }
+  .dis-intervention-card {
+    padding: 0.6rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(0,0,0,0.38);
+    color: #e2e8f0;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    text-align: center;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .dis-intervention-card:hover { background: rgba(255,255,255,0.05); }
+  .dis-intervention-card.active { background: rgba(59,130,246,0.1); }
+  .dis-intervention-icon { display: flex; font-size: 1.1rem; }
+  .dis-intervention-name { font-size: 0.7rem; font-weight: 700; }
+  .dis-intervention-efficacy { font-size: 0.62rem; color: #94a3b8; }
+
+  /* stats grid */
+  .dis-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+    margin-bottom: 0.65rem;
+  }
+  .dis-stat-card {
+    padding: 0.55rem;
+    background: rgba(0,0,0,0.38);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+  }
+  .dis-stat-label {
+    font-size: 0.62rem;
+    color: #94a3b8;
+    font-weight: 700;
+    margin-bottom: 0.18rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .dis-stat-value { font-size: 1.25rem; font-weight: 800; line-height: 1; }
+  .dis-stat-change { font-size: 0.62rem; color: #64748b; margin-top: 0.18rem; }
+
+  /* zoom badge */
+  .dis-zoom {
+    position: absolute;
+    bottom: 3.5rem;
+    right: 0.75rem;
+    background: rgba(0,0,0,0.65);
+    padding: 0.18rem 0.45rem;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-family: monospace;
+    color: #64748b;
+    z-index: 40;
   }
 `;
 
-const TheaterCanvas = styled.canvas<{ $theater?: boolean }>`
-  position: ${({ $theater }) => $theater ? 'fixed' : 'relative'};
-  inset: ${({ $theater }) => $theater ? '0' : 'auto'};
-  width: 100%;
-  height: ${({ $theater }) => $theater ? '100vh' : '100%'};
-  display: block;
-  cursor: grab;
-  touch-action: none;
-  z-index: 1;
-  
-  &:active {
-    cursor: grabbing;
-  }
-`;
-
-const ControlsDrawer = styled.div<{ $expanded: boolean }>`
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(10, 14, 26, 0.98);
-  backdrop-filter: blur(20px);
-  border-top: 2px solid rgba(59, 130, 246, 0.3);
-  z-index: 100;
-  max-height: ${({ $expanded }) => $expanded ? '70vh' : '60px'};
-  transition: max-height 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
-`;
-
-const DrawerHandle = styled.button`
-  width: 100%;
-  padding: 1rem;
-  background: transparent;
-  border: none;
-  color: #e2e8f0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-weight: 700;
-  font-size: 0.9rem;
-  flex-shrink: 0;
-  
-  &:hover {
-    background: rgba(59, 130, 246, 0.1);
-  }
-`;
-
-const DrawerContent = styled.div`
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 1.5rem;
-  min-height: 0;
-  
-  -webkit-overflow-scrolling: touch;
-  
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: rgba(51, 65, 85, 0.3);
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: rgba(59, 130, 246, 0.5);
-    border-radius: 3px;
-    
-    &:hover {
-      background: rgba(59, 130, 246, 0.7);
-    }
-  }
-`;
+// ─── Mobile fullscreen overlay ────────────────────────────────────────────────
 
 const FullscreenOverlay = styled.div<{ $show: boolean }>`
   position: fixed;
@@ -180,326 +435,6 @@ const ExitButton = styled.button`
   z-index: 100;
 `;
 
-const MaxWidthWrapper = styled.div`
-  max-width: 1200px;
-  margin: 0 auto;
-`;
-
-const Header = styled.header`
-  text-align: center;
-  margin-bottom: 2rem;
-`;
-
-const Title = styled.h1`
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 0.5rem;
-  
-  @media (max-width: 768px) {
-    font-size: 2rem;
-  }
-`;
-
-const Subtitle = styled.p`
-  font-size: 1rem;
-  color: #94a3b8;
-`;
-
-const ViewSimButton = styled.button`
-  display: none;
-  
-  @media (max-width: 768px) {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    padding: 1.25rem;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
-    border: none;
-    border-radius: 1rem;
-    font-size: 1.125rem;
-    font-weight: 600;
-    cursor: pointer;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-    
-    &:active {
-      transform: scale(0.98);
-    }
-  }
-`;
-
-const VideoSection = styled.section`
-  width: 100%;
-  background: linear-gradient(135deg, rgba(0,0,0,0.88), rgba(5,10,20,0.9));
-  border-radius: 12px;
-  overflow: hidden;
-  border: 2px solid rgba(59,130,246,0.22);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.32);
-  margin-bottom: 1.5rem;
-  aspect-ratio: 16 / 9;
-  max-height: 65vh;
-  
-  @media (max-width: 768px) {
-    display: none;
-  }
-`;
-
-const CanvasContainer = styled.div`
-  width: 100%;
-  height: 100%;
-  position: relative;
-`;
-
-const SimCanvas = styled.canvas`
-  width: 100%;
-  height: 100%;
-  display: block;
-  cursor: grab;
-  touch-action: none;
-  
-  &:active {
-    cursor: grabbing;
-  }
-`;
-
-const HUD = styled.div<{ $theater?: boolean }>`
-  position: fixed;
-  top: 1rem;
-  left: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  background: rgba(0,0,0,0.9);
-  backdrop-filter: blur(10px);
-  color: #e2e8f0;
-  border: 1px solid rgba(59,130,246,0.3);
-  font-size: 0.9rem;
-  z-index: 50;
-  margin-top: 120px;
-  min-width: 180px;
-`;
-
-const NetworkOverlay = styled.div`
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.9);
-  backdrop-filter: blur(10px);
-  border-radius: 8px;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  font-size: 0.75rem;
-  color: #fff;
-  z-index: 50;
-  max-width: 250px;
-`;
-
-const ControlsSection = styled.section`
-  width: 100%;
-  padding: 1.5rem;
-  border-radius: 12px;
-  background: rgba(8,12,20,0.6);
-  border: 1px solid rgba(59,130,246,0.1);
-  margin-bottom: 1.5rem;
-`;
-
-const SectionTitle = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.125rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: #fff;
-`;
-
-const TabContainer = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  overflow-x: auto;
-`;
-
-const Tab = styled.button<{ $active?: boolean }>`
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
-  border: 1px solid ${({ $active }) => ($active ? 'rgba(59,130,246,0.4)' : 'rgba(59,130,246,0.15)')};
-  background: ${({ $active }) => ($active ? 'rgba(59,130,246,0.1)' : 'transparent')};
-  color: ${({ $active }) => ($active ? '#3b82f6' : '#94a3b8')};
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-`;
-
-const TabContent = styled.div`
-  width: 100%;
-`;
-
-const Grid = styled.div<{ $columns: number }>`
-  display: grid;
-  grid-template-columns: repeat(${props => props.$columns}, 1fr);
-  gap: 1rem;
-  
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const ParameterControl = styled.div`
-  display: block;
-  padding: 0.75rem;
-  border-radius: 8px;
-  background: rgba(255,255,255,0.02);
-  
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-  }
-  
-  .label {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: #e6eef8;
-  }
-  
-  .value {
-    color: #3b82f6;
-    font-weight: 800;
-    font-size: 0.9rem;
-  }
-  
-  input[type="range"] {
-    width: 100%;
-    margin-top: 0.5rem;
-  }
-  
-  select {
-    width: 100%;
-    padding: 0.5rem;
-    margin-top: 0.5rem;
-    background: rgba(59, 130, 246, 0.1);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 4px;
-    color: #e2e8f0;
-    cursor: pointer;
-  }
-`;
-
-const InterventionGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.8rem;
-`;
-
-const InterventionCard = styled.button<{ $active?: boolean; $color?: string }>`
-  padding: 1rem;
-  border-radius: 12px;
-  background: ${({ $active }) => ($active ? 'rgba(59,130,246,0.15)' : 'rgba(0,0,0,0.4)')};
-  border: 1px solid ${({ $active, $color = '#3b82f6' }) => ($active ? $color : 'rgba(59,130,246,0.15)')};
-  color: #e6eef8;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: center;
-  cursor: pointer;
-  min-height: 100px;
-  justify-content: center;
-  
-  .icon {
-    font-size: 1.5rem;
-    color: ${({ $color = '#3b82f6' }) => $color};
-  }
-  
-  .name {
-    font-weight: 800;
-    font-size: 0.9rem;
-    text-align: center;
-  }
-  
-  .efficacy {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    text-align: center;
-  }
-`;
-
-const StatCard = styled.div<{ $color?: string }>`
-  padding: 0.85rem;
-  border-radius: 10px;
-  background: rgba(0,0,0,0.42);
-  border: 1px solid rgba(59,130,246,0.1);
-  color: #e6eef8;
-  
-  .label {
-    font-size: 0.72rem;
-    color: #94a3b8;
-    font-weight: 700;
-    margin-bottom: 0.3rem;
-  }
-  
-  .value {
-    font-size: 1.6rem;
-    color: ${({ $color = '#3b82f6' }) => $color};
-    font-weight: 800;
-  }
-  
-  .change {
-    font-size: 0.7rem;
-    color: #94a3b8;
-    margin-top: 0.2rem;
-  }
-`;
-
-const DiseaseSelector = styled.div`
-  margin-bottom: 1.5rem;
-`;
-
-const DiseaseButton = styled.button<{ $color: string; $selected: boolean }>`
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: ${({ $selected, $color }) => ($selected ? `${$color}20` : 'rgba(0,0,0,0.3)')};
-  border: 1px solid ${({ $selected, $color }) => ($selected ? $color : 'rgba(59,130,246,0.2)')};
-  border-radius: 10px;
-  color: white;
-  cursor: pointer;
-  text-align: left;
-  margin-bottom: 0.5rem;
-  
-  .disease-icon {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: ${({ $color }) => $color};
-    flex-shrink: 0;
-  }
-  
-  .disease-info {
-    flex: 1;
-  }
-  
-  .disease-name {
-    font-weight: 700;
-    font-size: 0.95rem;
-    margin-bottom: 0.25rem;
-  }
-  
-  .disease-stats {
-    font-size: 0.75rem;
-    color: #94a3b8;
-  }
-`;
 
 interface DiseaseSimulationProps {
   isDark?: boolean;
@@ -549,15 +484,15 @@ export default function DiseaseSimulation({
   const lastZoomRef = useRef<number>(1);
 
   // UI State (these are fine as useState - they don't change every frame)
-  const [drawerExpanded, setDrawerExpanded] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [tickCount, setTickCount] = useState(0);
   const [history, setHistory] = useState<any[]>([]);
   const [selectedDisease, setSelectedDisease] = useState<string>('covid19');
-  const [activeTab, setActiveTab] = useState<'parameters' | 'interventions' | 'statistics'>('parameters');
   const [simulationMode, setSimulationMode] = useState<SimulationMode>('homogeneous');
   const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
+  const [activePanel, setActivePanel] = useState<'none' | 'parameters' | 'interventions' | 'statistics'>('none');
+  const [hudVisible, setHudVisible] = useState(true);
 
   const disease = DISEASE_PROFILES[selectedDisease];
 
@@ -992,7 +927,7 @@ export default function DiseaseSimulation({
       // Throttle rendering
       if (lastRenderRef.current === null || time - lastRenderRef.current >= TARGET_FRAME_MS) {
         lastRenderRef.current = time;
-        const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
+        const canvas = isMobileFullscreen ? theaterCanvasRef.current : canvasRef.current;
         render(canvas);
         
         // Sync UI state periodically (every render, not every tick)
@@ -1012,18 +947,17 @@ export default function DiseaseSimulation({
       accumulatorRef.current = 0;
       lastRenderRef.current = null;
     };
-  }, [update, render, isTheaterMode]);
+  }, [update, render, isMobileFullscreen]);
 
-  // Canvas sizing
+  // Canvas sizing — main canvas
   useEffect(() => {
-    const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
+    const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     const updateSize = () => {
       const container = canvas.parentElement;
       if (!container) return;
       const rect = container.getBoundingClientRect();
-
       const dpr = window.devicePixelRatio || 1;
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
@@ -1034,19 +968,37 @@ export default function DiseaseSimulation({
     updateSize();
     window.addEventListener('resize', updateSize);
     canvas.addEventListener('wheel', handleWheel, { passive: false });
-    
+
     return () => {
       window.removeEventListener('resize', updateSize);
       canvas.removeEventListener('wheel', handleWheel);
     };
-  }, [isTheaterMode, handleWheel]);
+  }, [handleWheel]);
+
+  // Canvas sizing — mobile fullscreen canvas
+  useEffect(() => {
+    if (!isMobileFullscreen) return;
+    const canvas = theaterCanvasRef.current;
+    if (!canvas) return;
+
+    const updateSize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.scale(dpr, dpr);
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, [isMobileFullscreen]);
 
   // Initialize on param changes
   useEffect(() => {
     initAgents();
     setTimeout(() => {
-      const canvas = isTheaterMode ? theaterCanvasRef.current : canvasRef.current;
-      render(canvas);
+      render(canvasRef.current);
     }, 50);
   }, [population, initialInfected, selectedDisease, simulationMode]);
 
@@ -1089,455 +1041,314 @@ export default function DiseaseSimulation({
     animation: { duration: 0 }
   };
 
-  // Theater mode rendering
-  if (isTheaterMode) {
-    return (
-      <Container $theater>
-        <TheaterCanvas
-          ref={theaterCanvasRef}
-          $theater
+  // ── Unified NBody-style overlay render ──────────────────────────────────────
+  return (
+    <>
+      <DiseaseOverlayStyles />
+
+      {/* ── Main simulation canvas with floating overlays ── */}
+      <div className={`dis-root${isTheaterMode ? ' theater' : ''}`}>
+
+        {/* Canvas */}
+        <canvas
+          className="dis-canvas"
+          ref={canvasRef}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         />
 
-        <HUD $theater>
-          <div style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-            Day {stats.day}
-          </div>
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>Susceptible:</span>
-              <span style={{ fontWeight: 600, color: '#3b82f6' }}>{stats.S}</span>
+        {/* Top-left: disease profile chips */}
+        <div className="dis-model-switcher">
+          {Object.values(DISEASE_PROFILES).map(d => (
+            <button
+              key={d.id}
+              className={`dis-model-btn${d.id === selectedDisease ? ' active' : ''}`}
+              style={{ '--dis-color': d.color } as React.CSSProperties}
+              onClick={() => { setSelectedDisease(d.id); handleReset(); }}
+            >
+              <span className="dis-model-dot" style={{ background: d.color }} />
+              {d.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Top-right: icon buttons */}
+        <div className="dis-top-right">
+          <button
+            className={`dis-icon-btn${hudVisible ? ' active' : ''}`}
+            onClick={() => setHudVisible(v => !v)}
+            title="Toggle stats HUD"
+          >
+            <Activity size={15} />
+          </button>
+          {simulationMode === 'regions' && (
+            <button className="dis-icon-btn active" title="Regional network active">
+              <Network size={15} />
+            </button>
+          )}
+        </div>
+
+        {/* HUD panel */}
+        {hudVisible && (
+          <div className="dis-hud">
+            <div className="dis-hud-title">
+              <span style={{ color: disease.color }}>●</span>
+              {disease.name} — Day {stats.day}
+            </div>
+            <div className="dis-hud-divider" />
+            <div className="dis-hud-row">
+              <span>Susceptible</span>
+              <span style={{ color: '#3b82f6', fontWeight: 700 }}>{stats.S}</span>
             </div>
             {stats.E > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ opacity: 0.7 }}>Exposed:</span>
-                <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.E}</span>
+              <div className="dis-hud-row">
+                <span>Exposed</span>
+                <span style={{ color: '#fbbf24', fontWeight: 700 }}>{stats.E}</span>
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>Infected:</span>
-              <span style={{ fontWeight: 600, color: disease.color }}>{stats.I}</span>
+            <div className="dis-hud-row">
+              <span>Infected</span>
+              <span style={{ color: disease.color, fontWeight: 700 }}>{stats.I}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>Recovered:</span>
-              <span style={{ fontWeight: 600, color: '#22c55e' }}>{stats.R}</span>
+            <div className="dis-hud-row">
+              <span>Recovered</span>
+              <span style={{ color: '#22c55e', fontWeight: 700 }}>{stats.R}</span>
             </div>
-            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ opacity: 0.7 }}>R(t):</span>
-                <span style={{ fontWeight: 700, color: stats.rt > 1 ? '#ef4444' : '#22c55e' }}>
-                  {stats.rt.toFixed(2)}
-                </span>
+            {stats.D > 0 && (
+              <div className="dis-hud-row">
+                <span>Deaths</span>
+                <span style={{ color: '#ef4444', fontWeight: 700 }}>{stats.D}</span>
+              </div>
+            )}
+            <div className="dis-hud-divider" />
+            <div className="dis-hud-row">
+              <span>R(t)</span>
+              <span style={{ color: stats.rt > 1 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>
+                {stats.rt.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom pill bar */}
+        <div className="dis-bottom-bar">
+          <button
+            className={`dis-bar-btn${isRunning ? ' danger' : ' primary'}`}
+            onClick={() => setIsRunning(v => !v)}
+          >
+            {isRunning ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
+            {isRunning ? 'Pause' : 'Run'}
+          </button>
+
+          <button className="dis-bar-btn" onClick={handleReset}>
+            <RefreshCw size={14} />
+            Reset
+          </button>
+
+          <div className="dis-bar-divider" />
+
+          <div className="dis-speed-control">
+            <span className="dis-speed-label">{speed}×</span>
+            <input
+              type="range"
+              className="dis-slider"
+              min={1} max={5} step={1}
+              value={speed}
+              onChange={e => setSpeed(Number(e.target.value))}
+            />
+          </div>
+
+          <div className="dis-bar-divider" />
+
+          <button
+            className={`dis-bar-btn${activePanel === 'parameters' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'parameters' ? 'none' : 'parameters')}
+          >
+            <Settings size={14} />
+            Params
+          </button>
+
+          <button
+            className={`dis-bar-btn${activePanel === 'interventions' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'interventions' ? 'none' : 'interventions')}
+          >
+            <Shield size={14} />
+            Intervene
+          </button>
+
+          <button
+            className={`dis-bar-btn${activePanel === 'statistics' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'statistics' ? 'none' : 'statistics')}
+          >
+            <BarChart3 size={14} />
+            Stats
+          </button>
+        </div>
+
+        {/* Parameters panel */}
+        {activePanel === 'parameters' && (
+          <div className="dis-panel">
+            <div className="dis-panel-header">
+              <Settings size={15} />
+              Parameters
+              <button className="dis-panel-close" onClick={() => setActivePanel('none')}>
+                <X size={13} />
+              </button>
+            </div>
+            <div className="dis-panel-body">
+              <div className="dis-param-row">
+                <div className="dis-param-header">
+                  <span>Population</span>
+                  <span className="dis-param-val">{population}</span>
+                </div>
+                <input type="range" className="dis-param-slider" min={100} max={2000} step={50} value={population}
+                  onChange={e => setPopulation(Number(e.target.value))} disabled={isRunning} />
+              </div>
+              <div className="dis-param-row">
+                <div className="dis-param-header">
+                  <span>Initial Cases</span>
+                  <span className="dis-param-val">{initialInfected}</span>
+                </div>
+                <input type="range" className="dis-param-slider" min={1} max={20} value={initialInfected}
+                  onChange={e => setInitialInfected(Number(e.target.value))} disabled={isRunning} />
+              </div>
+              <div className="dis-param-row">
+                <div className="dis-param-header"><span>Network Model</span></div>
+                <select className="dis-param-select" value={simulationMode}
+                  onChange={e => setSimulationMode(e.target.value as SimulationMode)} disabled={isRunning}>
+                  <option value="homogeneous">Homogeneous</option>
+                  <option value="regions">Regional Clusters</option>
+                  <option value="households">Household Structure</option>
+                </select>
               </div>
             </div>
           </div>
-        </HUD>
-
-        {simulationMode === 'regions' && (
-          <NetworkOverlay>
-            <div style={{ fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Network size={14} />
-              Regional Network
-            </div>
-          </NetworkOverlay>
         )}
 
-        <ControlsDrawer $expanded={drawerExpanded}>
-          <DrawerHandle onClick={() => setDrawerExpanded(!drawerExpanded)}>
-            {drawerExpanded ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
-            <span>Controls & Settings</span>
-          </DrawerHandle>
-
-          <DrawerContent>
-            <MaxWidthWrapper>
-              <SectionTitle>
-                <Bug size={20} />
-                Disease Selection
-              </SectionTitle>
-
-              <DiseaseSelector>
-                {Object.values(DISEASE_PROFILES).map(d => (
-                  <DiseaseButton
-                    key={d.id}
-                    $color={d.color}
-                    $selected={d.id === selectedDisease}
-                    onClick={() => {
-                      setSelectedDisease(d.id);
-                      handleReset();
-                    }}
-                  >
-                    <div className="disease-icon" />
-                    <div className="disease-info">
-                      <div className="disease-name">{d.name}</div>
-                      <div className="disease-stats">
-                        R₀: {d.r0.typical} | CFR: {(d.cfr * 100).toFixed(1)}% | {d.transmissionMode}
-                      </div>
-                    </div>
-                  </DiseaseButton>
-                ))}
-              </DiseaseSelector>
-
-              <TabContainer>
-                <Tab $active={activeTab === 'parameters'} onClick={() => setActiveTab('parameters')}>
-                  <Settings size={16} />
-                  Parameters
-                </Tab>
-                <Tab $active={activeTab === 'interventions'} onClick={() => setActiveTab('interventions')}>
-                  <Shield size={16} />
-                  Interventions
-                </Tab>
-                <Tab $active={activeTab === 'statistics'} onClick={() => setActiveTab('statistics')}>
-                  <BarChart3 size={16} />
-                  Statistics
-                </Tab>
-              </TabContainer>
-
-              <TabContent>
-                {activeTab === 'parameters' && (
-                  <Grid $columns={3}>
-                    <ParameterControl>
-                      <div className="header">
-                        <span className="label">Population</span>
-                        <span className="value">{population}</span>
-                      </div>
-                      <input type="range" min={100} max={2000} step={50} value={population} onChange={(e) => setPopulation(Number(e.target.value))} disabled={isRunning} />
-                    </ParameterControl>
-
-                    <ParameterControl>
-                      <div className="header">
-                        <span className="label">Initial Cases</span>
-                        <span className="value">{initialInfected}</span>
-                      </div>
-                      <input type="range" min={1} max={20} value={initialInfected} onChange={(e) => setInitialInfected(Number(e.target.value))} disabled={isRunning} />
-                    </ParameterControl>
-
-                    <ParameterControl>
-                      <div className="header">
-                        <span className="label">Network Model</span>
-                      </div>
-                      <select value={simulationMode} onChange={(e) => setSimulationMode(e.target.value as SimulationMode)} disabled={isRunning}>
-                        <option value="homogeneous">Homogeneous</option>
-                        <option value="regions">Regional Clusters</option>
-                        <option value="households">Household Structure</option>
-                      </select>
-                    </ParameterControl>
-                  </Grid>
-                )}
-
-                {activeTab === 'interventions' && (
-                  <div>
-                    <InterventionGrid>
-                      {[
-                        { key: 'masks', state: maskWearing, setState: setMaskWearing, icon: Shield, label: 'Mask Mandate', color: '#10b981' },
-                        { key: 'distancing', state: socialDistancing, setState: setSocialDistancing, icon: Users, label: 'Social Distancing', color: '#3b82f6' },
-                        { key: 'quarantine', state: quarantine, setState: setQuarantine, icon: Home, label: 'Quarantine', color: '#f59e0b' },
-                        { key: 'vaccination', state: vaccination, setState: setVaccination, icon: Heart, label: 'Vaccination', color: '#8b5cf6' }
-                      ].map(intervention => {
-                        const efficacy = disease.interventions[intervention.key as keyof typeof disease.interventions]?.efficacy;
-                        return (
-                          <InterventionCard
-                            key={intervention.key}
-                            $active={intervention.state}
-                            $color={intervention.color}
-                            onClick={() => intervention.setState(!intervention.state)}
-                          >
-                            <div className="icon">
-                              <intervention.icon size={24} />
-                            </div>
-                            <div className="name">{intervention.label}</div>
-                            {efficacy && (
-                              <div className="efficacy">
-                                {Math.round(efficacy * 100)}% effective
-                              </div>
-                            )}
-                          </InterventionCard>
-                        );
-                      })}
-                    </InterventionGrid>
-
-                    {vaccination && (
-                      <div style={{ marginTop: '1.5rem' }}>
-                        <ParameterControl>
-                          <div className="header">
-                            <span className="label">Vaccination Coverage</span>
-                            <span className="value">{Math.round(vaccinationRate * 100)}%</span>
-                          </div>
-                          <input type="range" min={0} max={1} step={0.05} value={vaccinationRate} onChange={(e) => setVaccinationRate(Number(e.target.value))} disabled={isRunning} />
-                        </ParameterControl>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {activeTab === 'statistics' && (
-                  <div>
-                    <Grid $columns={4}>
-                      <StatCard $color="#3b82f6">
-                        <div className="label">Attack Rate</div>
-                        <div className="value">{((stats.totalCases / population) * 100).toFixed(1)}%</div>
-                        <div className="change">Total: {stats.totalCases}</div>
-                      </StatCard>
-
-                      <StatCard $color={stats.rt > 1 ? '#ef4444' : '#22c55e'}>
-                        <div className="label">R(t)</div>
-                        <div className="value">{stats.rt.toFixed(2)}</div>
-                        <div className="change">{stats.rt > 1 ? 'Growing' : 'Declining'}</div>
-                      </StatCard>
-
-                      <StatCard $color="#fbbf24">
-                        <div className="label">Peak Infected</div>
-                        <div className="value">{stats.peakInfected}</div>
-                        <div className="change">{((stats.peakInfected / population) * 100).toFixed(1)}%</div>
-                      </StatCard>
-
-                      <StatCard $color="#dc2626">
-                        <div className="label">Case Fatality</div>
-                        <div className="value">{stats.D > 0 ? ((stats.D / stats.totalCases) * 100).toFixed(1) : '0'}%</div>
-                        <div className="change">Deaths: {stats.D}</div>
-                      </StatCard>
-                    </Grid>
-
-                    <div style={{ height: '250px', background: 'rgba(0, 0, 0, 0.5)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '1rem' }}>
-                      <Line data={chartData} options={chartOptions} />
-                    </div>
-                  </div>
-                )}
-              </TabContent>
-            </MaxWidthWrapper>
-          </DrawerContent>
-        </ControlsDrawer>
-      </Container>
-    );
-  }
-
-  // Normal mode rendering
-  return (
-    <>
-      <Container>
-        <MaxWidthWrapper>
-          <Header>
-            <Title>Epidemic Simulation</Title>
-            <Subtitle>Configure parameters and interventions below</Subtitle>
-          </Header>
-
-          <ViewSimButton onClick={enterMobileFullscreen}>
-            <Activity size={24} />
-            View Simulation
-          </ViewSimButton>
-
-          <VideoSection>
-            <CanvasContainer>
-              <SimCanvas
-                ref={canvasRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              />
-
-              <HUD>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-                  Day {stats.day}
-                </div>
-                <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ opacity: 0.7 }}>Susceptible:</span>
-                    <span style={{ fontWeight: 600, color: '#3b82f6' }}>{stats.S}</span>
-                  </div>
-                  {stats.E > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ opacity: 0.7 }}>Exposed:</span>
-                      <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.E}</span>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ opacity: 0.7 }}>Infected:</span>
-                    <span style={{ fontWeight: 600, color: disease.color }}>{stats.I}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ opacity: 0.7 }}>Recovered:</span>
-                    <span style={{ fontWeight: 600, color: '#22c55e' }}>{stats.R}</span>
-                  </div>
-                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ opacity: 0.7 }}>R(t):</span>
-                      <span style={{ fontWeight: 700, color: stats.rt > 1 ? '#ef4444' : '#22c55e' }}>
-                        {stats.rt.toFixed(2)}
+        {/* Interventions panel */}
+        {activePanel === 'interventions' && (
+          <div className="dis-panel">
+            <div className="dis-panel-header">
+              <Shield size={15} />
+              Interventions
+              <button className="dis-panel-close" onClick={() => setActivePanel('none')}>
+                <X size={13} />
+              </button>
+            </div>
+            <div className="dis-panel-body">
+              <div className="dis-intervention-grid">
+                {([
+                  { key: 'masks',      state: maskWearing,     setState: setMaskWearing,     icon: Shield, label: 'Mask Mandate',      color: '#10b981' },
+                  { key: 'distancing', state: socialDistancing, setState: setSocialDistancing, icon: Users,  label: 'Social Distancing', color: '#3b82f6' },
+                  { key: 'quarantine', state: quarantine,       setState: setQuarantine,       icon: Home,   label: 'Quarantine',        color: '#f59e0b' },
+                  { key: 'vaccination',state: vaccination,      setState: setVaccination,      icon: Heart,  label: 'Vaccination',       color: '#8b5cf6' },
+                ] as const).map(intv => {
+                  const efficacy = disease.interventions[intv.key as keyof typeof disease.interventions]?.efficacy;
+                  return (
+                    <button
+                      key={intv.key}
+                      className={`dis-intervention-card${intv.state ? ' active' : ''}`}
+                      style={intv.state ? { borderColor: intv.color } : {}}
+                      onClick={() => intv.setState(!intv.state)}
+                    >
+                      <span className="dis-intervention-icon" style={{ color: intv.color }}>
+                        <intv.icon size={18} />
                       </span>
-                    </div>
+                      <span className="dis-intervention-name">{intv.label}</span>
+                      {efficacy && (
+                        <span className="dis-intervention-efficacy">{Math.round(efficacy * 100)}% effective</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {vaccination && (
+                <div className="dis-param-row" style={{ marginTop: '0.65rem' }}>
+                  <div className="dis-param-header">
+                    <span>Vaccination Coverage</span>
+                    <span className="dis-param-val">{Math.round(vaccinationRate * 100)}%</span>
                   </div>
-                </div>
-              </HUD>
-            </CanvasContainer>
-          </VideoSection>
-
-          <ControlsSection>
-            <SectionTitle>
-              <Bug size={20} />
-              Disease Selection
-            </SectionTitle>
-
-            <DiseaseSelector>
-              {Object.values(DISEASE_PROFILES).map(d => (
-                <DiseaseButton
-                  key={d.id}
-                  $color={d.color}
-                  $selected={d.id === selectedDisease}
-                  onClick={() => {
-                    setSelectedDisease(d.id);
-                    handleReset();
-                  }}
-                >
-                  <div className="disease-icon" />
-                  <div className="disease-info">
-                    <div className="disease-name">{d.name}</div>
-                    <div className="disease-stats">
-                      R₀: {d.r0.typical} | CFR: {(d.cfr * 100).toFixed(1)}% | {d.transmissionMode}
-                    </div>
-                  </div>
-                </DiseaseButton>
-              ))}
-            </DiseaseSelector>
-          </ControlsSection>
-
-          <ControlsSection>
-            <TabContainer>
-              <Tab $active={activeTab === 'parameters'} onClick={() => setActiveTab('parameters')}>
-                <Settings size={16} />
-                Parameters
-              </Tab>
-              <Tab $active={activeTab === 'interventions'} onClick={() => setActiveTab('interventions')}>
-                <Shield size={16} />
-                Interventions
-              </Tab>
-              <Tab $active={activeTab === 'statistics'} onClick={() => setActiveTab('statistics')}>
-                <BarChart3 size={16} />
-                Statistics
-              </Tab>
-            </TabContainer>
-
-            <TabContent>
-              {activeTab === 'parameters' && (
-                <Grid $columns={3}>
-                  <ParameterControl>
-                    <div className="header">
-                      <span className="label">Population Size</span>
-                      <span className="value">{population}</span>
-                    </div>
-                    <input type="range" min={100} max={2000} step={50} value={population} onChange={(e) => setPopulation(Number(e.target.value))} disabled={isRunning} />
-                  </ParameterControl>
-
-                  <ParameterControl>
-                    <div className="header">
-                      <span className="label">Initial Cases</span>
-                      <span className="value">{initialInfected}</span>
-                    </div>
-                    <input type="range" min={1} max={20} value={initialInfected} onChange={(e) => setInitialInfected(Number(e.target.value))} disabled={isRunning} />
-                  </ParameterControl>
-
-                  <ParameterControl>
-                    <div className="header">
-                      <span className="label">Network Model</span>
-                    </div>
-                    <select value={simulationMode} onChange={(e) => setSimulationMode(e.target.value as SimulationMode)} disabled={isRunning}>
-                      <option value="homogeneous">Homogeneous</option>
-                      <option value="regions">Regional Clusters</option>
-                      <option value="households">Household Structure</option>
-                    </select>
-                  </ParameterControl>
-                </Grid>
-              )}
-
-              {activeTab === 'interventions' && (
-                <div>
-                  <InterventionGrid>
-                    {[
-                      { key: 'masks', state: maskWearing, setState: setMaskWearing, icon: Shield, label: 'Mask Mandate', color: '#10b981' },
-                      { key: 'distancing', state: socialDistancing, setState: setSocialDistancing, icon: Users, label: 'Social Distancing', color: '#3b82f6' },
-                      { key: 'quarantine', state: quarantine, setState: setQuarantine, icon: Home, label: 'Quarantine', color: '#f59e0b' },
-                      { key: 'vaccination', state: vaccination, setState: setVaccination, icon: Heart, label: 'Vaccination', color: '#8b5cf6' }
-                    ].map(intervention => {
-                      const efficacy = disease.interventions[intervention.key as keyof typeof disease.interventions]?.efficacy;
-                      return (
-                        <InterventionCard
-                          key={intervention.key}
-                          $active={intervention.state}
-                          $color={intervention.color}
-                          onClick={() => intervention.setState(!intervention.state)}
-                        >
-                          <div className="icon">
-                            <intervention.icon size={24} />
-                          </div>
-                          <div className="name">{intervention.label}</div>
-                          {efficacy && (
-                            <div className="efficacy">
-                              {Math.round(efficacy * 100)}% effective
-                            </div>
-                          )}
-                        </InterventionCard>
-                      );
-                    })}
-                  </InterventionGrid>
-
-                  {vaccination && (
-                    <div style={{ marginTop: '1.5rem' }}>
-                      <ParameterControl>
-                        <div className="header">
-                          <span className="label">Vaccination Coverage</span>
-                          <span className="value">{Math.round(vaccinationRate * 100)}%</span>
-                        </div>
-                        <input type="range" min={0} max={1} step={0.05} value={vaccinationRate} onChange={(e) => setVaccinationRate(Number(e.target.value))} disabled={isRunning} />
-                      </ParameterControl>
-                    </div>
-                  )}
+                  <input type="range" className="dis-param-slider" min={0} max={1} step={0.05} value={vaccinationRate}
+                    onChange={e => setVaccinationRate(Number(e.target.value))} disabled={isRunning} />
                 </div>
               )}
+            </div>
+          </div>
+        )}
 
-              {activeTab === 'statistics' && (
-                <div>
-                  <Grid $columns={4}>
-                    <StatCard $color="#3b82f6">
-                      <div className="label">Attack Rate</div>
-                      <div className="value">{((stats.totalCases / population) * 100).toFixed(1)}%</div>
-                      <div className="change">Total cases: {stats.totalCases}</div>
-                    </StatCard>
-
-                    <StatCard $color={stats.rt > 1 ? '#ef4444' : '#22c55e'}>
-                      <div className="label">R(t)</div>
-                      <div className="value">{stats.rt.toFixed(2)}</div>
-                      <div className="change">{stats.rt > 1 ? 'Outbreak growing' : 'Outbreak declining'}</div>
-                    </StatCard>
-
-                    <StatCard $color="#fbbf24">
-                      <div className="label">Peak Infected</div>
-                      <div className="value">{stats.peakInfected}</div>
-                      <div className="change">{((stats.peakInfected / population) * 100).toFixed(1)}% of population</div>
-                    </StatCard>
-
-                    <StatCard $color="#dc2626">
-                      <div className="label">Case Fatality</div>
-                      <div className="value">{stats.D > 0 ? ((stats.D / stats.totalCases) * 100).toFixed(1) : '0'}%</div>
-                      <div className="change">Deaths: {stats.D}</div>
-                    </StatCard>
-                  </Grid>
-
-                  <div style={{ height: '250px', background: 'rgba(0, 0, 0, 0.5)', padding: '1rem', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)', marginTop: '1rem' }}>
-                    <Line data={chartData} options={chartOptions} />
+        {/* Statistics panel */}
+        {activePanel === 'statistics' && (
+          <div className="dis-panel">
+            <div className="dis-panel-header">
+              <BarChart3 size={15} />
+              Statistics
+              <button className="dis-panel-close" onClick={() => setActivePanel('none')}>
+                <X size={13} />
+              </button>
+            </div>
+            <div className="dis-panel-body">
+              <div className="dis-stats-grid">
+                <div className="dis-stat-card">
+                  <div className="dis-stat-label">Attack Rate</div>
+                  <div className="dis-stat-value" style={{ color: '#3b82f6' }}>
+                    {((stats.totalCases / population) * 100).toFixed(1)}%
+                  </div>
+                  <div className="dis-stat-change">Total: {stats.totalCases}</div>
+                </div>
+                <div className="dis-stat-card">
+                  <div className="dis-stat-label">R(t)</div>
+                  <div className="dis-stat-value" style={{ color: stats.rt > 1 ? '#ef4444' : '#22c55e' }}>
+                    {stats.rt.toFixed(2)}
+                  </div>
+                  <div className="dis-stat-change">{stats.rt > 1 ? 'Growing' : 'Declining'}</div>
+                </div>
+                <div className="dis-stat-card">
+                  <div className="dis-stat-label">Peak Infected</div>
+                  <div className="dis-stat-value" style={{ color: '#fbbf24' }}>{stats.peakInfected}</div>
+                  <div className="dis-stat-change">{((stats.peakInfected / population) * 100).toFixed(1)}%</div>
+                </div>
+                <div className="dis-stat-card">
+                  <div className="dis-stat-label">Deaths</div>
+                  <div className="dis-stat-value" style={{ color: '#dc2626' }}>{stats.D}</div>
+                  <div className="dis-stat-change">
+                    CFR: {stats.D > 0 ? ((stats.D / stats.totalCases) * 100).toFixed(1) : '0'}%
                   </div>
                 </div>
-              )}
-            </TabContent>
-          </ControlsSection>
-        </MaxWidthWrapper>
-      </Container>
+              </div>
+              <div style={{ height: '140px', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', padding: '0.5rem', border: '1px solid rgba(59,130,246,0.12)' }}>
+                <Line data={chartData} options={chartOptions} />
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* Mobile Fullscreen Overlay */}
+        {/* Zoom badge */}
+        <div className="dis-zoom">{(zoomLevel * 100).toFixed(0)}%</div>
+
+        {/* Mobile "View Sim" button — visible only on small screens */}
+        {!isTheaterMode && (
+          <button
+            onClick={enterMobileFullscreen}
+            style={{
+              display: 'none',
+              position: 'absolute', inset: 0, width: '100%',
+              background: 'rgba(0,0,0,0.55)', border: 'none', color: '#fff',
+              fontSize: '1rem', fontWeight: 600, cursor: 'pointer',
+              alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+            }}
+            className="dis-mobile-cta"
+          >
+            <Activity size={20} /> View Simulation
+          </button>
+        )}
+      </div>
+
+      {/* ── Mobile fullscreen overlay ── */}
       <FullscreenOverlay $show={isMobileFullscreen}>
         <FullscreenCanvas
           ref={theaterCanvasRef}
@@ -1550,44 +1361,41 @@ export default function DiseaseSimulation({
           onTouchEnd={handleTouchEnd}
         />
 
-        <HUD $theater>
-          <div style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.5rem' }}>Day {stats.day}</div>
-          <div style={{ display: 'grid', gap: '0.4rem', fontSize: '0.8rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>S:</span>
-              <span style={{ fontWeight: 600, color: '#3b82f6' }}>{stats.S}</span>
-            </div>
-            {stats.E > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ opacity: 0.7 }}>E:</span>
-                <span style={{ fontWeight: 600, color: '#fbbf24' }}>{stats.E}</span>
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>I:</span>
-              <span style={{ fontWeight: 600, color: disease.color }}>{stats.I}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ opacity: 0.7 }}>R:</span>
-              <span style={{ fontWeight: 600, color: '#22c55e' }}>{stats.R}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ opacity: 0.7 }}>R(t):</span>
-              <span style={{ fontWeight: 700, color: stats.rt > 1 ? '#ef4444' : '#22c55e' }}>{stats.rt.toFixed(2)}</span>
-            </div>
+        <div style={{
+          position: 'absolute', top: '1rem', left: '1rem',
+          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.09)', borderRadius: '10px',
+          padding: '0.6rem 0.75rem', fontSize: '0.73rem', color: 'rgba(255,255,255,0.55)',
+          minWidth: '130px', zIndex: 50,
+        }}>
+          <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#e2e8f0', marginBottom: '0.4rem' }}>
+            <span style={{ color: disease.color }}>●</span> Day {stats.day}
           </div>
-        </HUD>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.1rem 0' }}>
+            <span>S</span><span style={{ color: '#3b82f6', fontWeight: 600 }}>{stats.S}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.1rem 0' }}>
+            <span>I</span><span style={{ color: disease.color, fontWeight: 600 }}>{stats.I}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.1rem 0' }}>
+            <span>R</span><span style={{ color: '#22c55e', fontWeight: 600 }}>{stats.R}</span>
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', marginTop: '0.3rem', paddingTop: '0.3rem', display: 'flex', justifyContent: 'space-between' }}>
+            <span>R(t)</span>
+            <span style={{ color: stats.rt > 1 ? '#ef4444' : '#22c55e', fontWeight: 700 }}>{stats.rt.toFixed(2)}</span>
+          </div>
+        </div>
 
-        <div style={{ position: 'absolute', bottom: 'calc(1rem + env(safe-area-inset-bottom))', right: '1rem', background: 'rgba(0,0,0,0.9)', padding: '0.5rem 0.8rem', borderRadius: '18px', border: '1px solid rgba(59,130,246,0.5)', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace', zIndex: 50 }}>
+        <div style={{
+          position: 'absolute', bottom: 'calc(1rem + env(safe-area-inset-bottom))', right: '1rem',
+          background: 'rgba(0,0,0,0.75)', padding: '0.2rem 0.5rem', borderRadius: '8px',
+          fontSize: '0.68rem', fontFamily: 'monospace', color: '#64748b', zIndex: 50,
+        }}>
           {(zoomLevel * 100).toFixed(0)}%
         </div>
 
-        <div style={{ position: 'absolute', bottom: 'calc(6rem + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)', color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', textAlign: 'center', zIndex: 50 }}>
-          Pinch to zoom • Drag to pan
-        </div>
-
         <FullscreenControls>
-          <FullscreenButton $primary onClick={() => setIsRunning(!isRunning)}>
+          <FullscreenButton $primary onClick={() => setIsRunning(v => !v)}>
             {isRunning ? <PauseCircle size={20} /> : <PlayCircle size={20} />}
           </FullscreenButton>
           <FullscreenButton onClick={handleReset}>

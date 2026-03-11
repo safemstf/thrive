@@ -9,12 +9,11 @@ import {
   Genome, Neat
 } from './neat';
 import {
-  Container,
-  MaxWidthWrapper,
-  VideoSection,
-  CanvasContainer,
+  AgarioOverlayStyles,
   SimCanvas,
 } from './config/agario.styles';
+
+import { Play, Pause, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 
 import {
   TerrainZone, Food, FoodCluster, Obstacle, Log, Blob, NeuralLayout,
@@ -89,7 +88,6 @@ import {
   updateObstacles
 } from './utils/environment';
 
-import { HeaderSection } from "./components/HeaderSection";
 import { HUDComponent } from "./components/HUDComponent";
 import { LeaderboardComponent } from "./components/LeaderboardComponent";
 import { NeuralNetModalComponent } from "./components/NeuralNetModal";
@@ -104,13 +102,15 @@ import { SerializedGenome, HeadlessTrainer } from "./utils/headless-trainer";
 interface AgarioDemoProps {
   isRunning?: boolean;
   speed?: number;
+  isTheaterMode?: boolean;
 }
 
 // ===================== MAIN COMPONENT =====================
 
 export default function AgarioDemo({
   isRunning: isRunningProp = false,
-  speed: speedProp = 1
+  speed: speedProp = 1,
+  isTheaterMode = false
 }: AgarioDemoProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const neuralNetCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -157,7 +157,6 @@ export default function AgarioDemo({
   // UI State
   const [isRunning, setIsRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [drawerExpanded, setDrawerExpanded] = useState(false);
   const [selectedBlob, setSelectedBlob] = useState<Blob | null>(null);
   const [showTrainingPanel, setShowTrainingPanel] = useState(false);
 
@@ -1433,9 +1432,10 @@ export default function AgarioDemo({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  const handleToggleDrawer = useCallback(() => {
-    setDrawerExpanded(prev => !prev);
-  }, []);
+  const handleReset = useCallback(() => {
+    setIsRunning(false);
+    initSimulation();
+  }, [initSimulation]);
 
   const handleCloseModal = useCallback(() => {
     setSelectedBlob(null);
@@ -1500,66 +1500,98 @@ export default function AgarioDemo({
   // ===================== RENDER JSX =====================
 
   return (
-    <Container>
-      <MaxWidthWrapper>
-        <HeaderSection
-          speciesCount={stats.speciesCount}
-          population={stats.population}
-          largestFamily={stats.largestFamily}
+    <>
+      <AgarioOverlayStyles />
+
+      {/* ── Canvas root ── */}
+      <div
+        className={`agario-root${isTheaterMode ? ' theater' : ''}`}
+        ref={canvasContainerRef}
+      >
+        <SimCanvas
+          className="agario-canvas"
+          ref={canvasRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
         />
 
-        <VideoSection>
-          <CanvasContainer ref={canvasContainerRef}>
-            <SimCanvas
-              ref={canvasRef}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-            />
+        {/* Top-left HUD */}
+        <HUDComponent
+          generation={stats.generation}
+          population={stats.population}
+          maxPopulation={MAX_POPULATION}
+          foodCount={foodRef.current.length}
+          avgMass={stats.avgMass}
+          avgAge={stats.avgAge}
+          reproductionRate={stats.reproductionRate}
+          totalBirths={stats.totalBirths}
+          totalDeaths={stats.totalDeaths}
+        />
 
-            <HUDComponent
-              generation={stats.generation}
-              population={stats.population}
-              maxPopulation={MAX_POPULATION}
-              foodCount={foodRef.current.length}
-              avgMass={stats.avgMass}
-              avgAge={stats.avgAge}
-              reproductionRate={stats.reproductionRate}
-              totalBirths={stats.totalBirths}
-              totalDeaths={stats.totalDeaths}
-            />
+        {/* Top-right leaderboard */}
+        <LeaderboardComponent
+          topBlobs={topBlobs}
+          selectedBlobId={selectedBlob?.id || null}
+          followedBlobId={followedBlobId}
+          onSelectBlob={setSelectedBlob}
+          onFollowBlob={handleFollowBlob}
+          onOpenTraining={handleToggleTrainingPanel}
+          currentTick={tickCountRef.current}
+          speciesCount={stats.speciesCount}
+          totalBirths={stats.totalBirths}
+          totalDeaths={stats.totalDeaths}
+          population={stats.population}
+        />
 
-            <LeaderboardComponent
-              topBlobs={topBlobs}
-              selectedBlobId={selectedBlob?.id || null}
-              followedBlobId={followedBlobId}
-              onSelectBlob={setSelectedBlob}
-              onFollowBlob={handleFollowBlob}
-              onOpenTraining={handleToggleTrainingPanel}
-              currentTick={tickCountRef.current}
-              speciesCount={stats.speciesCount}
-              totalBirths={stats.totalBirths}
-              totalDeaths={stats.totalDeaths}
-              population={stats.population}
-            />
+        {/* Bottom-right viewport controls */}
+        <ViewportControlsComponent
+          zoom={zoom}
+          followBest={followBest}
+          isFullscreen={isFullscreen}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onResetCamera={resetCamera}
+          onToggleFollowBest={handleToggleFollowBest}
+          onToggleFullscreen={handleToggleFullscreen}
+        />
 
-            <ViewportControlsComponent
-              zoom={zoom}
-              followBest={followBest}
-              isFullscreen={isFullscreen}
-              onZoomIn={zoomIn}
-              onZoomOut={zoomOut}
-              onResetCamera={resetCamera}
-              onToggleFollowBest={handleToggleFollowBest}
-              onToggleFullscreen={handleToggleFullscreen}
-            />
-          </CanvasContainer>
-        </VideoSection>
+        {/* Bottom centre pill bar */}
+        <div className="agario-bar">
+          <button
+            className={`agario-bar-btn${isRunning ? ' active' : ' primary'}`}
+            onClick={() => setIsRunning(r => !r)}
+          >
+            {isRunning ? <Pause size={13} /> : <Play size={13} />}
+            {isRunning ? 'Pause' : 'Play'}
+          </button>
 
-        {/* StatsDrawer removed - stats now in LeaderboardComponent */}
-      </MaxWidthWrapper>
+          <div className="agario-bar-divider" />
 
+          <button className="agario-bar-btn" onClick={handleReset}>
+            <RefreshCw size={13} /> Reset
+          </button>
+
+          <div className="agario-bar-divider" />
+
+          <button
+            className="agario-bar-btn"
+            onClick={() => setSpeed(s => Math.max(0.5, parseFloat((s - 0.5).toFixed(1))))}
+          >
+            <ChevronLeft size={13} />
+          </button>
+          <span className="agario-speed-label">{speed}×</span>
+          <button
+            className="agario-bar-btn"
+            onClick={() => setSpeed(s => Math.min(4, parseFloat((s + 0.5).toFixed(1))))}
+          >
+            <ChevronRight size={13} />
+          </button>
+        </div>
+      </div>
+
+      {/* Neural net modal (fixed overlay) */}
       {selectedBlob && (
         <NeuralNetModalComponent
           selectedBlob={selectedBlob}
@@ -1589,7 +1621,7 @@ export default function AgarioDemo({
         />
       )}
 
-      {/* Training Panel */}
+      {/* Training panel (fixed overlay) */}
       <TrainingPanelComponent
         isOpen={showTrainingPanel}
         onClose={() => setShowTrainingPanel(false)}
@@ -1598,6 +1630,6 @@ export default function AgarioDemo({
         onPauseSimulation={() => setIsRunning(false)}
         onResumeSimulation={() => setIsRunning(true)}
       />
-    </Container>
+    </>
   );
 }
