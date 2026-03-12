@@ -36,38 +36,58 @@ export const NavContainer = styled.nav<{ $isScrolled?: boolean }>`
 
 export const NavButton = styled(Link)<{ $active?: boolean; $isScrolled?: boolean }>`
   background: none;
-  border: 1px solid var(--color-primary-500);
-  color: ${props => (props.$active ? 'var(--color-background-secondary)' : 'var(--color-primary-500)')};
-  background-color: ${props => (props.$active ? 'var(--color-primary-500)' : 'transparent')};
-  padding: ${props => (props.$isScrolled ? '0.6rem 1.2rem' : '0.75rem 1.5rem')};
-  font-size: ${props => (props.$isScrolled ? '0.9rem' : '1rem')};
-  font-family: var(--font-body);
-  letter-spacing: 1px;
+  border: none;
+  color: ${props => (props.$active ? '#1a1208' : '#7a6e5f')};
+  padding: ${props => (props.$isScrolled ? '0.45rem 0.75rem' : '0.5rem 0.75rem')};
+  font-size: ${props => (props.$isScrolled ? '0.84rem' : '0.88rem')};
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0;
   cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  font-weight: 300;
+  transition: color 0.2s ease;
+  font-weight: ${props => (props.$active ? '600' : '500')};
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   white-space: nowrap;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
+  position: relative;
+
+  /* Active underline indicator */
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0.75rem;
+    right: 0.75rem;
+    height: 2px;
+    background: #2563eb;
+    border-radius: 1px;
+    opacity: ${props => (props.$active ? 1 : 0)};
+    transform: scaleX(${props => (props.$active ? 1 : 0)});
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
   &:hover {
-    background: var(--color-primary-500);
-    color: var(--color-background-secondary);
+    color: #1a1208;
     text-decoration: none;
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+    &::after {
+      opacity: 0.3;
+      transform: scaleX(1);
+    }
   }
+
   &:active {
-    transform: translateY(0);
+    transform: none;
   }
+
   @media (max-width: 1024px) {
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
+    padding: 0.45rem 0.625rem;
+    font-size: 0.82rem;
   }
+
   @media (max-width: 840px) {
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.78rem;
   }
 `;
 
@@ -79,42 +99,38 @@ export const UserDropdown = styled.div<{ $isScrolled?: boolean }>`
 
 export const UserButton = styled.button<{ $isScrolled?: boolean }>`
   background: none;
-  border: 1px solid var(--color-primary-500);
-  color: var(--color-primary-500);
-  background-color: transparent;
-  padding: ${props => (props.$isScrolled ? '0.6rem 1.2rem' : '0.75rem 1.5rem')};
-  font-size: ${props => (props.$isScrolled ? '0.9rem' : '1rem')};
-  font-family: var(--font-body);
-  letter-spacing: 1px;
+  border: 1px solid rgba(26, 18, 8, 0.15);
+  color: #1a1208;
+  padding: ${props => (props.$isScrolled ? '0.35rem 0.875rem' : '0.4rem 1rem')};
+  font-size: ${props => (props.$isScrolled ? '0.82rem' : '0.85rem')};
+  font-family: 'DM Sans', sans-serif;
+  letter-spacing: 0;
   cursor: pointer;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  font-weight: 300;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  font-weight: 500;
   white-space: nowrap;
-  border-radius: var(--radius-sm);
+  border-radius: 99px;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  
+
   &:hover {
-    background: var(--color-primary-500);
-    color: var(--color-background-secondary);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+    background: rgba(26, 18, 8, 0.04);
+    border-color: rgba(26, 18, 8, 0.25);
   }
-  
+
   &:active {
-    transform: translateY(0);
+    transform: scale(0.98);
   }
-  
+
   @media (max-width: 1024px) {
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
+    padding: 0.35rem 0.875rem;
+    font-size: 0.82rem;
   }
-  
+
   @media (max-width: 840px) {
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.78rem;
   }
 `;
 

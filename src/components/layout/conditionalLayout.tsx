@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Header } from '@/components/misc/header';
 import { Footer } from '@/components/misc/footer';
 import { MatrixProvider, useMatrix } from '@/hooks/useMatrix';
-import { Code, Brush, BookOpen, FileText, Mail } from 'lucide-react';
+import { Code, Brush, BookOpen } from 'lucide-react';
 
 interface ConditionalLayoutProps {
   children: React.ReactNode;
@@ -96,20 +96,6 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
                 title: 'Services',
                 href: '/Services',
                 icon: <Code size={16} />,
-                types: []
-              },
-              {
-                id: 'taco',
-                title: 'Talk Oh—Taco',
-                href: '/talkohtaco',
-                icon: <Mail size={16} />,
-                types: []
-              },
-              {
-                id: 'homerank',
-                title: 'Home Rank',
-                href: '/homerank',
-                icon: <FileText size={16} />,
                 types: []
               }
             ]

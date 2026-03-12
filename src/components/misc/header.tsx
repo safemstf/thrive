@@ -4,12 +4,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import styled, { keyframes } from 'styled-components';
+import styled, { keyframes, createGlobalStyle } from 'styled-components';
 import {
   Menu, X, User, Settings, ArrowLeft,
   Code, Brush, Circle, Wifi, WifiOff,
   BookOpen, ChevronLeft, ChevronRight,
-  FileText, Mail
+  FileText
 } from 'lucide-react';
 import logoLight from '../../../public/assets/logo3.png';
 import { Taskbar } from './taskbar';
@@ -61,6 +61,13 @@ interface HeaderProps {
   withSidebar?: boolean;
   sidebarConfig?: SidebarConfig;
 }
+
+// ============================================
+// GLOBAL FONTS
+// ============================================
+const GlobalFonts = createGlobalStyle`
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap');
+`;
 
 // ============================================
 // ANIMATIONS
@@ -154,28 +161,25 @@ const HeaderContainer = styled.header<{ $scrolled: boolean; $visible: boolean }>
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
   background: ${props => props.$scrolled
-    ? 'rgba(255, 255, 255, 0.95)'
+    ? 'rgba(250, 247, 242, 0.97)'
     : '#ffffff'
   };
-  
-  backdrop-filter: ${props => props.$scrolled ? 'blur(12px)' : 'none'};
-  -webkit-backdrop-filter: ${props => props.$scrolled ? 'blur(12px)' : 'none'};
-  
+
+  backdrop-filter: ${props => props.$scrolled ? 'blur(16px)' : 'none'};
+  -webkit-backdrop-filter: ${props => props.$scrolled ? 'blur(16px)' : 'none'};
+
   border-bottom: 1px solid ${props => props.$scrolled
-    ? 'rgba(0, 0, 0, 0.08)'
-    : 'rgba(0, 0, 0, 0.05)'
+    ? 'rgba(26, 18, 8, 0.07)'
+    : 'rgba(26, 18, 8, 0.04)'
   };
-  
-  box-shadow: ${props => props.$scrolled
-    ? '0 4px 20px rgba(0, 0, 0, 0.08)'
-    : 'none'
-  };
+
+  box-shadow: none;
 `;
 
 const HeaderContent = styled.div<{ $scrolled: boolean }>`
   max-width: 1200px;
   margin: 0 auto;
-  padding: ${props => props.$scrolled ? '0.75rem 1rem' : '1.25rem 1rem'};
+  padding: ${props => props.$scrolled ? '0.625rem 1.75rem' : '1rem 1.75rem'};
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -183,7 +187,7 @@ const HeaderContent = styled.div<{ $scrolled: boolean }>`
   transition: padding 0.3s ease;
 
   @media (max-width: 768px) {
-    padding: 1rem;
+    padding: 0.875rem 1.25rem;
     gap: 1rem;
   }
 `;
@@ -211,14 +215,14 @@ const LogoSection = styled(Link)`
 `;
 
 const LogoImageContainer = styled.div<{ $scrolled: boolean }>`
-  width: ${props => props.$scrolled ? '56px' : '72px'};
-  height: ${props => props.$scrolled ? '56px' : '72px'};
-  transition: all 0.2s ease;
+  width: ${props => props.$scrolled ? '40px' : '56px'};
+  height: ${props => props.$scrolled ? '40px' : '56px'};
+  transition: all 0.25s ease;
   flex-shrink: 0;
 
   @media (max-width: 768px) {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
   }
 `;
 
@@ -234,22 +238,29 @@ const BrandText = styled.div<{ $scrolled: boolean }>`
 `;
 
 const BrandTitle = styled.span<{ $scrolled: boolean }>`
-  font-size: ${props => (props.$scrolled ? '1.25rem' : '1.6rem')};
-  font-weight: 600;
-  color: #1a1a1a;
-  letter-spacing: 0.5px;
-  transition: font-size 0.2s ease;
+  font-family: 'DM Serif Display', serif;
+  font-size: ${props => (props.$scrolled ? '1.2rem' : '1.45rem')};
+  font-weight: 400;
+  color: #1a1208;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  transition: font-size 0.25s ease;
 
   @media (max-width: 768px) {
-    font-size: ${props => (props.$scrolled ? '1.1rem' : '1.4rem')};
+    font-size: ${props => (props.$scrolled ? '1.05rem' : '1.25rem')};
   }
 `;
 
 const BrandSubtitle = styled.p<{ $scrolled: boolean }>`
-  font-size: ${props => (props.$scrolled ? '0.8rem' : '0.9rem')};
-  color: #666666;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem;
+  color: #8a8078;
   margin: 0;
-  transition: font-size 0.2s ease;
+  letter-spacing: 0.1px;
+  opacity: ${props => (props.$scrolled ? 0 : 1)};
+  max-height: ${props => (props.$scrolled ? '0' : '2rem')};
+  overflow: hidden;
+  transition: opacity 0.25s ease, max-height 0.25s ease;
 `;
 
 const DesktopNav = styled.div`
@@ -840,6 +851,7 @@ export function Header({
 
   return (
     <HeaderWrapper>
+      <GlobalFonts />
       <HeaderContainer $scrolled={isScrolled} $visible={isVisible}>
         <HeaderContent $scrolled={isScrolled}>
           <LeftSection>
@@ -1048,24 +1060,6 @@ export function Header({
               >
                 <Code size={20} />
                 Services
-              </NavLinkItem>
-
-              <NavLinkItem
-                href="/talkohtaco"
-                $active={pathname === '/talkohtaco'}
-                onClick={closeRightSidebar}
-              >
-                <Mail size={20} />
-                Talk Oh—Taco
-              </NavLinkItem>
-
-              <NavLinkItem
-                href="/homerank"
-                $active={pathname === '/homerank'}
-                onClick={closeRightSidebar}
-              >
-                <FileText size={20} />
-                Home Rank
               </NavLinkItem>
 
               {/* Dashboard + account items only when user exists */}

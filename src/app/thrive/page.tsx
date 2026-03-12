@@ -5,11 +5,11 @@ import React, { useState, useEffect, Suspense, useRef, useLayoutEffect } from 'r
 import styled, { keyframes } from 'styled-components';
 import {
   Target, TrendingUp, Users, Trophy, Star, CheckCircle,
-  ArrowRight, Shield, Globe, Loader2, Activity, Award,
+  ArrowRight, Loader2, Activity, Award,
   Lock, Sparkles, Timer, Brain, AlertCircle, Lightbulb,
-  Heart, Zap, BarChart3, Compass, ChevronRight, Building2,
+  Heart, Zap, BarChart3, Compass, ChevronRight,
   GraduationCap, Briefcase, LineChart, UserCheck, FileCheck,
-  Clock, X, Rocket, TrendingDown
+  Clock, X
 } from 'lucide-react';
 
 import {
@@ -1207,7 +1207,7 @@ const PublicContent: React.FC = () => {
       setWaiverOpen(true);
       return;
     }
-    console.log('Start assessment:', assessment.id);
+    handleCreateAccount();
   };
 
   const closeWaiver = () => {
@@ -1349,19 +1349,19 @@ const PublicContent: React.FC = () => {
 
           <HeroContent>
             <TrustBadge>
-              <Shield size={16} />
-              Trusted by Fortune 500 Companies
+              <Sparkles size={16} />
+              45+ Assessments — Free to Preview
             </TrustBadge>
 
             <HeroTitle>
-              Professional Assessments
+              Skills Arena
               <br />
-              <span className="accent">Career Excellence</span>
+              <span className="accent">Prove Your Edge</span>
             </HeroTitle>
 
             <HeroSubtitle>
-              Validate your skills with scientifically-backed assessments used by leading organizations
-              worldwide. Join millions of professionals advancing their careers.
+              Take scientifically-backed assessments to understand your strengths, track your growth,
+              and build a verifiable skills profile — free to start.
             </HeroSubtitle>
 
             <CTAButtons>
@@ -1374,20 +1374,20 @@ const PublicContent: React.FC = () => {
 
             <StatsGrid>
               <StatCard>
-                <StatNumber>2.4M+</StatNumber>
-                <StatLabel>Professionals Assessed</StatLabel>
-              </StatCard>
-              <StatCard>
-                <StatNumber>1,200+</StatNumber>
-                <StatLabel>Enterprise Clients</StatLabel>
-              </StatCard>
-              <StatCard>
                 <StatNumber>45+</StatNumber>
-                <StatLabel>Assessment Types</StatLabel>
+                <StatLabel>Assessments Available</StatLabel>
               </StatCard>
               <StatCard>
-                <StatNumber>94%</StatNumber>
-                <StatLabel>Accuracy Rate</StatLabel>
+                <StatNumber>3</StatNumber>
+                <StatLabel>Core Categories</StatLabel>
+              </StatCard>
+              <StatCard>
+                <StatNumber>~15</StatNumber>
+                <StatLabel>Minutes Per Assessment</StatLabel>
+              </StatCard>
+              <StatCard>
+                <StatNumber>100%</StatNumber>
+                <StatLabel>Free to Start</StatLabel>
               </StatCard>
             </StatsGrid>
           </HeroContent>
@@ -1401,13 +1401,13 @@ const PublicContent: React.FC = () => {
         <ParallaxSection1 ref={section1Ref}>
           <ParallaxBg1 />
           <ParallaxContent>
-            <ParallaxTitle>Measure What Matters</ParallaxTitle>
+            <ParallaxTitle>Know Your Strengths</ParallaxTitle>
             <ParallaxText>
-              Our scientifically validated assessments provide deep insights into professional competencies,
-              cognitive abilities, and creative potential. Get actionable feedback that drives real career growth.
+              Our assessments give you clear, actionable insights into your professional skills,
+              cognitive style, and creative potential — so you can focus on what you do best.
             </ParallaxText>
             <ParallaxButton onClick={handleCreateAccount}>
-              Explore Assessments <Target size={20} />
+              Browse Assessments <Target size={20} />
             </ParallaxButton>
           </ParallaxContent>
         </ParallaxSection1>
@@ -1421,7 +1421,7 @@ const PublicContent: React.FC = () => {
             </CategoryBadge>
             <CategoryTitle>Choose Your Assessment Category</CategoryTitle>
             <CategorySubtitle>
-              Comprehensive evaluation across multiple dimensions of professional excellence
+              From professional skills to creative thinking — find the assessment that fits your goals
             </CategorySubtitle>
           </CategoryHeader>
 
@@ -1456,13 +1456,13 @@ const PublicContent: React.FC = () => {
         <ParallaxSection2 ref={section2Ref}>
           <ParallaxBg2 />
           <ParallaxContent>
-            <ParallaxTitle>Data-Driven Career Decisions</ParallaxTitle>
+            <ParallaxTitle>Track Your Growth</ParallaxTitle>
             <ParallaxText>
-              Make informed career choices backed by comprehensive assessment data. Our platform helps you
-              identify strengths, discover growth opportunities, and plan your professional development journey.
+              Create an account to save your results, unlock detailed analytics, and build a skills
+              portfolio that proves your capabilities to employers and collaborators.
             </ParallaxText>
             <ParallaxButton onClick={handleSignIn}>
-              View Your Progress <TrendingUp size={20} />
+              Sign In to Continue <TrendingUp size={20} />
             </ParallaxButton>
           </ParallaxContent>
         </ParallaxSection2>
@@ -1470,33 +1470,33 @@ const PublicContent: React.FC = () => {
         {/* Trust Section */}
         <TrustSection ref={trustRef}>
           <TrustContent>
-            <TrustTitle>Trusted by Industry Leaders</TrustTitle>
+            <TrustTitle>Built for Ambitious Creators</TrustTitle>
             <TrustSubtitle>
-              Leading technology, healthcare, and enterprise organizations rely on our validated
-              assessments for talent development and recruitment.
+              Whether you're a designer, developer, or creative professional — our assessments
+              help you build a verified skills profile that stands out.
             </TrustSubtitle>
 
             <CompanyLogos>
               <CompanyLogo>
-                <Building2 size={20} />
-                TechCorp Global
+                <Zap size={20} />
+                Instant Results
               </CompanyLogo>
               <CompanyLogo>
-                <Globe size={20} />
-                Innovation Labs
+                <CheckCircle size={20} />
+                Free to Start
               </CompanyLogo>
               <CompanyLogo>
                 <Award size={20} />
-                Strategy Plus
+                Skill Certificates
               </CompanyLogo>
               <CompanyLogo>
-                <Target size={20} />
-                Future Systems
+                <TrendingUp size={20} />
+                Progress Tracking
               </CompanyLogo>
             </CompanyLogos>
 
             <PrimaryButton onClick={handleCreateAccount}>
-              Join 2.4 Million Professionals
+              Start Your Free Assessment
               <ArrowRight size={18} />
             </PrimaryButton>
           </TrustContent>

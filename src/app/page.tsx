@@ -1,6 +1,6 @@
-// src/app/page.tsx - Enhanced Homepage with Buttery Parallax (CSS-vars + rAF)
+// src/app/page.tsx - Homepage with Parallax & Brand-Updated Title
 'use client';
-import React, { useLayoutEffect, useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -69,14 +69,12 @@ const HeroSection = styled.section`
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  
-  /* Fixed parallax background */
+
   background-image: url('https://picsum.photos/1920/1080?random=10');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
-  
-  /* Gradient overlay */
+
   &::before {
     content: '';
     position: absolute;
@@ -89,10 +87,10 @@ const HeroSection = styled.section`
     pointer-events: none;
     z-index: 1;
   }
-  
-  @media (max-width: 768px) { 
+
+  @media (max-width: 768px) {
     min-height: 90vh;
-    background-attachment: scroll; /* Fixed doesn't work well on mobile */
+    background-attachment: scroll;
   }
 `;
 
@@ -103,7 +101,6 @@ const HeroFloatingElements = styled.div`
   z-index: 2;
 `;
 
-/* Floating shapes — decorative and animated, unaffected by CSS var movement (they float via keyframes) */
 const FloatingShape = styled.div<{ $delay: number; $duration: number; $top: string; $left: string }>`
   position: absolute;
   width: 100px;
@@ -121,7 +118,6 @@ const FloatingShape = styled.div<{ $delay: number; $duration: number; $top: stri
   }
 `;
 
-/* Foreground content */
 const HeroContent = styled.div`
   position: relative;
   z-index: 10;
@@ -157,7 +153,6 @@ const HeroSubtitle = styled.p`
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
 `;
 
-/* Search & buttons (unchanged styling) */
 const SearchContainer = styled.form`
   max-width: 600px;
   margin: 0 auto 2.5rem;
@@ -275,14 +270,12 @@ const ParallaxSection1 = styled.section`
   justify-content: center;
   overflow: hidden;
   margin: 0;
-  
-  /* Fixed parallax background */
+
   background-image: url('https://picsum.photos/1920/1080?random=20');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
-  
-  /* Gradient overlay */
+
   &::before {
     content: '';
     position: absolute;
@@ -294,14 +287,12 @@ const ParallaxSection1 = styled.section`
     pointer-events: none;
     z-index: 1;
   }
-  
-  @media (max-width: 768px) { 
+
+  @media (max-width: 768px) {
     min-height: 60vh;
     background-attachment: scroll;
   }
 `;
-
-/* Remove the separate background div */
 
 const ParallaxContent = styled.div`
   position: relative;
@@ -346,7 +337,7 @@ const ParallaxButton = styled(Link)`
   &:hover { transform: translateY(-2px) scale(1.02); }
 `;
 
-/* STATS, PORTFOLIO, other sections: these use the same small FG transform pattern */
+/* STATS */
 const StatsSection = styled.section`
   padding: 5rem 1.5rem;
   position: relative;
@@ -376,7 +367,6 @@ const StatsGrid = styled.div`
   gap: 2rem;
 `;
 
-/* stat cards etc (unchanged) */
 const StatCard = styled.div`
   text-align: center;
   padding: 2.5rem 1.5rem;
@@ -413,7 +403,6 @@ const PortfoliosSection = styled.section`
       rgba(248, 250, 252, 0.97) 0%,
       rgba(241, 245, 249, 0.07) 80%,
       rgba(248, 250, 252, 0.97) 100%
-
     );
   }
   & > * { position: relative; z-index: 1; }
@@ -515,14 +504,12 @@ const ParallaxSection2 = styled.section`
   justify-content: center;
   overflow: hidden;
   margin: 0;
-  
-  /* Fixed parallax background */
+
   background-image: url('https://picsum.photos/1920/1080?random=30');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
-  
-  /* Gradient overlay */
+
   &::before {
     content: '';
     position: absolute;
@@ -535,14 +522,27 @@ const ParallaxSection2 = styled.section`
     pointer-events: none;
     z-index: 1;
   }
-  
+
   @media (max-width: 768px) {
     min-height: 60vh;
     background-attachment: scroll;
   }
 `;
 
-/* Remove the separate background div */
+const ParallaxButton2 = styled(Link)`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  background: white;
+  color: #059669;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4);
+  animation: ${slideInRight} 0.8s ease-out 0.4s both;
+  &:hover { transform: translateY(-2px) scale(1.02); }
+`;
 
 /* QUICK ACTIONS */
 const QuickActionsSection = styled.section`
@@ -566,7 +566,6 @@ const QuickActionsGrid = styled.div`
   gap: 2rem;
 `;
 
-/* Small cards */
 const QuickActionCard = styled(Link)` display:block; padding:2.5rem 2rem; background: linear-gradient(135deg,#f8fafc,#ffffff); border-radius:20px; text-decoration:none; text-align:center; transition:all 0.3s ease; border:2px solid #e2e8f0; animation:${fadeInUp} 0.6s ease-out; &:hover { transform: translateY(-8px); border-color:#3b82f6; box-shadow:0 25px 50px -12px rgba(59,130,246,0.25); } `;
 const QuickActionIcon = styled.div` width:70px; height:70px; margin:0 auto 1.5rem; background: linear-gradient(135deg,#3b82f6,#8b5cf6); border-radius:18px; display:flex; align-items:center; justify-content:center; color:white; transition:transform 0.3s ease; box-shadow:0 10px 25px -5px rgba(59,130,246,0.4); ${QuickActionCard}:hover & { transform: scale(1.15) rotate(5deg); } `;
 const QuickActionTitle = styled.h3` font-size:1.375rem; font-weight:700; color:#1e293b; margin:0 0 0.75rem; `;
@@ -609,7 +608,7 @@ const useNetworkStatus = () => {
 
 const usePortfolios = () => {
   const [portfolios, setPortfolios] = useState<Portfolio[]>(() =>
-    Object.values(MOCK_PORTFOLIOS).slice(0, 6) // always show at least fallback
+    Object.values(MOCK_PORTFOLIOS).slice(0, 6)
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -620,7 +619,7 @@ const usePortfolios = () => {
     if (!isOnline) {
       setConnectionState('offline');
       setLoading(false);
-      return; // keep mock portfolios
+      return;
     }
     try {
       setLoading(true);
@@ -635,7 +634,6 @@ const usePortfolios = () => {
         serverPortfolios = (portfolioData as any).portfolios.map(normalizePortfolio);
       }
 
-      // Merge: server portfolios first, then fallback (avoid duplicates)
       const merged = [
         ...serverPortfolios,
         ...Object.values(MOCK_PORTFOLIOS)
@@ -651,8 +649,7 @@ const usePortfolios = () => {
       console.error('Failed to fetch portfolios:', err);
       setError('Failed to load portfolios');
       setConnectionState('error');
-      // keep fallback
-      setPortfolios((prev) => [...prev]); // just keep current mock
+      setPortfolios((prev) => [...prev]);
     } finally {
       setLoading(false);
     }
@@ -710,9 +707,10 @@ export default function HomePage() {
           </HeroFloatingElements>
 
           <HeroContent>
-            <HeroTitle>Portfolios <span> & </span> Simulations</HeroTitle>
+            <HeroTitle>Create. Learn. <span>Thrive.</span></HeroTitle>
             <HeroSubtitle>
-              Connect with talented creators, develop your skills, and showcase your work to a global community
+              Build stunning portfolios, master new skills, and explore powerful tools —
+              all in one creative platform.
             </HeroSubtitle>
 
             <SearchContainer onSubmit={handleSearch}>
@@ -772,7 +770,6 @@ export default function HomePage() {
 
           <PortfolioGrid>
             {loading && portfolios.length === 0 ? (
-              // Show skeleton cards while loading
               Array.from({ length: 6 }).map((_, idx) => (
                 <SkeletonCard key={idx}>
                   <SkeletonCover />
@@ -848,7 +845,7 @@ export default function HomePage() {
               Challenge yourself in the Skills Arena. Practice creative techniques, compete with peers,
               and track your progress as you master new abilities.
             </ParallaxText>
-            <ParallaxButton href="/thrive">Enter Arena <Target size={20} /></ParallaxButton>
+            <ParallaxButton2 href="/thrive">Enter Arena <Target size={20} /></ParallaxButton2>
           </ParallaxContent>
         </ParallaxSection2>
 
@@ -869,10 +866,10 @@ export default function HomePage() {
               <QuickActionDesc>Challenge yourself with interactive games and creative exercises</QuickActionDesc>
             </QuickActionCard>
 
-            <QuickActionCard href="/dashboard/profile">
-              <QuickActionIcon><Trophy size={28} /></QuickActionIcon>
-              <QuickActionTitle>Build Portfolio</QuickActionTitle>
-              <QuickActionDesc>Create your professional showcase and stand out to opportunities</QuickActionDesc>
+            <QuickActionCard href="/Services">
+              <QuickActionIcon><Zap size={28} /></QuickActionIcon>
+              <QuickActionTitle>Explore Services</QuickActionTitle>
+              <QuickActionDesc>Discover AI-powered tools and simulations built to help you work smarter</QuickActionDesc>
             </QuickActionCard>
           </QuickActionsGrid>
         </QuickActionsSection>

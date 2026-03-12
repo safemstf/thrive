@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
-import Script from 'next/script';
-import styled, { keyframes, css } from 'styled-components';
-import { useMatrix } from '@/hooks/useMatrix';
+import styled, { createGlobalStyle, keyframes, css } from 'styled-components';
+import { ExternalLink } from 'lucide-react';
 
 interface FooterProps {
   className?: string;
@@ -13,38 +12,35 @@ interface FooterProps {
 const TEAM_MEMBERS = [
   {
     name: 'Safe Mustafa',
-    vanity: 'safe-mufasa',
+    role: 'Senior Software Engineer',
+    initials: 'SM',
     profileUrl: 'https://www.linkedin.com/in/safe-mufasa',
   },
   {
     name: 'Dev Gurung',
-    vanity: 'dev-gurung-a8b863136',
+    role: 'Software Engineer',
+    initials: 'DG',
     profileUrl: 'https://www.linkedin.com/in/dev-gurung-a8b863136/',
   },
   {
     name: 'Alan Mathew',
-    vanity: 'alan-mathew-992863184',
+    role: 'Software Engineer',
+    initials: 'AM',
     profileUrl: 'https://www.linkedin.com/in/alan-mathew-992863184/',
   },
-   {
+  {
     name: 'Joseph Devasia',
-    vanity: 'josephdevasia',
+    role: 'Cybersecurity Engineer',
+    initials: 'JD',
     profileUrl: 'https://www.linkedin.com/in/josephdevasia/',
   },
 ];
 
-function useMatrixSafe() {
-  try {
-    return useMatrix();
-  } catch {
-    return {
-      isMatrixOn: false,
-      toggleMatrix: () => { },
-      setMatrixOn: () => { },
-      isHydrated: true,
-    };
-  }
-}
+/* -------------------------------- fonts -------------------------------- */
+
+const GlobalFonts = createGlobalStyle`
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap');
+`;
 
 /* -------------------------------- animations -------------------------------- */
 
@@ -58,7 +54,7 @@ const shimmer = keyframes`
 const FooterContainer = styled.footer`
   position: relative;
   overflow: hidden;
-  padding: 3rem 1rem 2rem;
+  padding: 3rem 1.5rem 2rem;
 
   background: linear-gradient(
     135deg,
@@ -66,7 +62,7 @@ const FooterContainer = styled.footer`
     rgba(248, 250, 252, 0.95)
   );
 
-  border-top: 1px solid rgba(59, 130, 246, 0.12);
+  border-top: 1px solid rgba(59, 130, 246, 0.10);
   border-radius: 24px 24px 0 0;
   backdrop-filter: blur(20px);
 
@@ -78,10 +74,10 @@ const FooterContainer = styled.footer`
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0.08),
       transparent
     );
-    ${css`animation: ${shimmer} 4s ease-in-out infinite;`}
+    ${css`animation: ${shimmer} 5s ease-in-out infinite;`}
   }
 
   @media (max-width: 768px) {
@@ -94,53 +90,55 @@ const FooterContent = styled.div`
   max-width: 1200px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(2, minmax(260px, 1fr));
-  gap: 2.25rem;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 1.75rem;
   position: relative;
   z-index: 1;
 
-  @media (max-width: 768px) {
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (max-width: 600px) {
     grid-template-columns: 1fr;
-    gap: 1.5rem;
+    gap: 1.25rem;
   }
 `;
 
 const FooterSection = styled.section`
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.5rem;
   padding: 1.5rem;
 
   background: linear-gradient(
     135deg,
-    rgba(59, 130, 246, 0.05),
+    rgba(59, 130, 246, 0.04),
     rgba(139, 92, 246, 0.02)
   );
 
-  border: 1px solid rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.07);
   border-radius: 16px;
-  backdrop-filter: blur(10px);
-  transition: all 0.25s ease;
+  transition: box-shadow 0.25s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(59, 130, 246, 0.08);
+    box-shadow: 0 6px 24px rgba(59, 130, 246, 0.07);
   }
 
   h3 {
-    margin: 0;
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.4rem;
-    font-weight: 600;
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.25rem;
+    font-weight: 400;
     color: #1a1a1a;
+    margin: 0 0 0.75rem;
     position: relative;
 
     &::after {
       content: '';
       position: absolute;
       left: 0;
-      bottom: -4px;
-      width: 32px;
+      bottom: -6px;
+      width: 28px;
       height: 2px;
       border-radius: 2px;
       background: linear-gradient(90deg, #3b82f6, #8b5cf6);
@@ -148,24 +146,25 @@ const FooterSection = styled.section`
   }
 `;
 
+/* -------------------------------- connect column -------------------------------- */
+
 const ConnectSection = styled(FooterSection)`
-  grid-column: 1 / -1;
-  align-items: center;
-  text-align: center;
-  padding: 1.25rem 1.5rem;
+  @media (max-width: 900px) {
+    grid-column: 1 / -1;
+  }
 `;
 
 /* -------------------------------- text -------------------------------- */
 
 const FooterLink = styled(Link)`
-  font-family: 'Work Sans', sans-serif;
-  font-size: 0.95rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
   font-weight: 500;
-  color: #666;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
+  color: #555;
+  padding: 0.4rem 0.6rem;
+  border-radius: 7px;
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
 
   &:hover {
     color: #3b82f6;
@@ -174,104 +173,103 @@ const FooterLink = styled(Link)`
   }
 `;
 
-const FooterText = styled.p`
-  margin: 0;
-  font-family: 'Work Sans', sans-serif;
-  font-size: 0.9rem;
-  color: #666;
-  opacity: 0.9;
+/* -------------------------------- team members -------------------------------- */
+
+const MemberList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
 `;
 
-/* -------------------------------- members -------------------------------- */
+const MemberCard = styled.a`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.18s ease;
 
-const MemberGrid = styled.div`
-  width: 100%;
-  margin-top: 1rem;
-
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.25rem;
-  justify-items: center;
-  max-width: 800px;
-  margin-left: auto;
-  margin-right: auto;
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+  &:hover {
+    border-color: rgba(59, 130, 246, 0.22);
+    background: rgba(59, 130, 246, 0.04);
+    transform: translateX(2px);
+    box-shadow: 0 2px 10px rgba(59, 130, 246, 0.08);
   }
 `;
 
-const MemberCard = styled.div`
-  width: 100%;
-  max-width: 340px;
-  
+const MemberInitials = styled.div`
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #1a1a1a;
+  color: #faf7f2;
+  font-family: 'DM Mono', monospace, 'DM Sans', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem 0.9rem;
-
-  border-radius: 14px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.65),
-    rgba(248, 250, 252, 0.55)
-  );
+  flex-shrink: 0;
 `;
 
-
-const MemberCardInner = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: center;
-  width: 100%;
-
-  .linkedin-wrapper {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-  }
-
-  .badge-base {
-    margin: 0 auto !important;
-    display: block !important;
-  }
-
-  .profile-fallback {
-    font-size: 0.8rem;
-    color: #64748b;
-    text-decoration: none;
-
-    &:hover {
-      color: #3b82f6;
-    }
-  }
+const MemberInfo = styled.div`
+  flex: 1;
+  min-width: 0;
 `;
 
+const MemberName = styled.p`
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin: 0 0 0.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const MemberRole = styled.p`
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.72rem;
+  color: #78716c;
+  margin: 0;
+`;
+
+const LinkedInIcon = styled.span`
+  color: #0a66c2;
+  opacity: 0.7;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+
+  ${MemberCard}:hover & {
+    opacity: 1;
+  }
+`;
 
 /* -------------------------------- bottom -------------------------------- */
 
 const FooterBottom = styled.div`
-  margin-top: 3rem;
-  padding: 1.5rem 2rem;
+  max-width: 1200px;
+  margin: 2rem auto 0;
+  padding: 1.25rem 1.5rem;
   text-align: center;
 
-  background: linear-gradient(
-    135deg,
-    rgba(248, 250, 252, 0.8),
-    rgba(241, 245, 249, 0.6)
-  );
-
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 16px;
-  backdrop-filter: blur(10px);
+  background: rgba(248, 250, 252, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
 
   p {
     margin: 0;
-    font-family: 'Work Sans', sans-serif;
-    font-size: 0.85rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
     font-weight: 500;
-    color: #1a1a1a;
+    color: #555;
   }
 `;
 
@@ -279,24 +277,17 @@ const FooterBottom = styled.div`
 
 export function Footer({ className }: FooterProps) {
   const [year] = useState(() => new Date().getFullYear());
-  const { isMatrixOn } = useMatrixSafe();
-
-  useEffect(() => { }, []);
 
   return (
     <>
-      <Script
-        src="https://platform.linkedin.com/badges/js/profile.js"
-        strategy="lazyOnload"
-      />
-
+      <GlobalFonts />
       <FooterContainer className={className}>
         <FooterContent>
           <FooterSection>
             <h3>Navigate</h3>
             <FooterLink href="/">Home</FooterLink>
             <FooterLink href="/thrive">Assessments</FooterLink>
-            <FooterLink href="/simulations">Simulations</FooterLink>
+            <FooterLink href="/Services">Services</FooterLink>
             <FooterLink href="/dashboard">Dashboard</FooterLink>
           </FooterSection>
 
@@ -309,43 +300,32 @@ export function Footer({ className }: FooterProps) {
           </FooterSection>
 
           <ConnectSection>
-            <h3>Connect</h3>
-            <FooterText>Message the LearnMorra team</FooterText>
-
-            <MemberGrid>
+            <h3>Meet the Team</h3>
+            <MemberList>
               {TEAM_MEMBERS.map((member) => (
-                <MemberCard key={member.vanity}>
-                  <MemberCardInner>
-                    <div className="linkedin-wrapper">
-                      <div
-                        className="badge-base LI-profile-badge"
-                        data-locale="en_US"
-                        data-size="medium"
-                        data-theme="dark"
-                        data-type="HORIZONTAL"
-                        data-vanity={member.vanity}
-                        data-version="v1"
-                      />
-                    </div>
-
-                    <a
-                      className="profile-fallback"
-                      href={member.profileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Visit {member.name}&rsquo;s profile
-                    </a>
-                  </MemberCardInner>
-
+                <MemberCard
+                  key={member.initials}
+                  href={member.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${member.name} on LinkedIn`}
+                >
+                  <MemberInitials>{member.initials}</MemberInitials>
+                  <MemberInfo>
+                    <MemberName>{member.name}</MemberName>
+                    <MemberRole>{member.role}</MemberRole>
+                  </MemberInfo>
+                  <LinkedInIcon>
+                    <ExternalLink size={13} />
+                  </LinkedInIcon>
                 </MemberCard>
               ))}
-            </MemberGrid>
+            </MemberList>
           </ConnectSection>
         </FooterContent>
 
         <FooterBottom>
-          <p>© {year} LearnMorra. All rights reserved. Brag Responsibly. ✨</p>
+          <p>© {year} LearnMorra · All rights reserved · Brag Responsibly ✨</p>
         </FooterBottom>
       </FooterContainer>
     </>

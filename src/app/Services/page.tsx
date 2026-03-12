@@ -8,7 +8,7 @@ import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen,
   Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check, Shield,
-  Lock, Fingerprint, FileSearch, Code2, Sheet, X, Briefcase
+  Lock, Fingerprint, FileSearch, Code2, Sheet, X, Briefcase, Home, Globe
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
@@ -111,9 +111,19 @@ const InterviewPrepDemo = dynamic(() => import('@/components/cs/interviewPrep/in
   loading: () => <SimulationLoader>Loading Interview Prep...</SimulationLoader>
 });
 
+const HomeRankDemo = dynamic(() => import('@/app/homerank/page'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Home Rank...</SimulationLoader>
+});
+
+const TalkOhTacoDemo = dynamic(() => import('@/app/talkohtaco/page'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Talk Oh—Taco...</SimulationLoader>
+});
+
 
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach' | 'virtual-recruiter' | 'interview-prep';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach' | 'virtual-recruiter' | 'interview-prep' | 'homerank' | 'talkohtaco';
 type TabType = 'simulations' | 'algorithms' | 'tools';
 
 interface SimulationItem {
@@ -1148,6 +1158,24 @@ const allItems: SimulationItem[] = [
     comingSoon: false,
     category: 'tools',
   },
+  {
+    key: 'homerank',
+    label: 'Home Rank',
+    icon: <Home size={22} />,
+    color: '#16a34a',
+    description: 'Explore and rank properties with natural language search, interactive map, and smart filters',
+    comingSoon: false,
+    category: 'tools',
+  },
+  {
+    key: 'talkohtaco',
+    label: 'Talk Oh—Taco',
+    icon: <Globe size={22} />,
+    color: '#f59e0b',
+    description: 'Learn languages with AI-powered teachers — choose from Arabic, Spanish, French, Chinese, or Italian',
+    comingSoon: false,
+    category: 'tools',
+  },
 
 ];
 
@@ -1392,6 +1420,10 @@ export default function SimulationsPage() {
         return <VirtualRecruiterDemo />;
       case 'interview-prep':
         return <InterviewPrepDemo />;
+      case 'homerank':
+        return <HomeRankDemo />;
+      case 'talkohtaco':
+        return <TalkOhTacoDemo />;
       default:
         return (
           <PlaceholderContent>
