@@ -106,9 +106,14 @@ const VirtualRecruiterDemo = dynamic(() => import('@/components/cs/virtualRecrui
   loading: () => <SimulationLoader>Loading Virtual Recruiter...</SimulationLoader>
 });
 
+const InterviewPrepDemo = dynamic(() => import('@/components/cs/interviewPrep/interviewPrep'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Interview Prep...</SimulationLoader>
+});
+
 
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach' | 'virtual-recruiter';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach' | 'virtual-recruiter' | 'interview-prep';
 type TabType = 'simulations' | 'algorithms' | 'tools';
 
 interface SimulationItem {
@@ -1134,6 +1139,15 @@ const allItems: SimulationItem[] = [
     comingSoon: false,
     category: 'tools',
   },
+  {
+    key: 'interview-prep',
+    label: 'Interview Prep',
+    icon: <BookOpen size={22} />,
+    color: '#7c3aed',
+    description: 'Enter the company and role — get a customized prep kit: behavioral questions, system design, topics to study, and questions to ask',
+    comingSoon: false,
+    category: 'tools',
+  },
 
 ];
 
@@ -1376,6 +1390,8 @@ export default function SimulationsPage() {
         return <SQLBreachDemo />;
       case 'virtual-recruiter':
         return <VirtualRecruiterDemo />;
+      case 'interview-prep':
+        return <InterviewPrepDemo />;
       default:
         return (
           <PlaceholderContent>

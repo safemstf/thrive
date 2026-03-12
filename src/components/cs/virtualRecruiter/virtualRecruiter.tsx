@@ -7,9 +7,8 @@ import {
   MapPin, Mail, Phone, Briefcase, GraduationCap,
   CheckCircle, XCircle, AlertCircle, ExternalLink, Copy,
   RefreshCw, ClipboardList, X, Sparkles, Wand2,
-  LayoutGrid, Building2, Search
+  LayoutGrid,
 } from "lucide-react";
-import type { NormalizedJob } from "@/app/api/jobs/route";
 
 // ─── Design tokens ───────────────────────────────────────────────────────────
 const T = {
@@ -83,11 +82,6 @@ interface MatchResult {
 interface BulletHint {
   bullet: string;
   suggestedKeyword: string;
-}
-
-interface ScoredJob extends NormalizedJob {
-  matchScore: number;
-  matchedSkills: string[];
 }
 
 type TabKey = 'jobs' | 'ats' | 'tailor' | 'letter';
@@ -390,22 +384,6 @@ function matchJD(resumeText: string, jdText: string): MatchResult {
   return { score: kws.length > 0 ? Math.round((matched.length / kws.length) * 100) : 0, matched: matched.slice(0, 30), missing, skillsToAdd, bulletHints };
 }
 
-// ─── Job Scoring ─────────────────────────────────────────────────────────────
-function scoreJob(resumeSkills: string[], job: NormalizedJob): ScoredJob {
-  // Build a text corpus from all job data
-  const corpus = [...job.tags, job.title, job.description].join(' ').toLowerCase();
-  const matchedSkills = resumeSkills.filter(skill => {
-    const s = skill.toLowerCase();
-    // exact match OR root match (e.g. "react" inside "react.js")
-    return corpus.includes(s) || (s.length > 3 && corpus.includes(s.slice(0, s.length - 1)));
-  });
-  // Score = % of your skills the job mentions (inverse: job wants what you have)
-  const score = resumeSkills.length > 0
-    ? Math.min(Math.round((matchedSkills.length / resumeSkills.length) * 100), 99)
-    : 30;
-  return { ...job, matchScore: score, matchedSkills };
-}
-
 // ─── Cover Letter ─────────────────────────────────────────────────────────────
 function generateCoverLetter(p: ParsedProfile, jdText: string): string {
   const topSkills = p.skills.slice(0, 3).join(', ') || 'my core skills';
@@ -439,15 +417,72 @@ Sincerely,
 ${p.name || '[Your Name]'}`;
 }
 
-// ─── Research quick-links per company ────────────────────────────────────────
-function glassdoorUrl(co: string) {
-  return `https://www.glassdoor.com/Search/results.htm?keyword=${encodeURIComponent(co)}`;
+// ─── Job Board Links ─────────────────────────────────────────────────────────
+interface BoardLink {
+  name: string;
+  desc: string;
+  color: string;
+  emoji: string;
+  url: string;
+  tip: string;
 }
-function levelsUrl(co: string) {
-  return `https://www.levels.fyi/companies/${encodeURIComponent(co.toLowerCase().replace(/\s+/g, '-'))}/`;
-}
-function linkedinUrl(co: string) {
-  return `https://www.linkedin.com/search/results/companies/?keywords=${encodeURIComponent(co)}`;
+
+function getJobBoardLinks(profile: ParsedProfile): BoardLink[] {
+  const rawTitle = profile.jobTitles[0] || 'Software Engineer';
+  const title    = encodeURIComponent(rawTitle);
+  const loc      = encodeURIComponent(profile.location || '');
+  const slug     = rawTitle.toLowerCase().replace(/\s+/g, '-');
+
+  return [
+    {
+      name: 'LinkedIn Jobs',
+      desc: 'Largest professional network · best for referrals',
+      color: '#0a66c2',
+      emoji: '💼',
+      tip: 'Turn on "Easy Apply" filter to move fast',
+      url: `https://www.linkedin.com/jobs/search/?keywords=${title}${loc ? '&location=' + loc : ''}`,
+    },
+    {
+      name: 'Indeed',
+      desc: 'Biggest job search engine · widest reach',
+      color: '#003a9b',
+      emoji: '🔍',
+      tip: 'Sort by "Date" to catch new postings early',
+      url: `https://www.indeed.com/jobs?q=${title}${loc ? '&l=' + loc : ''}`,
+    },
+    {
+      name: 'Glassdoor',
+      desc: 'Jobs + salary data + company reviews',
+      color: '#0caa41',
+      emoji: '🏢',
+      tip: 'Check reviews and interview questions before applying',
+      url: `https://www.glassdoor.com/Job/jobs.htm?suggestCount=0&typedKeyword=${title}`,
+    },
+    {
+      name: 'Wellfound',
+      desc: 'Top source for startup & Series A–C roles',
+      color: '#f43f5e',
+      emoji: '🚀',
+      tip: 'Many roles let you apply directly from your profile',
+      url: `https://wellfound.com/jobs?role=${title}`,
+    },
+    {
+      name: 'Remotive',
+      desc: 'Remote-first tech roles only',
+      color: '#7c3aed',
+      emoji: '🌍',
+      tip: 'Filter by category for best signal-to-noise',
+      url: `https://remotive.com/remote-jobs/${encodeURIComponent(slug)}`,
+    },
+    {
+      name: 'Levels.fyi Jobs',
+      desc: 'Verified comp data + curated TC-transparent postings',
+      color: '#b45309',
+      emoji: '📊',
+      tip: 'Use to benchmark offers before negotiating',
+      url: `https://www.levels.fyi/jobs?title=${title}`,
+    },
+  ];
 }
 
 // ─── Styled components ───────────────────────────────────────────────────────
@@ -670,94 +705,51 @@ const MatchTip = styled.div`
   border-radius: ${T.radiusSm}; font-size: 0.78rem; color: ${T.amber}; display: flex; gap: 0.5rem;
 `;
 
-// Find Jobs tab
-const JobsSearchRow = styled.div`
-  display: flex; gap: 0.65rem; margin-bottom: 0.85rem; flex-wrap: wrap;
+// ── Find Jobs — board links ───────────────────────────────────────────────────
+const BoardSectionLabel = styled.p`
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.07em; color: ${T.inkLight}; margin: 0 0 0.6rem;
 `;
-const JobsInput = styled.input`
-  flex: 1; min-width: 180px; padding: 0.55rem 0.85rem;
-  border: 1px solid ${T.borderMid}; border-radius: ${T.radiusSm};
-  background: ${T.cream}; font-family: ${T.sans}; font-size: 0.82rem; color: ${T.ink};
-  outline: none;
-  &:focus { border-color: ${T.accent}; box-shadow: 0 0 0 2px ${T.accentBg}; }
-  &::placeholder { color: ${T.inkLight}; }
-`;
-const SearchBtn = styled.button`
-  display: flex; align-items: center; gap: 0.4rem; padding: 0.55rem 1.1rem;
-  border-radius: ${T.radiusSm}; background: ${T.ink}; color: ${T.cream};
-  border: none; font-family: ${T.sans}; font-size: 0.82rem; font-weight: 700;
-  cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
-  &:hover { opacity: 0.85; }
-  &:disabled { opacity: 0.45; cursor: not-allowed; }
-`;
-const JobsMeta = styled.p`font-size: 0.75rem; color: ${T.inkLight}; margin: 0 0 0.85rem;`;
-const JobsList = styled.div`display: flex; flex-direction: column; gap: 0.75rem;`;
-const JobCard  = styled.div`
+const SearchProfileRow = styled.div`
+  padding: 0.85rem 1rem; background: ${T.cream}; border: 1px solid ${T.border};
+  border-radius: ${T.radiusSm}; margin-bottom: 1.25rem;
   display: flex; flex-direction: column; gap: 0.55rem;
-  padding: 1rem 1.1rem; border: 1px solid ${T.border}; border-radius: ${T.radiusSm};
-  background: ${T.cream}; transition: box-shadow 0.18s;
-  &:hover { box-shadow: ${T.shadowMd}; }
 `;
-const JobCardTop = styled.div`display: flex; align-items: flex-start; gap: 0.75rem;`;
-const JobLogo = styled.div<{ $src: string }>`
-  width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
-  background: ${({ $src }) => $src ? `url(${$src}) center/cover` : T.surface};
-  border: 1px solid ${T.border};
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.65rem; font-weight: 700; color: ${T.inkLight};
+const SearchTitle = styled.p`
+  font-size: 0.85rem; font-weight: 700; color: ${T.ink}; margin: 0;
 `;
-const JobInfo = styled.div`flex: 1; min-width: 0;`;
-const JobTitle   = styled.p`font-weight: 700; font-size: 0.88rem; color: ${T.ink}; margin: 0 0 0.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;`;
-const JobCompany = styled.p`font-size: 0.78rem; color: ${T.inkMid}; margin: 0; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;`;
-const JobBadge   = styled.span<{ $color?: string }>`
-  font-size: 0.62rem; font-weight: 700; border-radius: 99px; padding: 0.1rem 0.45rem;
-  background: ${({ $color }) => ($color ?? T.ink) + '15'};
-  border: 1px solid ${({ $color }) => ($color ?? T.ink) + '30'};
-  color: ${({ $color }) => $color ?? T.inkMid};
+const SearchMeta = styled.p`font-size: 0.75rem; color: ${T.inkLight}; margin: 0;`;
+const SkillTagRow = styled.div`display: flex; flex-wrap: wrap; gap: 0.3rem;`;
+const SkillTag = styled.span`
+  font-size: 0.7rem; font-weight: 600;
+  background: ${T.accentBg}; border: 1px solid ${T.accentBorder};
+  border-radius: 99px; padding: 0.18rem 0.55rem; color: ${T.accent};
 `;
-const ScoreBadge = styled.div<{ $score: number }>`
-  flex-shrink: 0; font-family: ${T.mono}; font-size: 0.82rem; font-weight: 700;
-  padding: 0.2rem 0.55rem; border-radius: 6px;
-  color: ${({ $score }) => $score >= 60 ? T.green : $score >= 35 ? T.amber : T.inkLight};
-  background: ${({ $score }) => $score >= 60 ? T.greenBg : $score >= 35 ? T.amberBg : T.surface};
-  border: 1px solid ${({ $score }) => $score >= 60 ? T.greenBorder : $score >= 35 ? T.amberBorder : T.border};
+const BoardGrid = styled.div`
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem;
+  @media (max-width: 620px) { grid-template-columns: 1fr; }
 `;
-const SkillChips = styled.div`display: flex; flex-wrap: wrap; gap: 0.3rem;`;
-const SkillChip  = styled.span<{ $matched: boolean }>`
-  font-size: 0.65rem; font-weight: 600; border-radius: 99px; padding: 0.15rem 0.5rem;
-  background: ${({ $matched }) => $matched ? T.greenBg : T.surface};
-  border: 1px solid ${({ $matched }) => $matched ? T.greenBorder : T.border};
-  color: ${({ $matched }) => $matched ? T.green : T.inkLight};
+const BoardCard = styled.a<{ $color: string }>`
+  display: flex; align-items: flex-start; gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid ${({ $color }) => $color + '28'};
+  border-radius: ${T.radiusSm};
+  background: ${({ $color }) => $color + '06'};
+  text-decoration: none; color: ${T.ink};
+  transition: all 0.18s; cursor: pointer;
+  &:hover {
+    background: ${({ $color }) => $color + '14'};
+    border-color: ${({ $color }) => $color + '55'};
+    transform: translateY(-2px);
+    box-shadow: ${T.shadowMd};
+  }
 `;
-const JobActions = styled.div`display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;`;
-const ApplyBtn = styled.a`
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  padding: 0.42rem 0.85rem; border-radius: ${T.radiusSm};
-  background: ${T.ink}; color: ${T.cream};
-  font-family: ${T.sans}; font-size: 0.75rem; font-weight: 700;
-  text-decoration: none; transition: opacity 0.15s;
-  &:hover { opacity: 0.85; }
-`;
-const ResearchLink = styled.a<{ $color: string }>`
-  display: inline-flex; align-items: center; gap: 0.2rem;
-  padding: 0.38rem 0.6rem; border-radius: ${T.radiusSm};
-  border: 1px solid ${({ $color }) => $color + '33'};
-  background: ${({ $color }) => $color + '10'};
-  color: ${({ $color }) => $color};
-  font-family: ${T.sans}; font-size: 0.7rem; font-weight: 700;
-  text-decoration: none; transition: all 0.15s;
-  &:hover { background: ${({ $color }) => $color + '20'}; }
-`;
-const JobSalary = styled.span`font-size: 0.72rem; color: ${T.green}; font-weight: 600;`;
-const JobsEmptyState = styled.div`
-  text-align: center; padding: 2.5rem 1rem;
-  display: flex; flex-direction: column; align-items: center; gap: 0.6rem;
-`;
-const JobsLoadingGrid = styled.div`display: flex; flex-direction: column; gap: 0.75rem;`;
-const JobSkeleton = styled.div`
-  height: 100px; border-radius: ${T.radiusSm}; background: ${T.surface};
-  border: 1px solid ${T.border}; animation: ${pulse} 1.5s ease infinite;
-`;
+const BoardEmoji = styled.span`font-size: 1.5rem; flex-shrink: 0; line-height: 1;`;
+const BoardInfo  = styled.div`flex: 1; min-width: 0;`;
+const BoardName  = styled.p`font-weight: 700; font-size: 0.88rem; color: ${T.ink}; margin: 0 0 0.15rem;`;
+const BoardDesc  = styled.p`font-size: 0.72rem; color: ${T.inkMid}; margin: 0 0 0.2rem; line-height: 1.4;`;
+const BoardTip   = styled.p`font-size: 0.68rem; color: ${T.inkLight}; margin: 0; font-style: italic;`;
+const BoardArrow = styled.span`color: ${T.inkLight}; font-size: 0.75rem; flex-shrink: 0; margin-top: 2px; opacity: 0.6;`;
 
 // Cover letter
 const LetterWrap    = styled.div`display: flex; flex-direction: column; gap: 0.75rem;`;
@@ -784,6 +776,7 @@ const InfoBox = styled.div`
   border-radius: ${T.radiusSm}; font-size: 0.8rem; color: ${T.accent};
   display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 1rem;
 `;
+
 const EmptyNote = styled.p`font-size: 0.82rem; color: ${T.inkLight}; text-align: center; margin: 2rem 0;`;
 const Spinner = styled.div`
   width: 20px; height: 20px; border-radius: 50%;
@@ -805,13 +798,6 @@ export default function VirtualRecruiter() {
   const [pasteText,    setPasteText]    = useState('');
   const [activeTab,    setActiveTab]    = useState<TabKey>('jobs');
 
-  // Find Jobs state
-  const [jobSearchTitle, setJobSearchTitle] = useState('');
-  const [jobsLoading,    setJobsLoading]    = useState(false);
-  const [jobListings,    setJobListings]    = useState<ScoredJob[]>([]);
-  const [jobsError,      setJobsError]      = useState('');
-  const [jobsFetched,    setJobsFetched]    = useState(false);
-
   // Tailor tab
   const [jdText,       setJDText]       = useState('');
   const [matchResult,  setMatchResult]  = useState<MatchResult | null>(null);
@@ -822,45 +808,11 @@ export default function VirtualRecruiter() {
   const [copied,       setCopied]       = useState(false);
   const [letterText,   setLetterText]   = useState('');
 
-  // ── Job Fetching ──
-  const fetchJobs = useCallback(async (title: string, skills: string[]) => {
-    if (!title.trim()) return;
-    setJobsLoading(true);
-    setJobsError('');
-    try {
-      const params = new URLSearchParams({
-        title: title.trim(),
-        skills: skills.slice(0, 10).join(','),
-      });
-      const res = await fetch(`/api/jobs?${params}`);
-      if (!res.ok) throw new Error('API error');
-      const data = await res.json() as { jobs: NormalizedJob[] };
-      const scored = data.jobs
-        .map(j => scoreJob(skills, j))
-        .sort((a, b) => b.matchScore - a.matchScore);
-      setJobListings(scored);
-      setJobsFetched(true);
-    } catch {
-      setJobsError('Could not load job listings — please try again.');
-    } finally {
-      setJobsLoading(false);
-    }
-  }, []);
-
-  // Auto-fetch once profile is parsed
-  useEffect(() => {
-    if (profile && !jobsFetched) {
-      const title = jobSearchTitle || profile.jobTitles[0] || 'Software Engineer';
-      fetchJobs(title, profile.skills);
-    }
-  }, [profile, jobsFetched, jobSearchTitle, fetchJobs, profile?.skills]);
-
   // Process raw text → set profile
   const processText = useCallback((text: string) => {
     const p = extractProfile(text);
     setProfile(p);
     setLetterText(generateCoverLetter(p, ''));
-    setJobSearchTitle(p.jobTitles[0] ?? 'Software Engineer');
     setActiveTab('jobs');
   }, []);
 
@@ -926,7 +878,6 @@ export default function VirtualRecruiter() {
   const handleReset = useCallback(() => {
     setProfile(null); setPasteText(''); setMatchResult(null); setIsAnalyzing(false);
     setJDText(''); setLetterText(''); setCopied(false); setCopiedSkills(false);
-    setJobListings([]); setJobsFetched(false); setJobsError(''); setJobSearchTitle('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
@@ -942,7 +893,7 @@ export default function VirtualRecruiter() {
       <PageHeader>
         <TitleGroup>
           <PageTitle>Virtual Recruiter</PageTitle>
-          <PageSub>Upload your resume — instantly see matching jobs from real company career pages</PageSub>
+          <PageSub>Upload your resume — get an ATS score, keyword match, cover letter, and direct links to find your next role</PageSub>
         </TitleGroup>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <MonoBadge>JOB MATCH</MonoBadge>
@@ -962,7 +913,6 @@ export default function VirtualRecruiter() {
             onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
           >
             <UploadIcon><Upload size={22} /></UploadIcon>
             <UploadTitle>Drop your resume here</UploadTitle>
@@ -1044,113 +994,54 @@ export default function VirtualRecruiter() {
               {/* ─── FIND JOBS TAB ─── */}
               {activeTab === 'jobs' && (
                 <>
-                  <JobsSearchRow>
-                    <JobsInput
-                      placeholder="Job title (e.g. Senior Software Engineer)"
-                      value={jobSearchTitle}
-                      onChange={e => setJobSearchTitle(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') fetchJobs(jobSearchTitle, profile.skills); }}
-                    />
-                    <SearchBtn
-                      onClick={() => fetchJobs(jobSearchTitle, profile.skills)}
-                      disabled={jobsLoading || !jobSearchTitle.trim()}
-                    >
-                      {jobsLoading
-                        ? <><Spinner style={{ width: 14, height: 14, borderWidth: 2 } as React.CSSProperties} /> Searching…</>
-                        : <><Search size={14} /> Search</>
-                      }
-                    </SearchBtn>
-                    {jobsFetched && !jobsLoading && (
-                      <ReuploadBtn onClick={() => fetchJobs(jobSearchTitle, profile.skills)}>
-                        <RefreshCw size={13} /> Refresh
-                      </ReuploadBtn>
+                  {/* Search profile summary */}
+                  <SearchProfileRow>
+                    <SearchTitle>
+                      Searching as: {profile.jobTitles[0] || 'Software Engineer'}
+                      {profile.location ? ` · ${profile.location}` : ''}
+                    </SearchTitle>
+                    {profile.skills.length > 0 && (
+                      <>
+                        <SearchMeta>Top skills detected from your resume:</SearchMeta>
+                        <SkillTagRow>
+                          {profile.skills.slice(0, 8).map(s => (
+                            <SkillTag key={s}>{s}</SkillTag>
+                          ))}
+                          {profile.skills.length > 8 && (
+                            <SkillTag style={{ opacity: 0.65 }}>+{profile.skills.length - 8} more</SkillTag>
+                          )}
+                        </SkillTagRow>
+                      </>
                     )}
-                  </JobsSearchRow>
+                  </SearchProfileRow>
 
-                  {jobsError && (
-                    <InfoBox style={{ background: T.redBg, borderColor: T.redBorder, color: T.red, marginBottom: 0 }}>
-                      <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                      {jobsError}
-                    </InfoBox>
-                  )}
+                  {/* Board links */}
+                  <BoardSectionLabel>Open pre-filled searches on top job boards →</BoardSectionLabel>
+                  <BoardGrid>
+                    {getJobBoardLinks(profile).map(board => (
+                      <BoardCard
+                        key={board.name}
+                        href={board.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        $color={board.color}
+                      >
+                        <BoardEmoji>{board.emoji}</BoardEmoji>
+                        <BoardInfo>
+                          <BoardName>{board.name}</BoardName>
+                          <BoardDesc>{board.desc}</BoardDesc>
+                          <BoardTip>💡 {board.tip}</BoardTip>
+                        </BoardInfo>
+                        <BoardArrow><ExternalLink size={13} /></BoardArrow>
+                      </BoardCard>
+                    ))}
+                  </BoardGrid>
 
-                  {jobsLoading && !jobListings.length && (
-                    <JobsLoadingGrid>
-                      {[1,2,3,4].map(i => <JobSkeleton key={i} />)}
-                    </JobsLoadingGrid>
-                  )}
-
-                  {!jobsLoading && jobsFetched && jobListings.length === 0 && !jobsError && (
-                    <JobsEmptyState>
-                      <Building2 size={32} color={T.inkLight} />
-                      <p style={{ fontSize: '0.85rem', color: T.inkLight, margin: 0 }}>
-                        No listings found — try a broader title (e.g. &quot;Software Engineer&quot;)
-                      </p>
-                    </JobsEmptyState>
-                  )}
-
-                  {jobListings.length > 0 && (
-                    <>
-                      <JobsMeta>
-                        Showing {jobListings.length} jobs · sorted by match score · sources: Remotive, The Muse
-                      </JobsMeta>
-                      <JobsList>
-                        {jobListings.map(job => (
-                          <JobCard key={job.id}>
-                            <JobCardTop>
-                              <JobLogo $src={job.logo}>
-                                {!job.logo && job.company.slice(0, 2).toUpperCase()}
-                              </JobLogo>
-                              <JobInfo>
-                                <JobTitle title={job.title}>{job.title}</JobTitle>
-                                <JobCompany>
-                                  <Building2 size={11} />
-                                  {job.company}
-                                  <JobBadge>{job.location}</JobBadge>
-                                  <JobBadge $color={job.source === 'Remotive' ? T.accent : T.purple}>
-                                    {job.source}
-                                  </JobBadge>
-                                  {job.salary && <JobSalary>{job.salary}</JobSalary>}
-                                </JobCompany>
-                              </JobInfo>
-                              <ScoreBadge $score={job.matchScore}>
-                                {job.matchScore}%
-                              </ScoreBadge>
-                            </JobCardTop>
-
-                            {job.tags.length > 0 && (
-                              <SkillChips>
-                                {job.tags.slice(0, 8).map(tag => (
-                                  <SkillChip key={tag} $matched={job.matchedSkills.some(s => s.toLowerCase() === tag.toLowerCase())}>
-                                    {tag}
-                                  </SkillChip>
-                                ))}
-                              </SkillChips>
-                            )}
-
-                            <JobActions>
-                              <ApplyBtn href={job.url} target="_blank" rel="noopener noreferrer">
-                                Apply <ExternalLink size={11} />
-                              </ApplyBtn>
-                              {job.company && (
-                                <>
-                                  <ResearchLink href={glassdoorUrl(job.company)} target="_blank" rel="noopener noreferrer" $color={T.green} title="Glassdoor reviews">
-                                    Glassdoor
-                                  </ResearchLink>
-                                  <ResearchLink href={levelsUrl(job.company)} target="_blank" rel="noopener noreferrer" $color={T.purple} title="Levels.fyi comp data">
-                                    Levels
-                                  </ResearchLink>
-                                  <ResearchLink href={linkedinUrl(job.company)} target="_blank" rel="noopener noreferrer" $color={T.accent} title="LinkedIn company page">
-                                    LinkedIn
-                                  </ResearchLink>
-                                </>
-                              )}
-                            </JobActions>
-                          </JobCard>
-                        ))}
-                      </JobsList>
-                    </>
-                  )}
+                  <p style={{ fontSize: '0.72rem', color: T.inkLight, margin: '1rem 0 0', lineHeight: 1.5 }}>
+                    Each link opens a pre-filled search using your detected job title
+                    {profile.location ? ` and location (${profile.location})` : ''}.
+                    Once inside, tailor the search with salary filters, date posted, or remote options.
+                  </p>
                 </>
               )}
 
