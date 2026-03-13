@@ -2,7 +2,7 @@
 // AI-Powered Clinical Decision Support for Acute Vascular Surgery
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { Activity, AlertTriangle, Heart, Droplets, Clock, ChevronDown, Stethoscope, Syringe, Brain } from 'lucide-react';
+import { Activity, AlertTriangle, Heart, Droplets, Stethoscope, Syringe, Brain, Shield } from 'lucide-react';
 
 interface MedicalModelsDemoProps {
   isDark?: boolean;
@@ -42,6 +42,86 @@ const ScrollContent = styled.div`
   margin: 0 auto;
 `;
 
+/* ── Tool Header ─────────────────────────────────────────────────────────── */
+const ToolHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 16px;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  animation: ${fadeIn} 0.4s ease;
+`;
+
+const HeaderLeft = styled.div`
+  flex: 1;
+`;
+
+const ToolBadge = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.2rem 0.625rem;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 6px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #a5b4fc;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+  margin-bottom: 0.5rem;
+`;
+
+const ToolTitle = styled.h2`
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.25px;
+`;
+
+const ToolSubtitle = styled.p`
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 0 0 0.75rem 0;
+  line-height: 1.4;
+`;
+
+const ToolModules = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+`;
+
+const ModuleChip = styled.span`
+  padding: 0.2rem 0.5rem;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #94a3b8;
+`;
+
+const DisclaimerBox = styled.div`
+  flex-shrink: 0;
+  padding: 0.625rem 0.875rem;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #fbbf24;
+  line-height: 1.5;
+  max-width: 170px;
+  text-align: center;
+`;
+
+/* ── Tab Bar ─────────────────────────────────────────────────────────────── */
 const TabBar = styled.div`
   display: flex;
   gap: 0.5rem;
@@ -68,17 +148,18 @@ const Tab = styled.button<{ $active: boolean }>`
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: inherit;
-  
+
   &:hover {
     background: ${p => p.$active ? 'rgba(99, 102, 241, 0.25)' : 'rgba(51, 65, 85, 0.5)'};
     color: ${p => p.$active ? '#a5b4fc' : '#e2e8f0'};
   }
-  
+
   svg {
     opacity: 0.8;
   }
 `;
 
+/* ── Cards ───────────────────────────────────────────────────────────────── */
 const Card = styled.div`
   background: rgba(30, 41, 59, 0.6);
   backdrop-filter: blur(12px);
@@ -97,22 +178,44 @@ const CardTitle = styled.h3`
   font-weight: 600;
   color: #e2e8f0;
   margin: 0 0 1rem 0;
-  
+
   svg {
     color: #60a5fa;
   }
 `;
 
+/* ── Layout ──────────────────────────────────────────────────────────────── */
 const Grid = styled.div<{ $cols?: number }>`
   display: grid;
   grid-template-columns: repeat(${p => p.$cols || 2}, 1fr);
   gap: 1rem;
-  
+
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
 `;
 
+const TwoColumn = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const ThreeColumn = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+/* ── Metrics ─────────────────────────────────────────────────────────────── */
 const MetricBox = styled.div<{ $color?: string }>`
   background: rgba(15, 23, 42, 0.5);
   border-radius: 12px;
@@ -143,6 +246,7 @@ const MetricUnit = styled.span`
   margin-left: 0.25rem;
 `;
 
+/* ── Badges ──────────────────────────────────────────────────────────────── */
 const Badge = styled.span<{ $variant?: 'critical' | 'warning' | 'success' | 'info' }>`
   display: inline-flex;
   align-items: center;
@@ -153,7 +257,7 @@ const Badge = styled.span<{ $variant?: 'critical' | 'warning' | 'success' | 'inf
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  
+
   ${p => {
     switch (p.$variant) {
       case 'critical':
@@ -168,6 +272,7 @@ const Badge = styled.span<{ $variant?: 'critical' | 'warning' | 'success' | 'inf
   }}
 `;
 
+/* ── Alert boxes ─────────────────────────────────────────────────────────── */
 const AlertBox = styled.div<{ $critical?: boolean }>`
   display: flex;
   align-items: flex-start;
@@ -178,7 +283,7 @@ const AlertBox = styled.div<{ $critical?: boolean }>`
   border: 1px solid ${p => p.$critical ? 'rgba(239, 68, 68, 0.25)' : 'rgba(245, 158, 11, 0.25)'};
   margin-bottom: 0.5rem;
   animation: ${fadeIn} 0.3s ease;
-  
+
   &:last-child {
     margin-bottom: 0;
   }
@@ -208,9 +313,10 @@ const AlertMessage = styled.div`
   line-height: 1.4;
 `;
 
+/* ── Sliders ─────────────────────────────────────────────────────────────── */
 const SliderGroup = styled.div`
   margin-bottom: 1rem;
-  
+
   &:last-child {
     margin-bottom: 0;
   }
@@ -244,7 +350,7 @@ const Slider = styled.input`
   appearance: none;
   background: #334155;
   cursor: pointer;
-  
+
   &::-webkit-slider-thumb {
     appearance: none;
     width: 16px;
@@ -254,7 +360,7 @@ const Slider = styled.input`
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
     transition: transform 0.2s ease;
-    
+
     &:hover {
       transform: scale(1.1);
     }
@@ -269,6 +375,7 @@ const SliderHints = styled.div`
   color: #64748b;
 `;
 
+/* ── Checkboxes ──────────────────────────────────────────────────────────── */
 const CheckboxGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -285,25 +392,26 @@ const Checkbox = styled.label`
   border: 1px solid rgba(148, 163, 184, 0.1);
   cursor: pointer;
   transition: all 0.2s ease;
-  
+
   &:hover {
     background: rgba(99, 102, 241, 0.1);
     border-color: rgba(99, 102, 241, 0.2);
   }
-  
+
   input {
     width: 16px;
     height: 16px;
     cursor: pointer;
     accent-color: #6366f1;
   }
-  
+
   span {
     font-size: 0.8rem;
     color: #cbd5e1;
   }
 `;
 
+/* ── Gauges ──────────────────────────────────────────────────────────────── */
 const GaugeContainer = styled.div`
   margin-bottom: 0.75rem;
 `;
@@ -330,6 +438,14 @@ const GaugeLabel = styled.div`
   font-size: 0.7rem;
 `;
 
+/* ── Selects ─────────────────────────────────────────────────────────────── */
+const SelectLabel = styled.div`
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+`;
+
 const Select = styled.select`
   width: 100%;
   padding: 0.75rem;
@@ -341,27 +457,19 @@ const Select = styled.select`
   font-weight: 500;
   cursor: pointer;
   font-family: inherit;
-  
+  margin-bottom: 1rem;
+
   &:focus {
     outline: none;
     border-color: #6366f1;
   }
-  
+
   option {
     background: #1e293b;
   }
 `;
 
-const TwoColumn = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  
-  @media (max-width: 900px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
+/* ── Classification ──────────────────────────────────────────────────────── */
 const GradeCircle = styled.div<{ $color: string }>`
   width: 120px;
   height: 120px;
@@ -394,7 +502,7 @@ const ResultCard = styled.div`
   border-radius: 10px;
   padding: 1rem;
   margin-bottom: 0.75rem;
-  
+
   &:last-child {
     margin-bottom: 0;
   }
@@ -435,6 +543,7 @@ const GradeSegment = styled.div<{ $color: string; $active: boolean }>`
   white-space: pre-line;
 `;
 
+/* ── Simulation ──────────────────────────────────────────────────────────── */
 const SimulationSVG = styled.svg`
   width: 100%;
   height: 200px;
@@ -486,7 +595,7 @@ const PatientText = styled.p`
 
 const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, isRunning = true, speed = 1 }) => {
   const [activeTab, setActiveTab] = useState<ModelType>('predictive');
-  
+
   // Predictive Model State
   const [patientData, setPatientData] = useState({
     systolicBP: 95,
@@ -532,7 +641,7 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
     }
   }, [isRunning, speed, activeTab]);
 
-  // Calculations
+  // ── Calculations ────────────────────────────────────────────────────────
   const calculateRisks = () => {
     const shockIndex = patientData.heartRate / patientData.systolicBP;
     const hemorrhageRisk = shockIndex > 1 ? 'CRITICAL' : shockIndex > 0.7 ? 'HIGH' : shockIndex > 0.5 ? 'MODERATE' : 'LOW';
@@ -566,38 +675,39 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
       hemorrhageRisk,
       hemorrhageScore: shockIndex * 100,
       infectionScore: Math.min(100, infectionScore),
+      infectionRisk: infectionScore >= 70 ? 'HIGH' : infectionScore >= 40 ? 'MODERATE' : 'LOW',
       compartmentScore: Math.min(100, compartmentScore),
       messScore,
       limbThreat,
       criticalAlerts: [
-        patientData.systolicBP < 90 && { type: 'CRITICAL', msg: 'Hypotensive - Hemorrhagic Shock' },
-        shockIndex > 1 && { type: 'CRITICAL', msg: 'Shock Index >1.0 - Massive Hemorrhage' },
-        patientData.lactate > 4 && { type: 'URGENT', msg: 'Elevated Lactate - Tissue Hypoperfusion' },
-        patientData.hoursSinceInjury > 6 && { type: 'URGENT', msg: 'Prolonged Ischemia >6h - Amputation Risk' },
-        compartmentScore > 60 && { type: 'URGENT', msg: 'High Compartment Syndrome Risk' }
+        patientData.systolicBP < 90 && { type: 'CRITICAL', msg: 'Hypotensive — Hemorrhagic Shock Protocol' },
+        shockIndex > 1 && { type: 'CRITICAL', msg: 'Shock Index >1.0 — Massive Hemorrhage Risk' },
+        patientData.lactate > 4 && { type: 'URGENT', msg: 'Elevated Lactate — Tissue Hypoperfusion' },
+        patientData.hoursSinceInjury > 6 && { type: 'URGENT', msg: 'Prolonged Ischemia >6 h — Amputation Risk' },
+        compartmentScore > 60 && { type: 'URGENT', msg: 'High Compartment Syndrome Risk — Consider Fasciotomy' }
       ].filter(Boolean) as { type: string; msg: string }[]
     };
   };
 
   const classifyInjury = () => {
     const { injuryType, occlusion } = imagingData;
-    
+
     if (injuryType === 'Transection') {
       return { grade: 5, urgency: 'STAT', color: '#dc2626', needsSurgery: true,
         description: 'Complete transection with tissue loss',
-        recommendation: 'IMMEDIATE operative repair - Life/limb threatening' };
+        recommendation: 'IMMEDIATE operative repair — Life/limb threatening' };
     } else if (injuryType === 'Laceration' || occlusion > 75) {
       return { grade: 4, urgency: 'Emergent', color: '#ef4444', needsSurgery: true,
         description: 'Severe occlusion or active bleeding',
-        recommendation: 'Emergent OR within 2 hours - Vascular repair required' };
+        recommendation: 'Emergent OR within 2 hours — Vascular repair required' };
     } else if (injuryType === 'Pseudoaneurysm' || occlusion > 50) {
       return { grade: 3, urgency: 'Urgent', color: '#f59e0b', needsSurgery: true,
         description: 'Pseudoaneurysm or significant stenosis',
-        recommendation: 'Urgent repair within 6-12 hours' };
+        recommendation: 'Urgent repair within 6–12 hours' };
     } else if (occlusion > 25) {
       return { grade: 2, urgency: 'Scheduled', color: '#3b82f6', needsSurgery: false,
         description: 'Intimal injury with moderate stenosis',
-        recommendation: 'Close monitoring, possible intervention within 24h' };
+        recommendation: 'Close monitoring, possible intervention within 24 h' };
     } else {
       return { grade: 1, urgency: 'Routine', color: '#22c55e', needsSurgery: false,
         description: 'Minor intimal irregularity',
@@ -620,8 +730,10 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
       statusColor = '#f59e0b';
     }
 
-    return { perfPressure, gradient, compartmentSyndrome, timeLeft, tissueStatus, statusColor,
-      needsFasciotomy: compartmentSyndrome || hemodynamics.compartmentPressure > 30 };
+    return {
+      perfPressure, gradient, compartmentSyndrome, timeLeft, tissueStatus, statusColor,
+      needsFasciotomy: compartmentSyndrome || hemodynamics.compartmentPressure > 30
+    };
   };
 
   const risks = calculateRisks();
@@ -635,10 +747,10 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
     return 'info';
   };
 
-  // Render tabs
+  // ── Tab renders ──────────────────────────────────────────────────────────
   const renderPredictive = () => (
     <>
-      {/* Alerts */}
+      {/* Clinical Alerts */}
       {risks.criticalAlerts.length > 0 && (
         <Card>
           <CardTitle><AlertTriangle size={18} /> AI Clinical Alerts</CardTitle>
@@ -656,7 +768,7 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
         </Card>
       )}
 
-      {/* Metrics */}
+      {/* Top Metrics */}
       <Grid $cols={4}>
         <MetricBox $color={risks.hemorrhageRisk === 'CRITICAL' ? '#ef4444' : risks.hemorrhageRisk === 'HIGH' ? '#f59e0b' : '#3b82f6'}>
           <MetricLabel>Shock Index</MetricLabel>
@@ -680,25 +792,27 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
         </MetricBox>
       </Grid>
 
-      {/* Risk Gauges */}
-      <TwoColumn>
+      {/* Risk Gauges — 3 columns */}
+      <ThreeColumn>
         <Card>
           <CardTitle><Heart size={18} /> Hemorrhagic Shock Risk</CardTitle>
           <GaugeContainer>
             <GaugeBar>
-              <GaugeFill 
-                $width={Math.min(100, risks.hemorrhageScore / 1.5)} 
-                $color={risks.hemorrhageScore > 90 ? '#ef4444' : risks.hemorrhageScore > 45 ? '#f59e0b' : '#22c55e'} 
+              <GaugeFill
+                $width={Math.min(100, risks.hemorrhageScore / 1.5)}
+                $color={risks.hemorrhageScore > 90 ? '#ef4444' : risks.hemorrhageScore > 45 ? '#f59e0b' : '#22c55e'}
               />
             </GaugeBar>
             <GaugeLabel>
               <span style={{ color: '#94a3b8' }}>Risk Score</span>
-              <span style={{ color: risks.hemorrhageScore > 90 ? '#f87171' : '#e2e8f0', fontWeight: 700 }}>{risks.hemorrhageScore.toFixed(0)}%</span>
+              <span style={{ color: risks.hemorrhageScore > 90 ? '#f87171' : '#e2e8f0', fontWeight: 700 }}>
+                {risks.hemorrhageScore.toFixed(0)}%
+              </span>
             </GaugeLabel>
           </GaugeContainer>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.5 }}>
-            BP: {patientData.systolicBP}/{patientData.diastolicBP} mmHg<br/>
-            HR: {patientData.heartRate} bpm • Lactate: {patientData.lactate} mmol/L
+          <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.6 }}>
+            BP: {patientData.systolicBP}/{patientData.diastolicBP} mmHg<br />
+            HR: {patientData.heartRate} bpm · Lactate: {patientData.lactate} mmol/L
           </div>
         </Card>
 
@@ -706,28 +820,56 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
           <CardTitle><Activity size={18} /> Compartment Syndrome Risk</CardTitle>
           <GaugeContainer>
             <GaugeBar>
-              <GaugeFill 
-                $width={risks.compartmentScore} 
-                $color={risks.compartmentScore > 60 ? '#ef4444' : risks.compartmentScore > 30 ? '#f59e0b' : '#22c55e'} 
+              <GaugeFill
+                $width={risks.compartmentScore}
+                $color={risks.compartmentScore > 60 ? '#ef4444' : risks.compartmentScore > 30 ? '#f59e0b' : '#22c55e'}
               />
             </GaugeBar>
             <GaugeLabel>
               <span style={{ color: '#94a3b8' }}>Risk Score</span>
-              <span style={{ color: risks.compartmentScore > 60 ? '#f87171' : '#e2e8f0', fontWeight: 700 }}>{risks.compartmentScore}%</span>
+              <span style={{ color: risks.compartmentScore > 60 ? '#f87171' : '#e2e8f0', fontWeight: 700 }}>
+                {risks.compartmentScore}%
+              </span>
             </GaugeLabel>
           </GaugeContainer>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.5 }}>
-            {patientData.hasLimbIschemia && '• Limb ischemia present\n'}
-            {patientData.hasFracture && '• Fracture present\n'}
-            Time since injury: {patientData.hoursSinceInjury}h
+          <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.6 }}>
+            {patientData.hasLimbIschemia && <span>Limb ischemia present<br /></span>}
+            {patientData.hasFracture && <span>Fracture present<br /></span>}
+            Time since injury: {patientData.hoursSinceInjury} h
           </div>
         </Card>
-      </TwoColumn>
 
-      {/* Controls */}
+        <Card>
+          <CardTitle><Shield size={18} /> Infection Risk</CardTitle>
+          <GaugeContainer>
+            <GaugeBar>
+              <GaugeFill
+                $width={risks.infectionScore}
+                $color={risks.infectionScore > 60 ? '#ef4444' : risks.infectionScore > 35 ? '#f59e0b' : '#22c55e'}
+              />
+            </GaugeBar>
+            <GaugeLabel>
+              <span style={{ color: '#94a3b8' }}>Risk Score</span>
+              <span style={{ color: risks.infectionScore > 60 ? '#f87171' : '#e2e8f0', fontWeight: 700 }}>
+                {risks.infectionScore}%
+              </span>
+            </GaugeLabel>
+          </GaugeContainer>
+          <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.6 }}>
+            WBC: {patientData.wbc.toFixed(1)} × 10³/µL{patientData.wbc > 12 && <span style={{ color: '#fbbf24' }}> ↑</span>}<br />
+            {patientData.hasOpenWound && <span>Open wound · </span>}
+            {patientData.hasCatheter && <span>Catheter in situ</span>}
+          </div>
+          <Badge $variant={getVariant(risks.infectionRisk)} style={{ marginTop: '0.5rem' }}>
+            {risks.infectionRisk}
+          </Badge>
+        </Card>
+      </ThreeColumn>
+
+      {/* Patient Data Input */}
       <Card>
         <CardTitle><Stethoscope size={18} /> Patient Data Input</CardTitle>
-        
+
         <Grid $cols={3}>
           <SliderGroup>
             <SliderHeader>
@@ -772,11 +914,11 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
           <SliderGroup>
             <SliderHeader>
               <SliderLabel>Hours Since Injury</SliderLabel>
-              <SliderValue $critical={patientData.hoursSinceInjury > 6} $warning={patientData.hoursSinceInjury > 4}>{patientData.hoursSinceInjury}h</SliderValue>
+              <SliderValue $critical={patientData.hoursSinceInjury > 6} $warning={patientData.hoursSinceInjury > 4}>{patientData.hoursSinceInjury} h</SliderValue>
             </SliderHeader>
             <Slider type="range" min="0" max="12" step="0.5" value={patientData.hoursSinceInjury}
               onChange={(e) => setPatientData({ ...patientData, hoursSinceInjury: +e.target.value })} />
-            <SliderHints><span>0</span><span style={{ color: '#4ade80' }}>Golden: 0-6h</span><span>12</span></SliderHints>
+            <SliderHints><span>0</span><span style={{ color: '#4ade80' }}>Golden: 0–6 h</span><span>12</span></SliderHints>
           </SliderGroup>
 
           <SliderGroup>
@@ -787,6 +929,16 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
             <Slider type="range" min="50" max="5000" step="50" value={patientData.creatineKinase}
               onChange={(e) => setPatientData({ ...patientData, creatineKinase: +e.target.value })} />
             <SliderHints><span>50</span><span style={{ color: '#f87171' }}>Rhabdo: &gt;1000</span><span>5000</span></SliderHints>
+          </SliderGroup>
+
+          <SliderGroup>
+            <SliderHeader>
+              <SliderLabel>White Blood Cells</SliderLabel>
+              <SliderValue $warning={patientData.wbc > 12} $critical={patientData.wbc > 20}>{patientData.wbc.toFixed(1)} ×10³/µL</SliderValue>
+            </SliderHeader>
+            <Slider type="range" min="2" max="30" step="0.2" value={patientData.wbc}
+              onChange={(e) => setPatientData({ ...patientData, wbc: +e.target.value })} />
+            <SliderHints><span>2</span><span style={{ color: '#fbbf24' }}>Leuko: &gt;12</span><span>30</span></SliderHints>
           </SliderGroup>
         </Grid>
 
@@ -817,9 +969,9 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
       <TwoColumn>
         <Card>
           <CardTitle><Stethoscope size={18} /> Imaging Findings</CardTitle>
-          
+
           <SliderGroup>
-            <SliderLabel>Imaging Modality</SliderLabel>
+            <SelectLabel>Imaging Modality</SelectLabel>
             <Select value={imagingData.modality} onChange={(e) => setImagingData({ ...imagingData, modality: e.target.value })}>
               <option>X-ray</option>
               <option>CT Angiography</option>
@@ -829,7 +981,7 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
           </SliderGroup>
 
           <SliderGroup>
-            <SliderLabel>Vessel Involved</SliderLabel>
+            <SelectLabel>Vessel Involved</SelectLabel>
             <Select value={imagingData.vessel} onChange={(e) => setImagingData({ ...imagingData, vessel: e.target.value })}>
               <option>Femoral Artery</option>
               <option>Popliteal Artery</option>
@@ -840,7 +992,7 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
           </SliderGroup>
 
           <SliderGroup>
-            <SliderLabel>Injury Pattern</SliderLabel>
+            <SelectLabel>Injury Pattern</SelectLabel>
             <Select value={imagingData.injuryType} onChange={(e) => setImagingData({ ...imagingData, injuryType: e.target.value as any })}>
               <option>Intimal Injury</option>
               <option>Laceration</option>
@@ -868,7 +1020,7 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
 
         <Card>
           <CardTitle><Brain size={18} /> AI Classification Result</CardTitle>
-          
+
           <GradeCircle $color={injury.color}>
             <GradeNumber>GRADE {injury.grade}</GradeNumber>
             <GradeUrgency>{injury.urgency}</GradeUrgency>
@@ -887,7 +1039,7 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
           <ResultCard>
             <ResultLabel>Operative Repair Required</ResultLabel>
             <ResultValue $color={injury.needsSurgery ? '#f87171' : '#4ade80'}>
-              {injury.needsSurgery ? '✓ YES - Schedule OR' : '✗ No - Medical management'}
+              {injury.needsSurgery ? '✓ YES — Schedule OR' : '✗ No — Medical management'}
             </ResultValue>
           </ResultCard>
 
@@ -919,7 +1071,8 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
   );
 
   const renderSimulation = () => {
-    const pulse = Math.sin(simulationTime / 30) * 0.3 + 1;
+    // pulseFactor drives particle radius animation (renamed from 'pulse' to avoid shadowing keyframe)
+    const pulseFactor = Math.sin(simulationTime / 30) * 0.3 + 1;
 
     return (
       <>
@@ -956,7 +1109,7 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
             <SliderGroup>
               <SliderHeader>
                 <SliderLabel>Time to Revasc</SliderLabel>
-                <SliderValue $critical={hemodynamics.timeToRevasc > 6}>{hemodynamics.timeToRevasc}h</SliderValue>
+                <SliderValue $critical={hemodynamics.timeToRevasc > 6}>{hemodynamics.timeToRevasc} h</SliderValue>
               </SliderHeader>
               <Slider type="range" min="0" max="12" step="0.5" value={hemodynamics.timeToRevasc}
                 onChange={(e) => setHemodynamics({ ...hemodynamics, timeToRevasc: +e.target.value })} />
@@ -969,37 +1122,55 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
           <SimulationSVG viewBox="0 0 800 200">
             {/* Proximal vessel */}
             <line x1="40" y1="100" x2="200" y2="100" stroke="#ef4444" strokeWidth="20" opacity="0.8" />
-            <text x="120" y="80" textAnchor="middle" fill="#94a3b8" fontSize="12" fontWeight="600">{hemodynamics.proximalBP} mmHg</text>
+            <text x="120" y="80" textAnchor="middle" fill="#94a3b8" fontSize="12" fontWeight="600">
+              {hemodynamics.proximalBP} mmHg
+            </text>
 
-            {/* Injury */}
+            {/* Injury site */}
             <circle cx="250" cy="100" r="28" fill="#f59e0b" opacity="0.9" />
-            <text x="250" y="105" textAnchor="middle" fill="white" fontSize="10" fontWeight="700">INJURY</text>
+            <text x="250" y="97" textAnchor="middle" fill="white" fontSize="9" fontWeight="700">INJURY</text>
+            <text x="250" y="109" textAnchor="middle" fill="white" fontSize="8" fontWeight="600">SITE</text>
 
-            {/* Distal vessel */}
+            {/* Distal vessel — width & opacity reflect distal pressure */}
             <line x1="300" y1="100" x2="480" y2="100" stroke="#ef4444"
               strokeWidth={10 + (hemodynamics.distalBP / hemodynamics.proximalBP) * 10}
               opacity={0.3 + (hemodynamics.distalBP / hemodynamics.proximalBP) * 0.5} />
-            <text x="390" y="80" textAnchor="middle" fill="#94a3b8" fontSize="12" fontWeight="600">{hemodynamics.distalBP} mmHg</text>
-
-            {/* Tissue compartment */}
-            <rect x="520" y="60" width="240" height="80" fill="#334155" opacity="0.3" rx="8" />
-            <text x="640" y="90" textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="600">TISSUE COMPARTMENT</text>
-            <text x="640" y="115" textAnchor="middle" fill="#e2e8f0" fontSize="16" fontWeight="700">{hemodynamics.compartmentPressure} mmHg</text>
-            <text x="640" y="135" textAnchor="middle" fill={perfusion.statusColor} fontSize="10" fontWeight="700">
-              {perfusion.compartmentSyndrome ? '⚠️ COMPARTMENT SYNDROME' : '✓ Normal'}
+            <text x="390" y="80" textAnchor="middle" fill="#94a3b8" fontSize="12" fontWeight="600">
+              {hemodynamics.distalBP} mmHg
             </text>
 
-            {/* Blood particles */}
+            {/* Tissue compartment box */}
+            <rect x="520" y="55" width="240" height="90" fill="#334155" opacity="0.35" rx="8" />
+            <text x="640" y="82" textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="600">
+              TISSUE COMPARTMENT
+            </text>
+            <text x="640" y="108" textAnchor="middle" fill="#e2e8f0" fontSize="16" fontWeight="700">
+              {hemodynamics.compartmentPressure} mmHg
+            </text>
+            <text x="640" y="131" textAnchor="middle"
+              fill={perfusion.compartmentSyndrome ? '#f87171' : '#4ade80'}
+              fontSize="10" fontWeight="700">
+              {perfusion.compartmentSyndrome ? 'COMPARTMENT SYNDROME' : 'Normal Pressure'}
+            </text>
+
+            {/* Blood particles — deterministic jitter (no Math.random) */}
             {isRunning && [...Array(12)].map((_, i) => {
               const x = ((simulationTime * 4 + i * 50) % 500) + 40;
+              const jitter = ((i * 7) % 12) - 6;   // stable per-particle vertical offset
               const opacity = x < 300 ? 0.7 : 0.3 + (hemodynamics.distalBP / hemodynamics.proximalBP) * 0.4;
-              const r = x < 300 ? 3 * pulse : 2.5 * (hemodynamics.distalBP / hemodynamics.proximalBP) * pulse;
-              return <circle key={i} cx={x} cy={100 + (Math.random() - 0.5) * 12} r={r} fill="#dc2626" opacity={opacity} />;
+              const r = x < 300
+                ? 3 * pulseFactor
+                : 2.5 * (hemodynamics.distalBP / hemodynamics.proximalBP) * pulseFactor;
+              return <circle key={i} cx={x} cy={100 + jitter} r={r} fill="#dc2626" opacity={opacity} />;
             })}
 
-            {/* Labels */}
-            <text x="250" y="165" textAnchor="middle" fill="#60a5fa" fontSize="11" fontWeight="600">Gradient: {perfusion.gradient} mmHg</text>
-            <text x="640" y="165" textAnchor="middle" fill="#a78bfa" fontSize="11" fontWeight="600">Perfusion: {perfusion.perfPressure} mmHg</text>
+            {/* Bottom labels */}
+            <text x="250" y="168" textAnchor="middle" fill="#60a5fa" fontSize="11" fontWeight="600">
+              Pressure gradient: {perfusion.gradient} mmHg
+            </text>
+            <text x="640" y="168" textAnchor="middle" fill="#a78bfa" fontSize="11" fontWeight="600">
+              Perfusion pressure: {perfusion.perfPressure} mmHg
+            </text>
           </SimulationSVG>
         </Card>
 
@@ -1037,14 +1208,16 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
           <PatientText>
             {perfusion.compartmentSyndrome ? (
               <>
-                <strong>⚠️ Why we need to act now:</strong> The pressure in your muscle compartment ({hemodynamics.compartmentPressure} mmHg) is squeezing your blood vessels.
-                Your perfusion pressure is only {perfusion.perfPressure} mmHg — below the critical 30 mmHg threshold.
-                Without surgery to release this pressure (fasciotomy), tissue damage will occur within {perfusion.timeLeft.toFixed(1)} hours.
+                <strong>Why we need to act now:</strong> The pressure in your muscle compartment ({hemodynamics.compartmentPressure} mmHg)
+                is squeezing your blood vessels. Your perfusion pressure is only {perfusion.perfPressure} mmHg — below the critical
+                30 mmHg threshold. Without surgery to release this pressure (fasciotomy), tissue damage will occur
+                within {perfusion.timeLeft.toFixed(1)} hours.
               </>
             ) : (
               <>
-                <strong>✓ Good news:</strong> Your perfusion pressure is adequate at {perfusion.perfPressure} mmHg, meaning blood is reaching your tissue.
-                We'll monitor you closely and can intervene quickly if things change.
+                <strong>Good news:</strong> Your perfusion pressure is adequate at {perfusion.perfPressure} mmHg,
+                meaning blood is still reaching your tissue. We will monitor you closely and can intervene
+                quickly if things change.
               </>
             )}
           </PatientText>
@@ -1056,6 +1229,29 @@ const MedicalModelsDemo: React.FC<MedicalModelsDemoProps> = ({ isDark = true, is
   return (
     <Container>
       <ScrollContent>
+        {/* Tool Header */}
+        <ToolHeader>
+          <HeaderLeft>
+            <ToolBadge>AI-Powered · Clinical Decision Support</ToolBadge>
+            <ToolTitle>Acute Vascular Surgery</ToolTitle>
+            <ToolSubtitle>
+              Integrated risk assessment, injury classification, and hemodynamic simulation
+              for acute vascular trauma management.
+            </ToolSubtitle>
+            <ToolModules>
+              <ModuleChip>Risk Prediction</ModuleChip>
+              <ModuleChip>SVS Injury Grading</ModuleChip>
+              <ModuleChip>Hemodynamic Simulation</ModuleChip>
+              <ModuleChip>MESS Score</ModuleChip>
+            </ToolModules>
+          </HeaderLeft>
+          <DisclaimerBox>
+            ⚠ For educational &amp; demonstration purposes only.<br />
+            Not for clinical use.
+          </DisclaimerBox>
+        </ToolHeader>
+
+        {/* Tab Navigation */}
         <TabBar>
           <Tab $active={activeTab === 'predictive'} onClick={() => setActiveTab('predictive')}>
             <Activity size={18} /> Risk Prediction

@@ -12,25 +12,25 @@ interface FooterProps {
 const TEAM_MEMBERS = [
   {
     name: 'Safe Mustafa',
-    role: 'Senior Software Engineer',
+    role: 'Senior Developer',
     initials: 'SM',
     profileUrl: 'https://www.linkedin.com/in/safe-mufasa',
   },
   {
     name: 'Dev Gurung',
-    role: 'Software Engineer',
+    role: 'Developer',
     initials: 'DG',
     profileUrl: 'https://www.linkedin.com/in/dev-gurung-a8b863136/',
   },
   {
     name: 'Alan Mathew',
-    role: 'Software Engineer',
+    role: 'Developer',
     initials: 'AM',
     profileUrl: 'https://www.linkedin.com/in/alan-mathew-992863184/',
   },
   {
     name: 'Joseph Devasia',
-    role: 'Cybersecurity Engineer',
+    role: 'Cybersecurity',
     initials: 'JD',
     profileUrl: 'https://www.linkedin.com/in/josephdevasia/',
   },

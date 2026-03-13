@@ -65,9 +65,9 @@ export const PROFESSIONAL_ASSESSMENTS: ProfessionalAssessment[] = [
         id: 'professional-communication',
         type: 'professional',
         title: 'Professional Communication Excellence',
-        description: 'Comprehensive evaluation of written, verbal, and non-verbal communication skills in workplace settings.',
+        description: 'Evaluate your written clarity, verbal precision, and ability to tailor messages to different audiences — the #1 skill employers screen for across every industry.',
         icon: MessageSquare,
-        color: '#3b82f6', // blue
+        color: '#3b82f6',
         items: 45,
         questions: 45,
         duration: '20-25 min',
@@ -78,20 +78,20 @@ export const PROFESSIONAL_ASSESSMENTS: ProfessionalAssessment[] = [
         certificationAvailable: true
     },
     {
-        id: 'leadership-360',
+        id: 'growth-mindset',
         type: 'professional',
-        title: 'Leadership 360° Assessment',
-        description: 'Multi-dimensional leadership evaluation covering strategic thinking, team building, and organizational influence.',
+        title: 'Growth Mindset Assessment',
+        description: "Rooted in Carol Dweck's landmark research, this assessment reveals whether you approach challenges with a growth or fixed mindset — one of the strongest predictors of long-term resilience and career success.",
         icon: Target,
-        color: '#8b5cf6', // purple
-        items: 60,
-        questions: 60,
-        duration: '25-30 min',
+        color: '#8b5cf6',
+        items: 20,
+        questions: 20,
+        duration: '8-10 min',
         validated: true,
-        category: 'Leadership',
-        skillArea: 'Management',
-        level: 'intermediate',
-        certificationAvailable: true
+        category: 'Mindset',
+        skillArea: 'Self-Development',
+        level: 'all',
+        publisher: 'Dweck et al.'
     },
     {
         id: 'technical-problem-solving',
