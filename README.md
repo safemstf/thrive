@@ -5,7 +5,7 @@
 ![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)
 
 
-**Tagline:** *Brag Responsibly*
+**Tagline:** *Louder Than Words*
 
 ---
 
@@ -109,4 +109,4 @@ Built by creators for creators. Thanks to open-source libraries and frameworks t
 * 💻 Repository: [GitHub repo link]
 * 🧩 Issues & Feedback: [issues page]
 
-> *Brag responsibly.* ✨
+> *Louder Than Words.* ✨

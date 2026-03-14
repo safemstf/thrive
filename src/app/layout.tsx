@@ -30,7 +30,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Brag Responsibly | learnmorra.com',
+    default: 'Louder Than Words | learnmorra.com',
     template: '%s | learnmorra.com',
   },
   description: 'Connecting people to knowledge and resources through accessible portfolio management',
@@ -59,7 +59,7 @@ export const metadata: Metadata = {
         url: ogImage.src,
         width: ogImage.width,
         height: ogImage.height,
-        alt: 'LearnMorra.com - Brag Responsibly',
+        alt: 'LearnMorra.com - Louder Than Words',
       },
     ],
   },

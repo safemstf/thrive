@@ -412,7 +412,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Enhanced Header with smooth sidebar */}
           <Header
             title="LearnMorra"
-            subtitle="Brag Responsibly"
+            subtitle="Louder Than Words"
             withSidebar={true}
             sidebarConfig={sidebarConfig}
           />

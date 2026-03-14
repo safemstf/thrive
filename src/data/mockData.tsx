@@ -92,7 +92,7 @@ export const PROFESSIONAL_ASSESSMENTS: ProfessionalAssessment[] = [
     category: 'Mindset',
     skillArea: 'Self-Development',
     level: 'all',
-    status: 'coming_soon',
+    status: 'available',
     publisher: 'Dweck et al.'
   },
   {
@@ -187,7 +187,7 @@ export const PSYCHOLOGICAL_ASSESSMENTS: PsychologicalAssessment[] = [
     normData: 'Clinical cutoff scores',
     interpretationGuide: true,
     disclaimerRequired: true,
-    status: 'coming_soon',
+    status: 'available',
     publisher: 'Spitzer et al.',
     year: 2006
   },
@@ -209,7 +209,7 @@ export const PSYCHOLOGICAL_ASSESSMENTS: PsychologicalAssessment[] = [
     normData: 'Clinical severity ranges',
     interpretationGuide: true,
     disclaimerRequired: true,
-    status: 'coming_soon',
+    status: 'available',
     publisher: 'Kroenke et al.',
     year: 2001
   },
@@ -232,7 +232,7 @@ export const PSYCHOLOGICAL_ASSESSMENTS: PsychologicalAssessment[] = [
     ageRange: '16+',
     interpretationGuide: true,
     disclaimerRequired: false,
-    status: 'coming_soon',
+    status: 'available',
     publisher: 'Seligman et al.'
   },
   {
@@ -335,7 +335,7 @@ export const PSYCHOLOGICAL_ASSESSMENTS: PsychologicalAssessment[] = [
     normData: 'Extensive cross-cultural norms',
     interpretationGuide: true,
     disclaimerRequired: false,
-    status: 'coming_soon',
+    status: 'available',
     publisher: 'Rosenberg',
     year: 1965
   },
@@ -402,7 +402,7 @@ export const CREATIVITY_ASSESSMENTS: CreativityAssessment[] = [
     category: 'Cognition',
     domain: 'convergent',
     scoringMethod: 'Accuracy scoring',
-    status: 'coming_soon',
+    status: 'available',
     publisher: 'Frederick'
   },
   {

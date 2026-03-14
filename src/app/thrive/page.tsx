@@ -1143,7 +1143,7 @@ type AssessmentCategory = 'professional' | 'psychological' | 'creativity';
 const PublicContent: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [assessmentCategory, setAssessmentCategory] = useState<AssessmentCategory>('professional');
-  const { handleCreateAccount, handleSignIn } = useThrive();
+  const { handleCreateAccount, handleSignIn, handleAssessmentClick: thriveHandleAssessmentClick } = useThrive();
 
   const [waiverOpen, setWaiverOpen] = useState(false);
   const [selectedAssessmentForWaiver, setSelectedAssessmentForWaiver] = useState<Assessment | null>(null);
@@ -1207,7 +1207,7 @@ const PublicContent: React.FC = () => {
       setWaiverOpen(true);
       return;
     }
-    handleCreateAccount();
+    thriveHandleAssessmentClick(assessment.id);
   };
 
   const closeWaiver = () => {
@@ -1318,8 +1318,9 @@ const PublicContent: React.FC = () => {
                 <ActionButton
                   $variant="primary"
                   onClick={() => {
-                    console.log('Accepted waiver', selectedAssessmentForWaiver.id);
+                    const id = selectedAssessmentForWaiver.id;
                     closeWaiver();
+                    thriveHandleAssessmentClick(id);
                   }}
                 >
                   I Understand — Start Assessment

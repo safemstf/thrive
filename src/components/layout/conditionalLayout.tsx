@@ -60,7 +60,7 @@ function LayoutInner({ children }: { children: React.ReactNode }) {
       {!isFullscreen && (
         <Header
           title="LearnMorra"
-          subtitle="Brag Responsibly"
+          subtitle="Louder Than Words"
           withSidebar={true}
           sidebarConfig={{
             user: {

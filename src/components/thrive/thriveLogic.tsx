@@ -249,25 +249,8 @@ export const ThriveProvider: React.FC<ThriveProviderProps> = ({
   
   const handleAssessmentClick = useCallback((assessmentId: string) => {
     setLoading(true);
-    
-    // Find the assessment across all categories
-    const allAssessments = [
-      ...professionalAssessments,
-      ...creativityAssessments,
-      ...Object.values(psychologicalAssessments).flat()
-    ];
-    
-    const assessment = allAssessments.find(a => a.id === assessmentId);
-    
-    if (isAuthenticated) {
-      // Direct navigation for authenticated users
-      router.push(`/dashboard/thrive/assessments/${assessmentId}`);
-    } else {
-      // Redirect to register with assessment info for non-authenticated
-      const title = assessment?.title || assessmentId;
-      router.push(`/auth/register?redirect=/dashboard/thrive/assessments/${assessmentId}&assessment=${encodeURIComponent(title)}`);
-    }
-  }, [router, isAuthenticated, professionalAssessments, creativityAssessments, psychologicalAssessments]);
+    router.push(`/thrive/assessments/${assessmentId}`);
+  }, [router]);
   
   const handleCreateAccount = useCallback(() => {
     router.push('/auth/register?redirect=/dashboard/thrive&from=public');

@@ -325,7 +325,7 @@ export function Footer({ className }: FooterProps) {
         </FooterContent>
 
         <FooterBottom>
-          <p>© {year} LearnMorra · All rights reserved · Brag Responsibly ✨</p>
+          <p>© {year} LearnMorra · All rights reserved · Louder Than Words ✨</p>
         </FooterBottom>
       </FooterContainer>
     </>
