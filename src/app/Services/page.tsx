@@ -1398,7 +1398,7 @@ export default function SimulationsPage() {
       case 'nbody':
         return <NBodySandbox isRunning={isRunning} speed={speed} isDark={false} />;
       case 'phylogeny':
-        return <PhylogeneticTreeBuilder isRunning={isRunning} speed={speed} />;
+        return <PhylogeneticTreeBuilder isRunning={isRunning} speed={speed} isTheaterMode={theaterMode} />;
       case 'Shortest-Path-Networks':
         return <ShortestPathAlgorithmDemo isRunning={isRunning} speed={speed} />;
       case 'predprey':
