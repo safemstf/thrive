@@ -263,13 +263,15 @@ export class PrimordialWorld {
             });
         }
         
+        // Lit zones: high energyRate because sunlight drives photosynthesis here.
+        // Photosynthetic organisms in these zones will continuously regenerate the world energy field.
         this.zones.push({
             x: this.width * 0.5, y: this.height * 0.12, radius: 200,
-            type: 'oxygen_rich', energyRate: 0.6, temperature: 18, lightLevel: 0.7, oxygenLevel: 0.95, toxicity: 0,
+            type: 'oxygen_rich', energyRate: 1.8, temperature: 18, lightLevel: 0.7, oxygenLevel: 0.95, toxicity: 0,
         });
         this.zones.push({
             x: this.width * 0.2, y: this.height * 0.85, radius: 150,
-            type: 'surface', energyRate: 0.4, temperature: 15, lightLevel: 1.0, oxygenLevel: 0.8, toxicity: 0,
+            type: 'surface', energyRate: 1.5, temperature: 15, lightLevel: 1.0, oxygenLevel: 0.8, toxicity: 0,
         });
 
         this.zones.push({
@@ -369,15 +371,28 @@ export class PrimordialWorld {
         }
     }
 
+    // Producers (photosynthetic organisms) inject energy back into the world field —
+    // this is what drives the ecosystem loop and prevents energy depletion death-spirals.
+    addEnergyAt(x: number, y: number, amount: number) {
+        const col = Math.floor(x / 40), row = Math.floor(y / 40);
+        if (this.energyField[row]?.[col] !== undefined) {
+            const prev = this.energyField[row][col];
+            this.energyField[row][col] = Math.min(80, this.energyField[row][col] + amount);
+            this.totalEnergy += this.energyField[row][col] - prev;
+        }
+    }
+
     getFlowAt(x: number, y: number): { fx: number; fy: number } {
         let fx = 0, fy = 0;
         const cx = this.width / 2, cy = this.height / 2;
         
-        // Global Coriolis-like rotation
-        fx += -0.0006 * wrapDelta(y - cy, this.height);
-        fy += 0.0006 * wrapDelta(x - cx, this.width);
+        // Global Coriolis-like rotation — kept subtle so flow particles look great
+        // but organisms aren't locked into orbits (was 0.0006, reduced to 0.00018)
+        fx += -0.00018 * wrapDelta(y - cy, this.height);
+        fy += 0.00018 * wrapDelta(x - cx, this.width);
 
-        // Vent-driven convection currents
+        // Vent-driven convection currents — primarily radial outward, minimal tangential spin
+        // (tangential spin was 0.4 — caused organisms to orbit vents; reduced to 0.12)
         for (const vent of this.vents) {
             const dx = wrapDelta(x - vent.x, this.width);
             const dy = wrapDelta(y - vent.y, this.height);
@@ -386,12 +401,12 @@ export class PrimordialWorld {
                 const pulse = Math.sin(this.time * 0.04 + vent.phase) * 0.3 + 0.7;
                 const strength = (1 - dist / 150) * vent.strength * pulse * 0.4;
                 const angle = Math.atan2(dy, dx);
-                // Radial outward + tangential rotation
+                // Radial outward push (unchanged — keeps molecules spreading from vents)
                 fx += Math.cos(angle) * strength * 0.6;
                 fy += Math.sin(angle) * strength * 0.6;
-                // Add rotation around vent
-                fx += -Math.sin(angle) * strength * 0.4;
-                fy += Math.cos(angle) * strength * 0.4;
+                // Tangential rotation — much weaker to avoid orbital lock
+                fx += -Math.sin(angle) * strength * 0.12;
+                fy += Math.cos(angle) * strength * 0.12;
             }
         }
         return { fx, fy };
@@ -421,7 +436,10 @@ export class PrimordialWorld {
             }
         }
 
-        if (this.time % 120 === 0 && this.totalEnergy < this.maxEnergy * 0.7) {
+        // Always regenerate — no depletion gate. Photosynthesis + vents continuously
+        // replenish the field; the gate was causing permanent energy starvation.
+        // Run every 60 ticks (was 120, gated at < 70% capacity).
+        if (this.time % 60 === 0) {
             const catMod = this.getCatastropheModifiers();
             for (let y = 0; y < this.energyField.length; y++) {
                 for (let x = 0; x < this.energyField[y].length; x++) {
@@ -515,8 +533,9 @@ export class Molecule implements MolecularEntity {
         this.age++;
         const speedMult = 1 - Math.min(this.bondedTo.size * 0.22, 0.85);
         const flow = world.getFlowAt(this.x, this.y);
-        this.vx += flow.fx * 0.07;
-        this.vy += flow.fy * 0.07;
+        // Reduced from 0.07 → 0.022 so molecules aren't swept into orbital paths
+        this.vx += flow.fx * 0.022;
+        this.vy += flow.fy * 0.022;
 
         const newX = this.x + this.vx * speedMult;
         const newY = this.y + this.vy * speedMult;
@@ -853,6 +872,9 @@ export class ProkaryoteEntity implements LivingEntity {
             const photoE = zone.lightLevel * this.traits.photosynthetic * EVOLUTION.ENERGY_FROM_PHOTOSYNTHESIS;
             this.energy += photoE;
             world.addOxygenAt(this.x, this.y, photoE * 0.25);
+            // True primary production: photosynthesizers fix light energy into the world field,
+            // making them real producers that sustain the rest of the ecosystem.
+            world.addEnergyAt(this.x, this.y, photoE * 0.35);
         }
         
         if (this.traits.aerobic > 0.3) {
@@ -876,8 +898,9 @@ export class ProkaryoteEntity implements LivingEntity {
 
         if (this.canMove && allOrganisms && !this.inColony && !this.isMating) {
             const flow = world.getFlowAt(this.x, this.y);
-            this.vx += flow.fx * 0.045;
-            this.vy += flow.fy * 0.045;
+            // Reduced from 0.045 → 0.014 — prevents prokaryotes orbiting with the current
+            this.vx += flow.fx * 0.014;
+            this.vy += flow.fy * 0.014;
 
             if (this.traits.predatory > 0.4) {
                 let nearestPrey: ProkaryoteEntity | EukaryoteOrganism | null = null;
@@ -911,9 +934,11 @@ export class ProkaryoteEntity implements LivingEntity {
                 }
             }
 
-            if (Math.random() < 0.018) {
-                this.vx += (Math.random() - 0.5) * 0.07;
-                this.vy += (Math.random() - 0.5) * 0.07;
+            // Boosted Brownian noise: more frequent + stronger so organisms don't
+            // follow predictable current paths (was 0.018 chance × 0.07 magnitude)
+            if (Math.random() < 0.04) {
+                this.vx += (Math.random() - 0.5) * 0.14;
+                this.vy += (Math.random() - 0.5) * 0.14;
             }
 
             const newX = this.x + this.vx;
@@ -1085,6 +1110,9 @@ export class EukaryoteOrganism implements EukaryoteEntity {
             const photoE = zone.lightLevel * this.traits.photosynthetic * EVOLUTION.CHLOROPLAST_BOOST;
             this.energy += photoE;
             world.addOxygenAt(this.x, this.y, photoE * 0.4);
+            // Chloroplast-bearing eukaryotes are highly efficient producers — more energy
+            // returned to world than prokaryotes (larger cell, more chloroplast surface area).
+            world.addEnergyAt(this.x, this.y, photoE * 0.45);
         }
         
         this.energy += baseEnergy;
@@ -1104,12 +1132,13 @@ export class EukaryoteOrganism implements EukaryoteEntity {
 
         if (this.canMove && !this.inColony && !this.isMating) {
             const flow = world.getFlowAt(this.x, this.y);
-            this.vx += flow.fx * 0.035;
-            this.vy += flow.fy * 0.035;
+            // Reduced from 0.035 → 0.011 — eukaryotes larger/heavier, less flow-swept
+            this.vx += flow.fx * 0.011;
+            this.vy += flow.fy * 0.011;
 
-            if (Math.random() < 0.012) {
-                this.vx += (Math.random() - 0.5) * 0.05;
-                this.vy += (Math.random() - 0.5) * 0.05;
+            if (Math.random() < 0.03) {
+                this.vx += (Math.random() - 0.5) * 0.1;
+                this.vy += (Math.random() - 0.5) * 0.1;
             }
 
             const newX = this.x + this.vx;
@@ -1666,7 +1695,8 @@ export class SimulationEngine {
                 const symbiont = allProk[j];
                 
                 const dist = toroidalDistance(host.x, host.y, symbiont.x, symbiont.y, this.world.width, this.world.height);
-                if (dist > host.radius + symbiont.radius) continue;
+                // Relaxed proximity: allow endosymbiosis within 60 units (was only at literal overlap)
+                if (dist > Math.max(60, host.radius + symbiont.radius)) continue;
                 
                 let canEngulf = host.canEngulf(symbiont);
                 let actualHost = host, actualSymbiont = symbiont;
@@ -1852,6 +1882,23 @@ export class SimulationEngine {
                 this.world.phase = 'luca_emergence';
                 this.achieveMilestone('luca');
                 this.addEvent('first_occurrence', 'LUCA Emerges!', 'The Last Universal Common Ancestor', '⭐');
+
+                // Seed guaranteed photosynthetic prokaryotes so the ecosystem has producers
+                // from day one. Without these, all energy runs to zero and emergence stalls.
+                // Genome: high photosynthesis [24-27]=GGGG, aerobic [28-31]=GGGG,
+                // cooperation [20-23]=GGGG — these will also be great endosymbiosis partners.
+                const PHOTO_GENOME = 'GGGGAAAACCCCAAAAAAAAGGGGGGGGGGGGGAAAACCCC';
+                for (let s = 0; s < 4; s++) {
+                    const angle = (s / 4) * Math.PI * 2;
+                    const seedX = ((this.world.width * 0.45 + Math.cos(angle) * 280) % this.world.width + this.world.width) % this.world.width;
+                    const seedY = ((this.world.height * 0.12 + Math.sin(angle) * 160) % this.world.height + this.world.height) % this.world.height;
+                    const seeder = new ProkaryoteEntity(
+                        this.nextId++, seedX, seedY, 1, this.luca.id,
+                        PHOTO_GENOME, this.world.time, lucaSpecies.id
+                    );
+                    this.prokaryotes.push(seeder);
+                    this.organismMap.set(seeder.id, seeder);
+                }
                 
                 for (const molId of p.molecules) {
                     const mol = this.moleculeMap.get(molId);
@@ -1961,10 +2008,23 @@ export class SimulationEngine {
         }
 
         if (this.frameCount % 40 === 0) {
+            // Nutrient cycling: dead organisms decompose and return energy to the environment.
+            // This closes the energy loop — without it, every death is a permanent energy loss.
+            for (const o of this.prokaryotes) {
+                if (!o.isAlive && o.age >= 120 && o.energy > 0) {
+                    this.world.addEnergyAt(o.x, o.y, o.energy * 0.5);
+                }
+            }
+            for (const o of this.eukaryotes) {
+                if (!o.isAlive && o.age >= 160 && o.energy > 0) {
+                    this.world.addEnergyAt(o.x, o.y, o.energy * 0.5);
+                }
+            }
+
             const beforeProk = this.prokaryotes.length;
             this.prokaryotes = this.prokaryotes.filter(o => o.isAlive || o.age < 120);
             this.stats.totalDeaths += beforeProk - this.prokaryotes.length;
-            
+
             const beforeEuk = this.eukaryotes.length;
             this.eukaryotes = this.eukaryotes.filter(o => o.isAlive || o.age < 160);
             this.stats.totalDeaths += beforeEuk - this.eukaryotes.length;

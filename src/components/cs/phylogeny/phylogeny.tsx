@@ -1,14 +1,18 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createGlobalStyle } from 'styled-components';
 import { SimulationEngine, wrapDelta, toroidalDistance } from './phylogeny.logic';
-import { 
+import {
     COLORS, PHASE_LABELS, PHASE_DESCRIPTIONS, MOLECULE_INFO, CELL_ROLE_INFO,
     CATASTROPHE_CONFIG, WORLD_WIDTH, WORLD_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT,
-    RENDER, MoleculeType, ViewMode, CellRole, Species,
+    RENDER, MILESTONES,
+    type MoleculeType, type ViewMode, type CellRole, type Species,
+    type SimulationPhase, type Milestone, type HistoricalEvent, type Catastrophe,
 } from './phylogeny.config';
 
 interface EvolutionSimProps {
-    isRunning: boolean;
-    speed: number;
+    isRunning?: boolean;
+    speed?: number;
+    isTheaterMode?: boolean;
 }
 
 // ==================== PALETTE ====================
@@ -18,18 +22,18 @@ const PALETTE = {
     bgMid: '#080c14',
     bgLight: '#0f1520',
     gridLine: 'rgba(25, 45, 65, 0.15)',
-    
+
     ventCore: '#ff6b35',
     ventGlow: '#ff9f1c',
-    
+
     luca: '#fbbf24',
     prokaryote: '#3b82f6',
     eukaryote: '#a855f7',
     colony: '#06b6d4',
     multicellular: '#14b8a6',
-    
+
     catastrophe: 'rgba(239, 68, 68, 0.3)',
-    
+
     uiBg: 'rgba(3, 5, 8, 0.95)',
     uiBgLight: 'rgba(15, 21, 32, 0.95)',
     uiBorder: 'rgba(40, 70, 110, 0.35)',
@@ -81,17 +85,358 @@ function drawRoundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w:
     ctx.closePath();
 }
 
+// ==================== OVERLAY STYLES ====================
+
+const PhyOverlayStyles = createGlobalStyle`
+    .phy-root {
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        background: #020306;
+        line-height: 1;
+    }
+    .phy-canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        cursor: grab;
+        user-select: none;
+    }
+    .phy-canvas.dragging { cursor: grabbing; }
+
+    /* ── View mode chips — top left ── */
+    .phy-chips {
+        position: absolute;
+        top: 0.75rem;
+        left: 0.75rem;
+        display: flex;
+        gap: 0.3rem;
+        z-index: 10;
+    }
+    .phy-chip {
+        padding: 0.28rem 0.7rem;
+        border-radius: 20px;
+        font-size: 0.69rem;
+        font-weight: 600;
+        font-family: 'DM Mono', monospace;
+        border: 1px solid rgba(100, 180, 255, 0.25);
+        background: rgba(3, 5, 8, 0.88);
+        color: rgba(100, 180, 255, 0.6);
+        cursor: pointer;
+        transition: all 0.15s;
+        backdrop-filter: blur(8px);
+        white-space: nowrap;
+    }
+    .phy-chip:hover {
+        background: rgba(100, 180, 255, 0.1);
+        color: rgba(160, 210, 255, 0.9);
+    }
+    .phy-chip.active {
+        background: rgba(100, 180, 255, 0.16);
+        border-color: rgba(100, 180, 255, 0.55);
+        color: #70c0ff;
+    }
+
+    /* ── HUD — top right ── */
+    .phy-hud {
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        background: rgba(3, 5, 8, 0.92);
+        border: 1px solid rgba(40, 70, 110, 0.5);
+        border-radius: 10px;
+        padding: 0.6rem 0.85rem;
+        backdrop-filter: blur(8px);
+        z-index: 10;
+        min-width: 172px;
+    }
+    .phy-hud-phase {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #00d4ff;
+        margin-bottom: 0.4rem;
+        font-family: 'DM Mono', monospace;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 200px;
+    }
+    .phy-hud-phase.advanced { color: #22c55e; }
+    .phy-hud-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.18rem;
+    }
+    .phy-hud-stat {
+        font-size: 0.68rem;
+        color: rgba(139, 156, 184, 0.85);
+        white-space: nowrap;
+    }
+    .phy-hud-val {
+        font-size: 0.68rem;
+        font-weight: 700;
+        color: #d4e0f0;
+        font-family: 'DM Mono', monospace;
+    }
+
+    /* ── Event ticker — bottom left ── */
+    .phy-ticker {
+        position: absolute;
+        bottom: 4.5rem;
+        left: 0.75rem;
+        background: rgba(3, 5, 8, 0.88);
+        border: 1px solid rgba(40, 70, 110, 0.4);
+        border-radius: 8px;
+        padding: 0.38rem 0.65rem;
+        backdrop-filter: blur(6px);
+        z-index: 10;
+        max-width: 280px;
+    }
+    .phy-ticker-title {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #00d4ff;
+        font-family: 'DM Mono', monospace;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .phy-ticker-desc {
+        font-size: 0.62rem;
+        color: #8b9cb8;
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* ── Catastrophe banner — top center ── */
+    .phy-catastrophe {
+        position: absolute;
+        top: 0.75rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(239, 68, 68, 0.13);
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        border-radius: 8px;
+        padding: 0.32rem 0.85rem;
+        font-size: 0.7rem;
+        color: #ef4444;
+        font-weight: 700;
+        font-family: 'DM Mono', monospace;
+        backdrop-filter: blur(6px);
+        z-index: 10;
+        white-space: nowrap;
+        pointer-events: none;
+    }
+
+    /* ── Bottom pill bar (normal) / Top pill bar (theater) ── */
+    .phy-bar {
+        position: absolute;
+        bottom: 2.75rem;
+        top: auto;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        background: rgba(3, 5, 8, 0.93);
+        border: 1px solid rgba(40, 70, 110, 0.5);
+        border-radius: 40px;
+        padding: 0.38rem 0.7rem;
+        backdrop-filter: blur(12px);
+        z-index: 10;
+        white-space: nowrap;
+    }
+    /* Theater mode: flip bar to top so it doesn't compete with parent TheaterBar */
+    .phy-bar.theater-top {
+        bottom: auto;
+        top: 0.65rem;
+    }
+
+    .phy-bar-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.28rem;
+        padding: 0.32rem 0.68rem;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        font-family: 'DM Mono', monospace;
+        border: 1px solid transparent;
+        cursor: pointer;
+        transition: all 0.15s;
+        color: #8b9cb8;
+        background: transparent;
+    }
+    .phy-bar-btn:hover {
+        background: rgba(100, 180, 255, 0.07);
+        color: #d4e0f0;
+    }
+    .phy-bar-btn.primary {
+        background: rgba(0, 212, 255, 0.14);
+        border-color: rgba(0, 212, 255, 0.38);
+        color: #00d4ff;
+    }
+    .phy-bar-btn.primary:hover { background: rgba(0, 212, 255, 0.2); }
+    .phy-bar-btn.danger {
+        background: rgba(239, 68, 68, 0.11);
+        border-color: rgba(239, 68, 68, 0.34);
+        color: #ef4444;
+    }
+    .phy-bar-btn.danger:hover { background: rgba(239, 68, 68, 0.18); }
+    .phy-bar-btn.active {
+        background: rgba(100, 180, 255, 0.14);
+        border-color: rgba(100, 180, 255, 0.48);
+        color: #70c0ff;
+    }
+    .phy-bar-divider {
+        width: 1px;
+        height: 18px;
+        background: rgba(40, 70, 110, 0.5);
+        margin: 0 0.08rem;
+        flex-shrink: 0;
+    }
+    .phy-speed-ctrl {
+        display: flex;
+        align-items: center;
+        gap: 0.38rem;
+    }
+    .phy-speed-label {
+        font-size: 0.66rem;
+        color: #8b9cb8;
+        font-family: 'DM Mono', monospace;
+        min-width: 22px;
+        text-align: right;
+    }
+    .phy-slider {
+        width: 66px;
+        height: 3px;
+        accent-color: #00d4ff;
+        cursor: pointer;
+    }
+
+    /* ── Popup panels ── */
+    .phy-panel {
+        position: absolute;
+        bottom: 4.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(3, 5, 8, 0.97);
+        border: 1px solid rgba(40, 70, 110, 0.5);
+        border-radius: 12px;
+        padding: 0.7rem;
+        backdrop-filter: blur(12px);
+        z-index: 20;
+        min-width: 255px;
+        max-width: 330px;
+        max-height: 300px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(40, 70, 110, 0.5) transparent;
+    }
+    .phy-panel::-webkit-scrollbar { width: 3px; }
+    .phy-panel::-webkit-scrollbar-thumb { background: rgba(40, 70, 110, 0.5); border-radius: 3px; }
+
+    .phy-panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.55rem;
+        padding-bottom: 0.45rem;
+        border-bottom: 1px solid rgba(40, 70, 110, 0.4);
+    }
+    .phy-panel-title {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #d4e0f0;
+        font-family: 'DM Mono', monospace;
+    }
+    .phy-panel-close {
+        background: none;
+        border: none;
+        color: #8b9cb8;
+        cursor: pointer;
+        font-size: 0.85rem;
+        padding: 0;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+    }
+    .phy-panel-close:hover { color: #d4e0f0; }
+
+    .phy-milestone-row {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.28rem 0;
+        border-bottom: 1px solid rgba(40, 70, 110, 0.18);
+        font-size: 0.7rem;
+    }
+    .phy-milestone-icon { font-size: 0.95rem; flex-shrink: 0; }
+    .phy-milestone-name { color: #22c55e; font-weight: 600; flex: 1; }
+    .phy-milestone-pending { color: #8b9cb8; opacity: 0.45; flex: 1; }
+    .phy-milestone-time {
+        color: #8b9cb8;
+        font-family: 'DM Mono', monospace;
+        font-size: 0.62rem;
+        flex-shrink: 0;
+    }
+
+    .phy-event-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.45rem;
+        padding: 0.28rem 0;
+        border-bottom: 1px solid rgba(40, 70, 110, 0.18);
+        font-size: 0.68rem;
+    }
+    .phy-event-icon { font-size: 0.88rem; flex-shrink: 0; margin-top: 1px; }
+    .phy-event-body { flex: 1; min-width: 0; }
+    .phy-event-title { font-weight: 600; color: #d4e0f0; }
+    .phy-event-desc { color: #8b9cb8; font-size: 0.62rem; margin-top: 1px; }
+    .phy-event-time {
+        color: #8b9cb8;
+        font-family: 'DM Mono', monospace;
+        font-size: 0.6rem;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .phy-species-row {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.28rem 0;
+        border-bottom: 1px solid rgba(40, 70, 110, 0.18);
+        font-size: 0.7rem;
+    }
+    .phy-species-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .phy-species-name { color: #d4e0f0; font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .phy-species-count { color: #8b9cb8; font-family: 'DM Mono', monospace; font-size: 0.62rem; flex-shrink: 0; }
+    .phy-species-extinct { opacity: 0.38; }
+    .phy-species-extinct .phy-species-name { text-decoration: line-through; }
+
+    .phy-empty { color: #8b9cb8; font-size: 0.68rem; padding: 0.5rem 0; }
+`;
+
 // ==================== RENDER FUNCTIONS ====================
 
 function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngine, camera: { x: number; y: number; zoom: number }) {
     const { world } = engine;
     const W = CANVAS_WIDTH, H = CANVAS_HEIGHT;
     const { zoom } = camera;
-    
+
     const offsetX = camera.x - (W / 2) / zoom;
     const offsetY = camera.y - (H / 2) / zoom;
 
-    // Background gradient
     const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
     bgGrad.addColorStop(0, PALETTE.bgDeep);
     bgGrad.addColorStop(0.5, PALETTE.bgMid);
@@ -99,18 +444,17 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    // Active catastrophe overlay
     if (world.activeCatastrophe) {
         const progress = (world.time - world.activeCatastrophe.startTime) / world.activeCatastrophe.duration;
         const intensity = Math.sin(progress * Math.PI) * world.activeCatastrophe.intensity;
-        
+
         let overlayColor = 'rgba(239, 68, 68, 0.15)';
         if (world.activeCatastrophe.type === 'ice_age') overlayColor = `rgba(147, 197, 253, ${0.2 * intensity})`;
         else if (world.activeCatastrophe.type === 'volcanic_winter') overlayColor = `rgba(75, 85, 99, ${0.25 * intensity})`;
         else if (world.activeCatastrophe.type === 'oxygen_spike') overlayColor = `rgba(96, 165, 250, ${0.15 * intensity})`;
         else if (world.activeCatastrophe.type === 'solar_flare') overlayColor = `rgba(251, 191, 36, ${0.2 * intensity})`;
         else overlayColor = `rgba(239, 68, 68, ${0.15 * intensity})`;
-        
+
         ctx.fillStyle = overlayColor;
         ctx.fillRect(0, 0, W, H);
     }
@@ -119,7 +463,6 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
     ctx.scale(zoom, zoom);
     ctx.translate(-offsetX, -offsetY);
 
-    // Grid (only at certain zoom levels)
     if (zoom > 0.5 && engine.viewMode !== 'ecosystem') {
         ctx.strokeStyle = PALETTE.gridLine;
         ctx.lineWidth = 0.5 / zoom;
@@ -128,7 +471,7 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         const startY = Math.floor(offsetY / gridSize) * gridSize;
         const endX = offsetX + W / zoom;
         const endY = offsetY + H / zoom;
-        
+
         for (let x = startX; x < endX; x += gridSize) {
             ctx.beginPath(); ctx.moveTo(x, offsetY); ctx.lineTo(x, endY); ctx.stroke();
         }
@@ -137,7 +480,6 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         }
     }
 
-    // Energy field visualization
     if (RENDER.SHOW_ENERGY_FIELD && engine.viewMode === 'molecular') {
         const cellSize = 40;
         for (let y = 0; y < world.energyField.length; y++) {
@@ -152,7 +494,6 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         }
     }
 
-    // Oxygen/light zones
     for (const zone of world.zones) {
         if (zone.oxygenLevel > 0.5) {
             const grad = ctx.createRadialGradient(zone.x, zone.y, 0, zone.x, zone.y, zone.radius);
@@ -170,28 +511,20 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         }
     }
 
-    // Flow particles (Coriolis effect visualization)
     if (RENDER.SHOW_FLOW_PARTICLES) {
         for (const particle of flowParticles) {
-            // Update particle position based on flow
             const flow = world.getFlowAt(particle.x, particle.y);
             particle.x += flow.fx * RENDER.FLOW_PARTICLE_SPEED * 8;
             particle.y += flow.fy * RENDER.FLOW_PARTICLE_SPEED * 8;
             particle.age++;
-            
-            // Wrap around world
             particle.x = ((particle.x % WORLD_WIDTH) + WORLD_WIDTH) % WORLD_WIDTH;
             particle.y = ((particle.y % WORLD_HEIGHT) + WORLD_HEIGHT) % WORLD_HEIGHT;
-            
-            // Reset old particles
             if (particle.age > particle.maxAge) {
                 particle.x = Math.random() * WORLD_WIDTH;
                 particle.y = Math.random() * WORLD_HEIGHT;
                 particle.age = 0;
                 particle.maxAge = 150 + Math.random() * 100;
             }
-            
-            // Draw particle with fade based on age
             const lifeFade = 1 - (particle.age / particle.maxAge);
             const alpha = particle.opacity * lifeFade * 0.6;
             ctx.fillStyle = `rgba(100, 180, 255, ${alpha})`;
@@ -201,7 +534,6 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         }
     }
 
-    // Rocks
     for (const rock of world.rocks) {
         const rockGrad = ctx.createRadialGradient(rock.x, rock.y, 0, rock.x, rock.y, rock.radius);
         rockGrad.addColorStop(0, 'rgba(45, 55, 72, 0.9)');
@@ -209,18 +541,14 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         rockGrad.addColorStop(1, 'rgba(20, 30, 40, 0.6)');
         ctx.fillStyle = rockGrad;
         ctx.beginPath(); ctx.arc(rock.x, rock.y, rock.radius, 0, Math.PI * 2); ctx.fill();
-        
-        // Rock highlight
         ctx.strokeStyle = 'rgba(80, 100, 120, 0.3)';
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(rock.x, rock.y, rock.radius, 0, Math.PI * 2); ctx.stroke();
     }
 
-    // Hydrothermal vents
     for (const vent of world.vents) {
         const pulse = 0.75 + Math.sin(world.time * 0.07 + vent.phase) * 0.25;
 
-        // Outer glow
         const glowGrad = ctx.createRadialGradient(vent.x, vent.y, 0, vent.x, vent.y, 110);
         glowGrad.addColorStop(0, `rgba(255, 159, 28, ${0.15 * pulse})`);
         glowGrad.addColorStop(0.4, `rgba(255, 107, 53, ${0.08 * pulse})`);
@@ -229,12 +557,11 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         ctx.fillStyle = glowGrad;
         ctx.beginPath(); ctx.arc(vent.x, vent.y, 110, 0, Math.PI * 2); ctx.fill();
 
-        // Rising plume particles
         for (let i = 0; i < 15; i++) {
             const age = ((world.time * 0.05 + i * 0.12) % 1);
             const spread = age * 45;
             const angle = (i / 15) * Math.PI * 2 + world.time * 0.015;
-            const rise = age * 30; // Particles rise up
+            const rise = age * 30;
             const px = vent.x + Math.cos(angle) * spread;
             const py = vent.y + Math.sin(angle) * spread - rise;
             const size = (1 - age * 0.5) * 3;
@@ -242,7 +569,6 @@ function renderBackground(ctx: CanvasRenderingContext2D, engine: SimulationEngin
             ctx.beginPath(); ctx.arc(px, py, size, 0, Math.PI * 2); ctx.fill();
         }
 
-        // Core glow
         const coreGrad = ctx.createRadialGradient(vent.x, vent.y, 0, vent.x, vent.y, 20);
         coreGrad.addColorStop(0, `rgba(255, 255, 220, ${0.9 * pulse})`);
         coreGrad.addColorStop(0.3, `rgba(255, 200, 100, ${0.7 * pulse})`);
@@ -265,15 +591,14 @@ function renderMolecules(ctx: CanvasRenderingContext2D, engine: SimulationEngine
     ctx.scale(zoom, zoom);
     ctx.translate(-offsetX, -offsetY);
 
-    // Draw bonds first (behind molecules)
     for (const bond of bonds) {
         const m1 = engine.moleculeMap.get(bond.mol1);
         const m2 = engine.moleculeMap.get(bond.mol2);
         if (!m1 || !m2) continue;
-        
+
         const dx = wrapDelta(m2.x - m1.x, world.width);
         const dy = wrapDelta(m2.y - m1.y, world.height);
-        
+
         if (bond.type === 'covalent') {
             ctx.strokeStyle = 'rgba(180, 140, 255, 0.5)';
             ctx.lineWidth = RENDER.BOND_COVALENT_WIDTH;
@@ -286,53 +611,46 @@ function renderMolecules(ctx: CanvasRenderingContext2D, engine: SimulationEngine
             ctx.lineWidth = RENDER.BOND_HYDROGEN_WIDTH;
             ctx.setLineDash([2, 2]);
         }
-        
-        ctx.beginPath(); 
-        ctx.moveTo(m1.x, m1.y); 
-        ctx.lineTo(m1.x + dx, m1.y + dy); 
+
+        ctx.beginPath();
+        ctx.moveTo(m1.x, m1.y);
+        ctx.lineTo(m1.x + dx, m1.y + dy);
         ctx.stroke();
         ctx.setLineDash([]);
     }
 
-    // Draw molecules
     for (const m of molecules) {
         const info = MOLECULE_INFO[m.type];
         const color = info?.color || '#64748b';
         const glowColor = info?.glowColor || 'rgba(100, 116, 139, 0.3)';
-        
-        // Size based on complexity
+
         const baseSize = m.radius;
         const size = baseSize * (m.complexity === 1 ? 1 : m.complexity === 2 ? 1.4 : 1.8);
 
-        // Glow effect for complex molecules
         if (m.complexity > 1 || m.bondedTo.size > 0) {
             const glow = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, size * 2);
             glow.addColorStop(0, glowColor);
             glow.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = glow;
-            ctx.beginPath(); 
-            ctx.arc(m.x, m.y, size * 2, 0, Math.PI * 2); 
+            ctx.beginPath();
+            ctx.arc(m.x, m.y, size * 2, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Main body
         const bodyGrad = ctx.createRadialGradient(m.x - size * 0.2, m.y - size * 0.2, 0, m.x, m.y, size);
         bodyGrad.addColorStop(0, color);
         bodyGrad.addColorStop(0.7, color);
         bodyGrad.addColorStop(1, `${color}88`);
         ctx.fillStyle = bodyGrad;
-        ctx.beginPath(); 
-        ctx.arc(m.x, m.y, size * 0.65, 0, Math.PI * 2); 
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, size * 0.65, 0, Math.PI * 2);
         ctx.fill();
 
-        // Draw symbol on complex molecules when zoomed in
         if (RENDER.SHOW_MOLECULE_SYMBOLS && zoom >= RENDER.MOLECULE_SYMBOL_MIN_ZOOM && m.complexity >= 2) {
             ctx.font = `bold ${Math.max(6, size * 0.5)}px system-ui`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            
-            // Use the nucleotide base for nucleotides, symbol for others
             const symbol = m.type === 'nucleotide' ? m.symbol : info?.symbol || '';
             ctx.fillText(symbol, m.x, m.y);
         }
@@ -353,7 +671,6 @@ function renderProtoCells(ctx: CanvasRenderingContext2D, engine: SimulationEngin
     for (const p of engine.protoCells) {
         const stability = p.stability / 100;
 
-        // Inner glow
         const innerGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius);
         innerGrad.addColorStop(0, `rgba(255, 220, 100, ${0.08 * stability})`);
         innerGrad.addColorStop(0.7, `rgba(255, 200, 50, ${0.04 * stability})`);
@@ -361,7 +678,6 @@ function renderProtoCells(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         ctx.fillStyle = innerGrad;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill();
 
-        // Membrane
         if (p.hasMembrane) {
             ctx.strokeStyle = `rgba(255, 217, 61, ${0.6 * stability})`;
             ctx.lineWidth = 3;
@@ -374,12 +690,11 @@ function renderProtoCells(ctx: CanvasRenderingContext2D, engine: SimulationEngin
             ctx.setLineDash([]);
         }
 
-        // Feature indicators with actual icons
         const icons: string[] = [];
-        if (p.hasMembrane) icons.push('🟡'); // Lipid membrane
-        if (p.hasMetabolism) icons.push('⛓️'); // Peptide metabolism
-        if (p.canReplicate) icons.push('🧬'); // RNA replication
-        
+        if (p.hasMembrane) icons.push('🟡');
+        if (p.hasMetabolism) icons.push('⛓️');
+        if (p.canReplicate) icons.push('🧬');
+
         if (icons.length > 0 && zoom > 0.6) {
             ctx.font = '10px sans-serif';
             ctx.textAlign = 'center';
@@ -387,7 +702,6 @@ function renderProtoCells(ctx: CanvasRenderingContext2D, engine: SimulationEngin
             ctx.fillText(icons.join(' '), p.x, p.y - p.radius - 10);
         }
 
-        // Status label
         let label = 'Vesicle';
         let labelColor = PALETTE.uiText;
         if (p.canBecomeLUCA()) {
@@ -399,15 +713,13 @@ function renderProtoCells(ctx: CanvasRenderingContext2D, engine: SimulationEngin
         } else if (p.hasMembrane) {
             label = 'Liposome';
         }
-        
+
         if (zoom > 0.5) {
             ctx.font = 'bold 9px system-ui';
             ctx.fillStyle = labelColor;
             ctx.fillText(label, p.x, p.y + p.radius + 13);
-            
-            // Stability bar
-            const barWidth = 30;
-            const barHeight = 3;
+
+            const barWidth = 30, barHeight = 3;
             ctx.fillStyle = 'rgba(50, 50, 50, 0.5)';
             ctx.fillRect(p.x - barWidth / 2, p.y + p.radius + 17, barWidth, barHeight);
             ctx.fillStyle = `rgba(251, 191, 36, ${0.7 + stability * 0.3})`;
@@ -431,7 +743,6 @@ function renderLUCA(ctx: CanvasRenderingContext2D, engine: SimulationEngine, cam
     ctx.scale(zoom, zoom);
     ctx.translate(-offsetX, -offsetY);
 
-    // Outer aura
     const aura = ctx.createRadialGradient(luca.x, luca.y, 0, luca.x, luca.y, luca.radius * 3);
     aura.addColorStop(0, 'rgba(251, 191, 36, 0.25)');
     aura.addColorStop(0.4, 'rgba(251, 191, 36, 0.1)');
@@ -440,16 +751,14 @@ function renderLUCA(ctx: CanvasRenderingContext2D, engine: SimulationEngine, cam
     ctx.fillStyle = aura;
     ctx.beginPath(); ctx.arc(luca.x, luca.y, luca.radius * 3, 0, Math.PI * 2); ctx.fill();
 
-    // Pulsing ring
     const pulsePhase = (Math.sin(world.time * 0.08) + 1) / 2;
     const pulseR = luca.radius * (1.1 + pulsePhase * 0.15);
     ctx.strokeStyle = `rgba(251, 191, 36, ${0.3 + pulsePhase * 0.25})`;
     ctx.lineWidth = 2 + pulsePhase;
     ctx.beginPath(); ctx.arc(luca.x, luca.y, pulseR, 0, Math.PI * 2); ctx.stroke();
 
-    // Body gradient
     const bodyGrad = ctx.createRadialGradient(
-        luca.x - luca.radius * 0.2, luca.y - luca.radius * 0.2, 0, 
+        luca.x - luca.radius * 0.2, luca.y - luca.radius * 0.2, 0,
         luca.x, luca.y, luca.radius
     );
     bodyGrad.addColorStop(0, 'rgba(255, 230, 150, 0.4)');
@@ -458,29 +767,24 @@ function renderLUCA(ctx: CanvasRenderingContext2D, engine: SimulationEngine, cam
     ctx.fillStyle = bodyGrad;
     ctx.beginPath(); ctx.arc(luca.x, luca.y, luca.radius, 0, Math.PI * 2); ctx.fill();
 
-    // Main membrane
     ctx.strokeStyle = PALETTE.luca;
     ctx.lineWidth = 3.5;
     ctx.beginPath(); ctx.arc(luca.x, luca.y, luca.radius, 0, Math.PI * 2); ctx.stroke();
 
-    // Internal structures
     for (let i = 0; i < 6; i++) {
         const angle = (i / 6) * Math.PI * 2 + world.time * 0.012;
         const r = luca.radius * 0.55;
         const x = luca.x + Math.cos(angle) * r;
         const y = luca.y + Math.sin(angle) * r;
-        
         ctx.fillStyle = 'rgba(255, 255, 200, 0.35)';
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Central nucleus
     ctx.fillStyle = 'rgba(255, 220, 100, 0.5)';
     ctx.beginPath(); ctx.arc(luca.x, luca.y, luca.radius * 0.25, 0, Math.PI * 2); ctx.fill();
 
-    // Labels
     ctx.font = 'bold 13px system-ui';
     ctx.textAlign = 'center';
     ctx.fillStyle = PALETTE.luca;
@@ -489,7 +793,6 @@ function renderLUCA(ctx: CanvasRenderingContext2D, engine: SimulationEngine, cam
     ctx.fillStyle = PALETTE.uiText;
     ctx.fillText('Last Universal Common Ancestor', luca.x, luca.y - luca.radius - 6);
 
-    // Energy bar
     const energyPct = Math.min(1, luca.energy / 160);
     const barW = 40;
     ctx.fillStyle = 'rgba(30, 30, 30, 0.6)';
@@ -510,17 +813,35 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
     ctx.scale(zoom, zoom);
     ctx.translate(-offsetX, -offsetY);
 
-    // Prokaryotes
     for (const o of engine.prokaryotes) {
         if (!o.isAlive && o.age > 100) continue;
-        
+
         const alpha = o.isAlive ? 1 : Math.max(0, 1 - o.age / 120);
         const energy = Math.min(100, o.energy) / 100;
-        
+
         const species = engine.species.get(o.speciesId);
         const speciesColor = species?.color || o.traits.color;
 
-        // Glow for healthy organisms
+        // Photosynthetic producers get a prominent chartreuse halo — always visible
+        // regardless of zoom level so you can immediately spot the energy sources.
+        if (o.isAlive && o.traits.photosynthetic > 0.3) {
+            const pulse = (Math.sin(world.time * 0.11 + o.id * 0.7) + 1) / 2;
+            const photoGlow = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.radius * 4);
+            photoGlow.addColorStop(0, `rgba(134, 239, 172, ${0.45 + pulse * 0.2})`);
+            photoGlow.addColorStop(0.35, `rgba(74, 222, 128, ${0.18 + pulse * 0.08})`);
+            photoGlow.addColorStop(0.7, `rgba(34, 197, 94, 0.06)`);
+            photoGlow.addColorStop(1, 'rgba(34, 197, 94, 0)');
+            ctx.fillStyle = photoGlow;
+            ctx.beginPath(); ctx.arc(o.x, o.y, o.radius * 4, 0, Math.PI * 2); ctx.fill();
+
+            // Dashed ring that expands outward like a photon wave
+            ctx.strokeStyle = `rgba(74, 222, 128, ${0.35 + pulse * 0.25})`;
+            ctx.lineWidth = 1.2;
+            ctx.setLineDash([5, 4]);
+            ctx.beginPath(); ctx.arc(o.x, o.y, o.radius * (1.8 + pulse * 0.5), 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
         if (o.isAlive && energy > 0.4) {
             const glow = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.radius * 1.6);
             glow.addColorStop(0, `${speciesColor}40`);
@@ -529,7 +850,6 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
             ctx.beginPath(); ctx.arc(o.x, o.y, o.radius * 1.6, 0, Math.PI * 2); ctx.fill();
         }
 
-        // Mating indicator
         if (o.isMating) {
             const matingPulse = Math.sin(world.time * 0.2) * 0.3 + 0.7;
             ctx.strokeStyle = `rgba(236, 72, 153, ${0.7 * matingPulse})`;
@@ -539,7 +859,6 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
             ctx.setLineDash([]);
         }
 
-        // Body
         const bodyGrad = ctx.createRadialGradient(
             o.x - o.radius * 0.2, o.y - o.radius * 0.2, 0,
             o.x, o.y, o.radius
@@ -552,32 +871,22 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
         ctx.beginPath(); ctx.arc(o.x, o.y, o.radius, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
 
-        // Membrane
         ctx.strokeStyle = `${speciesColor}${Math.floor((0.6 + energy * 0.4) * alpha * 255).toString(16).padStart(2, '0')}`;
         ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(o.x, o.y, o.radius, 0, Math.PI * 2); ctx.stroke();
 
-        // Trait indicators (small icons)
-        const indicators: { icon: string; x: number; y: number; color: string }[] = [];
-        
-        if (o.traits.predatory > 0.5) {
-            indicators.push({ icon: '🔴', x: o.radius * 0.7, y: -o.radius * 0.7, color: '#ef4444' });
-        }
-        if (o.traits.photosynthetic > 0.4) {
-            indicators.push({ icon: '☀️', x: -o.radius * 0.7, y: -o.radius * 0.7, color: '#22c55e' });
-        }
-        if (o.traits.cooperation > 0.6) {
-            indicators.push({ icon: '🔗', x: 0, y: -o.radius * 0.9, color: '#06b6d4' });
+        const indicators: { icon: string; x: number; y: number; size: number }[] = [];
+        if (o.traits.predatory > 0.5) indicators.push({ icon: '🔴', x: o.radius * 0.7, y: -o.radius * 0.7, size: 8 });
+        // ☀️ always visible for producers — larger font, no zoom gate
+        if (o.traits.photosynthetic > 0.3) indicators.push({ icon: '☀', x: 0, y: -o.radius - 8, size: Math.max(11, o.radius * 0.75) });
+        if (o.traits.cooperation > 0.6) indicators.push({ icon: '🔗', x: o.radius * 0.7, y: -o.radius * 0.7, size: 8 });
+
+        for (const ind of indicators) {
+            if (ind.size <= 9 && zoom < 0.7) continue; // only hide tiny secondary icons at low zoom
+            ctx.font = `${ind.size}px sans-serif`;
+            ctx.fillText(ind.icon, o.x + ind.x, o.y + ind.y);
         }
 
-        if (zoom > 0.7) {
-            ctx.font = '8px sans-serif';
-            for (const ind of indicators) {
-                ctx.fillText(ind.icon, o.x + ind.x, o.y + ind.y);
-            }
-        }
-
-        // Name label
         if (o.isAlive && o.radius > 7 && zoom > 0.6) {
             ctx.font = `bold ${Math.max(7, o.radius * 0.45)}px system-ui`;
             ctx.textAlign = 'center';
@@ -586,16 +895,14 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
         }
     }
 
-    // Eukaryotes
     for (const e of engine.eukaryotes) {
         if (!e.isAlive && e.age > 140) continue;
-        
+
         const alpha = e.isAlive ? 1 : Math.max(0, 1 - e.age / 180);
         const energy = Math.min(100, e.energy) / 100;
         const species = engine.species.get(e.speciesId);
         const speciesColor = species?.color || PALETTE.eukaryote;
 
-        // Glow
         if (e.isAlive) {
             const glow = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius * 2.2);
             glow.addColorStop(0, `${speciesColor}30`);
@@ -604,7 +911,6 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
             ctx.beginPath(); ctx.arc(e.x, e.y, e.radius * 2.2, 0, Math.PI * 2); ctx.fill();
         }
 
-        // Body
         const bodyGrad = ctx.createRadialGradient(
             e.x - e.radius * 0.15, e.y - e.radius * 0.15, 0,
             e.x, e.y, e.radius
@@ -617,14 +923,12 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
         ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
 
-        // Membrane (double for eukaryotes)
         ctx.strokeStyle = `${speciesColor}${Math.floor((0.6 + energy * 0.35) * alpha * 255).toString(16).padStart(2, '0')}`;
         ctx.lineWidth = 2.5;
         ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.stroke();
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.arc(e.x, e.y, e.radius - 4, 0, Math.PI * 2); ctx.stroke();
 
-        // Nucleus
         const nucGrad = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.radius * 0.38);
         nucGrad.addColorStop(0, `rgba(129, 140, 248, ${0.6 * alpha})`);
         nucGrad.addColorStop(1, `rgba(99, 102, 241, ${0.3 * alpha})`);
@@ -634,20 +938,16 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Mitochondria
         if (e.hasMitochondria) {
             for (let i = 0; i < 4; i++) {
                 const angle = (i / 4) * Math.PI * 2 + world.time * 0.006;
                 const r = e.radius * 0.6;
                 const mx = e.x + Math.cos(angle) * r;
                 const my = e.y + Math.sin(angle) * r;
-                
                 ctx.fillStyle = `rgba(249, 115, 22, ${0.7 * alpha})`;
                 ctx.beginPath();
                 ctx.ellipse(mx, my, 5, 2.5, angle, 0, Math.PI * 2);
                 ctx.fill();
-                
-                // Inner membrane folds
                 ctx.strokeStyle = `rgba(251, 146, 60, ${0.5 * alpha})`;
                 ctx.lineWidth = 0.5;
                 ctx.beginPath();
@@ -657,20 +957,16 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
             }
         }
 
-        // Chloroplasts
         if (e.hasChloroplast) {
             for (let i = 0; i < 3; i++) {
                 const angle = (i / 3) * Math.PI + Math.PI / 6 + world.time * 0.004;
                 const r = e.radius * 0.55;
                 const cx = e.x + Math.cos(angle) * r;
                 const cy = e.y + Math.sin(angle) * r;
-                
                 ctx.fillStyle = `rgba(34, 197, 94, ${0.6 * alpha})`;
                 ctx.beginPath();
                 ctx.ellipse(cx, cy, 6, 3.5, angle, 0, Math.PI * 2);
                 ctx.fill();
-                
-                // Thylakoid stacks
                 ctx.strokeStyle = `rgba(74, 222, 128, ${0.4 * alpha})`;
                 ctx.lineWidth = 0.5;
                 for (let j = -1; j <= 1; j++) {
@@ -682,13 +978,12 @@ function renderOrganisms(ctx: CanvasRenderingContext2D, engine: SimulationEngine
             }
         }
 
-        // Label
         if (e.isAlive && zoom > 0.5) {
             ctx.font = 'bold 10px system-ui';
             ctx.textAlign = 'center';
             ctx.fillStyle = `${speciesColor}`;
             ctx.fillText(e.name, e.x, e.y - e.radius - 8);
-            
+
             const icons: string[] = [];
             if (e.hasMitochondria) icons.push('⚡');
             if (e.hasChloroplast) icons.push('☀️');
@@ -713,8 +1008,7 @@ function renderColonies(ctx: CanvasRenderingContext2D, engine: SimulationEngine,
 
     for (const colony of engine.colonies) {
         const borderColor = colony.isMulticellular ? PALETTE.multicellular : PALETTE.colony;
-        
-        // Colony boundary glow
+
         const boundGrad = ctx.createRadialGradient(colony.x, colony.y, colony.radius * 0.5, colony.x, colony.y, colony.radius * 1.3);
         boundGrad.addColorStop(0, 'rgba(0,0,0,0)');
         boundGrad.addColorStop(0.7, `${borderColor}15`);
@@ -722,26 +1016,24 @@ function renderColonies(ctx: CanvasRenderingContext2D, engine: SimulationEngine,
         ctx.fillStyle = boundGrad;
         ctx.beginPath(); ctx.arc(colony.x, colony.y, colony.radius * 1.3, 0, Math.PI * 2); ctx.fill();
 
-        // Boundary line
         ctx.strokeStyle = borderColor + '60';
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 5]);
         ctx.beginPath(); ctx.arc(colony.x, colony.y, colony.radius, 0, Math.PI * 2); ctx.stroke();
         ctx.setLineDash([]);
 
-        // Inter-cell connections
         const memberArray = Array.from(colony.members.values());
         ctx.strokeStyle = borderColor + '35';
         ctx.lineWidth = 1;
-        
+
         for (let i = 0; i < memberArray.length; i++) {
             const m1 = engine.organismMap.get(memberArray[i].organismId);
             if (!m1 || !m1.isAlive) continue;
-            
+
             for (let j = i + 1; j < memberArray.length; j++) {
                 const m2 = engine.organismMap.get(memberArray[j].organismId);
                 if (!m2 || !m2.isAlive) continue;
-                
+
                 const dist = toroidalDistance(m1.x, m1.y, m2.x, m2.y, engine.world.width, engine.world.height);
                 if (dist < colony.radius * 1.2) {
                     ctx.beginPath();
@@ -754,12 +1046,11 @@ function renderColonies(ctx: CanvasRenderingContext2D, engine: SimulationEngine,
             }
         }
 
-        // Role indicators on cells
         if (zoom > 0.5) {
             for (const [id, member] of colony.members) {
                 const org = engine.organismMap.get(id);
                 if (!org || !org.isAlive) continue;
-                
+
                 if (member.role !== 'stem') {
                     const roleInfo = CELL_ROLE_INFO[member.role];
                     ctx.fillStyle = roleInfo.color + 'dd';
@@ -770,23 +1061,22 @@ function renderColonies(ctx: CanvasRenderingContext2D, engine: SimulationEngine,
             }
         }
 
-        // Colony label
         if (zoom > 0.4) {
             ctx.font = 'bold 11px system-ui';
             ctx.textAlign = 'center';
             ctx.fillStyle = borderColor;
-            
-            const label = colony.isMulticellular 
+
+            const label = colony.isMulticellular
                 ? `🌿 Multicellular (${colony.cellCount})`
                 : `🔗 Colony (${colony.cellCount})`;
             ctx.fillText(label, colony.x, colony.y - colony.radius - 12);
-            
+
             if (colony.differentiationLevel > 0) {
                 ctx.font = '9px system-ui';
                 ctx.fillStyle = PALETTE.uiText;
                 ctx.fillText(`${Math.round(colony.differentiationLevel * 100)}% specialized`, colony.x, colony.y - colony.radius);
             }
-            
+
             if (colony.hasNervousSystem) {
                 ctx.font = '9px system-ui';
                 ctx.fillStyle = PALETTE.uiHighlight;
@@ -798,253 +1088,92 @@ function renderColonies(ctx: CanvasRenderingContext2D, engine: SimulationEngine,
     ctx.restore();
 }
 
-function renderUI(ctx: CanvasRenderingContext2D, engine: SimulationEngine) {
-    const { world, stats, milestones, species, eventHistory, viewMode } = engine;
-    const W = CANVAS_WIDTH, H = CANVAS_HEIGHT;
-
-    // Main info panel
-    const panelW = 265, panelH = 230;
-    drawRoundedRect(ctx, 10, 10, panelW, panelH, 8);
-    ctx.fillStyle = PALETTE.uiBg;
-    ctx.fill();
-    ctx.strokeStyle = PALETTE.uiBorder;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Phase header
-    ctx.font = 'bold 13px system-ui';
-    ctx.textAlign = 'left';
-    const phaseColor = ['luca_emergence', 'multicellular', 'eukaryotes', 'cambrian_explosion'].includes(world.phase) 
-        ? PALETTE.uiSuccess : PALETTE.uiHighlight;
-    ctx.fillStyle = phaseColor;
-    ctx.fillText(PHASE_LABELS[world.phase] || world.phase, 20, 32);
-    
-    ctx.font = '9px system-ui';
-    ctx.fillStyle = PALETTE.uiText;
-    ctx.fillText(PHASE_DESCRIPTIONS[world.phase] || '', 20, 46);
-
-    // Catastrophe warning
-    let yOffset = 0;
-    if (world.activeCatastrophe) {
-        const catConfig = CATASTROPHE_CONFIG[world.activeCatastrophe.type];
-        const progress = (world.time - world.activeCatastrophe.startTime) / world.activeCatastrophe.duration;
-        
-        ctx.fillStyle = PALETTE.uiDanger;
-        ctx.font = 'bold 10px system-ui';
-        ctx.fillText(`${catConfig.icon} ${catConfig.name}`, 20, 62);
-        
-        // Progress bar
-        const barW = 80;
-        ctx.fillStyle = 'rgba(50, 50, 50, 0.5)';
-        ctx.fillRect(120, 56, barW, 6);
-        ctx.fillStyle = PALETTE.uiDanger;
-        ctx.fillRect(120, 56, barW * progress, 6);
-        
-        yOffset = 18;
-    }
-
-    // Stats
-    ctx.font = '10px system-ui';
-    let y = 62 + yOffset;
-    const col1 = 20, col2 = 145;
-
-    ctx.fillStyle = PALETTE.uiText;
-    ctx.fillText(`Time: ${Math.floor(world.time / 60)}s`, col1, y);
-    ctx.fillText(`View: ${viewMode}`, col2, y);
-    y += 16;
-
-    ctx.fillText(`Molecules: ${engine.molecules.length}`, col1, y);
-    ctx.fillText(`Bonds: ${engine.bonds.length}`, col2, y);
-    y += 16;
-
-    ctx.fillStyle = PALETTE.prokaryote;
-    ctx.fillText(`Prokaryotes: ${stats.prokaryoteCount}`, col1, y);
-    ctx.fillStyle = PALETTE.eukaryote;
-    ctx.fillText(`Eukaryotes: ${stats.eukaryoteCount}`, col2, y);
-    y += 16;
-
-    ctx.fillStyle = PALETTE.colony;
-    ctx.fillText(`Colonies: ${stats.colonyCount}`, col1, y);
-    ctx.fillStyle = PALETTE.uiSuccess;
-    ctx.fillText(`Species: ${stats.livingSpeciesCount}/${stats.speciesCount}`, col2, y);
-    y += 16;
-
-    ctx.fillStyle = PALETTE.uiText;
-    ctx.fillText(`Generation: ${stats.maxGeneration}`, col1, y);
-    ctx.fillText(`Born: ${stats.totalBorn}`, col2, y);
-    y += 16;
-
-    ctx.fillText(`Deaths: ${stats.totalDeaths}`, col1, y);
-    if (stats.predationEvents > 0) {
-        ctx.fillStyle = PALETTE.uiDanger;
-        ctx.fillText(`Predation: ${stats.predationEvents}`, col2, y);
-    }
-    y += 16;
-
-    if (stats.sexualReproductionEvents > 0) {
-        ctx.fillStyle = '#ec4899';
-        ctx.fillText(`Sexual: ${stats.sexualReproductionEvents}`, col1, y);
-    }
-    if (stats.endosymbiosisEvents > 0) {
-        ctx.fillStyle = PALETTE.uiSuccess;
-        ctx.fillText(`Endosymb: ${stats.endosymbiosisEvents}`, col2, y);
-    }
-
-    // Milestones panel
-    const achievedMilestones = milestones.filter(m => m.achieved);
-    if (achievedMilestones.length > 0) {
-        const mPanelW = 210, mPanelH = Math.min(190, 28 + achievedMilestones.length * 16);
-        const mPanelX = W - mPanelW - 10;
-        
-        drawRoundedRect(ctx, mPanelX, 10, mPanelW, mPanelH, 8);
-        ctx.fillStyle = PALETTE.uiBg;
-        ctx.fill();
-        ctx.strokeStyle = PALETTE.uiBorder;
-        ctx.stroke();
-
-        ctx.font = 'bold 10px system-ui';
-        ctx.fillStyle = PALETTE.uiTextBright;
-        ctx.textAlign = 'left';
-        ctx.fillText('🏆 Milestones', mPanelX + 12, 30);
-
-        ctx.font = '9px system-ui';
-        let my = 48;
-        for (const m of achievedMilestones.slice(-10)) {
-            ctx.fillStyle = PALETTE.uiSuccess;
-            ctx.fillText(`${m.icon} ${m.name}`, mPanelX + 12, my);
-            my += 16;
-        }
-    }
-
-    // Species panel
-    if (stats.speciesCount > 0) {
-        const sPanelW = 190, sPanelH = Math.min(160, 30 + stats.livingSpeciesCount * 20);
-        const sPanelX = W - sPanelW - 10;
-        const sPanelY = achievedMilestones.length > 0 ? Math.min(220, 28 + achievedMilestones.length * 16) + 20 : 10;
-        
-        drawRoundedRect(ctx, sPanelX, sPanelY, sPanelW, sPanelH, 8);
-        ctx.fillStyle = PALETTE.uiBg;
-        ctx.fill();
-        ctx.strokeStyle = PALETTE.uiBorder;
-        ctx.stroke();
-
-        ctx.font = 'bold 10px system-ui';
-        ctx.fillStyle = PALETTE.uiTextBright;
-        ctx.textAlign = 'left';
-        ctx.fillText('🌿 Species', sPanelX + 12, sPanelY + 20);
-
-        ctx.font = '9px system-ui';
-        let sy = sPanelY + 40;
-        const livingSpecies = Array.from(species.values()).filter(s => !s.extinctAt).slice(0, 6);
-        for (const s of livingSpecies) {
-            ctx.fillStyle = s.color;
-            ctx.beginPath(); ctx.arc(sPanelX + 20, sy - 4, 6, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = PALETTE.uiText;
-            ctx.fillText(`${s.name} (${s.memberCount})`, sPanelX + 32, sy);
-            sy += 20;
-        }
-    }
-
-    // Event timeline (bottom left)
-    if (eventHistory.length > 0) {
-        const tPanelW = 300, tPanelH = 90;
-        const tPanelX = 10, tPanelY = H - tPanelH - 10;
-        
-        drawRoundedRect(ctx, tPanelX, tPanelY, tPanelW, tPanelH, 8);
-        ctx.fillStyle = PALETTE.uiBg;
-        ctx.fill();
-        ctx.strokeStyle = PALETTE.uiBorder;
-        ctx.stroke();
-
-        ctx.font = 'bold 10px system-ui';
-        ctx.fillStyle = PALETTE.uiTextBright;
-        ctx.textAlign = 'left';
-        ctx.fillText('📜 Recent Events', tPanelX + 12, tPanelY + 18);
-
-        ctx.font = '9px system-ui';
-        let ty = tPanelY + 36;
-        const recentEvents = eventHistory.slice(-4);
-        for (const event of recentEvents) {
-            ctx.fillStyle = event.type === 'catastrophe' ? PALETTE.uiDanger : 
-                           event.type === 'speciation' ? PALETTE.uiSuccess :
-                           event.type === 'extinction' ? '#6b7280' : PALETTE.uiHighlight;
-            ctx.fillText(`${event.icon} ${event.title}`, tPanelX + 12, ty);
-            ty += 14;
-        }
-    }
-
-    // Legend (bottom center)
-    if (viewMode === 'molecular' || !engine.lucaBorn) {
-        const legendW = 520, legendH = 40;
-        const legendX = (W - legendW) / 2, legendY = H - legendH - 10;
-        
-        drawRoundedRect(ctx, legendX, legendY, legendW, legendH, 8);
-        ctx.fillStyle = PALETTE.uiBg;
-        ctx.fill();
-        ctx.strokeStyle = PALETTE.uiBorder;
-        ctx.stroke();
-
-        ctx.font = '9px system-ui';
-        ctx.textAlign = 'left';
-        let lx = legendX + 18;
-
-        // Key molecule counts with icons
-        const counts = engine.moleculeCounts;
-        const showTypes: MoleculeType[] = ['amino_acid', 'nucleotide', 'lipid', 'peptide', 'rna_fragment'];
-        
-        for (const type of showTypes) {
-            const info = MOLECULE_INFO[type];
-            if (!info) continue;
-            const count = counts.get(type) || 0;
-            
-            // Color dot
-            ctx.fillStyle = info.color;
-            ctx.beginPath(); ctx.arc(lx, legendY + 20, 5, 0, Math.PI * 2); ctx.fill();
-            
-            // Label and count
-            ctx.fillStyle = PALETTE.uiText;
-            ctx.fillText(`${info.label}: ${count}`, lx + 10, legendY + 23);
-            lx += 100;
-        }
-    }
-}
-
 function renderSimulation(ctx: CanvasRenderingContext2D, engine: SimulationEngine) {
     const camera = engine.camera;
-    
+
     renderBackground(ctx, engine, camera);
-    
+
     if (engine.viewMode === 'molecular' || !engine.lucaBorn) {
         renderMolecules(ctx, engine, camera);
     }
-    
+
     renderProtoCells(ctx, engine, camera);
     renderLUCA(ctx, engine, camera);
     renderOrganisms(ctx, engine, camera);
     renderColonies(ctx, engine, camera);
-    renderUI(ctx, engine);
+    // UI is now rendered as HTML overlays — no canvas renderUI call
 }
 
 // ==================== MAIN COMPONENT ====================
 
-export default function EvolutionSimulation({ isRunning, speed }: EvolutionSimProps) {
+const ADVANCED_PHASES: SimulationPhase[] = [
+    'luca_emergence', 'multicellular', 'eukaryotes', 'cambrian_explosion',
+    'colonial_life', 'cell_differentiation', 'endosymbiosis',
+];
+
+interface DisplayData {
+    phase: SimulationPhase;
+    time: number;
+    prokaryoteCount: number;
+    eukaryoteCount: number;
+    colonyCount: number;
+    livingSpeciesCount: number;
+    speciesCount: number;
+    maxGeneration: number;
+    totalBorn: number;
+    predationEvents: number;
+    milestones: Milestone[];
+    events: HistoricalEvent[];
+    species: Species[];
+    activeCatastrophe: Catastrophe | null;
+    viewMode: ViewMode;
+    latestEvent: HistoricalEvent | null;
+}
+
+const INITIAL_DISPLAY: DisplayData = {
+    phase: 'primordial_soup',
+    time: 0,
+    prokaryoteCount: 0,
+    eukaryoteCount: 0,
+    colonyCount: 0,
+    livingSpeciesCount: 0,
+    speciesCount: 0,
+    maxGeneration: 0,
+    totalBorn: 0,
+    predationEvents: 0,
+    milestones: JSON.parse(JSON.stringify(MILESTONES)) as Milestone[],
+    events: [],
+    species: [],
+    activeCatastrophe: null,
+    viewMode: 'molecular',
+    latestEvent: null,
+};
+
+export default function EvolutionSimulation({ isRunning = true, speed = 1, isTheaterMode = false }: EvolutionSimProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const engineRef = useRef<SimulationEngine | null>(null);
     const animationRef = useRef<number | null>(null);
-    const [, forceUpdate] = useState(0);
+    const isDragging = useRef(false);
+    const lastMouse = useRef({ x: 0, y: 0 });
+    const tickRef = useRef(0);
 
-    // Handle mouse wheel for zoom
+    const [isPlaying, setIsPlaying] = useState(isRunning);
+    const [localSpeed, setLocalSpeed] = useState(Math.max(1, Math.min(6, speed)));
+    const [activePanel, setActivePanel] = useState<'none' | 'milestones' | 'events' | 'species'>('none');
+    const [displayData, setDisplayData] = useState<DisplayData>(INITIAL_DISPLAY);
+
+    // Ref-backed values so the animation loop always sees current values
+    const isPlayingRef = useRef(isPlaying);
+    const localSpeedRef = useRef(localSpeed);
+    isPlayingRef.current = isPlaying;
+    localSpeedRef.current = localSpeed;
+
     const handleWheel = useCallback((e: WheelEvent) => {
         e.preventDefault();
         if (!engineRef.current) return;
-        const engine = engineRef.current;
-        const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
-        engine.camera.targetZoom = Math.max(0.25, Math.min(3.5, engine.camera.zoom * zoomDelta));
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        engineRef.current.camera.targetZoom = Math.max(0.25, Math.min(3.5, engineRef.current.camera.zoom * delta));
     }, []);
-
-    // Handle mouse drag for pan
-    const isDragging = useRef(false);
-    const lastMouse = useRef({ x: 0, y: 0 });
 
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         isDragging.current = true;
@@ -1053,16 +1182,30 @@ export default function EvolutionSimulation({ isRunning, speed }: EvolutionSimPr
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         if (!isDragging.current || !engineRef.current) return;
-        const engine = engineRef.current;
         const dx = e.clientX - lastMouse.current.x;
         const dy = e.clientY - lastMouse.current.y;
-        engine.camera.targetX -= dx / engine.camera.zoom;
-        engine.camera.targetY -= dy / engine.camera.zoom;
+        engineRef.current.camera.targetX -= dx / engineRef.current.camera.zoom;
+        engineRef.current.camera.targetY -= dy / engineRef.current.camera.zoom;
         lastMouse.current = { x: e.clientX, y: e.clientY };
     }, []);
 
-    const handleMouseUp = useCallback(() => {
-        isDragging.current = false;
+    const handleMouseUp = useCallback(() => { isDragging.current = false; }, []);
+
+    const handleReset = useCallback(() => {
+        engineRef.current = new SimulationEngine();
+        initFlowParticles();
+        setIsPlaying(false);
+        setActivePanel('none');
+        setDisplayData(INITIAL_DISPLAY);
+    }, []);
+
+    const handleViewMode = useCallback((mode: ViewMode) => {
+        if (engineRef.current) engineRef.current.viewMode = mode;
+        setDisplayData(prev => ({ ...prev, viewMode: mode }));
+    }, []);
+
+    const togglePanel = useCallback((panel: 'milestones' | 'events' | 'species') => {
+        setActivePanel(prev => (prev === panel ? 'none' : panel));
     }, []);
 
     useEffect(() => {
@@ -1070,86 +1213,283 @@ export default function EvolutionSimulation({ isRunning, speed }: EvolutionSimPr
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        
+
         if (!engineRef.current) {
             engineRef.current = new SimulationEngine();
             initFlowParticles();
         }
-        const engine = engineRef.current;
-        
+
         canvas.addEventListener('wheel', handleWheel, { passive: false });
-        
+
+        // High-DPI / Retina sharpness — scale canvas buffer by devicePixelRatio.
+        // CSS keeps width:100% / height:auto so layout is unchanged;
+        // we just double the physical pixel count on 2× screens.
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = CANVAS_WIDTH * dpr;
+        canvas.height = CANVAS_HEIGHT * dpr;
+
         const animate = () => {
-            if (isRunning) {
-                for (let i = 0; i < speed; i++) {
+            const engine = engineRef.current!;
+
+            if (isPlayingRef.current) {
+                for (let i = 0; i < localSpeedRef.current; i++) {
                     engine.update();
                 }
             }
-            
-            // Smooth camera interpolation
+
+            // Smooth camera
             engine.camera.x += (engine.camera.targetX - engine.camera.x) * 0.08;
             engine.camera.y += (engine.camera.targetY - engine.camera.y) * 0.08;
             engine.camera.zoom += (engine.camera.targetZoom - engine.camera.zoom) * 0.1;
-            
-            // Clamp camera to world bounds
             engine.camera.targetX = Math.max(0, Math.min(WORLD_WIDTH, engine.camera.targetX));
             engine.camera.targetY = Math.max(0, Math.min(WORLD_HEIGHT, engine.camera.targetY));
-            
+
+            // Scale context by DPR once; nested save/restore in render functions
+            // preserve this outer scale, so all logical coords remain in CSS pixels.
+            ctx.save();
+            ctx.scale(dpr, dpr);
             renderSimulation(ctx, engine);
+            ctx.restore();
+
+            // React state refresh every 20 frames
+            tickRef.current++;
+            if (tickRef.current % 20 === 0) {
+                const recentEvents = [...engine.eventHistory].slice(-20).reverse();
+                setDisplayData({
+                    phase: engine.world.phase,
+                    time: Math.floor(engine.world.time / 60),
+                    prokaryoteCount: engine.stats.prokaryoteCount,
+                    eukaryoteCount: engine.stats.eukaryoteCount,
+                    colonyCount: engine.stats.colonyCount,
+                    livingSpeciesCount: engine.stats.livingSpeciesCount,
+                    speciesCount: engine.stats.speciesCount,
+                    maxGeneration: engine.stats.maxGeneration,
+                    totalBorn: engine.stats.totalBorn,
+                    predationEvents: engine.stats.predationEvents,
+                    milestones: [...engine.milestones],
+                    events: recentEvents,
+                    species: Array.from(engine.species.values()),
+                    activeCatastrophe: engine.world.activeCatastrophe,
+                    viewMode: engine.viewMode,
+                    latestEvent: recentEvents[0] ?? null,
+                });
+            }
+
             animationRef.current = requestAnimationFrame(animate);
         };
+
         animate();
-        
+
         return () => {
             if (animationRef.current) cancelAnimationFrame(animationRef.current);
             canvas.removeEventListener('wheel', handleWheel);
         };
-    }, [isRunning, speed, handleWheel]);
+    }, [handleWheel]);
+
+    const {
+        phase, time, prokaryoteCount, eukaryoteCount, colonyCount,
+        livingSpeciesCount, speciesCount, maxGeneration, milestones, events,
+        species, activeCatastrophe, viewMode, latestEvent,
+    } = displayData;
+
+    const isAdvancedPhase = ADVANCED_PHASES.includes(phase);
 
     return (
-        <div style={{ 
-            width: '100%', 
-            height: '100vh', 
-            display: 'flex', 
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#020306',
-            padding: '10px',
-            boxSizing: 'border-box',
-            userSelect: 'none',
-        }}>
-            <canvas 
-                ref={canvasRef} 
-                width={CANVAS_WIDTH} 
-                height={CANVAS_HEIGHT}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                style={{ 
-                    display: 'block', 
-                    maxWidth: '100%', 
-                    height: 'auto',
-                    borderRadius: '12px',
-                    boxShadow: '0 12px 50px rgba(0, 0, 0, 0.9)',
-                    cursor: isDragging.current ? 'grabbing' : 'grab',
-                }}
-            />
-            <div style={{
-                marginTop: '14px',
-                color: '#64748b',
-                fontSize: '11px',
-                fontFamily: 'system-ui',
-                textAlign: 'center',
-                display: 'flex',
-                gap: '24px',
-                alignItems: 'center',
-            }}>
-                <span>🧬 Abiogenesis → LUCA → Speciation → Multicellular Life</span>
-                <span style={{ color: '#374151' }}>|</span>
-                <span>🖱️ Scroll to zoom • Drag to pan</span>
+        <>
+            <PhyOverlayStyles />
+            <div className="phy-root">
+                <canvas
+                    ref={canvasRef}
+                    className={`phy-canvas${isDragging.current ? ' dragging' : ''}`}
+                    width={CANVAS_WIDTH}
+                    height={CANVAS_HEIGHT}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                />
+
+                {/* Catastrophe warning — top center */}
+                {activeCatastrophe && (
+                    <div className="phy-catastrophe">
+                        {CATASTROPHE_CONFIG[activeCatastrophe.type].icon}{' '}
+                        {CATASTROPHE_CONFIG[activeCatastrophe.type].name}
+                    </div>
+                )}
+
+                {/* View mode chips — top left */}
+                <div className="phy-chips">
+                    {(['molecular', 'cellular', 'ecosystem'] as ViewMode[]).map(mode => (
+                        <button
+                            key={mode}
+                            className={`phy-chip${viewMode === mode ? ' active' : ''}`}
+                            onClick={() => handleViewMode(mode)}
+                        >
+                            {mode === 'molecular' ? '🧪' : mode === 'cellular' ? '🦠' : '🌍'} {mode}
+                        </button>
+                    ))}
+                </div>
+
+                {/* HUD — top right */}
+                <div className="phy-hud">
+                    <div className={`phy-hud-phase${isAdvancedPhase ? ' advanced' : ''}`}>
+                        {PHASE_LABELS[phase] ?? phase}
+                    </div>
+                    <div className="phy-hud-row">
+                        <span className="phy-hud-stat">⏱ Time</span>
+                        <span className="phy-hud-val">{time}s</span>
+                    </div>
+                    <div className="phy-hud-row">
+                        <span className="phy-hud-stat">🦠 Prokaryotes</span>
+                        <span className="phy-hud-val">{prokaryoteCount}</span>
+                    </div>
+                    {eukaryoteCount > 0 && (
+                        <div className="phy-hud-row">
+                            <span className="phy-hud-stat">🧫 Eukaryotes</span>
+                            <span className="phy-hud-val">{eukaryoteCount}</span>
+                        </div>
+                    )}
+                    {colonyCount > 0 && (
+                        <div className="phy-hud-row">
+                            <span className="phy-hud-stat">🔗 Colonies</span>
+                            <span className="phy-hud-val">{colonyCount}</span>
+                        </div>
+                    )}
+                    {livingSpeciesCount > 0 && (
+                        <div className="phy-hud-row">
+                            <span className="phy-hud-stat">🌿 Species</span>
+                            <span className="phy-hud-val">{livingSpeciesCount}/{speciesCount}</span>
+                        </div>
+                    )}
+                    <div className="phy-hud-row">
+                        <span className="phy-hud-stat">🧬 Gen</span>
+                        <span className="phy-hud-val">{maxGeneration}</span>
+                    </div>
+                </div>
+
+                {/* Latest event ticker — bottom left */}
+                {latestEvent && (
+                    <div className="phy-ticker">
+                        <div className="phy-ticker-title">
+                            {latestEvent.icon} {latestEvent.title}
+                        </div>
+                        <div className="phy-ticker-desc">{latestEvent.description}</div>
+                    </div>
+                )}
+
+                {/* ── Pill bar — bottom normally, top in theater mode ── */}
+                <div className={`phy-bar${isTheaterMode ? ' theater-top' : ''}`}>
+                    <button
+                        className={`phy-bar-btn${isPlaying ? ' danger' : ' primary'}`}
+                        onClick={() => setIsPlaying(p => !p)}
+                    >
+                        {isPlaying ? '⏸ Pause' : '▶ Run'}
+                    </button>
+                    <button className="phy-bar-btn" onClick={handleReset}>
+                        ↺ Reset
+                    </button>
+                    <div className="phy-bar-divider" />
+                    <div className="phy-speed-ctrl">
+                        <span className="phy-speed-label">{localSpeed}×</span>
+                        <input
+                            type="range"
+                            className="phy-slider"
+                            min={1} max={6} step={1}
+                            value={localSpeed}
+                            onChange={e => setLocalSpeed(Number(e.target.value))}
+                        />
+                    </div>
+                    <div className="phy-bar-divider" />
+                    <button
+                        className={`phy-bar-btn${activePanel === 'milestones' ? ' active' : ''}`}
+                        onClick={() => togglePanel('milestones')}
+                    >
+                        🏆 Milestones
+                    </button>
+                    <button
+                        className={`phy-bar-btn${activePanel === 'events' ? ' active' : ''}`}
+                        onClick={() => togglePanel('events')}
+                    >
+                        📜 Events
+                    </button>
+                    <button
+                        className={`phy-bar-btn${activePanel === 'species' ? ' active' : ''}`}
+                        onClick={() => togglePanel('species')}
+                    >
+                        🌿 Species
+                    </button>
+                </div>
+
+                {/* Milestones panel */}
+                {activePanel === 'milestones' && (
+                    <div className="phy-panel">
+                        <div className="phy-panel-head">
+                            <span className="phy-panel-title">🏆 Milestones</span>
+                            <button className="phy-panel-close" onClick={() => setActivePanel('none')}>✕</button>
+                        </div>
+                        {milestones.map(m => (
+                            <div key={m.id} className="phy-milestone-row">
+                                <span className="phy-milestone-icon">{m.icon}</span>
+                                <span className={m.achieved ? 'phy-milestone-name' : 'phy-milestone-pending'}>
+                                    {m.name}
+                                </span>
+                                {m.achieved && m.time !== null && (
+                                    <span className="phy-milestone-time">{Math.floor(m.time / 60)}s</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Events panel */}
+                {activePanel === 'events' && (
+                    <div className="phy-panel">
+                        <div className="phy-panel-head">
+                            <span className="phy-panel-title">📜 Event History</span>
+                            <button className="phy-panel-close" onClick={() => setActivePanel('none')}>✕</button>
+                        </div>
+                        {events.length === 0 ? (
+                            <div className="phy-empty">No events yet — run the simulation…</div>
+                        ) : events.map((ev, i) => (
+                            <div key={i} className="phy-event-row">
+                                <span className="phy-event-icon">{ev.icon}</span>
+                                <div className="phy-event-body">
+                                    <div className="phy-event-title">{ev.title}</div>
+                                    <div className="phy-event-desc">{ev.description}</div>
+                                </div>
+                                <span className="phy-event-time">{Math.floor(ev.time / 60)}s</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Species panel */}
+                {activePanel === 'species' && (
+                    <div className="phy-panel">
+                        <div className="phy-panel-head">
+                            <span className="phy-panel-title">
+                                🌿 Species ({livingSpeciesCount}/{speciesCount})
+                            </span>
+                            <button className="phy-panel-close" onClick={() => setActivePanel('none')}>✕</button>
+                        </div>
+                        {species.length === 0 ? (
+                            <div className="phy-empty">No species yet — wait for LUCA to diversify…</div>
+                        ) : [...species]
+                            .sort((a, b) => b.memberCount - a.memberCount)
+                            .slice(0, 20)
+                            .map(s => (
+                                <div
+                                    key={s.id}
+                                    className={`phy-species-row${s.extinctAt ? ' phy-species-extinct' : ''}`}
+                                >
+                                    <div className="phy-species-dot" style={{ background: s.color }} />
+                                    <span className="phy-species-name">{s.name}</span>
+                                    <span className="phy-species-count">{s.memberCount}</span>
+                                </div>
+                            ))}
+                    </div>
+                )}
             </div>
-        </div>
+        </>
     );
 }

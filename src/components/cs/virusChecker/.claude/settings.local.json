@@ -14,7 +14,9 @@
       "Bash(echo \"EXIT:$?\")",
       "Bash(npx tsc --noEmit --project \"C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\\\\tsconfig.json\")",
       "Bash(Get-Content \"C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\\\\src\\\\components\\\\cs\\\\interviewPrep\\\\interviewPrep.tsx\")",
-      "Bash(Measure-Object -Line)"
+      "Bash(Measure-Object -Line)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(wc -l \"C:/Users/safeb/OneDrive/Documents/GitHub/thrive/src/components/cs/phylogeny/\"*)"
     ]
   }
 }

@@ -5,8 +5,9 @@ import {
   Play, Pause, RotateCcw, ChevronDown,
   Grid3X3, Truck, Eye, EyeOff, MapPin,
   Activity, Target, Route, Timer, TrendingUp,
-  Cpu, BarChart3, Settings2, Layers
+  Cpu, BarChart3, Settings2, Layers, X
 } from 'lucide-react';
+import { createGlobalStyle } from 'styled-components';
 
 import {
   breadthFirstSearch,
@@ -163,6 +164,98 @@ interface DeliveryAgent {
   finishTime: number;
   progress: number;
 }
+
+// ==================== OVERLAY STYLES ====================
+const MzOverlayStyles = createGlobalStyle`
+  .mz-root {
+    position: relative;
+    width: 100%;
+    min-height: 420px;
+    background: #0a0e1a;
+    border-radius: 12px;
+    overflow: hidden;
+    user-select: none;
+  }
+  .mz-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    cursor: default; touch-action: none; display: block;
+  }
+
+  .mz-chips { position: absolute; top: 0.75rem; left: 0.75rem; z-index: 50;
+    display: flex; flex-wrap: wrap; gap: 0.3rem; max-width: calc(100% - 5rem); }
+  .mz-chip { display: flex; align-items: center; gap: 0.3rem; padding: 0.28rem 0.6rem;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.62); color: rgba(255,255,255,0.65);
+    font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    backdrop-filter: blur(8px); font-family: inherit; white-space: nowrap; }
+  .mz-chip:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .mz-chip.active { border-color: var(--chip-color, #3b82f6);
+    background: color-mix(in srgb, var(--chip-color, #3b82f6) 20%, rgba(0,0,0,0.6)); color: #fff; }
+
+  .mz-top-right { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 50; display: flex; gap: 0.3rem; }
+  .mz-icon-btn { width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.62);
+    color: rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; backdrop-filter: blur(8px); transition: all 0.15s; }
+  .mz-icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .mz-icon-btn.active { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.5); color: #3b82f6; }
+
+  .mz-hud { position: absolute; top: 3rem; right: 0.75rem; z-index: 40;
+    min-width: 145px; background: rgba(5,8,18,0.82); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.09); border-radius: 10px;
+    padding: 0.6rem 0.75rem; font-size: 0.73rem; color: rgba(255,255,255,0.55); }
+  .mz-hud-title { font-weight: 700; font-size: 0.78rem; color: #e2e8f0;
+    margin-bottom: 0.45rem; display: flex; align-items: center; gap: 0.3rem; }
+  .mz-hud-row { display: flex; justify-content: space-between; align-items: center;
+    padding: 0.13rem 0; gap: 0.6rem; }
+  .mz-hud-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 0.3rem 0; }
+
+  .mz-bar { position: absolute; bottom: 0.75rem; left: 50%; transform: translateX(-50%);
+    z-index: 50; display: flex; align-items: center; gap: 0.25rem;
+    background: rgba(4,7,16,0.84); backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.09); border-radius: 999px;
+    padding: 0.35rem 0.55rem; white-space: nowrap; }
+  .mz-bar-btn { display: flex; align-items: center; gap: 0.28rem;
+    padding: 0.28rem 0.6rem; border-radius: 999px; border: 1px solid transparent;
+    background: transparent; color: rgba(255,255,255,0.55); font-size: 0.72rem;
+    font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap; font-family: inherit; }
+  .mz-bar-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .mz-bar-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .mz-bar-btn.primary { background: #3b82f6; color: #fff; border-color: rgba(59,130,246,0.4); }
+  .mz-bar-btn.primary:hover { background: #2563eb; }
+  .mz-bar-btn.danger { background: rgba(239,68,68,0.18); color: #f87171; border-color: rgba(239,68,68,0.25); }
+  .mz-bar-btn.active { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.35); color: #a5b4fc; }
+  .mz-bar-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 0.1rem; flex-shrink: 0; }
+  .mz-speed-ctrl { display: flex; align-items: center; gap: 0.3rem; }
+  .mz-slider { width: 56px; height: 4px; cursor: pointer; accent-color: #3b82f6; }
+  .mz-speed-label { color: rgba(255,255,255,0.45); font-size: 0.68rem; font-family: monospace; min-width: 1.6rem; text-align: right; }
+
+  .mz-panel { position: absolute; bottom: 3.5rem; left: 0.75rem; z-index: 60;
+    width: clamp(220px, 32vw, 380px); background: rgba(6,10,22,0.93);
+    backdrop-filter: blur(20px); border: 1px solid rgba(59,130,246,0.18);
+    border-radius: 12px; overflow: hidden; }
+  .mz-panel-header { display: flex; align-items: center; gap: 0.45rem;
+    padding: 0.65rem 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-weight: 700; font-size: 0.82rem; color: #e2e8f0; }
+  .mz-panel-close { margin-left: auto; background: transparent; border: none;
+    color: rgba(255,255,255,0.35); cursor: pointer; padding: 0.2rem; border-radius: 4px;
+    display: flex; align-items: center; transition: all 0.15s; }
+  .mz-panel-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .mz-panel-body { padding: 0.6rem 0.85rem; max-height: 48vh; overflow-y: auto; overflow-x: hidden; }
+  .mz-panel-body::-webkit-scrollbar { width: 3px; }
+  .mz-panel-body::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.4); border-radius: 2px; }
+
+  .mz-panel-label { font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-bottom: 0.2rem; display: flex; justify-content: space-between; }
+  .mz-panel-label span:last-child { color: rgba(255,255,255,0.8); font-family: monospace; }
+  .mz-panel-range { width: 100%; accent-color: #3b82f6; cursor: pointer; margin-bottom: 0.75rem; }
+  .mz-panel-mode-row { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; }
+  .mz-panel-mode-btn { flex: 1; padding: 0.3rem 0.5rem; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.5); font-size: 0.7rem; font-weight: 600; cursor: pointer;
+    transition: all 0.15s; font-family: inherit; }
+  .mz-panel-mode-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .mz-panel-mode-btn.active { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.5); color: #93c5fd; }
+`;
 
 const CELL_SIZE = 16;
 const DEFAULT_MAZE_SIZE = 41;
@@ -701,7 +794,8 @@ export default function PathfindingVisualization() {
   const [showPaths, setShowPaths] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [expandedResult, setExpandedResult] = useState<string | null>(null);
-  
+  const [activePanel, setActivePanel] = useState<'none' | 'settings' | 'algos' | 'results'>('none');
+
   const statusRef = useRef(status);
   const speedRef = useRef(animationSpeed);
   useEffect(() => { statusRef.current = status; }, [status]);
@@ -1181,291 +1275,153 @@ export default function PathfindingVisualization() {
   }, [status, initializeSimulation]);
   
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: theme.colors.bg.primary,
-      color: theme.colors.text.primary,
-      fontFamily: theme.fonts.sans,
-      padding: '20px',
-    }}>
-      {/* Header */}
-      <header style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '20px',
-        paddingBottom: '16px',
-        borderBottom: `1px solid ${theme.colors.border.default}`,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: theme.radius.lg,
-            background: theme.colors.accent.primary + '20',
-            border: `1px solid ${theme.colors.accent.primary}40`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            {environmentMode === 'maze' ? <Cpu size={20} color={theme.colors.accent.primary} /> : <Route size={20} color={theme.colors.accent.primary} />}
-          </div>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>
-              {environmentMode === 'maze' ? 'Pathfinding Analysis' : 'Route Optimization'}
-            </h1>
-            <p style={{ margin: '2px 0 0', fontSize: '13px', color: theme.colors.text.secondary }}>
-              Compare algorithm performance
-            </p>
-          </div>
+    <>
+      <MzOverlayStyles />
+
+      <div className="mz-root" style={{ height: canvasHeight + 80 }}>
+        <canvas ref={canvasRef} className="mz-canvas" width={canvasWidth} height={canvasHeight} />
+
+        {/* Top-left: environment chips */}
+        <div className="mz-chips">
+          {(['maze', 'network'] as EnvironmentMode[]).map(mode => (
+            <button key={mode} className={`mz-chip${environmentMode === mode ? ' active' : ''}`}
+              style={environmentMode === mode ? { '--chip-color': '#3b82f6' } as React.CSSProperties : {}}
+              onClick={() => setEnvironmentMode(mode)}>
+              {mode === 'maze' ? <Grid3X3 size={12} /> : <Truck size={12} />}
+              {mode === 'maze' ? 'Maze' : 'Delivery'}
+            </button>
+          ))}
         </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            padding: '6px 12px',
-            background: theme.colors.bg.tertiary,
-            borderRadius: theme.radius.md,
-            fontFamily: theme.fonts.mono,
-            fontSize: '13px',
-            color: theme.colors.text.secondary,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}>
-            <Timer size={14} />
-            {(elapsedTime / 1000).toFixed(1)}s
-          </div>
-          <StatusBadge status={status} />
+
+        {/* Top-right: toggle buttons */}
+        <div className="mz-top-right">
+          <button className={`mz-icon-btn${showExploration ? ' active' : ''}`} onClick={() => setShowExploration(!showExploration)} title="Exploration">
+            <Eye size={14} />
+          </button>
+          <button className={`mz-icon-btn${showPaths ? ' active' : ''}`} onClick={() => setShowPaths(!showPaths)} title="Paths">
+            <Route size={14} />
+          </button>
+          <button className={`mz-icon-btn${showLabels ? ' active' : ''}`} onClick={() => setShowLabels(!showLabels)} title="Labels">
+            <Layers size={14} />
+          </button>
         </div>
-      </header>
-      
-      {/* Main Layout */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '280px 1fr 300px',
-        gap: '16px',
-      }}>
-        {/* Left Panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Environment */}
-          <div style={{
-            background: theme.colors.bg.secondary,
-            borderRadius: theme.radius.lg,
-            border: `1px solid ${theme.colors.border.subtle}`,
-            overflow: 'hidden',
-          }}>
-            <div style={{
-              padding: '12px 14px',
-              borderBottom: `1px solid ${theme.colors.border.subtle}`,
-              fontSize: '11px',
-              fontWeight: 600,
-              color: theme.colors.text.muted,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}>
-              <Layers size={12} />
-              Environment
-            </div>
-            <div style={{ padding: '12px' }}>
-              <div style={{ display: 'flex', background: theme.colors.bg.tertiary, borderRadius: theme.radius.md, padding: '3px' }}>
-                {(['maze', 'network'] as EnvironmentMode[]).map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => setEnvironmentMode(mode)}
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px',
-                      padding: '8px 12px',
-                      background: environmentMode === mode ? theme.colors.bg.secondary : 'transparent',
-                      border: 'none',
-                      borderRadius: theme.radius.sm,
-                      color: environmentMode === mode ? theme.colors.text.primary : theme.colors.text.muted,
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {mode === 'maze' ? <Grid3X3 size={14} /> : <Truck size={14} />}
-                    {mode === 'maze' ? 'Maze' : 'TSP'}
-                  </button>
-                ))}
-              </div>
-              
-              <div style={{ marginTop: '14px' }}>
-                <label style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '12px',
-                  color: theme.colors.text.secondary,
-                  marginBottom: '6px',
-                }}>
-                  <span>{environmentMode === 'maze' ? 'Grid Size' : 'Stops'}</span>
-                  <span style={{ fontFamily: theme.fonts.mono, color: theme.colors.text.primary }}>
-                    {environmentMode === 'maze' ? `${mazeSize}×${mazeSize}` : stopCount}
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  min={environmentMode === 'maze' ? 21 : 10}
-                  max={environmentMode === 'maze' ? 61 : 100}
-                  step={environmentMode === 'maze' ? 10 : 5}
-                  value={environmentMode === 'maze' ? mazeSize : stopCount}
-                  onChange={(e) => environmentMode === 'maze' 
-                    ? setMazeSize(Number(e.target.value)) 
-                    : setStopCount(Number(e.target.value))
-                  }
-                  style={{ width: '100%' }}
-                />
-              </div>
-            </div>
+
+        {/* Stats HUD */}
+        {stats.best > 0 && (
+          <div className="mz-hud">
+            <div className="mz-hud-title"><TrendingUp size={13} /> Results</div>
+            <div className="mz-hud-divider" />
+            <div className="mz-hud-row"><span>Best</span><span style={{ color: '#22c55e', fontWeight: 700 }}>{stats.best.toLocaleString()}</span></div>
+            <div className="mz-hud-row"><span>Worst</span><span style={{ color: '#ef4444', fontWeight: 700 }}>{stats.worst.toLocaleString()}</span></div>
+            <div className="mz-hud-row"><span>Δ</span><span style={{ color: '#fbbf24', fontWeight: 700 }}>{Math.round((stats.worst / stats.best - 1) * 100)}%</span></div>
           </div>
-          
-          {/* Mode (maze only) */}
-          {environmentMode === 'maze' && (
-            <div style={{
-              background: theme.colors.bg.secondary,
-              borderRadius: theme.radius.lg,
-              border: `1px solid ${theme.colors.border.subtle}`,
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                padding: '12px 14px',
-                borderBottom: `1px solid ${theme.colors.border.subtle}`,
-                fontSize: '11px',
-                fontWeight: 600,
-                color: theme.colors.text.muted,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}>
-                <Target size={12} />
-                Mode
+        )}
+
+        {/* Bottom pill bar */}
+        <div className="mz-bar">
+          <button
+            className={`mz-bar-btn${status === 'starting' ? ' danger' : ' primary'}`}
+            onClick={() => status === 'starting' ? setStatus('preparing') : startAnalysis()}
+            disabled={selectedAlgorithms.length === 0}
+          >
+            {status === 'starting' ? <><Pause size={13} />Pause</> : <><Play size={13} />{status === 'finished' ? 'Restart' : 'Start'}</>}
+          </button>
+
+          <button className="mz-bar-btn" onClick={initializeSimulation}>
+            <RotateCcw size={13} />Reset
+          </button>
+
+          <div className="mz-bar-divider" />
+
+          <div className="mz-speed-ctrl">
+            <span className="mz-speed-label">{animationSpeed}×</span>
+            <input type="range" className="mz-slider" min={0.5} max={5} step={0.5}
+              value={animationSpeed} onChange={e => setAnimationSpeed(Number(e.target.value))} />
+          </div>
+
+          <div className="mz-bar-divider" />
+
+          <button className={`mz-bar-btn${activePanel === 'settings' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'settings' ? 'none' : 'settings')}>
+            <Settings2 size={13} />Setup
+          </button>
+
+          <button className={`mz-bar-btn${activePanel === 'algos' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'algos' ? 'none' : 'algos')}>
+            <Cpu size={13} />Algos
+          </button>
+
+          <button className={`mz-bar-btn${activePanel === 'results' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'results' ? 'none' : 'results')}>
+            <BarChart3 size={13} />Results
+          </button>
+        </div>
+
+        {/* Settings panel */}
+        {activePanel === 'settings' && (
+          <div className="mz-panel">
+            <div className="mz-panel-header">
+              <Settings2 size={15} />Setup
+              <button className="mz-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
+            </div>
+            <div className="mz-panel-body">
+              <div className="mz-panel-label">
+                <span>{environmentMode === 'maze' ? 'Grid Size' : 'Stops'}</span>
+                <span>{environmentMode === 'maze' ? `${mazeSize}×${mazeSize}` : stopCount}</span>
               </div>
-              <div style={{ padding: '12px' }}>
-                <div style={{ display: 'flex', background: theme.colors.bg.tertiary, borderRadius: theme.radius.md, padding: '3px' }}>
-                  {(['sprint', 'waypoints'] as RaceMode[]).map(mode => (
-                    <button
-                      key={mode}
-                      onClick={() => setRaceMode(mode)}
-                      style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        padding: '8px 12px',
-                        background: raceMode === mode ? theme.colors.bg.secondary : 'transparent',
-                        border: 'none',
-                        borderRadius: theme.radius.sm,
-                        color: raceMode === mode ? theme.colors.text.primary : theme.colors.text.muted,
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {mode === 'sprint' ? <Activity size={14} /> : <MapPin size={14} />}
-                      {mode === 'sprint' ? 'Direct' : 'Waypoints'}
-                    </button>
-                  ))}
-                </div>
-                
-                {raceMode === 'waypoints' && (
-                  <div style={{ marginTop: '14px' }}>
-                    <label style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: '12px',
-                      color: theme.colors.text.secondary,
-                      marginBottom: '6px',
-                    }}>
-                      <span>Waypoints</span>
-                      <span style={{ fontFamily: theme.fonts.mono, color: theme.colors.text.primary }}>{waypointCount}</span>
-                    </label>
-                    <input
-                      type="range"
-                      min={1}
-                      max={15}
-                      value={waypointCount}
-                      onChange={(e) => setWaypointCount(Number(e.target.value))}
-                      style={{ width: '100%' }}
-                    />
+              <input
+                type="range"
+                className="mz-panel-range"
+                min={environmentMode === 'maze' ? 21 : 10}
+                max={environmentMode === 'maze' ? 61 : 100}
+                step={environmentMode === 'maze' ? 10 : 5}
+                value={environmentMode === 'maze' ? mazeSize : stopCount}
+                onChange={(e) => environmentMode === 'maze'
+                  ? setMazeSize(Number(e.target.value))
+                  : setStopCount(Number(e.target.value))
+                }
+              />
+              {environmentMode === 'maze' && (
+                <>
+                  <div className="mz-panel-label"><span>Race Mode</span></div>
+                  <div className="mz-panel-mode-row">
+                    {(['sprint', 'waypoints'] as RaceMode[]).map(mode => (
+                      <button key={mode} className={`mz-panel-mode-btn${raceMode === mode ? ' active' : ''}`}
+                        onClick={() => setRaceMode(mode)}>
+                        {mode === 'sprint' ? 'Direct' : 'Waypoints'}
+                      </button>
+                    ))}
                   </div>
-                )}
-              </div>
+                  {raceMode === 'waypoints' && (
+                    <>
+                      <div className="mz-panel-label">
+                        <span>Waypoints</span>
+                        <span>{waypointCount}</span>
+                      </div>
+                      <input
+                        type="range"
+                        className="mz-panel-range"
+                        min={1}
+                        max={15}
+                        value={waypointCount}
+                        onChange={(e) => setWaypointCount(Number(e.target.value))}
+                      />
+                    </>
+                  )}
+                </>
+              )}
             </div>
-          )}
-          
-          {/* Speed */}
-          <div style={{
-            background: theme.colors.bg.secondary,
-            borderRadius: theme.radius.lg,
-            border: `1px solid ${theme.colors.border.subtle}`,
-            padding: '14px',
-          }}>
-            <label style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: '12px',
-              color: theme.colors.text.secondary,
-              marginBottom: '8px',
-            }}>
-              <span>Speed</span>
-              <span style={{ fontFamily: theme.fonts.mono, color: theme.colors.text.primary }}>{animationSpeed}×</span>
-            </label>
-            <input
-              type="range"
-              min={0.5}
-              max={5}
-              step={0.5}
-              value={animationSpeed}
-              onChange={(e) => setAnimationSpeed(Number(e.target.value))}
-              style={{ width: '100%' }}
-            />
           </div>
-          
-          {/* Algorithms */}
-          <div style={{
-            background: theme.colors.bg.secondary,
-            borderRadius: theme.radius.lg,
-            border: `1px solid ${theme.colors.border.subtle}`,
-            overflow: 'hidden',
-            flex: 1,
-          }}>
-            <div style={{
-              padding: '12px 14px',
-              borderBottom: `1px solid ${theme.colors.border.subtle}`,
-              fontSize: '11px',
-              fontWeight: 600,
-              color: theme.colors.text.muted,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Cpu size={12} />
-                Algorithms
-              </span>
-              <span style={{
-                padding: '2px 6px',
-                background: theme.colors.accent.primary + '20',
-                borderRadius: theme.radius.sm,
-                color: theme.colors.accent.primary,
-                fontSize: '10px',
-              }}>
-                {selectedAlgorithms.length}
-              </span>
+        )}
+
+        {/* Algorithms panel */}
+        {activePanel === 'algos' && (
+          <div className="mz-panel">
+            <div className="mz-panel-header">
+              <Cpu size={15} />Algorithms ({selectedAlgorithms.length})
+              <button className="mz-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
             </div>
-            <div style={{ padding: '10px', maxHeight: '280px', overflowY: 'auto' }}>
+            <div className="mz-panel-body">
               {Object.values(RACING_TEAMS).map(team => (
                 <div key={team.id} style={{ marginBottom: '6px' }}>
                   <AlgorithmCard
@@ -1483,204 +1439,47 @@ export default function PathfindingVisualization() {
               ))}
             </div>
           </div>
-        </div>
-        
-        {/* Center - Canvas */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{
-            background: theme.colors.bg.secondary,
-            borderRadius: theme.radius.lg,
-            border: `1px solid ${theme.colors.border.subtle}`,
-            padding: '16px',
-          }}>
-            {/* Toggles */}
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              marginBottom: '12px',
-              paddingBottom: '12px',
-              borderBottom: `1px solid ${theme.colors.border.subtle}`,
-            }}>
-              <Toggle label="Exploration" checked={showExploration} onChange={() => setShowExploration(!showExploration)} />
-              <Toggle label="Paths" checked={showPaths} onChange={() => setShowPaths(!showPaths)} />
-              <Toggle label="Labels" checked={showLabels} onChange={() => setShowLabels(!showLabels)} />
+        )}
+
+        {/* Results panel */}
+        {activePanel === 'results' && (
+          <div className="mz-panel" style={{ left: 'auto', right: '0.75rem', bottom: '3.5rem' }}>
+            <div className="mz-panel-header">
+              <BarChart3 size={15} />Results
+              <button className="mz-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
             </div>
-            
-            {/* Canvas */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              background: theme.colors.bg.primary,
-              borderRadius: theme.radius.md,
-              overflow: 'hidden',
-            }}>
-              <canvas
-                ref={canvasRef}
-                width={canvasWidth}
-                height={canvasHeight}
-                style={{ maxWidth: '100%', height: 'auto' }}
-              />
-            </div>
-            
-            {/* Controls */}
-            <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
-              <Button
-                onClick={() => status === 'starting' ? setStatus('preparing') : startAnalysis()}
-                disabled={selectedAlgorithms.length === 0}
-                style={{ flex: 1 }}
-              >
-                {status === 'starting' ? <><Pause size={16} /> Pause</> : <><Play size={16} /> {status === 'finished' ? 'Restart' : 'Start'}</>}
-              </Button>
-              <Button onClick={initializeSimulation} variant="secondary">
-                <RotateCcw size={16} /> Reset
-              </Button>
-            </div>
-            
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '16px',
-              marginTop: '10px',
-              fontSize: '11px',
-              color: theme.colors.text.muted,
-            }}>
-              <span><kbd style={{ padding: '2px 5px', background: theme.colors.bg.tertiary, borderRadius: '3px', fontSize: '10px' }}>Space</kbd> Start/Pause</span>
-              <span><kbd style={{ padding: '2px 5px', background: theme.colors.bg.tertiary, borderRadius: '3px', fontSize: '10px' }}>R</kbd> Reset</span>
-            </div>
-          </div>
-          
-          {/* Summary Stats */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '10px',
-          }}>
-            {[
-              { label: 'Best', value: stats.best, color: theme.colors.accent.success },
-              { label: 'Worst', value: stats.worst, color: theme.colors.accent.error },
-              { label: 'Δ', value: stats.best > 0 ? `${Math.round((stats.worst / stats.best - 1) * 100)}%` : '—', color: theme.colors.accent.warning },
-            ].map((s, i) => (
-              <div key={i} style={{
-                background: theme.colors.bg.secondary,
-                borderRadius: theme.radius.lg,
-                border: `1px solid ${theme.colors.border.subtle}`,
-                padding: '14px',
-                textAlign: 'center',
-              }}>
-                <div style={{ fontSize: '11px', color: theme.colors.text.muted, marginBottom: '4px' }}>{s.label}</div>
-                <div style={{ fontSize: '20px', fontWeight: 600, fontFamily: theme.fonts.mono, color: s.color }}>
-                  {typeof s.value === 'number' ? s.value.toLocaleString() : s.value}
+            <div className="mz-panel-body">
+              {sortedResults.map((r, pos) => {
+                const isMaze = environmentMode === 'maze';
+                const metric = isMaze
+                  ? ('path' in r ? r.path?.length || 0 : 0)
+                  : ('totalDistance' in r ? Math.round(r.totalDistance) : 0);
+                const explored = isMaze && 'explored' in r ? r.explored.size : undefined;
+
+                return (
+                  <ResultRow
+                    key={r.team.id}
+                    position={pos + 1}
+                    team={r.team}
+                    metric={metric}
+                    unit={isMaze ? 'steps' : 'dist'}
+                    finished={r.finished}
+                    expanded={expandedResult === r.team.id}
+                    onToggle={() => setExpandedResult(expandedResult === r.team.id ? null : r.team.id)}
+                    isMaze={isMaze}
+                    explored={explored}
+                  />
+                );
+              })}
+              {sortedResults.length === 0 && (
+                <div style={{ padding: '20px 0', textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: '12px' }}>
+                  Select algorithms to compare
                 </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
-        </div>
-        
-        {/* Right Panel - Results */}
-        <div style={{
-          background: theme.colors.bg.secondary,
-          borderRadius: theme.radius.lg,
-          border: `1px solid ${theme.colors.border.subtle}`,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          <div style={{
-            padding: '12px 14px',
-            borderBottom: `1px solid ${theme.colors.border.subtle}`,
-            fontSize: '11px',
-            fontWeight: 600,
-            color: theme.colors.text.muted,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}>
-            <BarChart3 size={12} />
-            Results
-          </div>
-          <div style={{ padding: '10px', flex: 1, overflowY: 'auto' }}>
-            {sortedResults.map((r, pos) => {
-              const isMaze = environmentMode === 'maze';
-              const metric = isMaze
-                ? ('path' in r ? r.path?.length || 0 : 0)
-                : ('totalDistance' in r ? Math.round(r.totalDistance) : 0);
-              const explored = isMaze && 'explored' in r ? r.explored.size : undefined;
-              
-              return (
-                <ResultRow
-                  key={r.team.id}
-                  position={pos + 1}
-                  team={r.team}
-                  metric={metric}
-                  unit={isMaze ? 'steps' : 'dist'}
-                  finished={r.finished}
-                  expanded={expandedResult === r.team.id}
-                  onToggle={() => setExpandedResult(expandedResult === r.team.id ? null : r.team.id)}
-                  isMaze={isMaze}
-                  explored={explored}
-                />
-              );
-            })}
-            
-            {sortedResults.length === 0 && (
-              <div style={{ padding: '30px 16px', textAlign: 'center', color: theme.colors.text.muted, fontSize: '13px' }}>
-                Select algorithms to compare
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
-      
-      <style>{`
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: ${theme.colors.bg.primary}; }
-        ::-webkit-scrollbar-thumb { background: ${theme.colors.border.default}; border-radius: 3px; }
-        
-        input[type="range"] {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 100%;
-          height: 6px;
-          background: ${theme.colors.bg.elevated};
-          border-radius: 3px;
-          cursor: pointer;
-          outline: none;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: ${theme.colors.accent.primary};
-          cursor: pointer;
-          border: 2px solid ${theme.colors.bg.secondary};
-          transition: transform 0.15s ease;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb:hover {
-          transform: scale(1.1);
-        }
-        
-        input[type="range"]::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: ${theme.colors.accent.primary};
-          cursor: pointer;
-          border: 2px solid ${theme.colors.bg.secondary};
-        }
-        
-        input[type="range"]::-moz-range-track {
-          background: ${theme.colors.bg.elevated};
-          height: 6px;
-          border-radius: 3px;
-        }
-      `}</style>
-    </div>
+    </>
   );
 }

@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Play, Pause, Zap, MapPin, Navigation, Building2, Brain, Shuffle, Trophy, Cpu, BarChart3, ChevronDown, ChevronUp, Home, Compass, CheckCircle2, AlertCircle, TrendingUp, Award, RotateCcw, Layers } from 'lucide-react';
-import styled, { keyframes } from 'styled-components';
+import { Play, Pause, Zap, MapPin, Navigation, Building2, Brain, Shuffle, Trophy, Cpu, BarChart3, ChevronDown, ChevronUp, Home, Compass, CheckCircle2, AlertCircle, TrendingUp, Award, RotateCcw, Layers, X } from 'lucide-react';
+import styled, { keyframes, createGlobalStyle } from 'styled-components';
 
 // ==================== CONSTANTS ====================
 const COLORS = {
@@ -59,137 +59,93 @@ const gentlePulse = keyframes`
   50% { transform: scale(1.05); }
 `;
 
-const MainContainer = styled.div`
-  width: 100%;
-  height: 100vh;
-  background: linear-gradient(135deg, ${COLORS.bg1} 0%, ${COLORS.bg2} 50%, ${COLORS.bg1} 100%);
-  color: ${COLORS.textPrimary};
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-                radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
-    pointer-events: none;
-  }
-`;
-
-const Header = styled.div`
-  padding: 1.5rem 2rem;
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid ${COLORS.borderAccent};
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  animation: ${fadeIn} 0.6s ease-out;
-  z-index: 10;
-  
-  @media (max-width: 768px) {
-    padding: 1rem;
-    flex-wrap: wrap;
-  }
-`;
-
-const Title = styled.h1`
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-  
-  @media (max-width: 768px) {
-    font-size: 1.25rem;
-  }
-`;
-
-const Badge = styled.div`
-  padding: 0.5rem 1rem;
-  background: rgba(59, 130, 246, 0.12);
-  border-radius: 24px;
-  font-size: 0.875rem;
-  border: 1px solid ${COLORS.borderAccent};
-  font-weight: 500;
-`;
-
-const PerformanceBadge = styled(Badge) <{ $level: 'good' | 'medium' | 'heavy' }>`
-  background: ${({ $level }) =>
-    $level === 'good' ? 'rgba(34, 197, 94, 0.12)' :
-      $level === 'medium' ? 'rgba(251, 191, 36, 0.12)' :
-        'rgba(239, 68, 68, 0.12)'};
-  border-color: ${({ $level }) =>
-    $level === 'good' ? 'rgba(34, 197, 94, 0.3)' :
-      $level === 'medium' ? 'rgba(251, 191, 36, 0.3)' :
-        'rgba(239, 68, 68, 0.3)'};
-  color: ${({ $level }) =>
-    $level === 'good' ? COLORS.success :
-      $level === 'medium' ? COLORS.warn :
-        COLORS.danger};
-`;
-
-const MainContent = styled.div`
-  flex: 1;
-  display: flex;
-  padding: 1.5rem;
-  gap: 1.5rem;
-  overflow: hidden;
-  animation: ${fadeIn} 0.8s ease-out;
-  z-index: 1;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    padding: 1rem;
-    overflow-y: auto;
-  }
-`;
-
-const CanvasArea = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid ${COLORS.borderAccent};
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-  position: relative;
-  overflow: hidden;
-  padding: 2rem;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.35), transparent);
-    background-size: 200% 100%;
-    animation: ${shimmer} 3s linear infinite;
-  }
-  
-  @media (max-width: 768px) {
-    min-height: 400px;
-    padding: 1rem;
-  }
-`;
-
-const CanvasColumn = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  
-  @media (max-width: 768px) {
+// ==================== OVERLAY STYLES ====================
+const SpOverlayStyles = createGlobalStyle`
+  .sp-root {
+    position: relative;
     width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 65vh;
+    background: #0a0e1a;
+    border-radius: 12px;
+    overflow: hidden;
+    user-select: none;
   }
+  .sp-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    cursor: grab; touch-action: none; display: block;
+  }
+  .sp-canvas:active { cursor: grabbing; }
+
+  .sp-chips { position: absolute; top: 0.75rem; left: 0.75rem; z-index: 50;
+    display: flex; flex-wrap: wrap; gap: 0.3rem; max-width: calc(100% - 5rem); }
+  .sp-chip { display: flex; align-items: center; gap: 0.3rem; padding: 0.28rem 0.6rem;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.62); color: rgba(255,255,255,0.65);
+    font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    backdrop-filter: blur(8px); font-family: inherit; white-space: nowrap; }
+  .sp-chip:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .sp-chip.active { border-color: var(--chip-color, #3b82f6);
+    background: color-mix(in srgb, var(--chip-color, #3b82f6) 20%, rgba(0,0,0,0.6)); color: #fff; }
+
+  .sp-top-right { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 50; display: flex; gap: 0.3rem; }
+  .sp-icon-btn { width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.62);
+    color: rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; backdrop-filter: blur(8px); transition: all 0.15s; }
+  .sp-icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .sp-icon-btn.active { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.5); color: #3b82f6; }
+
+  .sp-hud { position: absolute; top: 3rem; right: 0.75rem; z-index: 40;
+    min-width: 145px; background: rgba(5,8,18,0.82); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.09); border-radius: 10px;
+    padding: 0.6rem 0.75rem; font-size: 0.73rem; color: rgba(255,255,255,0.55); }
+  .sp-hud-title { font-weight: 700; font-size: 0.78rem; color: #e2e8f0;
+    margin-bottom: 0.45rem; display: flex; align-items: center; gap: 0.3rem; }
+  .sp-hud-row { display: flex; justify-content: space-between; align-items: center;
+    padding: 0.13rem 0; gap: 0.6rem; }
+  .sp-hud-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 0.3rem 0; }
+
+  .sp-bar { position: absolute; bottom: 0.75rem; left: 50%; transform: translateX(-50%);
+    z-index: 50; display: flex; align-items: center; gap: 0.25rem;
+    background: rgba(4,7,16,0.84); backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.09); border-radius: 999px;
+    padding: 0.35rem 0.55rem; white-space: nowrap; }
+  .sp-bar-btn { display: flex; align-items: center; gap: 0.28rem;
+    padding: 0.28rem 0.6rem; border-radius: 999px; border: 1px solid transparent;
+    background: transparent; color: rgba(255,255,255,0.55); font-size: 0.72rem;
+    font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap; font-family: inherit; }
+  .sp-bar-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .sp-bar-btn.primary { background: #3b82f6; color: #fff; border-color: rgba(59,130,246,0.4); }
+  .sp-bar-btn.primary:hover { background: #2563eb; }
+  .sp-bar-btn.danger { background: rgba(239,68,68,0.18); color: #f87171; border-color: rgba(239,68,68,0.25); }
+  .sp-bar-btn.active { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.35); color: #a5b4fc; }
+  .sp-bar-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 0.1rem; flex-shrink: 0; }
+  .sp-speed-ctrl { display: flex; align-items: center; gap: 0.3rem; }
+  .sp-slider { width: 56px; height: 4px; cursor: pointer; accent-color: #3b82f6; }
+  .sp-speed-label { color: rgba(255,255,255,0.45); font-size: 0.68rem; font-family: monospace; min-width: 1.6rem; text-align: right; }
+
+  .sp-panel { position: absolute; bottom: 3.5rem; left: 0.75rem; z-index: 60;
+    width: clamp(220px, 32vw, 380px); background: rgba(6,10,22,0.93);
+    backdrop-filter: blur(20px); border: 1px solid rgba(59,130,246,0.18);
+    border-radius: 12px; overflow: hidden; }
+  .sp-panel-header { display: flex; align-items: center; gap: 0.45rem;
+    padding: 0.65rem 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-weight: 700; font-size: 0.82rem; color: #e2e8f0; }
+  .sp-panel-close { margin-left: auto; background: transparent; border: none;
+    color: rgba(255,255,255,0.35); cursor: pointer; padding: 0.2rem; border-radius: 4px;
+    display: flex; align-items: center; transition: all 0.15s; }
+  .sp-panel-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .sp-panel-body { padding: 0.6rem 0.85rem; max-height: 48vh; overflow-y: auto; overflow-x: hidden; }
+  .sp-panel-body::-webkit-scrollbar { width: 3px; }
+  .sp-panel-body::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.4); border-radius: 2px; }
+
+  .sp-route-info { position: absolute; top: 0.75rem; left: 50%; transform: translateX(-50%);
+    z-index: 40; display: flex; align-items: center; gap: 0.5rem;
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(10px);
+    padding: 0.3rem 0.75rem; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.1);
+    font-size: 0.72rem; font-weight: 600; color: rgba(255,255,255,0.7); white-space: nowrap; }
 `;
 
 const RouteInfo = styled.div`
@@ -268,70 +224,6 @@ const WinnerStats = styled.div`
   }
 `;
 
-const Sidebar = styled.div`
-  width: 420px;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  overflow-y: auto;
-  padding-right: 0.5rem;
-  
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.2);
-    border-radius: 3px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: ${COLORS.borderAccent};
-    border-radius: 3px;
-  }
-  
-  @media (max-width: 768px) {
-    width: 100%;
-  }
-`;
-
-const ControlsSection = styled.div`
-  display: flex;
-  gap: 0.75rem;
-`;
-
-const ControlButton = styled.button<{ $variant?: 'primary' | 'secondary' }>`
-  flex: 1;
-  padding: 1rem 1.5rem;
-  background: ${({ $variant }) =>
-    $variant === 'primary'
-      ? `linear-gradient(135deg, ${COLORS.accent} 0%, ${COLORS.accentSoft} 100%)`
-      : 'rgba(59, 130, 246, 0.12)'};
-  border: 1px solid ${COLORS.borderAccent};
-  border-radius: 12px;
-  color: ${COLORS.textPrimary};
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    background: ${({ $variant }) =>
-    $variant === 'primary'
-      ? `linear-gradient(135deg, ${COLORS.accentSoft} 0%, ${COLORS.accent} 100%)`
-      : 'rgba(59, 130, 246, 0.2)'};
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-`;
 
 const Section = styled.div`
   background: rgba(0,0,0,0.4);
@@ -2072,6 +1964,7 @@ export default function ShortestPathAlgorithmDemo({
   const [startCity, setStartCity] = useState(0);
   const [goalCity, setGoalCity] = useState(0);
   const [globalStats, setGlobalStats] = useState<Record<AlgorithmType, LeaderboardStats>>(LeaderboardManager.getStats());
+  const [activePanel, setActivePanel] = useState<'none' | 'algorithms' | 'leaderboard'>('none');
 
   // Use refs to track mutable state that needs to be accessed in callbacks without stale closures
   const statsUpdatedRef = useRef(false);
@@ -2326,146 +2219,145 @@ export default function ShortestPathAlgorithmDemo({
   const performanceLevel = getPerformanceLevel(cities.length);
 
   return (
-    <MainContainer>
-      <Header>
-        <Title>
-          <Cpu size={32} />
-          Pathfinding Arena Ultra
-        </Title>
+    <>
+      <SpOverlayStyles />
 
-        <Badge>
-          {cities.length.toLocaleString()} Nodes • {selectedAlgos.length} Algorithms
-        </Badge>
+      {/* ── Canvas container with all overlays ── */}
+      <div className="sp-root">
+        <canvas ref={canvasRef} className="sp-canvas" width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />
 
-        <PerformanceBadge $level={performanceLevel}>
-          {performanceLevel === 'good' ? '⚡ Fast' :
-            performanceLevel === 'medium' ? '⚠️ Medium' :
-              '🔥 Heavy'}
-        </PerformanceBadge>
-      </Header>
+        {/* Top-left: network size chips */}
+        <div className="sp-chips">
+          {Object.entries(mapModeIcons).map(([mode, { icon, label }]) => (
+            <button
+              key={mode}
+              className={`sp-chip${mapMode === mode ? ' active' : ''}`}
+              style={mapMode === mode ? { '--chip-color': '#3b82f6' } as React.CSSProperties : {}}
+              onClick={() => setMapMode(mode as MapMode)}
+            >
+              {icon}{label}
+            </button>
+          ))}
+        </div>
 
-      <MainContent>
-        <CanvasColumn>
-          <CanvasArea>
-            <RouteInfo>
-              <CityLabel $color={COLORS.success}>
-                <Home size={16} />
-                {cities[startCity]?.name || `Node ${startCity}`}
-              </CityLabel>
-              <Navigation size={16} color={COLORS.textMuted} />
-              <CityLabel $color={COLORS.danger}>
-                <MapPin size={16} />
-                {cities[goalCity]?.name || `Node ${goalCity}`}
-              </CityLabel>
-            </RouteInfo>
+        {/* Top-center: route info */}
+        <div className="sp-route-info">
+          <CityLabel $color={COLORS.success}>
+            <Home size={12} />
+            {cities[startCity]?.name || `Node ${startCity}`}
+          </CityLabel>
+          <Navigation size={12} color="rgba(255,255,255,0.4)" />
+          <CityLabel $color={COLORS.danger}>
+            <MapPin size={12} />
+            {cities[goalCity]?.name || `Node ${goalCity}`}
+          </CityLabel>
+        </div>
 
-            <canvas
-              ref={canvasRef}
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
-              style={{
-                maxWidth: '100%',
-                height: 'auto',
-                borderRadius: '8px'
-              }}
-            />
-          </CanvasArea>
+        {/* Top-right: icon buttons */}
+        <div className="sp-top-right">
+          <button className={`sp-icon-btn${showStats ? ' active' : ''}`} onClick={() => setShowStats(!showStats)} title="Race results">
+            <Trophy size={15} />
+          </button>
+          <button className={`sp-icon-btn${showGlobalLeaderboard ? ' active' : ''}`} onClick={() => setShowGlobalLeaderboard(!showGlobalLeaderboard)} title="Global leaderboard">
+            <Award size={15} />
+          </button>
+        </div>
 
-          {winnerConfig && winnerState && (
-            <WinnerBanner $color={winnerConfig.color}>
-              <WinnerTitle $color={winnerConfig.color}>
-                <Trophy size={28} />
-                <span>{winnerConfig.emoji} {winnerConfig.name} Wins!</span>
-                <span style={{ opacity: 0.5, margin: '0 0.5rem' }}>•</span>
-                <WinnerStats>
-                  {winnerState.steps.toLocaleString()} steps • {winnerState.path.length} nodes • {winnerState.distance.toFixed(0)} distance
-                </WinnerStats>
-              </WinnerTitle>
-            </WinnerBanner>
-          )}
-        </CanvasColumn>
+        {/* HUD: winner/route info */}
+        {winnerConfig && winnerState && (
+          <div className="sp-hud">
+            <div className="sp-hud-title">
+              <Trophy size={13} style={{ color: winnerConfig.color }} />
+              {winnerConfig.emoji} {winnerConfig.name}
+            </div>
+            <div className="sp-hud-divider" />
+            <div className="sp-hud-row"><span>Steps</span><span style={{ color: '#3b82f6', fontWeight: 700 }}>{winnerState.steps.toLocaleString()}</span></div>
+            <div className="sp-hud-row"><span>Nodes</span><span style={{ color: '#22c55e', fontWeight: 700 }}>{winnerState.path.length}</span></div>
+            <div className="sp-hud-row"><span>Dist</span><span style={{ color: '#fbbf24', fontWeight: 700 }}>{winnerState.distance.toFixed(0)}</span></div>
+          </div>
+        )}
 
-        <Sidebar>
-          <ControlsSection>
-            <ControlButton $variant="primary" onClick={handlePlay}>
-              {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-              {isPlaying ? 'Pause' : 'Play'}
-            </ControlButton>
-            <ControlButton $variant="secondary" onClick={handleReset}>
-              <Shuffle size={20} />
-              Reset
-            </ControlButton>
-          </ControlsSection>
+        {/* Bottom pill bar */}
+        <div className="sp-bar">
+          <button
+            className={`sp-bar-btn${isPlaying ? ' danger' : ' primary'}`}
+            onClick={handlePlay}
+          >
+            {isPlaying ? <Pause size={13} /> : <Play size={13} />}
+            {isPlaying ? 'Pause' : 'Race'}
+          </button>
 
-          {showGlobalLeaderboard && (
-            <GlobalLeaderboard>
-              <GlobalLeaderboardHeader>
-                <LeaderboardTitle>
-                  <Award size={20} />
-                  Global Leaderboard
-                </LeaderboardTitle>
-                <ResetButton onClick={handleResetGlobalStats}>
-                  <RotateCcw size={14} />
-                  Reset
-                </ResetButton>
-              </GlobalLeaderboardHeader>
+          <button className="sp-bar-btn" onClick={handleReset}>
+            <Shuffle size={13} />Reset
+          </button>
 
-              {sortedGlobalStats.map(([id, stats], idx) => {
-                const config = algorithmConfigs[id as AlgorithmType];
-                const totalScore = stats.firstPlace * 3 + stats.secondPlace * 2 + stats.thirdPlace * 1;
-                const podiumFinishes = stats.firstPlace + stats.secondPlace + stats.thirdPlace;
-                const podiumRate = stats.totalRuns > 0 ? ((podiumFinishes / stats.totalRuns) * 100).toFixed(0) : '0';
+          <div className="sp-bar-divider" />
 
-                return (
-                  <GlobalLeaderboardItem key={id} $rank={idx} $color={config.color}>
-                    <GlobalAlgoHeader>
-                      <GlobalAlgoLeft>
-                        <span style={{ fontSize: '1.5rem' }}>{config.emoji}</span>
-                        <GlobalAlgoName $color={config.color}>
-                          {config.name}
-                        </GlobalAlgoName>
-                      </GlobalAlgoLeft>
-                      <Rank style={{ fontSize: '1rem', minWidth: 'auto' }}>
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
-                      </Rank>
-                    </GlobalAlgoHeader>
+          <div className="sp-speed-ctrl">
+            <span className="sp-speed-label">{localSpeed}×</span>
+            <input type="range" className="sp-slider" min={1} max={20} step={1}
+              value={localSpeed} onChange={e => setLocalSpeed(Number(e.target.value))} />
+          </div>
 
-                    <GlobalStats>
-                      <GlobalStatItem>
-                        <GlobalStatLabel>Score</GlobalStatLabel>
-                        <GlobalStatValue>{totalScore} pts</GlobalStatValue>
-                      </GlobalStatItem>
-                      <GlobalStatItem>
-                        <GlobalStatLabel>Podium Rate</GlobalStatLabel>
-                        <GlobalStatValue>{podiumRate}%</GlobalStatValue>
-                      </GlobalStatItem>
-                      <GlobalStatItem style={{ gridColumn: '1 / -1' }}>
-                        <GlobalStatLabel>Finishes</GlobalStatLabel>
-                        <GlobalStatValue>
-                          <span style={{ marginRight: '0.75rem' }}>🥇 {stats.firstPlace}</span>
-                          <span style={{ marginRight: '0.75rem' }}>🥈 {stats.secondPlace}</span>
-                          <span>🥉 {stats.thirdPlace}</span>
-                        </GlobalStatValue>
-                      </GlobalStatItem>
-                    </GlobalStats>
-                  </GlobalLeaderboardItem>
-                );
-              })}
-            </GlobalLeaderboard>
-          )}
+          <div className="sp-bar-divider" />
 
-          {showStats && (
-            <Leaderboard $expanded={expandedStats}>
-              <LeaderboardHeader>
-                <LeaderboardTitle>
-                  <Trophy size={20} />
-                  Current Race
-                </LeaderboardTitle>
-                <ExpandButton onClick={() => setExpandedStats(!expandedStats)}>
-                  {expandedStats ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </ExpandButton>
-              </LeaderboardHeader>
+          <button className={`sp-bar-btn${activePanel === 'algorithms' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'algorithms' ? 'none' : 'algorithms')}>
+            <Brain size={13} />Algos
+          </button>
 
+          <button className={`sp-bar-btn${activePanel === 'leaderboard' ? ' active' : ''}`}
+            onClick={() => setActivePanel(p => p === 'leaderboard' ? 'none' : 'leaderboard')}>
+            <Trophy size={13} />Race
+          </button>
+        </div>
+
+        {/* Algorithms popup panel */}
+        {activePanel === 'algorithms' && (
+          <div className="sp-panel">
+            <div className="sp-panel-header">
+              <Brain size={15} />Algorithms
+              <button className="sp-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
+            </div>
+            <div className="sp-panel-body">
+              {Object.entries(algorithmConfigs).map(([id, config]) => (
+                <AlgoCheckbox
+                  key={id}
+                  $active={selectedAlgos.includes(id as AlgorithmType)}
+                  $color={config.color}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedAlgos.includes(id as AlgorithmType)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedAlgos([...selectedAlgos, id as AlgorithmType]);
+                      } else {
+                        setSelectedAlgos(selectedAlgos.filter(a => a !== id));
+                      }
+                    }}
+                  />
+                  <AlgoEmoji>{config.emoji}</AlgoEmoji>
+                  <AlgoDetails>
+                    <AlgoName $color={config.color} $active={selectedAlgos.includes(id as AlgorithmType)}>
+                      {config.name}
+                    </AlgoName>
+                    <AlgoDescription>{config.funFact}</AlgoDescription>
+                  </AlgoDetails>
+                </AlgoCheckbox>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Leaderboard popup panel */}
+        {activePanel === 'leaderboard' && (
+          <div className="sp-panel">
+            <div className="sp-panel-header">
+              <Trophy size={15} />Current Race
+              <button className="sp-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
+            </div>
+            <div className="sp-panel-body">
               {[...algorithmStates]
                 .sort((a, b) => {
                   if (a.status === 'failed' && b.status !== 'failed') return 1;
@@ -2490,21 +2382,13 @@ export default function ShortestPathAlgorithmDemo({
                           idx === 0 && algo.status === 'winner' ? '🏆' :
                             idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
                       </Rank>
-
                       <AlgoInfo>
                         <AlgoHeader>
                           <span style={{ fontSize: '1.5rem' }}>{config.emoji}</span>
-                          <AlgoNameInBoard $color={config.color}>
-                            {config.name}
-                          </AlgoNameInBoard>
-                          {algo.status === 'running' && (
-                            <AlgoStatus $color={config.color} />
-                          )}
-                          {algo.status === 'winner' && (
-                            <CheckCircle2 size={18} color={COLORS.success} />
-                          )}
+                          <AlgoNameInBoard $color={config.color}>{config.name}</AlgoNameInBoard>
+                          {algo.status === 'running' && <AlgoStatus $color={config.color} />}
+                          {algo.status === 'winner' && <CheckCircle2 size={18} color={COLORS.success} />}
                         </AlgoHeader>
-
                         <Stats>
                           <span>Steps: <StatValue>{algo.steps.toLocaleString()}</StatValue></span>
                           <span>Nodes: <StatValue>{algo.path.length > 0 ? algo.path.length : '-'}</StatValue></span>
@@ -2516,84 +2400,63 @@ export default function ShortestPathAlgorithmDemo({
                     </LeaderboardItem>
                   );
                 })}
-            </Leaderboard>
-          )}
+            </div>
+          </div>
+        )}
 
-          <Section>
-            <Label>
-              <Zap size={16} />
-              Speed: {localSpeed}x
-            </Label>
-            <Slider
-              type="range"
-              min="1"
-              max="20"
-              step="1"
-              value={localSpeed}
-              onChange={(e) => setLocalSpeed(Number(e.target.value))}
-            />
-          </Section>
+        {/* Global leaderboard popup (right side) when toggled */}
+        {showGlobalLeaderboard && (
+          <div className="sp-panel" style={{ left: 'auto', right: '0.75rem', bottom: '3.5rem' }}>
+            <div className="sp-panel-header">
+              <Award size={15} />Global Stats
+              <button className="sp-panel-close" onClick={() => setShowGlobalLeaderboard(false)}><X size={13} /></button>
+            </div>
+            <div className="sp-panel-body">
+              {sortedGlobalStats.map(([id, stats], idx) => {
+                const config = algorithmConfigs[id as AlgorithmType];
+                const totalScore = stats.firstPlace * 3 + stats.secondPlace * 2 + stats.thirdPlace * 1;
+                const podiumFinishes = stats.firstPlace + stats.secondPlace + stats.thirdPlace;
+                const podiumRate = stats.totalRuns > 0 ? ((podiumFinishes / stats.totalRuns) * 100).toFixed(0) : '0';
 
-          <Section>
-            <SectionTitle>
-              <Compass size={18} />
-              Network Size
-            </SectionTitle>
-
-            <ButtonGrid>
-              {Object.entries(mapModeIcons).map(([mode, { icon, label }]) => (
-                <ModeButton
-                  key={mode}
-                  $active={mapMode === mode}
-                  onClick={() => setMapMode(mode as MapMode)}
-                >
-                  {icon}
-                  <span>{label}</span>
-                </ModeButton>
-              ))}
-            </ButtonGrid>
-          </Section>
-
-          <Section>
-            <SectionTitle>
-              <Brain size={18} />
-              Algorithms
-            </SectionTitle>
-
-            {Object.entries(algorithmConfigs).map(([id, config]) => (
-              <AlgoCheckbox
-                key={id}
-                $active={selectedAlgos.includes(id as AlgorithmType)}
-                $color={config.color}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedAlgos.includes(id as AlgorithmType)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedAlgos([...selectedAlgos, id as AlgorithmType]);
-                    } else {
-                      setSelectedAlgos(selectedAlgos.filter(a => a !== id));
-                    }
-                  }}
-                />
-                <AlgoEmoji>{config.emoji}</AlgoEmoji>
-                <AlgoDetails>
-                  <AlgoName
-                    $color={config.color}
-                    $active={selectedAlgos.includes(id as AlgorithmType)}
-                  >
-                    {config.name}
-                  </AlgoName>
-                  <AlgoDescription>
-                    {config.funFact}
-                  </AlgoDescription>
-                </AlgoDetails>
-              </AlgoCheckbox>
-            ))}
-          </Section>
-        </Sidebar>
-      </MainContent>
-    </MainContainer>
+                return (
+                  <GlobalLeaderboardItem key={id} $rank={idx} $color={config.color}>
+                    <GlobalAlgoHeader>
+                      <GlobalAlgoLeft>
+                        <span style={{ fontSize: '1.5rem' }}>{config.emoji}</span>
+                        <GlobalAlgoName $color={config.color}>{config.name}</GlobalAlgoName>
+                      </GlobalAlgoLeft>
+                      <Rank style={{ fontSize: '1rem', minWidth: 'auto' }}>
+                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                      </Rank>
+                    </GlobalAlgoHeader>
+                    <GlobalStats>
+                      <GlobalStatItem>
+                        <GlobalStatLabel>Score</GlobalStatLabel>
+                        <GlobalStatValue>{totalScore} pts</GlobalStatValue>
+                      </GlobalStatItem>
+                      <GlobalStatItem>
+                        <GlobalStatLabel>Podium Rate</GlobalStatLabel>
+                        <GlobalStatValue>{podiumRate}%</GlobalStatValue>
+                      </GlobalStatItem>
+                      <GlobalStatItem style={{ gridColumn: '1 / -1' }}>
+                        <GlobalStatLabel>Finishes</GlobalStatLabel>
+                        <GlobalStatValue>
+                          <span style={{ marginRight: '0.75rem' }}>🥇 {stats.firstPlace}</span>
+                          <span style={{ marginRight: '0.75rem' }}>🥈 {stats.secondPlace}</span>
+                          <span>🥉 {stats.thirdPlace}</span>
+                        </GlobalStatValue>
+                      </GlobalStatItem>
+                    </GlobalStats>
+                  </GlobalLeaderboardItem>
+                );
+              })}
+              <ResetButton onClick={handleResetGlobalStats} style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}>
+                <RotateCcw size={14} />Reset Stats
+              </ResetButton>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

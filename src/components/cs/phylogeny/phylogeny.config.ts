@@ -351,7 +351,7 @@ export const EVOLUTION = {
     BASE_ENERGY_DRAIN: 0.06,
     ENERGY_FROM_ENVIRONMENT: 0.8,
     ENERGY_FROM_PREDATION: 0.6,
-    ENERGY_FROM_PHOTOSYNTHESIS: 1.2,
+    ENERGY_FROM_PHOTOSYNTHESIS: 2.5,  // was 1.2 — photosynthesizers must generate enough to sustain ecosystem
     STARVATION_THRESHOLD: 20,
     
     // Predation
@@ -360,10 +360,10 @@ export const EVOLUTION = {
     PREDATION_RANGE: 80,
     
     // Reproduction
-    ASEXUAL_REPRODUCTION_COST: 45,
-    ASEXUAL_REPRODUCTION_COOLDOWN: 400,
-    SEXUAL_REPRODUCTION_COST: 60,
-    SEXUAL_REPRODUCTION_COOLDOWN: 500,
+    ASEXUAL_REPRODUCTION_COST: 40,
+    ASEXUAL_REPRODUCTION_COOLDOWN: 280, // was 400 — faster population build-up
+    SEXUAL_REPRODUCTION_COST: 55,
+    SEXUAL_REPRODUCTION_COOLDOWN: 380,  // was 500
     MUTATION_RATE: 0.025,
     SEXUAL_MUTATION_RATE: 0.015,
     CROSSOVER_RATE: 0.12,
@@ -371,36 +371,36 @@ export const EVOLUTION = {
     MATING_DURATION: 80,
     
     // Endosymbiosis
-    ENDOSYMBIOSIS_CHANCE: 0.001,
-    ENDOSYMBIOSIS_SIZE_RATIO: 2.0,
-    ENDOSYMBIOSIS_MIN_GENERATIONS: 5,
+    ENDOSYMBIOSIS_CHANCE: 0.018,      // was 0.001 — increased 18× to prevent emergence bottleneck
+    ENDOSYMBIOSIS_SIZE_RATIO: 1.6,    // was 2.0 — slightly relaxed size requirement
+    ENDOSYMBIOSIS_MIN_GENERATIONS: 3, // was 5
     MITOCHONDRIA_BOOST: 1.5,
     CHLOROPLAST_BOOST: 1.8,
-    
+
     // Colony formation
-    COLONY_COOPERATION_THRESHOLD: 0.6,
-    COLONY_RANGE: 40,
+    COLONY_COOPERATION_THRESHOLD: 0.48, // was 0.6 — easier colony formation
+    COLONY_RANGE: 65,                   // was 40 — larger detection range
     COLONY_MIN_SIZE: 3,
-    COLONY_MAX_SIZE: 12,
+    COLONY_MAX_SIZE: 14,
     COLONY_COHESION_FORCE: 0.015,
-    
+
     // Cell differentiation
-    DIFFERENTIATION_THRESHOLD: 0.4,
-    DIFFERENTIATION_MIN_CELLS: 4,
-    NERVOUS_SYSTEM_THRESHOLD: 8,
-    
+    DIFFERENTIATION_THRESHOLD: 0.35,   // was 0.4
+    DIFFERENTIATION_MIN_CELLS: 3,      // was 4
+    NERVOUS_SYSTEM_THRESHOLD: 6,       // was 8
+
     // Speciation
-    SPECIATION_THRESHOLD: 0.35,
-    MIN_POPULATION_FOR_SPECIATION: 3,
-    
+    SPECIATION_THRESHOLD: 0.26,        // was 0.35 — easier speciation
+    MIN_POPULATION_FOR_SPECIATION: 2,  // was 3
+
     // Catastrophes
     CATASTROPHE_BASE_CHANCE: 0.00008,
     CATASTROPHE_MIN_INTERVAL: 3000,
-    
+
     // Population limits
-    MAX_PROKARYOTES: 40,
-    MAX_EUKARYOTES: 20,
-    MAX_COLONIES: 8,
+    MAX_PROKARYOTES: 65,  // was 40
+    MAX_EUKARYOTES: 35,   // was 20
+    MAX_COLONIES: 12,     // was 8
 } as const;
 
 // Genome encoding regions (40 bases total)
