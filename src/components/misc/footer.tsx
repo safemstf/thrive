@@ -30,7 +30,7 @@ const TEAM_MEMBERS = [
   },
   {
     name: 'Joseph Devasia',
-    role: 'Cybersecurity',
+    role: 'SRE',
     initials: 'JD',
     profileUrl: 'https://www.linkedin.com/in/josephdevasia/',
   },

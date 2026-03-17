@@ -76,10 +76,9 @@ const progressFlow = keyframes`
 const ProgressBarInner = styled.div<{ $width: number }>`
   width: ${props => props.$width}%;
   height: 100%;
-  background: linear-gradient(90deg, var(--color-primary-500), var(--color-primary-600));
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
   border-radius: 6px;
-  animation: ${progressFlow} 2s ease-in-out;
-  background-size: 200% 100%; /* Required for the animation to work */
+  transition: width 0.8s ease;
 `;
 
 const floatingBadge = keyframes`
@@ -361,34 +360,21 @@ const SpecializationTags = styled.div`
 `;
 
 const SpecTag = styled(Badge)`
-  background: var(--glass-background);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--glass-border);
+  background: rgba(59, 130, 246, 0.07);
+  border: 1px solid rgba(59, 130, 246, 0.18);
   color: var(--color-text-primary);
   font-weight: 500;
-  padding: ${GOLDEN_SPACING.xs} ${GOLDEN_SPACING.sm};
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transition: left 0.5s;
-  }
-  
+  font-size: 0.8rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  text-transform: none;
+  letter-spacing: 0;
+  transition: all 0.2s ease;
+
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    
-    &::before {
-      left: 100%;
-    }
+    background: rgba(59, 130, 246, 0.13);
+    border-color: rgba(59, 130, 246, 0.35);
+    transform: translateY(-1px);
   }
 `;
 
@@ -403,48 +389,24 @@ const SocialLinksContainer = styled.div`
 `;
 
 const SocialLink = styled.a`
-  width: ${50 * PHI}px;
-  height: ${50 * PHI}px;
-  border-radius: 50%;
-  background: var(--glass-background);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--glass-border);
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--color-background-secondary);
+  border: 1px solid var(--color-border-light);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--color-text-secondary);
   text-decoration: none;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  
-  svg {
-    position: relative;
-    z-index: 1;
-    transition: color 0.3s ease;
-  }
-  
+  transition: all 0.2s ease;
+
   &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    
-    &::before {
-      opacity: 1;
-    }
-    
-    svg {
-      color: white;
-    }
+    transform: translateY(-2px);
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
   }
 `;
 
@@ -462,89 +424,73 @@ const ActionButtons = styled.div`
   }
 `;
 
-const PremiumButton = styled(BaseButton)`
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+const PremiumButton = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.4rem;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
   border: none;
-  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-    transition: left 0.5s;
-  }
-  
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+  transition: all 0.2s ease;
+
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-    
-    &::before {
-      left: 100%;
-    }
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.45);
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
   }
 `;
 
 const StatsSection = styled.section`
-  background: var(--glass-background);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  margin: ${GOLDEN_SPACING.xxl} 0;
-  padding: ${GOLDEN_SPACING.xl};
-  animation: ${scaleIn} 0.6s ease;
-  position: relative;
-  overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--color-primary-500), transparent);
-    animation: ${shimmerEffect} 3s ease-in-out infinite;
-  }
+  margin: ${GOLDEN_SPACING.xl} 0;
+  padding: ${GOLDEN_SPACING.lg} 0;
+  border-top: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-light);
 `;
 
 const StatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: ${GOLDEN_SPACING.lg};
+  grid-template-columns: repeat(3, 1fr);
+  gap: ${GOLDEN_SPACING.md};
+
+  ${utils.responsive.below.md} {
+    grid-template-columns: repeat(2, 1fr);
+  }
 `;
 
 const StatCard = styled.div`
   text-align: center;
-  padding: ${GOLDEN_SPACING.lg};
-  border-radius: 16px;
+  padding: ${GOLDEN_SPACING.md} ${GOLDEN_SPACING.lg};
+  border-radius: 14px;
   background: var(--color-background-secondary);
   border: 1px solid var(--color-border-light);
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
   position: relative;
   overflow: hidden;
-  
-  &::before {
+
+  &::after {
     content: '';
     position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
-    border-radius: inherit;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #3b82f6, #6366f1);
+    border-radius: 14px 14px 0 0;
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.25s ease;
   }
-  
+
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-    
-    &::before {
-      opacity: 0.05;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+    border-color: rgba(59, 130, 246, 0.2);
+
+    &::after {
+      opacity: 1;
     }
   }
 `;
@@ -1068,27 +1014,27 @@ export default function PremiumPortfolioPage() {
                 <SocialLinksContainer>
                   {portfolio.socialLinks?.github && (
                     <SocialLink href={portfolio.socialLinks.github} target="_blank">
-                      <Github size={20} />
+                      <Github size={16} />
                     </SocialLink>
                   )}
                   {portfolio.socialLinks?.linkedin && (
                     <SocialLink href={portfolio.socialLinks.linkedin} target="_blank">
-                      <Linkedin size={20} />
+                      <Linkedin size={16} />
                     </SocialLink>
                   )}
                   {portfolio.socialLinks?.twitter && (
                     <SocialLink href={portfolio.socialLinks.twitter} target="_blank">
-                      <Twitter size={20} />
+                      <Twitter size={16} />
                     </SocialLink>
                   )}
                   {portfolio.socialLinks?.instagram && (
                     <SocialLink href={portfolio.socialLinks.instagram} target="_blank">
-                      <Instagram size={20} />
+                      <Instagram size={16} />
                     </SocialLink>
                   )}
                   {portfolio.socialLinks?.website && (
                     <SocialLink href={portfolio.socialLinks.website} target="_blank">
-                      <Globe size={20} />
+                      <Globe size={16} />
                     </SocialLink>
                   )}
                 </SocialLinksContainer>
@@ -1126,17 +1072,21 @@ export default function PremiumPortfolioPage() {
       <ContentWrapper>
         {/* Enhanced Stats Section */}
         <StatsSection data-section="stats">
-          <Heading2 style={{ 
-            textAlign: 'center', 
-            marginBottom: GOLDEN_SPACING.xl,
+          <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            gap: GOLDEN_SPACING.sm
+            gap: '0.5rem',
+            marginBottom: GOLDEN_SPACING.lg,
           }}>
-            <BarChart size={28} />
-            Portfolio Analytics
-          </Heading2>
+            <BarChart size={18} style={{ color: '#3b82f6' }} />
+            <span style={{
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              color: 'var(--color-text-secondary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em'
+            }}>Analytics</span>
+          </div>
           
           <StatsGrid>
             <StatCard>
