@@ -16,7 +16,8 @@
       "Bash(Get-Content \"C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\\\\src\\\\components\\\\cs\\\\interviewPrep\\\\interviewPrep.tsx\")",
       "Bash(Measure-Object -Line)",
       "Bash(echo \"Exit code: $?\")",
-      "Bash(wc -l \"C:/Users/safeb/OneDrive/Documents/GitHub/thrive/src/components/cs/phylogeny/\"*)"
+      "Bash(wc -l \"C:/Users/safeb/OneDrive/Documents/GitHub/thrive/src/components/cs/phylogeny/\"*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

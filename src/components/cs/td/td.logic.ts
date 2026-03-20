@@ -1,395 +1,716 @@
-/* ================================================================
-   td.logic.ts — Middle-Earth Defender · Game Logic
-   ================================================================ */
+// ============================================================
+// NEAT-inspired Neural Evolution of Walking Ragdolls
+// td.logic.ts — Physics · Neural Network · Genetic Algorithm
+// ============================================================
 
-/* -------------------- Constants -------------------- */
-export const COLS      = 20;
-export const ROWS      = 13;
-export const CELL      = 44;
-export const GW        = COLS * CELL;   // 880
-export const GH        = ROWS * CELL;   // 572
-export const DAY_LEN   = 25_000;        // 25 s prepare
-export const NIGHT_LEN = 35_000;        // 35 s battle
-export const CHAIN_R   = 80;
-export const KEEP: [number, number] = [10, 6];
-export const KEEP_R    = 2.5;
+// ── Constants ────────────────────────────────────────────────
 
-/* -------------------- Types -------------------- */
-export type TT = 'arrow' | 'wizard' | 'catapult' | 'elven' | 'beacon' | 'rohirrim' | 'treant';
-export type ET = 'orc' | 'warg' | 'urukhai' | 'troll' | 'nazgul' | 'balrog';
+const GRAVITY          = 750;   // px / s²
+const BODY_DAMPING     = 0.984; // velocity damping per step
+const CONSTRAINT_ITERS = 14;    // position-constraint iterations (stability)
+const GROUND_FRICTION  = 0.68;  // horizontal friction on ground contact
 
-export interface Tower   { col:number; row:number; type:TT; lastFired:number; lvl:1|2|3; key:string; angle:number; }
-export interface Enemy   { id:number; x:number; y:number; hp:number; maxHp:number; baseSpeed:number; speed:number; reward:number; wpIdx:number; pathPX:[number,number][]; type:ET; armor:number; slowUntil:number; slowPct:number; healRate:number; }
-export interface Proj    { id:number; x:number; y:number; eid:number; dmg:number; spd:number; splash:number; chain:number; color:string; slowUntil:number; type:TT; }
-export interface Float   { id:number; x:number; y:number; text:string; color:string; age:number; }
-export interface Particle{ id:number; x:number; y:number; vx:number; vy:number; color:string; life:number; maxLife:number; r:number; }
-export interface Spawn   { type:ET; at:number; pathIdx:number; }
-
-/** Per-game map data — re-generated each initGS() call for variety */
-export interface MapData {
-  roads:       [number, number][][];
-  roadSet:     Set<string>;
-  buildableSet:Set<string>;
-  pathPX:      [number, number][][];
-  deco:        Map<string, string>;
-}
-
-export interface GS {
-  gold:number; lives:number; wave:number; score:number; kills:number; gt:number;
-  towers: Map<string, Tower>;
-  enemies:Enemy[]; projs:Proj[]; floats:Float[]; particles:Particle[];
-  waveActive:boolean; gameOver:boolean;
-  waveStartGT:number; queue:Spawn[];
-  waveScale:number; waveLabel:string; isBoss:boolean; uid:number;
-  selectedKey:string|null; selType:TT;
-  mode:'day'|'night'; dayLen:number; nightLen:number; phaseTime:number;
-  eyeOfSauron:number;
-  beaconCharges:number; beaconActive:boolean; beaconEnd:number; nextBeaconWave:number;
-  /* New */
-  map: MapData;
-  gameSpeed: 1 | 2 | 4;
-  sendWaveReady: boolean; // can fast-forward to night
-}
-
-/* -------------------- Tower Config -------------------- */
-export interface TCfg {
-  name:string; cost:number; range:number; dmg:number; rate:number;
-  color:string; dark:string; pc:string;
-  splash:number; chain:number; slow:number;
-  piercesArmor:boolean; desc:string;
-}
-export const TCFG: Record<TT, TCfg> = {
-  arrow:    { name:'Arrow Tower',   cost:65,  range:3.2, dmg:22, rate:2.5, color:'#8aaa70', dark:'#1e3010', pc:'#c0d890', splash:0,  chain:0, slow:0,   piercesArmor:false, desc:'Swift, reliable — great vs hordes' },
-  wizard:   { name:'Istari Spire',  cost:190, range:3.6, dmg:45, rate:0.9, color:'#8898f0', dark:'#101840', pc:'#c0c8ff', splash:0,  chain:3, slow:0,   piercesArmor:false, desc:'Magic chains between foes' },
-  catapult: { name:'Siege Engine',  cost:135, range:2.8, dmg:75, rate:0.5, color:'#c08858', dark:'#381808', pc:'#f0b880', splash:70, chain:0, slow:0,   piercesArmor:false, desc:'Explosive area damage' },
-  elven:    { name:'Elven Watch',   cost:125, range:5.0, dmg:50, rate:1.1, color:'#78d8a0', dark:'#103828', pc:'#a8f8c8', splash:0,  chain:0, slow:0,   piercesArmor:true,  desc:'Long range, ignores armour' },
-  beacon:   { name:'Beacon Tower',  cost:75,  range:4.0, dmg:0,  rate:0,   color:'#e8a030', dark:'#382008', pc:'#ffd060', splash:0,  chain:0, slow:0,   piercesArmor:false, desc:'+25% dmg to towers in range' },
-  rohirrim: { name:'Rohirrim Post', cost:155, range:3.0, dmg:60, rate:1.0, color:'#d8a840', dark:'#382808', pc:'#f8d878', splash:32, chain:0, slow:0,   piercesArmor:false, desc:'Cavalry charge — small splash' },
-  treant:   { name:'Ent Guardian',  cost:195, range:2.5, dmg:55, rate:0.7, color:'#60a848', dark:'#182010', pc:'#98d870', splash:50, chain:0, slow:0.5, piercesArmor:false, desc:'Slows enemies, crushes groups' },
+// Limb segment lengths (px)
+export const L = {
+  NECK:      27,
+  SPINE:     40,
+  THIGH:     37,
+  SHIN:      34,
+  UPPER_ARM: 28,
+  FOREARM:   22,
+  FOOT:      14,
 };
+export const HEAD_RADIUS = 12;
+export const STANDING_PELVIS_H = L.SHIN + L.THIGH;                                   // ~71px
+export const STANDING_HEAD_H   = L.SHIN + L.THIGH + L.SPINE + L.NECK + HEAD_RADIUS;  // ~150px
 
-/* -------------------- Enemy Config -------------------- */
-export interface ECfg { hp:number; spd:number; reward:number; color:string; rim:string; sz:number; name:string; armor:number; healRate:number; }
-export const ECFG: Record<ET, ECfg> = {
-  orc:     { hp:85,   spd:75,  reward:8,   color:'#3d5a30', rim:'#70a050', sz:9,  name:'Orc',               armor:0,    healRate:0 },
-  warg:    { hp:75,   spd:155, reward:13,  color:'#7a5028', rim:'#b07840', sz:9,  name:'Warg Rider',        armor:0,    healRate:0 },
-  urukhai: { hp:320,  spd:50,  reward:24,  color:'#282820', rim:'#585848', sz:12, name:'Uruk-hai',          armor:0.4,  healRate:0 },
-  troll:   { hp:750,  spd:28,  reward:55,  color:'#5a6050', rim:'#90a080', sz:16, name:'Cave Troll',        armor:0.5,  healRate:0 },
-  nazgul:  { hp:200,  spd:105, reward:45,  color:'#18102a', rim:'#6040a0', sz:13, name:'Nazgûl',            armor:0.25, healRate:0 },
-  balrog:  { hp:3200, spd:22,  reward:220, color:'#c84000', rim:'#ff8030', sz:22, name:'Balrog of Morgoth', armor:0.4,  healRate:0 },
-};
+// ── Particle indices ─────────────────────────────────────────
 
-/* -------------------- Map Generation -------------------- */
-const SPAWN_SRCS: [number, number][] = [[0,3],[0,9],[10,0],[10,12],[19,4],[19,8]];
+export const PI = {
+  HEAD:    0,
+  CHEST:   1,
+  PELVIS:  2,
+  L_KNEE:  3,
+  L_FOOT:  4,
+  R_KNEE:  5,
+  R_FOOT:  6,
+  L_ELBOW: 7,
+  L_HAND:  8,
+  R_ELBOW: 9,
+  R_HAND:  10,
+  L_TOE:   11,
+  R_TOE:   12,
+} as const;
 
-function genRoad(sc:number, sr:number): [number,number][] {
-  const path:[number,number][] = [[sc,sr]];
-  let [c,r] = [sc,sr];
-  const [tc,tr] = KEEP;
-  let safety = 0;
-  while (Math.hypot(c-tc,r-tr) > KEEP_R && safety++ < 240) {
-    const dc = tc-c, dr = tr-r;
-    const mh = Math.abs(dc) > Math.abs(dr) ? Math.sign(dc) : 0;
-    const mv = Math.abs(dr) > Math.abs(dc) ? Math.sign(dr) : 0;
-    if (Math.random() < 0.30) {
-      if (mh && Math.random()<0.5) r += Math.sign(dr)||1;
-      else if (mv) c += Math.sign(dc)||1;
-      else { c += Math.random()>.5?1:-1; r += Math.random()>.5?1:-1; }
-    } else { c += mh; r += mv; }
-    c = Math.max(0, Math.min(COLS-1,c));
-    r = Math.max(0, Math.min(ROWS-1,r));
-    const last = path[path.length-1];
-    if (last[0]!==c || last[1]!==r) path.push([c,r]);
-  }
-  return path;
+// ── Types ────────────────────────────────────────────────────
+
+export interface Particle {
+  x: number; y: number;
+  px: number; py: number; // previous position (verlet)
+  mass: number;
 }
 
-export function generateMap(): MapData {
-  const roads = SPAWN_SRCS.map(([c,r]) => genRoad(c,r));
-  const roadSet = new Set<string>();
-  for (const road of roads) for (const [c,r] of road) roadSet.add(`${c},${r}`);
+export interface DistConstraint {
+  a: number; b: number;
+  restLen: number;
+  stiffness: number;
+}
 
-  const buildableSet = new Set<string>();
-  for (let c=0;c<COLS;c++) for (let r=0;r<ROWS;r++) {
-    const k = `${c},${r}`;
-    if (roadSet.has(k) || Math.hypot(c-KEEP[0],r-KEEP[1])<KEEP_R) continue;
-    let adj=false;
-    outer: for (let dc=-1;dc<=1;dc++) for (let dr=-1;dr<=1;dr++) {
-      if (!dc&&!dr) continue;
-      if (roadSet.has(`${c+dc},${r+dr}`)) { adj=true; break outer; }
+export interface MotorDef {
+  parentIdx: number;  // reference particle for angle measurement
+  pivotIdx:  number;  // joint pivot
+  childIdx:  number;  // particle that gets moved
+  strength:  number;
+  minAngle:  number;
+  maxAngle:  number;
+}
+
+// Motor definitions (8 joints — NN output order)
+export const MOTORS: MotorDef[] = [
+  // Hips — strong enough to support upper body weight. Range: back-swing ↔ forward-swing around standing (0).
+  { parentIdx: PI.CHEST,   pivotIdx: PI.PELVIS,  childIdx: PI.L_KNEE,   strength: 3200, minAngle: -0.9, maxAngle: 1.5  },
+  { parentIdx: PI.CHEST,   pivotIdx: PI.PELVIS,  childIdx: PI.R_KNEE,   strength: 3200, minAngle: -1.5, maxAngle: 0.9  },
+  // Knees — range includes fully straight (0) and deep bend
+  { parentIdx: PI.PELVIS,  pivotIdx: PI.L_KNEE,  childIdx: PI.L_FOOT,   strength: 2600, minAngle: -0.3, maxAngle: 2.4  },
+  { parentIdx: PI.PELVIS,  pivotIdx: PI.R_KNEE,  childIdx: PI.R_FOOT,   strength: 2600, minAngle: -2.4, maxAngle: 0.3  },
+  // Shoulders — wider range to allow natural arm swing
+  { parentIdx: PI.PELVIS,  pivotIdx: PI.CHEST,   childIdx: PI.L_ELBOW,  strength: 900,  minAngle: -2.2, maxAngle: 2.2  },
+  { parentIdx: PI.PELVIS,  pivotIdx: PI.CHEST,   childIdx: PI.R_ELBOW,  strength: 900,  minAngle: -2.2, maxAngle: 2.2  },
+  // Elbows — range includes straight and bent positions
+  { parentIdx: PI.CHEST,   pivotIdx: PI.L_ELBOW, childIdx: PI.L_HAND,   strength: 700,  minAngle: -1.5, maxAngle: 2.4  },
+  { parentIdx: PI.CHEST,   pivotIdx: PI.R_ELBOW, childIdx: PI.R_HAND,   strength: 700,  minAngle: -2.4, maxAngle: 1.5  },
+];
+
+export interface Ragdoll {
+  particles:   Particle[];
+  constraints: DistConstraint[];
+  alive:       boolean;
+  age:         number;
+  startX:      number;
+  fitness:     number;
+  fitnessScore: number;
+  fallTime:     number;
+  standingTime: number;  // seconds spent upright (used in rational standing reward)
+  color:        string;
+  footTrail:   Array<{ x: number; y: number; side: 'l' | 'r' }>;
+}
+
+// ── NEAT — Topology-evolving Neural Network ───────────────────
+//
+// Node IDs:
+//   0  … N_INPUT-1               → sensor inputs  (fixed)
+//   N_INPUT … N_INPUT+N_OUTPUT-1 → motor outputs  (fixed)
+//   N_INPUT+N_OUTPUT+            → hidden nodes   (grown by evolution)
+//
+// Connections are stored as a flat list with global innovation numbers
+// that align genes during crossover (the core NEAT insight).
+
+export const N_INPUT  = 17;  // +2 for center-of-mass balance & vertical velocity
+export const N_OUTPUT = 8;
+const MAX_HIDDEN = 40;   // cap hidden nodes to prevent bloat
+const MAX_CONNS  = 400;  // cap total connections — raised to allow deeper networks
+
+export interface NodeGene {
+  id:   number;
+  bias: number;
+}
+
+export interface ConnGene {
+  innov:   number;  // global innovation number (crossover alignment key)
+  inNode:  number;
+  outNode: number;
+  weight:  number;
+  enabled: boolean;
+}
+
+export interface NEATGenome {
+  nodes: NodeGene[];  // hidden nodes only (input/output are implicit)
+  conns: ConnGene[];  // ALL connections (input→hidden, input→output, hidden→output, hidden→hidden)
+}
+
+// ── Innovation Registry (module-level singleton) ──────────────
+// Shared across the whole session so identical structural mutations
+// in the same generation get the same innovation number.
+
+let _nextHiddenId = N_INPUT + N_OUTPUT;
+let _nextInnov    = 0;
+const _innovCache = new Map<string, number>();
+
+export function resetNEAT(): void {
+  _nextHiddenId = N_INPUT + N_OUTPUT;
+  _nextInnov    = 0;
+  _innovCache.clear();
+}
+
+function getInnov(inNode: number, outNode: number): number {
+  const key = `${inNode}|${outNode}`;
+  if (!_innovCache.has(key)) _innovCache.set(key, _nextInnov++);
+  return _innovCache.get(key)!;
+}
+
+function rand(lo: number, hi: number): number {
+  return lo + Math.random() * (hi - lo);
+}
+
+function tanhFast(x: number): number {
+  if (x >  5) return  1;
+  if (x < -5) return -1;
+  const x2 = x * x;
+  return x * (27 + x2) / (27 + 9 * x2);
+}
+
+// ── NEAT Forward Pass ─────────────────────────────────────────
+// Hidden nodes are evaluated in ascending ID order.
+// Because NEAT's "add node" mutation always creates a new node with
+// a higher ID than its source connection's endpoints, ascending-ID
+// order IS a valid topological order for any acyclic NEAT genome.
+
+export function neatForward(genome: NEATGenome, inputs: Float32Array): Float32Array {
+  const act = new Map<number, number>();
+
+  // Set inputs
+  for (let i = 0; i < N_INPUT; i++) act.set(i, inputs[i]);
+
+  // Hidden nodes in ascending ID order
+  const sortedHidden = [...genome.nodes].sort((a, b) => a.id - b.id);
+  for (const n of sortedHidden) {
+    let sum = n.bias;
+    for (const c of genome.conns) {
+      if (c.enabled && c.outNode === n.id) sum += (act.get(c.inNode) ?? 0) * c.weight;
     }
-    if (adj) buildableSet.add(k);
+    act.set(n.id, tanhFast(sum));
   }
 
-  const pathPX: [number,number][][] = roads.map(road => road.map(([c,r]) => [c*CELL+CELL/2, r*CELL+CELL/2] as [number,number]));
-
-  const WILD = ['tree','tree','tree','bush','rock','rock','none','none','none','none'];
-  const deco = new Map<string,string>();
-  for (let c=0;c<COLS;c++) for (let r=0;r<ROWS;r++) {
-    const k = `${c},${r}`;
-    if (roadSet.has(k)) deco.set(k,'road');
-    else if (buildableSet.has(k)) deco.set(k,'buildable');
-    else if (Math.hypot(c-KEEP[0],r-KEEP[1])<KEEP_R) deco.set(k,'keep');
-    else deco.set(k, WILD[(c*37+r*19+c*r*11)%WILD.length]);
+  // Output nodes
+  const outputs = new Float32Array(N_OUTPUT);
+  for (let o = 0; o < N_OUTPUT; o++) {
+    const outId = N_INPUT + o;
+    let sum = 0;
+    for (const c of genome.conns) {
+      if (c.enabled && c.outNode === outId) sum += (act.get(c.inNode) ?? 0) * c.weight;
+    }
+    outputs[o] = tanhFast(sum);
   }
-
-  return { roads, roadSet, buildableSet, pathPX, deco };
+  return outputs;
 }
 
-/* Legacy static exports (kept for backward compat; rendering now uses gs.map) */
-export const ROADS       = SPAWN_SRCS.map(([c,r])=>genRoad(c,r));
-export const ROAD_SET    = new Set<string>(); for (const road of ROADS) for (const [c,r] of road) ROAD_SET.add(`${c},${r}`);
-export const BUILDABLE_SET = new Set<string>();
-export const PATH_PX: [number,number][][] = ROADS.map(road=>road.map(([c,r])=>[c*CELL+CELL/2,r*CELL+CELL/2] as [number,number]));
-export const DECO = new Map<string,string>();
+// ── Genome Creation ───────────────────────────────────────────
+// Start fully connected input→output (no hidden).
+// Hidden nodes grow organically via add-node mutations.
 
-/* -------------------- Tower Helpers -------------------- */
-export const tDmg   = (t:Tower)              => { const b=TCFG[t.type].dmg;   return t.lvl===1?b:t.lvl===2?Math.round(b*1.8):Math.round(b*3.0); };
-export const tRng   = (t:{type:TT;lvl:number}) => { const b=TCFG[t.type].range; return t.lvl===1?b:t.lvl===2?b+0.8:b+1.6; };
-export const tRate  = (t:Tower)              => { const b=TCFG[t.type].rate;  return t.lvl===1?b:t.lvl===2?b*1.45:b*1.9; };
-export const tChain = (t:Tower)              => { const b=TCFG[t.type].chain; return t.lvl===1?b:t.lvl===2?b+2:b+4; };
-export const tSlow  = (t:Tower)              => { const b=TCFG[t.type].slow;  return t.lvl===1?b:t.lvl===2?b+0.15:b+0.3; };
-export const upgCost = (t:Tower) => t.lvl<3 ? Math.round(TCFG[t.type].cost*(t.lvl===1?1.0:1.5)) : 0;
-export const sellVal = (t:Tower) => Math.floor(TCFG[t.type].cost*(1+(t.lvl-1)*1.25)*0.6);
-export const uidOf   = (gs:GS) => gs.uid++;
-
-/* -------------------- GS Helpers -------------------- */
-export function floatText(gs:GS,x:number,y:number,text:string,color:string) { gs.floats.push({id:uidOf(gs),x,y,text,color,age:0}); }
-export function spawnParticles(gs:GS,x:number,y:number,color:string,count=6) {
-  for (let i=0;i<count;i++) {
-    const a=(i/count)*Math.PI*2+Math.random()*0.6, spd=35+Math.random()*65;
-    gs.particles.push({id:uidOf(gs),x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,color,life:0.45+Math.random()*0.35,maxLife:0.8,r:2+Math.random()*3});
-  }
-}
-export function beaconBoost(gs:GS,tCol:number,tRow:number):number {
-  let bonus=1;
-  for (const [,t] of gs.towers) if (t.type==='beacon' && Math.hypot(t.col-tCol,t.row-tRow)<=tRng(t)) bonus+=0.25*t.lvl;
-  return bonus;
-}
-function nazgulDebuff(gs:GS,tCol:number,tRow:number):number {
-  let mult=1.0;
-  for (const e of gs.enemies) if (e.type==='nazgul' && Math.hypot(e.x/CELL-tCol,e.y/CELL-tRow)<=2.5) mult=Math.max(0.5,mult-0.25);
-  return mult;
-}
-function eyeSpeedMult(gs:GS) { return gs.eyeOfSauron>=80?1.30:gs.eyeOfSauron>=50?1.15:1.0; }
-function eyeHpMult(gs:GS)    { return gs.eyeOfSauron>=80?1.20:1.0; }
-
-/* -------------------- Wave Generation -------------------- */
-function mkSpawns(type:ET,n:number,iv:number,st=0,pLen=6):Spawn[] {
-  return Array.from({length:n},(_,i)=>({type,at:st+i*iv,pathIdx:Math.floor(Math.random()*pLen)}));
-}
-
-export function generateWave(gs:GS):{spawns:Spawn[];label:string;isBoss:boolean} {
-  const n=gs.wave, arch=n%6, pLen=gs.map.pathPX.length;
-  const spawns:Spawn[]=[];
-  let label='',isBoss=false;
-  if (arch===0) {
-    isBoss=true; label=n<=6?'💀 THE BALROG WAKES':`💀 BALROG RETURNS (${n})`;
-    spawns.push(...mkSpawns('balrog',Math.min(1+Math.floor(n/6),2),9000,0,pLen));
-    spawns.push(...mkSpawns('urukhai',Math.floor(n*0.4)+2,1200,3000,pLen));
-    spawns.push(...mkSpawns('orc',8+n,Math.max(350,700-n*18),2000,pLen));
-  } else if (arch===1) {
-    label=`⚔ Shadow of Mordor — ${n}`;
-    spawns.push(...mkSpawns('orc',12+n*2,Math.max(180,580-n*20),0,pLen));
-    if (n>3) spawns.push(...mkSpawns('warg',3+Math.floor(n*0.3),500,2200,pLen));
-  } else if (arch===2) {
-    label=`🐺 Warg Riders — ${n}`;
-    spawns.push(...mkSpawns('warg',10+n,Math.max(100,380-n*14),0,pLen));
-    spawns.push(...mkSpawns('orc',6+n,340,1500,pLen));
-  } else if (arch===3) {
-    label=`⛧ March of Isengard — ${n}`;
-    const uc=Math.max(3,Math.floor(n*0.6));
-    spawns.push(...mkSpawns('urukhai',uc,Math.max(900,2400-n*55),0,pLen));
-    spawns.push(...mkSpawns('troll',Math.max(1,Math.floor(n*0.2)),3200,uc*900,pLen));
-  } else if (arch===4) {
-    label=`🌑 Riders of the Nine — ${n}`;
-    const nc=Math.min(1+Math.floor(n/5),4);
-    spawns.push(...mkSpawns('nazgul',nc,3000,0,pLen));
-    spawns.push(...mkSpawns('orc',8+n,340,1000,pLen));
-    if (n>4) spawns.push(...mkSpawns('urukhai',Math.floor(n*0.3),900,2600,pLen));
-  } else {
-    label=`🔥 Armies of Mordor — ${n}`;
-    const b=Math.max(3,Math.floor(n*0.5));
-    spawns.push(...mkSpawns('orc',b,480,0,pLen));
-    spawns.push(...mkSpawns('warg',Math.floor(b*0.6),300,b*380,pLen));
-    spawns.push(...mkSpawns('urukhai',Math.max(1,Math.floor(n*0.25)),1400,b*600,pLen));
-    if (n>5) spawns.push(...mkSpawns('troll',Math.max(1,Math.floor(n*0.1)),3500,b*1000,pLen));
-    if (n>8) spawns.push(...mkSpawns('nazgul',Math.floor(n*0.1),4000,b*1300,pLen));
-  }
-  spawns.sort((a,b)=>a.at-b.at);
-  return {spawns,label,isBoss};
-}
-
-/* -------------------- Init -------------------- */
-export function initGS(): GS {
-  return {
-    gold:200, lives:20, wave:0, score:0, kills:0, gt:0,
-    towers:new Map(), enemies:[], projs:[], floats:[], particles:[],
-    waveActive:false, gameOver:false,
-    waveStartGT:0, queue:[], waveScale:1, waveLabel:'Middle-earth awaits…', isBoss:false, uid:1,
-    selectedKey:null, selType:'arrow',
-    mode:'day', dayLen:DAY_LEN, nightLen:NIGHT_LEN, phaseTime:0,
-    eyeOfSauron:0,
-    beaconCharges:1, beaconActive:false, beaconEnd:0, nextBeaconWave:3,
-    map: generateMap(),
-    gameSpeed: 1,
-    sendWaveReady: true,
-  };
-}
-
-/* -------------------- Phase Logic -------------------- */
-export function startNight(gs:GS) {
-  gs.mode='night'; gs.phaseTime=0;
-  gs.wave++;
-  gs.waveScale = 1+(gs.wave-1)*0.14;
-  const {spawns,label,isBoss} = generateWave(gs);
-  gs.queue=spawns; gs.waveLabel=label; gs.isBoss=isBoss;
-  gs.waveStartGT=gs.gt; gs.waveActive=true; gs.sendWaveReady=false;
-}
-
-/** Call during day phase to start night early and earn a gold bonus */
-export function sendWaveNow(gs:GS) {
-  if (gs.mode!=='day'||gs.gameOver||!gs.sendWaveReady) return;
-  const bonus = Math.round(20 + gs.wave * 8);
-  gs.gold += bonus;
-  floatText(gs, GW/2, GH*0.45, `+${bonus}🌾 Early Assault Bonus!`, '#ffd060');
-  startNight(gs);
-}
-
-export function endNight(gs:GS) {
-  gs.mode='day'; gs.phaseTime=0; gs.waveActive=false; gs.sendWaveReady=true;
-  const interest = Math.min(Math.floor(gs.gold*0.04), 60);
-  if (interest>0) { gs.gold+=interest; floatText(gs,GW/2,GH*0.45,`+${interest}🌾 interest`,TCFG.arrow.color); }
-  if (gs.wave>=gs.nextBeaconWave && gs.beaconCharges<3) {
-    gs.beaconCharges++;
-    gs.nextBeaconWave+=3;
-    floatText(gs,GW/2,GH*0.38,'🔥 Beacon Charged!','#ffc860');
-  }
-}
-
-/* -------------------- Night Update -------------------- */
-export function updateNight(gs:GS,dt:number) {
-  if (gs.gameOver) return;
-  gs.eyeOfSauron = Math.min(100, gs.eyeOfSauron+0.15*dt);
-  if (gs.beaconActive && gs.gt>gs.beaconEnd) gs.beaconActive=false;
-
-  if (gs.waveActive && gs.queue.length>0) {
-    const elapsed = gs.gt-gs.waveStartGT;
-    while (gs.queue.length>0 && gs.queue[0].at<=elapsed) {
-      const s=gs.queue.shift()!;
-      const cfg=ECFG[s.type];
-      const spdMult=(1+Math.min(gs.wave*0.01,0.45))*eyeSpeedMult(gs);
-      const path = gs.map.pathPX[s.pathIdx%gs.map.pathPX.length];
-      const [sx,sy]=path[0];
-      const hp=Math.round(cfg.hp*gs.waveScale*eyeHpMult(gs));
-      gs.enemies.push({
-        id:uidOf(gs),x:sx,y:sy,hp,maxHp:hp,
-        baseSpeed:cfg.spd,speed:cfg.spd*spdMult,
-        reward:Math.round(cfg.reward*(1+(gs.wave-1)*0.07)),
-        wpIdx:1,pathPX:path,
-        type:s.type,armor:cfg.armor,slowUntil:0,slowPct:0,healRate:cfg.healRate,
+export function createInitialGenome(): NEATGenome {
+  const conns: ConnGene[] = [];
+  for (let i = 0; i < N_INPUT; i++) {
+    for (let o = 0; o < N_OUTPUT; o++) {
+      conns.push({
+        innov:   getInnov(i, N_INPUT + o),
+        inNode:  i,
+        outNode: N_INPUT + o,
+        weight:  rand(-1.5, 1.5),
+        enabled: true,
       });
     }
   }
-
-  const leakedIds:number[]=[];
-  for (const e of gs.enemies) {
-    if (e.healRate>0) e.hp=Math.min(e.maxHp,e.hp+e.healRate*dt);
-    if (e.wpIdx>=e.pathPX.length) {
-      leakedIds.push(e.id); gs.lives--;
-      gs.eyeOfSauron=Math.min(100,gs.eyeOfSauron+5);
-      if (gs.lives<=0) { gs.gameOver=true; return; }
-      continue;
-    }
-    const sf = gs.gt<e.slowUntil ? Math.max(0.15,1-e.slowPct) : 1;
-    const [tx,ty]=e.pathPX[e.wpIdx];
-    const dx=tx-e.x,dy=ty-e.y,dist=Math.hypot(dx,dy)||1,step=e.speed*sf*dt;
-    if (dist<=step+0.5) { e.x=tx; e.y=ty; e.wpIdx++; }
-    else { e.x+=dx/dist*step; e.y+=dy/dist*step; }
-  }
-  gs.enemies=gs.enemies.filter(e=>!leakedIds.includes(e.id)&&e.hp>0);
-
-  const beaconDmg=gs.beaconActive?2.5:1.0, beaconRng=gs.beaconActive?1.5:1.0;
-  for (const [,t] of gs.towers) {
-    const cfg=TCFG[t.type];
-    if (!cfg.dmg&&!cfg.slow) continue;
-    const rate=tRate(t)*nazgulDebuff(gs,t.col,t.row);
-    if (gs.gt-t.lastFired < 1000/rate) continue;
-    const range=tRng(t)*CELL*beaconRng;
-    const bx=t.col*CELL+CELL/2, by=t.row*CELL+CELL/2;
-    let best:Enemy|null=null,bestWp=-1;
-    for (const e of gs.enemies) {
-      const dx=e.x-bx,dy=e.y-by;
-      if (dx*dx+dy*dy<=range*range&&e.wpIdx>bestWp) { best=e; bestWp=e.wpIdx; }
-    }
-    if (!best) continue;
-    t.lastFired=gs.gt; t.angle=Math.atan2(best.y-by,best.x-bx);
-    const boost=beaconBoost(gs,t.col,t.row)*beaconDmg;
-    const dmg=Math.round(tDmg(t)*boost);
-    const slowDur=cfg.slow>0?gs.gt+2200:0;
-    gs.projs.push({id:uidOf(gs),x:bx,y:by,eid:best.id,dmg,spd:460,splash:cfg.splash,chain:tChain(t),color:cfg.pc,slowUntil:slowDur,type:t.type});
-  }
-
-  const deadProj:number[]=[];
-  for (const p of gs.projs) {
-    const tgt=gs.enemies.find(e=>e.id===p.eid);
-    if (!tgt) { deadProj.push(p.id); continue; }
-    const dx=tgt.x-p.x,dy=tgt.y-p.y,dist=Math.hypot(dx,dy)||1;
-    if (dist<=p.spd*dt+8) {
-      const hitList=p.splash>0?gs.enemies.filter(e=>Math.hypot(e.x-tgt.x,e.y-tgt.y)<=p.splash):[tgt];
-      for (const e of hitList) {
-        const pierce=TCFG[p.type].piercesArmor;
-        const dmg=pierce?p.dmg:Math.round(p.dmg*(1-e.armor));
-        e.hp-=dmg;
-        if (p.slowUntil>0) { e.slowUntil=Math.max(e.slowUntil,p.slowUntil); e.slowPct=Math.max(e.slowPct,TCFG.treant.slow); }
-        spawnParticles(gs,e.x,e.y,p.color,p.splash>0?12:4);
-        if (e.hp<=0) {
-          gs.gold+=e.reward; gs.score+=e.reward; gs.kills++;
-          floatText(gs,e.x,e.y-16,`+${e.reward}🌾`,'#f8d060');
-          spawnParticles(gs,e.x,e.y,ECFG[e.type].rim,12);
-        }
-      }
-      if (p.chain>0) {
-        const already=new Set(hitList.map(h=>h.id));
-        let from=tgt;
-        for (let i=0;i<p.chain;i++) {
-          const next=gs.enemies.filter(e=>!already.has(e.id)&&Math.hypot(e.x-from.x,e.y-from.y)<CHAIN_R)
-            .sort((a,b)=>Math.hypot(a.x-from.x,a.y-from.y)-Math.hypot(b.x-from.x,b.y-from.y))[0];
-          if (!next) break;
-          next.hp-=Math.round(p.dmg*0.6*(1-next.armor));
-          spawnParticles(gs,next.x,next.y,p.color,4);
-          if (next.hp<=0) { gs.gold+=next.reward; gs.score+=next.reward; gs.kills++; }
-          already.add(next.id); from=next;
-        }
-      }
-      deadProj.push(p.id);
-    } else { p.x+=dx/dist*p.spd*dt; p.y+=dy/dist*p.spd*dt; }
-  }
-  gs.projs=gs.projs.filter(p=>!deadProj.includes(p.id));
-  if (gs.waveActive&&gs.queue.length===0&&gs.enemies.length===0) gs.waveActive=false;
+  return { nodes: [], conns };
 }
 
-/* -------------------- Day Update -------------------- */
-export function updateDay(gs:GS,dt:number) {
-  gs.eyeOfSauron=Math.max(0,gs.eyeOfSauron-0.4*dt);
-  gs.gold+=2.5*dt; // passive trickle
+// ── NEAT Structural Mutations ─────────────────────────────────
+
+// Split an existing connection with a new hidden node.
+// Old connection disabled; two new connections added.
+function addNodeMut(g: NEATGenome): void {
+  if (g.nodes.length >= MAX_HIDDEN) return;
+  const enabled = g.conns.filter(c => c.enabled);
+  if (!enabled.length) return;
+  const target  = enabled[Math.floor(Math.random() * enabled.length)];
+  target.enabled = false;
+  const newId   = _nextHiddenId++;
+  g.nodes.push({ id: newId, bias: 0 });
+  g.conns.push(
+    { innov: getInnov(target.inNode, newId),      inNode: target.inNode, outNode: newId,         weight: 1.0,           enabled: true },
+    { innov: getInnov(newId, target.outNode),      inNode: newId,         outNode: target.outNode, weight: target.weight, enabled: true },
+  );
 }
 
-/* -------------------- Main Update -------------------- */
-export function update(gs:GS,dt:number) {
-  if (gs.gameOver) return;
-  gs.gt+=dt*1000;
-  gs.phaseTime+=dt*1000;
-  if (gs.mode==='day') {
-    updateDay(gs,dt);
-    if (gs.phaseTime>=gs.dayLen) startNight(gs);
-  } else {
-    updateNight(gs,dt);
-    if (gs.phaseTime>=gs.nightLen) endNight(gs);
+// Add a new random connection between two previously unconnected nodes.
+function addConnMut(g: NEATGenome): void {
+  if (g.conns.length >= MAX_CONNS) return;
+  const existing = new Set(g.conns.map(c => `${c.inNode}|${c.outNode}`));
+  const sources  = [...Array.from({ length: N_INPUT }, (_, i) => i), ...g.nodes.map(n => n.id)];
+  const targets  = [...g.nodes.map(n => n.id), ...Array.from({ length: N_OUTPUT }, (_, i) => N_INPUT + i)];
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const src = sources[Math.floor(Math.random() * sources.length)];
+    const dst = targets[Math.floor(Math.random() * targets.length)];
+    if (src === dst || existing.has(`${src}|${dst}`)) continue;
+    g.conns.push({ innov: getInnov(src, dst), inNode: src, outNode: dst, weight: rand(-1, 1), enabled: true });
+    break;
   }
-  for (const f of gs.floats) f.age+=dt*1000;
-  gs.floats=gs.floats.filter(f=>f.age<1800);
-  for (const p of gs.particles) { p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.85; p.vy*=0.85; p.life-=dt; }
-  gs.particles=gs.particles.filter(p=>p.life>0);
-  if (gs.particles.length>900) gs.particles.splice(0,gs.particles.length-900);
+}
+
+// ── Weight Mutation ───────────────────────────────────────────
+
+function mutateWeights(g: NEATGenome, rate: number, str: number): NEATGenome {
+  return {
+    nodes: g.nodes.map(n => ({
+      ...n,
+      bias: Math.random() < rate ? n.bias + rand(-str, str) : n.bias,
+    })),
+    conns: g.conns.map(c => ({
+      ...c,
+      weight: Math.random() < rate
+        ? (Math.random() < 0.08
+            ? rand(-2, 2)  // random reset
+            : Math.max(-3, Math.min(3, c.weight + rand(-str, str))))
+        : c.weight,
+    })),
+  };
+}
+
+// ── NEAT Crossover ────────────────────────────────────────────
+// g1 is assumed fitter — disjoint/excess genes come from g1.
+
+function neatCrossover(g1: NEATGenome, g2: NEATGenome): NEATGenome {
+  const g2Map = new Map(g2.conns.map(c => [c.innov, c]));
+  const childConns: ConnGene[] = g1.conns.map(c1 => {
+    const c2 = g2Map.get(c1.innov);
+    if (c2) {
+      const base    = Math.random() < 0.5 ? c1 : c2;
+      const enabled = (c1.enabled && c2.enabled) || Math.random() < 0.75;
+      return { ...base, enabled };
+    }
+    return { ...c1 }; // disjoint/excess: inherit from fitter parent
+  });
+
+  // Hidden nodes: union of both parents, pruned to only those referenced
+  const referencedIds = new Set(
+    childConns.flatMap(c => [c.inNode, c.outNode]).filter(id => id >= N_INPUT + N_OUTPUT)
+  );
+  const allHidden = new Map([...g2.nodes, ...g1.nodes].map(n => [n.id, n])); // g1 wins on conflict
+  const childNodes = [...referencedIds].map(id => allHidden.get(id) ?? { id, bias: 0 });
+
+  return { nodes: childNodes, conns: childConns };
+}
+
+// ── Ragdoll factory ──────────────────────────────────────────
+
+function mkP(x: number, y: number, mass = 1.0): Particle {
+  return { x, y, px: x, py: y, mass };
+}
+
+export function createRagdoll(startX: number, groundY: number, color: string): Ragdoll {
+  const gy      = groundY;
+  const px      = startX;
+  const footY   = gy;
+  const kneeY   = gy - L.SHIN;
+  const pelvisY = kneeY - L.THIGH + 6;
+  const chestY  = pelvisY - L.SPINE;
+  const headY   = chestY - L.NECK - HEAD_RADIUS;
+  const elbowY  = chestY + 8;
+  const handY   = elbowY + L.FOREARM;
+
+  const particles: Particle[] = [
+    mkP(px,               headY,   0.6), // 0  head
+    mkP(px,               chestY,  1.0), // 1  chest
+    mkP(px,               pelvisY, 1.2), // 2  pelvis
+    mkP(px - 5,           kneeY,   0.8), // 3  lKnee
+    mkP(px - 5,           footY,   0.8), // 4  lFoot
+    mkP(px + 5,           kneeY,   0.8), // 5  rKnee
+    mkP(px + 5,           footY,   0.8), // 6  rFoot
+    mkP(px - L.UPPER_ARM, elbowY,  0.5), // 7  lElbow
+    mkP(px - L.UPPER_ARM, handY,   0.4), // 8  lHand
+    mkP(px + L.UPPER_ARM, elbowY,  0.5), // 9  rElbow
+    mkP(px + L.UPPER_ARM, handY,   0.4), // 10 rHand
+    mkP(px - 5 + L.FOOT,  footY,   0.5), // 11 lToe — flat foot for stable base
+    mkP(px + 5 + L.FOOT,  footY,   0.5), // 12 rToe
+  ];
+
+  const constraints: DistConstraint[] = [
+    { a: PI.HEAD,    b: PI.CHEST,   restLen: L.NECK,      stiffness: 1.0  },
+    { a: PI.CHEST,   b: PI.PELVIS,  restLen: L.SPINE,     stiffness: 1.0  },
+    { a: PI.PELVIS,  b: PI.L_KNEE,  restLen: L.THIGH,     stiffness: 1.0  },
+    { a: PI.L_KNEE,  b: PI.L_FOOT,  restLen: L.SHIN,      stiffness: 1.0  },
+    { a: PI.PELVIS,  b: PI.R_KNEE,  restLen: L.THIGH,     stiffness: 1.0  },
+    { a: PI.R_KNEE,  b: PI.R_FOOT,  restLen: L.SHIN,      stiffness: 1.0  },
+    { a: PI.CHEST,   b: PI.L_ELBOW, restLen: L.UPPER_ARM, stiffness: 0.92 },
+    { a: PI.L_ELBOW, b: PI.L_HAND,  restLen: L.FOREARM,   stiffness: 0.92 },
+    { a: PI.CHEST,   b: PI.R_ELBOW, restLen: L.UPPER_ARM, stiffness: 0.92 },
+    { a: PI.R_ELBOW, b: PI.R_HAND,  restLen: L.FOREARM,   stiffness: 0.92 },
+    // Spine stabiliser (stiffer = harder to fold torso)
+    { a: PI.HEAD,    b: PI.PELVIS,  restLen: L.NECK + L.SPINE, stiffness: 0.25 },
+    // Feet — rigid foot segments give a flat base of support (no more chopstick legs)
+    { a: PI.L_FOOT,  b: PI.L_TOE,   restLen: L.FOOT, stiffness: 1.0  },
+    { a: PI.R_FOOT,  b: PI.R_TOE,   restLen: L.FOOT, stiffness: 1.0  },
+    // Ankle cross-braces: knee→toe keeps feet roughly flat, prevents ankle flopping
+    { a: PI.L_KNEE,  b: PI.L_TOE,   restLen: Math.sqrt(L.SHIN * L.SHIN + L.FOOT * L.FOOT), stiffness: 0.35 },
+    { a: PI.R_KNEE,  b: PI.R_TOE,   restLen: Math.sqrt(L.SHIN * L.SHIN + L.FOOT * L.FOOT), stiffness: 0.35 },
+  ];
+
+  return { particles, constraints, alive: true, age: 0, startX, fitness: 0, fitnessScore: 0, fallTime: 0, standingTime: 0, color, footTrail: [] };
+}
+
+// ── Physics step ─────────────────────────────────────────────
+
+function bearing(ax: number, ay: number, bx: number, by: number): number {
+  return Math.atan2(by - ay, bx - ax);
+}
+
+function jointAngle(parent: Particle, pivot: Particle, child: Particle): number {
+  // Measure from the continuation of parent→pivot line, so 0 = fully extended (standing straight).
+  // Old code used pivot→parent which put standing at ±π — outside all motor ranges.
+  let d = bearing(pivot.x, pivot.y, child.x, child.y)
+        - bearing(parent.x, parent.y, pivot.x, pivot.y);
+  while (d >  Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+export function stepRagdoll(
+  ragdoll: Ragdoll,
+  groundY: number,
+  dt: number,
+  motorOutputs: Float32Array,
+): void {
+  const { particles, constraints } = ragdoll;
+
+  // Motor forces
+  MOTORS.forEach((motor, i) => {
+    const target  = Math.max(motor.minAngle, Math.min(motor.maxAngle, motorOutputs[i] * 1.3));
+    const parent  = particles[motor.parentIdx];
+    const pivot   = particles[motor.pivotIdx];
+    const child   = particles[motor.childIdx];
+    let   err     = target - jointAngle(parent, pivot, child);
+    while (err >  Math.PI) err -= 2 * Math.PI;
+    while (err < -Math.PI) err += 2 * Math.PI;
+
+    const torque = Math.min(Math.abs(err), 1.2) * Math.sign(err) * motor.strength * dt * dt;
+    const dx   = child.x - pivot.x;
+    const dy   = child.y - pivot.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) + 0.001;
+    const fx   = (-dy / dist) * torque;
+    const fy   = ( dx / dist) * torque;
+
+    child.x += fx / child.mass;
+    child.y += fy / child.mass;
+    pivot.x -= fx * 0.18 / pivot.mass;
+    pivot.y -= fy * 0.18 / pivot.mass;
+  });
+
+  // Verlet + gravity
+  for (const p of particles) {
+    const vx = (p.x - p.px) * BODY_DAMPING;
+    const vy = (p.y - p.py) * BODY_DAMPING;
+    p.px = p.x; p.py = p.y;
+    p.x += vx;
+    p.y += vy + GRAVITY * dt * dt;
+  }
+
+  // Constraint solver
+  for (let iter = 0; iter < CONSTRAINT_ITERS; iter++) {
+    for (const c of constraints) {
+      const a  = particles[c.a];
+      const b  = particles[c.b];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d  = Math.sqrt(dx * dx + dy * dy) + 0.0001;
+      const k  = (d - c.restLen) / d * c.stiffness;
+      const tm = a.mass + b.mass;
+      a.x += dx * k * (b.mass / tm);
+      a.y += dy * k * (b.mass / tm);
+      b.x -= dx * k * (a.mass / tm);
+      b.y -= dy * k * (a.mass / tm);
+    }
+    for (const p of particles) {
+      if (p.y >= groundY) {
+        p.y  = groundY;
+        const vx = (p.x - p.px) * GROUND_FRICTION;
+        p.px = p.x - vx;
+        p.py = p.y;
+      }
+    }
+  }
+
+  // Core stability — gentle angular spring biasing torso toward vertical.
+  // Mimics involuntary postural muscles; makes standing biomechanically achievable
+  // without the NN needing to discover basic balance from scratch.
+  const chest  = particles[PI.CHEST];
+  const pelvis = particles[PI.PELVIS];
+  const spDx   = chest.x - pelvis.x;
+  const spDy   = chest.y - pelvis.y;
+  const spDist = Math.sqrt(spDx * spDx + spDy * spDy) + 0.001;
+  const spineAngle = Math.atan2(spDx, pelvis.y - chest.y); // 0 = vertical upright
+  const corr = -spineAngle * 0.20;   // enough to help balance but allows forward lean for walking
+  chest.x += (-spDy / spDist) * corr;
+  chest.y += ( spDx / spDist) * corr;
+
+  ragdoll.age    += dt;
+
+  // Displacement fitness (used for camera tracking / display)
+  let maxX = particles[PI.PELVIS].x;
+  for (const p of particles) if (p.x > maxX) maxX = p.x;
+  ragdoll.fitness = Math.max(0, maxX - ragdoll.startX);
+
+  // Accumulated walking score: forward displacement × uprightness each frame.
+  // No floor for crawlers — they get ~0 fitness, forcing evolution toward upright gaits.
+  const pelvisH      = Math.max(0, groundY - particles[PI.PELVIS].y);
+  const headH        = Math.max(0, groundY - particles[PI.HEAD].y);
+  const uprightRatio = Math.min(1, pelvisH / STANDING_PELVIS_H)
+                     * Math.min(1, headH / (STANDING_HEAD_H * 0.75));
+  const forwardDisp  = Math.max(0, particles[PI.PELVIS].x - particles[PI.PELVIS].px);
+  // Track standing time and upright distance separately — combined via rational+exponential in nextGeneration
+  if (uprightRatio > 0.4) {
+    ragdoll.standingTime += dt;
+    ragdoll.fitnessScore += forwardDisp;  // only count distance while sufficiently upright
+  }
+
+  // Footprints
+  for (const [fi, side] of [[PI.L_FOOT, 'l'], [PI.R_FOOT, 'r']] as [number, 'l'|'r'][]) {
+    const f = particles[fi];
+    if (f.y >= groundY - 2) {
+      const trail = ragdoll.footTrail;
+      const last  = trail[trail.length - 1];
+      if (!last || Math.abs(f.x - last.x) > 10) {
+        trail.push({ x: f.x, y: f.y, side });
+        if (trail.length > 300) trail.shift();
+      }
+    }
+  }
+
+  // Death conditions:
+  // 1) Drifting backward — genuinely stuck
+  if (particles[PI.PELVIS].x < ragdoll.startX - 50) ragdoll.alive = false;
+  // 2) Head too low for > 0.5s = dead. Minimum height ~43px (60% of standing pelvis).
+  //    Can't crawl with head at knee height. 0.5s grace allows brief stumbles.
+  //    1.5s age grace for settling + initial stabilization.
+  if (ragdoll.age > 1.5) {
+    const headTooLow = particles[PI.HEAD].y > groundY - STANDING_PELVIS_H * 0.30;
+    if (headTooLow) {
+      ragdoll.fallTime += dt;
+      if (ragdoll.fallTime > 1.5) ragdoll.alive = false;
+    } else {
+      ragdoll.fallTime = Math.max(0, ragdoll.fallTime - dt * 3);  // recover 3× faster
+    }
+  }
+}
+
+// ── Center of mass ────────────────────────────────────────────
+
+function getCenterOfMass(particles: Particle[]): { x: number; y: number; px: number; py: number } {
+  let mx = 0, my = 0, mpx = 0, mpy = 0, tm = 0;
+  for (const p of particles) {
+    mx  += p.x  * p.mass;
+    my  += p.y  * p.mass;
+    mpx += p.px * p.mass;
+    mpy += p.py * p.mass;
+    tm  += p.mass;
+  }
+  return { x: mx / tm, y: my / tm, px: mpx / tm, py: mpy / tm };
+}
+
+// ── Sensor inputs ─────────────────────────────────────────────
+
+export function getSensorInputs(ragdoll: Ragdoll, groundY: number, time: number): Float32Array {
+  const p      = ragdoll.particles;
+  const pelvis = p[PI.PELVIS];
+  const chest  = p[PI.CHEST];
+  const torsoAngle = Math.atan2(chest.x - pelvis.x, pelvis.y - chest.y) / Math.PI;
+  const hVel       = (pelvis.x - pelvis.px) / (GRAVITY * 0.001 * 180);
+  const jointAngles = MOTORS.map(m =>
+    jointAngle(p[m.parentIdx], p[m.pivotIdx], p[m.childIdx]) / Math.PI
+  );
+
+  // Center of mass relative to base of support — critical for balance
+  const com = getCenterOfMass(p);
+  const footMidX   = (p[PI.L_FOOT].x + p[PI.R_FOOT].x + p[PI.L_TOE].x + p[PI.R_TOE].x) / 4;
+  const comBalance = (com.x - footMidX) / 40;        // + = leaning forward of feet
+  const comVVel    = (com.py - com.y) / 5;            // + = rising (verlet: prev-cur)
+
+  return Float32Array.from([
+    torsoAngle,
+    Math.min(1, Math.max(0, (groundY - pelvis.y) / STANDING_PELVIS_H)),  // pelvis height ratio
+    hVel,
+    ...jointAngles,
+    p[PI.L_FOOT].y >= groundY - 2 ? 1.0 : -1.0,
+    p[PI.R_FOOT].y >= groundY - 2 ? 1.0 : -1.0,
+    Math.sin(time * 2.8),
+    Math.cos(time * 2.8),
+    comBalance,   // CoM x offset from feet — balance indicator
+    comVVel,      // CoM vertical velocity — falling/rising indicator
+  ]);
+}
+
+// ── Agent & Simulation ────────────────────────────────────────
+
+// One colour per character slot (0=Batman … 9=Nurse)
+export const AGENT_COLORS = [
+  '#6b7280', // 0  Batman        — dark grey
+  '#ec4899', // 1  Russian Stripper — hot pink
+  '#a855f7', // 2  KinkyButtplug   — devil purple
+  '#fbbf24', // 3  Spongebob       — yellow
+  '#a16207', // 4  Jack Sparrow    — weathered brown
+  '#60a5fa', // 5  Elon Musk       — Tesla blue
+  '#f97316', // 6  Donald Trump    — orange
+  '#818cf8', // 7  Bill Clinton    — indigo
+  '#34d399', // 8  Obama           — emerald
+  '#e2e8f0', // 9  Nurse           — white
+];
+
+export interface Agent {
+  ragdoll:    Ragdoll;
+  genome:     NEATGenome;
+  rank:       number;
+  lastInputs: Float32Array | null;
+  lastOutputs: Float32Array | null;
+}
+
+export interface SimState {
+  agents:       Agent[];
+  generation:   number;
+  time:         number;
+  evalDuration: number;
+  groundY:      number;
+  bestFitness:  number;
+  allTimeBest:  number;
+  history:      number[];
+}
+
+const EVAL_DURATION = 60;
+const N_AGENTS      = 10;
+
+function makeAgent(genome: NEATGenome, i: number, groundY: number): Agent {
+  return {
+    genome,
+    ragdoll:    createRagdoll(120 + i * 4, groundY, AGENT_COLORS[i]),
+    rank:       i,
+    lastInputs: null,
+    lastOutputs: null,
+  };
+}
+
+export function createSimState(groundY: number): SimState {
+  resetNEAT();
+  const agents = Array.from({ length: N_AGENTS }, (_, i) =>
+    makeAgent(createInitialGenome(), i, groundY)
+  );
+  return { agents, generation: 1, time: 0, evalDuration: EVAL_DURATION, groundY, bestFitness: 0, allTimeBest: 0, history: [] };
+}
+
+const SETTLE_TIME = 0.5; // seconds of settling before NN activates
+const ZERO_MOTORS = new Float32Array(8); // all-zero motor outputs
+
+export function stepSim(state: SimState, dt: number): boolean {
+  state.time += dt;
+  const settling = state.time < SETTLE_TIME;
+
+  for (const agent of state.agents) {
+    if (!agent.ragdoll.alive) continue;
+
+    if (settling) {
+      // No motor forces — let gravity settle the ragdoll on the ground
+      stepRagdoll(agent.ragdoll, state.groundY, dt, ZERO_MOTORS);
+    } else {
+      const inputs  = getSensorInputs(agent.ragdoll, state.groundY, state.time - SETTLE_TIME);
+      const outputs = neatForward(agent.genome, inputs);
+      agent.lastInputs  = inputs;
+      agent.lastOutputs = outputs;
+      stepRagdoll(agent.ragdoll, state.groundY, dt, outputs);
+    }
+  }
+
+  // Reset fitness reference point after settling (don't penalise settling drift)
+  if (settling) {
+    for (const agent of state.agents) {
+      agent.ragdoll.startX       = agent.ragdoll.particles[PI.PELVIS].x;
+      agent.ragdoll.fitness       = 0;
+      agent.ragdoll.fitnessScore  = 0;
+      agent.ragdoll.fallTime      = 0;
+      agent.ragdoll.standingTime  = 0;
+    }
+  }
+
+  return state.time >= state.evalDuration + SETTLE_TIME
+    || state.agents.every(a => !a.ragdoll.alive);
+}
+
+export function nextGeneration(state: SimState): void {
+  const totalDuration = state.evalDuration + SETTLE_TIME;
+
+  // Apply survival factor to raw metrics
+  for (const a of state.agents) {
+    const sf = a.ragdoll.alive ? 1.0 : Math.max(0.15, a.ragdoll.age / totalDuration);
+    a.ragdoll.fitness       *= sf;
+    a.ragdoll.fitnessScore  *= sf;  // upright distance at this point
+    a.ragdoll.standingTime  *= sf;
+  }
+
+  // Combined fitness: rational standing reward + exponential distance reward.
+  // Rational f(t) = 1500·t/(t+15): plateaus ~1500, half-life 15s → rewards balance early.
+  // Exponential g(d) = 89.4·(e^(d/400)−1): small distances ~worthless, explodes for large d.
+  // Crossover: f(30s) ≈ g(1000px) ≈ 1000. First learn to stand, then distance takes over.
+  for (const a of state.agents) {
+    const t = a.ragdoll.standingTime;
+    const d = a.ragdoll.fitnessScore;  // accumulated upright distance
+    const standReward = 1500 * t / (t + 15);
+    const distReward  = 89.4 * (Math.exp(Math.min(d / 400, 8)) - 1);
+    a.ragdoll.fitnessScore = standReward + distReward;
+  }
+
+  // Sort by combined fitness
+  const sorted = [...state.agents].sort((a, b) => b.ragdoll.fitnessScore - a.ragdoll.fitnessScore);
+  const best   = Math.max(...state.agents.map(a => a.ragdoll.fitness));  // display uses displacement
+  state.bestFitness = best;
+  if (best > state.allTimeBest) state.allTimeBest = best;
+  state.history.push(Math.round(best));
+
+  const [e1, e2, e3] = sorted.map(a => a.genome);
+
+  // Helper: mutate weights + optionally add structure
+  function evolve(
+    base: NEATGenome,
+    rate: number, str: number,
+    nodeP = 0, connP = 0,
+  ): NEATGenome {
+    const g = mutateWeights(base, rate, str);
+    // Three rounds of structural mutations — deeper networks need more growth pressure
+    for (let i = 0; i < 3; i++) {
+      if (nodeP > 0 && g.nodes.length < MAX_HIDDEN && Math.random() < nodeP) addNodeMut(g);
+      if (connP > 0 && g.conns.length < MAX_CONNS  && Math.random() < connP) addConnMut(g);
+    }
+    return g;
+  }
+
+  // Generation slots (10 agents):
+  // 0     : true elite (exact champion copy)
+  // 1     : 2nd elite with tiny mutation
+  // 2-3   : NEAT crossovers with aggressive structural growth
+  // 4-5   : champion weight mutations + structural growth
+  // 6     : champion heavy mutation + forced structural growth
+  // 7     : 2nd place with structural growth
+  // 8     : deep-structure explorer (champion + very aggressive structural)
+  // 9     : wildcard diversity from random top-5 parent
+  const e4 = sorted.length > 3 ? sorted[3].genome : e3;
+  const nextGenomes: NEATGenome[] = [
+    // 0: TRUE ELITE — exact champion genome, no mutations (guaranteed preservation)
+    { nodes: e1.nodes.map(n => ({...n})), conns: e1.conns.map(c => ({...c})) },
+    // 1: 2nd elite, tiny weight mutation + small structural chance
+    evolve(e2, 0.02, 0.05, 0.15, 0.20),
+    // 2-3: NEAT crossovers with aggressive structural growth
+    evolve(neatCrossover(e1, e2), 0.08, 0.16, 0.35, 0.40),
+    evolve(neatCrossover(e1, e3), 0.08, 0.16, 0.35, 0.35),
+    // 4-5: champion with increasing weight + structural mutation
+    evolve(e1, 0.08, 0.18, 0.25, 0.30),
+    evolve(e1, 0.18, 0.40, 0.35, 0.40),
+    // 6: champion heavy mutation + forced structural growth (breaks plateaus)
+    evolve(e1, 0.30, 0.65, 0.50, 0.55),
+    // 7: 2nd place with structural growth
+    evolve(e2, 0.14, 0.30, 0.30, 0.35),
+    // 8: deep-structure explorer — champion with very aggressive structural mutation
+    // This slot specifically exists to push past node count plateaus
+    evolve(e1, 0.10, 0.20, 0.65, 0.70),
+    // 9: heavily mutated random top-5 parent (structured diversity, not blank slate)
+    evolve(sorted[Math.floor(Math.random() * 5)].genome, 0.5, 1.0, 0.55, 0.55),
+  ];
+
+  state.agents     = nextGenomes.map((g, i) => makeAgent(g, i, state.groundY));
+  state.generation += 1;
+  state.time        = 0;
 }

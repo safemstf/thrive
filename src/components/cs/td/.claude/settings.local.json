@@ -4,7 +4,8 @@
       "Bash(if not exist \"C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\\\\.claude\" mkdir \"C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive\\\\.claude\")",
       "Bash(npx tsc:*)",
       "Bash(start /B cmd /c \"cd /d C:\\\\Users\\\\safeb\\\\OneDrive\\\\Documents\\\\GitHub\\\\thrive && npm run dev > C:\\\\Users\\\\safeb\\\\AppData\\\\Local\\\\Temp\\\\next-dev.log 2>&1\")",
-      "Bash(timeout /t 12 /nobreak)"
+      "Bash(timeout /t 12 /nobreak)",
+      "Bash(npx next:*)"
     ]
   }
 }
