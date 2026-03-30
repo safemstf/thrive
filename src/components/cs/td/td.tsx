@@ -2,10 +2,11 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createGlobalStyle } from 'styled-components';
 import {
-  SimState, Agent, NEATGenome, Particle,
+  SimState, Agent, NEATGenome, Particle, Obstacle, Species,
   createSimState, stepSim, nextGeneration,
   PI, L, HEAD_RADIUS, MOTORS, AGENT_COLORS,
-  N_INPUT, N_OUTPUT, STANDING_PELVIS_H,
+  N_INPUT, N_OUTPUT, STANDING_PELVIS_H, STANDING_COM_H, STANDING_HEAD_H,
+  getObstaclesNear,
 } from './td.logic';
 
 // ── Character costumes ─────────────────────────────────────────
@@ -22,18 +23,22 @@ type DrawFn = (
 ) => void;
 
 const noop: DrawFn = () => {};
-const CHARACTERS: Array<{ name: string; drawExtras: DrawFn }> = [
-  { name: 'A', drawExtras: noop },
-  { name: 'B', drawExtras: noop },
-  { name: 'C', drawExtras: noop },
-  { name: 'D', drawExtras: noop },
-  { name: 'E', drawExtras: noop },
-  { name: 'F', drawExtras: noop },
-  { name: 'G', drawExtras: noop },
-  { name: 'H', drawExtras: noop },
-  { name: 'I', drawExtras: noop },
-  { name: 'J', drawExtras: noop },
-];
+// Generate character labels dynamically for any population size
+const CHARACTERS: Array<{ name: string; drawExtras: DrawFn }> = Array.from(
+  { length: 15 },
+  (_, i) => ({ name: String(i + 1), drawExtras: noop }),
+);
+
+// ── Alto's Adventure Color Palette ─────────────────────────────
+const ALTO = {
+  skyTop: '#0f0a2a', skyMid: '#2a1555', skyAmber: '#d4804a', skyHorizon: '#c05a30',
+  groundTop: '#2a1a10', groundBot: '#1a0e08', groundLine: '#5a3820',
+  mtFar: '#151030', mtMid: '#25152a', mtNear: '#351a18',
+  hudBg: 'rgba(35,20,12,0.88)', hudBorder: 'rgba(255,190,140,0.12)',
+  hudText: '#a08060', hudVal: '#e8c090', hudGreen: '#70c080', hudAmber: '#f0a050', hudRed: '#c05040',
+  barBg: 'rgba(35,20,12,0.92)', barBorder: 'rgba(255,190,140,0.15)',
+  btnText: '#a08060', btnHover: '#e8c090', btnActive: '#f0a050',
+};
 
 // ── Styles ────────────────────────────────────────────────────
 
@@ -42,7 +47,7 @@ const NeatStyles = createGlobalStyle`
     position: relative;
     width: 100%;
     overflow: hidden;
-    background: #07090f;
+    background: ${ALTO.groundBot};
     user-select: none;
   }
   .neat-canvas {
@@ -55,51 +60,52 @@ const NeatStyles = createGlobalStyle`
   .neat-hud {
     position: absolute;
     top: 0.75rem; right: 0.75rem;
-    background: rgba(7,9,15,0.88);
+    background: ${ALTO.hudBg};
     backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,0.07);
+    border: 1px solid ${ALTO.hudBorder};
     border-radius: 10px;
     padding: 0.6rem 0.85rem;
     min-width: 148px;
-    font-family: 'DM Mono', monospace;
+    font-family: 'DM Sans', system-ui, sans-serif;
     font-size: 0.72rem;
-    color: #64748b;
+    color: ${ALTO.hudText};
     line-height: 1.8;
   }
   .neat-hud-row { display: flex; justify-content: space-between; gap: 0.75rem; }
-  .neat-hud .label { color: #475569; }
-  .neat-hud .val   { color: #60a5fa; font-weight: 600; }
-  .neat-hud .best  { color: #34d399; font-weight: 600; }
-  .neat-hud .champ { color: #fbbf24; font-weight: 600; }
-  .neat-hud-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 0.3rem 0; }
+  .neat-hud .label { color: #7a6050; }
+  .neat-hud .val   { color: ${ALTO.hudVal}; font-weight: 600; }
+  .neat-hud .best  { color: ${ALTO.hudGreen}; font-weight: 600; }
+  .neat-hud .champ { color: ${ALTO.hudAmber}; font-weight: 600; }
+  .neat-hud-divider { height: 1px; background: rgba(255,190,140,0.08); margin: 0.3rem 0; }
 
   /* NN overlay — top-left */
   .neat-nn {
     position: absolute;
     top: 0.75rem; left: 0.75rem;
-    background: rgba(7,9,15,0.88);
+    background: ${ALTO.hudBg};
     backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,0.07);
+    border: 1px solid ${ALTO.hudBorder};
     border-radius: 10px;
     padding: 0.4rem 0.5rem 0.5rem;
-    font-family: 'DM Mono', monospace;
+    font-family: 'DM Sans', system-ui, sans-serif;
     font-size: 0.6rem;
-    color: #475569;
+    color: #7a6050;
   }
   .neat-nn-title {
-    font-size: 0.62rem;
-    color: #60a5fa;
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 0.65rem;
+    color: ${ALTO.hudAmber};
     margin-bottom: 0.3rem;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.02em;
   }
 
-  /* Fitness history bar — bottom of NN box */
+  /* Fitness history bar */
   .neat-history {
     position: absolute;
     bottom: 4rem; left: 0.75rem;
-    background: rgba(7,9,15,0.8);
+    background: ${ALTO.hudBg};
     backdrop-filter: blur(6px);
-    border: 1px solid rgba(255,255,255,0.06);
+    border: 1px solid ${ALTO.hudBorder};
     border-radius: 8px;
     padding: 0.4rem 0.6rem;
     display: flex;
@@ -115,12 +121,12 @@ const NeatStyles = createGlobalStyle`
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    background: rgba(7,9,15,0.92);
+    background: ${ALTO.barBg};
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid ${ALTO.barBorder};
     border-radius: 50px;
     padding: 0.3rem 0.7rem;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.6);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
     white-space: nowrap;
   }
   .neat-bar.theater-top { bottom: auto; top: 0.65rem; }
@@ -128,33 +134,33 @@ const NeatStyles = createGlobalStyle`
   .neat-btn {
     background: none;
     border: none;
-    color: #64748b;
+    color: ${ALTO.btnText};
     cursor: pointer;
     padding: 0.3rem 0.55rem;
     border-radius: 20px;
     font-size: 0.75rem;
-    font-family: 'DM Mono', monospace;
+    font-family: 'DM Sans', system-ui, sans-serif;
     transition: all 0.15s;
     display: flex;
     align-items: center;
     gap: 0.25rem;
   }
-  .neat-btn:hover  { background: rgba(255,255,255,0.07); color: #f1f5f9; }
-  .neat-btn.active { background: rgba(96,165,250,0.15);  color: #60a5fa; }
-  .neat-btn.danger { background: rgba(248,113,113,0.12); color: #f87171; }
-  .neat-divider    { width: 1px; height: 18px; background: rgba(255,255,255,0.09); margin: 0 0.1rem; }
+  .neat-btn:hover  { background: rgba(255,190,140,0.10); color: ${ALTO.btnHover}; }
+  .neat-btn.active { background: rgba(240,160,80,0.20);  color: ${ALTO.btnActive}; }
+  .neat-btn.danger { background: rgba(192,80,64,0.12);   color: ${ALTO.hudRed}; }
+  .neat-divider    { width: 1px; height: 18px; background: rgba(255,190,140,0.10); margin: 0 0.1rem; }
 
-  /* Population dots at very bottom */
+  /* Population dots */
   .neat-pop {
     position: absolute;
     bottom: 1.1rem; left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 4px;
+    gap: 2px;
     align-items: center;
   }
   .neat-pop-dot {
-    width: 5px; height: 5px;
+    width: 4px; height: 4px;
     border-radius: 50%;
     transition: all 0.3s;
   }
@@ -168,70 +174,93 @@ const GROUND_Y = 360;  // ground at ~78% — leaves room for characters (~155px 
 
 // ── Rendering helpers ─────────────────────────────────────────
 
-function hex2rgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
+function colorWithAlpha(color: string, alpha: number): string {
+  if (color.startsWith('#')) {
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  // HSL → HSLA
+  if (color.startsWith('hsl(')) {
+    return color.replace('hsl(', 'hsla(').replace(')', `,${alpha})`);
+  }
+  return color;
 }
 
 function drawBackground(
   ctx: CanvasRenderingContext2D,
-  camX: number,   // world X of left screen edge
-  startX: number, // world X where ragdolls started
+  camX: number,
+  startX: number,
 ) {
-  // Sky gradient
+  // ── Alto's Adventure sky gradient ──
   const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-  sky.addColorStop(0, '#06080e');
-  sky.addColorStop(1, '#0d1420');
+  sky.addColorStop(0, ALTO.skyTop);
+  sky.addColorStop(0.35, ALTO.skyMid);
+  sky.addColorStop(0.75, ALTO.skyAmber);
+  sky.addColorStop(1, ALTO.skyHorizon);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, CW, GROUND_Y);
 
-  // Stars — parallax at 20% of camera speed
-  for (let i = 0; i < 90; i++) {
+  // ── Stars — warm twinkle ──
+  const now = Date.now();
+  for (let i = 0; i < 60; i++) {
     const wx  = (i * 137.508) % 4000;
-    const wy  = (i * 53.71)   % (GROUND_Y - 40);
-    const sz  = (i * 0.43)    % 1.5 + 0.4;
-    const brt = (i * 0.17)    % 0.4 + 0.3;
-    const sx  = ((wx - camX * 0.2) % CW + CW) % CW;
+    const wy  = (i * 53.71)   % (GROUND_Y * 0.5);  // only upper sky
+    const sz  = (i * 0.43)    % 1.2 + 0.3;
+    const twinkle = 0.3 + 0.3 * Math.sin(now * 0.001 + i * 2.3);
+    const sx  = ((wx - camX * 0.05) % CW + CW) % CW;
     ctx.beginPath();
     ctx.arc(sx, wy, sz, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(200,220,255,${brt})`;
+    ctx.fillStyle = `rgba(255,230,200,${twinkle})`;
     ctx.fill();
   }
 
-  // Horizon glow
-  const hor = ctx.createLinearGradient(0, GROUND_Y - 70, 0, GROUND_Y);
-  hor.addColorStop(0, 'rgba(20,50,100,0)');
-  hor.addColorStop(1, 'rgba(20,50,120,0.18)');
-  ctx.fillStyle = hor;
-  ctx.fillRect(0, GROUND_Y - 70, CW, 70);
+  // ── Parallax mountain silhouettes (3 layers) ──
+  const mtLayers = [
+    { parallax: 0.03, baseY: GROUND_Y - 100, color: ALTO.mtFar,  freqs: [0.003, 0.008], amps: [50, 20] },
+    { parallax: 0.10, baseY: GROUND_Y - 60,  color: ALTO.mtMid,  freqs: [0.005, 0.012], amps: [40, 18] },
+    { parallax: 0.20, baseY: GROUND_Y - 30,  color: ALTO.mtNear, freqs: [0.008, 0.020], amps: [30, 12] },
+  ];
+  for (const layer of mtLayers) {
+    ctx.beginPath();
+    ctx.moveTo(0, GROUND_Y);
+    for (let x = 0; x <= CW; x += 2) {
+      const wx = x + camX * layer.parallax;
+      const h = layer.amps[0] * Math.sin(wx * layer.freqs[0])
+              + layer.amps[1] * Math.sin(wx * layer.freqs[1]);
+      ctx.lineTo(x, layer.baseY - Math.max(0, h));
+    }
+    ctx.lineTo(CW, GROUND_Y);
+    ctx.closePath();
+    ctx.fillStyle = layer.color;
+    ctx.fill();
+  }
 
-  // Ground fill
+  // ── Ground fill — warm earth ──
   const gnd = ctx.createLinearGradient(0, GROUND_Y, 0, CH);
-  gnd.addColorStop(0, '#18212e');
-  gnd.addColorStop(1, '#0b0f16');
+  gnd.addColorStop(0, ALTO.groundTop);
+  gnd.addColorStop(1, ALTO.groundBot);
   ctx.fillStyle = gnd;
   ctx.fillRect(0, GROUND_Y, CW, CH - GROUND_Y);
 
   // Ground surface line
-  ctx.strokeStyle = '#2a3d52';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = ALTO.groundLine;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(0, GROUND_Y); ctx.lineTo(CW, GROUND_Y);
   ctx.stroke();
 
-  // Distance ticks — every 100px in world space, labeled with distance from start
-  // Only tick positions AT OR AFTER startX get numeric labels (no duplicate "0"s)
+  // ── Distance ticks ──
   const firstWx = Math.floor(camX / 100) * 100;
   for (let wx = firstWx; wx < camX + CW + 100; wx += 100) {
-    if (wx < startX) continue; // don't draw ticks before the spawn point
+    if (wx < startX) continue;
     const sx   = wx - camX;
     const dist = wx - startX;
     if (sx < -10 || sx > CW + 10) continue;
 
     const isMajor = dist % 500 === 0;
-    ctx.strokeStyle = isMajor ? '#3a5070' : '#1e2d3e';
+    ctx.strokeStyle = isMajor ? '#5a3820' : '#3a2010';
     ctx.lineWidth   = isMajor ? 1.5 : 1;
     ctx.beginPath();
     ctx.moveTo(sx, GROUND_Y);
@@ -239,22 +268,24 @@ function drawBackground(
     ctx.stroke();
 
     if (dist % 200 === 0) {
-      ctx.fillStyle = '#2e4158';
-      ctx.font      = '10px "DM Mono", monospace';
+      ctx.fillStyle = '#5a3820';
+      ctx.font      = '10px "DM Sans", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(dist === 0 ? 'START' : `${dist}`, sx, GROUND_Y + 22);
     }
   }
 
-  // Subtle ground texture — pebbles at 95% parallax
-  for (let i = 0; i < 50; i++) {
-    const wx = (i * 97.3) % 2000;
-    const wy = GROUND_Y + 4 + (i * 7.1) % 28;
+  // ── Grass strokes along ground line ──
+  for (let i = 0; i < 80; i++) {
+    const wx = (i * 73.7) % 2000;
     const px = ((wx - camX * 0.95) % CW + CW) % CW;
+    const h = 3 + (i % 4) * 1.5;
+    ctx.strokeStyle = `rgba(60,80,40,${0.15 + (i % 3) * 0.08})`;
+    ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.arc(px, wy, 1 + (i % 2) * 0.5, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(42,61,82,${0.25 + (i % 3) * 0.08})`;
-    ctx.fill();
+    ctx.moveTo(px, GROUND_Y);
+    ctx.lineTo(px + (i % 2 ? 1 : -1), GROUND_Y - h);
+    ctx.stroke();
   }
 }
 
@@ -270,7 +301,7 @@ function drawFootTrail(
     ctx.beginPath();
     const r = isChamp ? (pt.side === 'l' ? 3.5 : 3) : (pt.side === 'l' ? 2.5 : 2);
     ctx.arc(sx, pt.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = hex2rgba(agent.ragdoll.color, isChamp ? 0.45 : 0.2);
+    ctx.fillStyle = colorWithAlpha(agent.ragdoll.color, isChamp ? 0.45 : 0.2);
     ctx.fill();
   }
 }
@@ -342,7 +373,7 @@ function drawRagdoll(
   ctx.fillStyle = col;
   ctx.fill();
   if (isChamp) {
-    ctx.strokeStyle = 'rgba(251,191,36,0.7)';
+    ctx.strokeStyle = 'rgba(240,160,80,0.6)';
     ctx.lineWidth = 2;
     ctx.stroke();
   }
@@ -354,7 +385,7 @@ function drawRagdoll(
 
   // Character name label (small, above head)
   ctx.globalAlpha = alpha * (isChamp ? 0.95 : 0.55);
-  ctx.font = isChamp ? 'bold 8px "DM Mono",monospace' : '7px "DM Mono",monospace';
+  ctx.font = isChamp ? 'bold 8px "DM Sans",sans-serif' : '7px "DM Sans",sans-serif';
   ctx.fillStyle = col;
   ctx.textAlign = 'center';
   const nameY = sy(p[PI.HEAD].y) - HEAD_RADIUS - (isChamp ? 24 : 16);
@@ -364,14 +395,14 @@ function drawRagdoll(
   if (isChamp) {
     ctx.globalAlpha = 0.9;
     ctx.font = 'bold 11px sans-serif';
-    ctx.fillStyle = '#fbbf24';
+    ctx.fillStyle = '#f0a050';
     ctx.textAlign = 'center';
     ctx.fillText('★', sx(p[PI.HEAD].x), sy(p[PI.HEAD].y) - HEAD_RADIUS - 14);
     if (alive) {
       const dist = Math.round(agent.ragdoll.fitness);
       ctx.globalAlpha = 0.8;
-      ctx.font = '9px "DM Mono",monospace';
-      ctx.fillStyle = '#fbbf24';
+      ctx.font = '9px "DM Sans",sans-serif';
+      ctx.fillStyle = '#f0a050';
       ctx.fillText(`${dist}px`, sx(p[PI.HEAD].x), sy(p[PI.HEAD].y) - HEAD_RADIUS - 36);
     }
   }
@@ -397,90 +428,125 @@ function drawNN(
   const inputs  = agent.lastInputs  ?? new Float32Array(N_INPUT);
   const outputs = agent.lastOutputs ?? new Float32Array(N_OUTPUT);
 
-  const PAD = 12;
-  const inputX  = PAD + 10;
-  const outputX = W - PAD - 10;
-  const hiddenX = (inputX + outputX) / 2;
+  // Run a forward pass to get hidden activations
+  const activations = new Map<number, number>();
+  for (let i = 0; i < N_INPUT; i++) activations.set(i, inputs[i]);
+  const sortedHidden = [...genome.nodes].sort((a, b) => a.id - b.id);
+  for (const n of sortedHidden) {
+    let sum = n.bias;
+    for (const c of genome.conns) {
+      if (c.enabled && c.outNode === n.id) sum += (activations.get(c.inNode) ?? 0) * c.weight;
+    }
+    const x = Math.max(-5, Math.min(5, sum));
+    activations.set(n.id, x * (27 + x * x) / (27 + 9 * x * x));
+  }
+
+  const PAD = 10;
+  const inputX  = PAD + 6;
+  const outputX = W - PAD - 6;
+
+  // ── Group hidden nodes by their explicit layer tag ──
+  const layerMap = new Map<number, number[]>();
+  for (const n of genome.nodes) {
+    const l = n.layer ?? 0;
+    if (!layerMap.has(l)) layerMap.set(l, []);
+    layerMap.get(l)!.push(n.id);
+  }
+  const layerDepths = [...layerMap.keys()].sort((a, b) => a - b);
+  const nLayers = layerDepths.length || 1;
 
   // Build node position map
   const nodePos = new Map<number, { x: number; y: number }>();
 
+  // Inputs: left column
   const iSpacing = (H - PAD * 2) / Math.max(N_INPUT - 1, 1);
-  for (let i = 0; i < N_INPUT; i++) nodePos.set(i, { x: inputX,  y: PAD + i * iSpacing });
+  for (let i = 0; i < N_INPUT; i++) nodePos.set(i, { x: inputX, y: PAD + i * iSpacing });
 
+  // Outputs: right column
   const oSpacing = (H - PAD * 2) / Math.max(N_OUTPUT - 1, 1);
   for (let o = 0; o < N_OUTPUT; o++) nodePos.set(N_INPUT + o, { x: outputX, y: PAD + o * oSpacing });
 
-  // Hidden nodes: spread horizontally by "depth" (derived from ID order)
-  const sortedHidden = [...genome.nodes].sort((a, b) => a.id - b.id);
-  if (sortedHidden.length > 0) {
-    const hSpacing = (H - PAD * 2) / Math.max(sortedHidden.length - 1, 1);
-    sortedHidden.forEach((n, idx) => {
-      // Alternate x positions slightly to avoid overlap on same layer
-      const xJitter = ((idx % 3) - 1) * 14;
-      nodePos.set(n.id, { x: hiddenX + xJitter, y: PAD + idx * hSpacing });
+  // Hidden: spread across columns between input and output
+  const hiddenXStart = inputX + 30;
+  const hiddenXEnd   = outputX - 30;
+  for (let li = 0; li < layerDepths.length; li++) {
+    const depth = layerDepths[li];
+    const nodesInLayer = layerMap.get(depth)!;
+    const x = nLayers === 1
+      ? (hiddenXStart + hiddenXEnd) / 2
+      : hiddenXStart + (li / (nLayers - 1)) * (hiddenXEnd - hiddenXStart);
+    const spacing = (H - PAD * 2) / Math.max(nodesInLayer.length, 1);
+    const startY = PAD + (spacing * 0.5);
+    nodesInLayer.forEach((id, idx) => {
+      nodePos.set(id, { x, y: startY + idx * spacing });
     });
   }
 
-  // Draw connections
-  ctx.lineWidth = 1;
-  for (const c of genome.conns) {
-    if (!c.enabled) continue;
+  // ── Draw connections (only strong ones for clarity with large networks) ──
+  const enabledConns = genome.conns.filter(c => c.enabled);
+  // With 1000+ connections, only draw the top ~400 by weight magnitude
+  const maxDraw = 400;
+  const sorted = enabledConns.length > maxDraw
+    ? [...enabledConns].sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight)).slice(0, maxDraw)
+    : enabledConns;
+
+  ctx.lineWidth = 0.6;
+  for (const c of sorted) {
     const src = nodePos.get(c.inNode);
     const dst = nodePos.get(c.outNode);
     if (!src || !dst) continue;
-    const a = Math.min(Math.abs(c.weight) * 0.35, 0.55);
-    ctx.strokeStyle = c.weight > 0 ? `rgba(96,165,250,${a})` : `rgba(248,113,113,${a})`;
+    const w = Math.abs(c.weight);
+    const a = Math.min(w * 0.25, 0.45);
+    ctx.strokeStyle = c.weight > 0
+      ? `rgba(240,160,80,${a})`
+      : `rgba(180,80,60,${a})`;
     ctx.beginPath();
     ctx.moveTo(src.x, src.y);
-    // Slight curve for aesthetics
-    const mx = (src.x + dst.x) / 2;
-    const my = (src.y + dst.y) / 2 - 8;
-    ctx.quadraticCurveTo(mx, my, dst.x, dst.y);
+    ctx.lineTo(dst.x, dst.y);
     ctx.stroke();
   }
+
+  // ── Draw nodes ──
+  const nodeR = Math.max(1.5, Math.min(4, 120 / Math.max(genome.nodes.length, 1)));
 
   // Input nodes
   for (let i = 0; i < N_INPUT; i++) {
     const pos = nodePos.get(i)!;
-    const val = inputs[i];
-    const brt = Math.abs(val);
+    const brt = Math.abs(inputs[i]);
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(52,211,153,${0.3 + brt * 0.6})`;
+    ctx.arc(pos.x, pos.y, nodeR + 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(120,180,120,${0.3 + brt * 0.7})`;
     ctx.fill();
   }
 
-  // Hidden nodes
+  // Hidden nodes — color by activation
   for (const n of genome.nodes) {
     const pos = nodePos.get(n.id);
     if (!pos) continue;
+    const act = activations.get(n.id) ?? 0;
+    const brt = Math.abs(act);
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(167,139,250,0.7)';
+    ctx.arc(pos.x, pos.y, nodeR, 0, Math.PI * 2);
+    // Purple hue, brightness by activation
+    ctx.fillStyle = `rgba(200,160,120,${0.2 + brt * 0.7})`;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(167,139,250,0.4)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
   }
 
   // Output nodes
   for (let o = 0; o < N_OUTPUT; o++) {
     const pos = nodePos.get(N_INPUT + o)!;
-    const val = outputs[o];
-    const brt = Math.abs(val);
+    const brt = Math.abs(outputs[o]);
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(251,191,36,${0.3 + brt * 0.6})`;
+    ctx.arc(pos.x, pos.y, nodeR + 1, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(240,160,80,${0.3 + brt * 0.7})`;
     ctx.fill();
   }
 
-  // Legend: nodes/connections count
+  // Legend
   ctx.font      = '9px "DM Mono", monospace';
-  ctx.fillStyle = 'rgba(100,130,160,0.8)';
+  ctx.fillStyle = 'rgba(160,128,96,0.9)';
   ctx.textAlign = 'left';
-  ctx.fillText(`${genome.nodes.length}H  ${genome.conns.filter(c=>c.enabled).length}C`, PAD, H - 4);
-
+  ctx.fillText(`${genome.nodes.length}H  ${enabledConns.length}C  ${nLayers}L`, PAD, H - 4);
 }
 
 // ── Fitness history mini-chart ────────────────────────────────
@@ -500,7 +566,7 @@ function drawHistory(canvas: HTMLCanvasElement, history: number[]) {
   const show    = history.slice(-maxBars);
 
   // Draw a subtle baseline
-  ctx.strokeStyle = 'rgba(46,65,88,0.6)';
+  ctx.strokeStyle = 'rgba(90,56,32,0.6)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, H - 0.5); ctx.lineTo(W, H - 0.5);
@@ -512,8 +578,8 @@ function drawHistory(canvas: HTMLCanvasElement, history: number[]) {
     const alpha = 0.25 + (i / show.length) * 0.75;
     // Gradient from teal to blue as fitness grows
     const g = ctx.createLinearGradient(0, H - bh, 0, H);
-    g.addColorStop(0, `rgba(96,165,250,${alpha})`);
-    g.addColorStop(1, `rgba(52,211,153,${alpha})`);
+    g.addColorStop(0, `rgba(240,160,80,${alpha})`);
+    g.addColorStop(1, `rgba(120,180,120,${alpha})`);
     ctx.fillStyle = g;
     ctx.fillRect(bx, H - bh, barW, bh);
   }
@@ -542,10 +608,12 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
   const [localSpeed, setLocalSpeed] = useState(speed);
   const [display, setDisplay] = useState({
     generation: 1, time: 0, bestFitness: 0,
-    allTimeBest: 0, alive: 10,
+    allTimeBest: 0, alive: 15,
     champDist: 0, history: [] as number[],
     hiddenNodes: 0, activeConns: N_INPUT * N_OUTPUT,
-    uprightPct: 0,
+    uprightPct: 0, champSteps: 0, champStandingTime: 0, comPct: 0, headPct: 0,
+    stagnation: 0, gravityPct: 90,
+    speciesCount: 0,
   });
 
   isPlayingRef.current = isPlaying;
@@ -607,8 +675,28 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
       const barY = GROUND_Y + 38;
       ctx.fillStyle = 'rgba(30,45,62,0.4)';
       ctx.fillRect(barX, barY, barW, 2.5);
-      ctx.fillStyle = `rgba(96,165,250,${0.35 + progress * 0.4})`;
+      ctx.fillStyle = `rgba(240,160,80,${0.35 + progress * 0.4})`;
       ctx.fillRect(barX, barY, barW * progress, 2.5);
+
+      // Draw obstacles (hurdles on the ground)
+      const obstacles = getObstaclesNear(camX + CW / 2, CW, startX, GROUND_Y);
+      for (const obs of obstacles) {
+        const sx = obs.x - camX;
+        if (sx + obs.w < -10 || sx > CW + 10) continue;
+        const top = obs.groundY - obs.h;
+        // Subtle gradient hurdle
+        const grad = ctx.createLinearGradient(0, top, 0, obs.groundY);
+        grad.addColorStop(0, 'rgba(240,160,80,0.35)');
+        grad.addColorStop(1, 'rgba(240,160,80,0.12)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(sx, top, obs.w, obs.h);
+        // Top edge highlight
+        ctx.strokeStyle = 'rgba(240,160,80,0.5)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(sx, top); ctx.lineTo(sx + obs.w, top);
+        ctx.stroke();
+      }
 
       // All foot trails
       for (const agent of state.agents) drawFootTrail(ctx, agent, camX);
@@ -637,11 +725,20 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
         alive,
         champDist:    champ ? Math.round(champ.ragdoll.fitness) : 0,
         history:      state.history,
-        // Show MAX hidden nodes across all agents (not just champion) so NEAT growth is visible
         hiddenNodes:  Math.max(...state.agents.map(a => a.genome.nodes.length)),
         activeConns:  champ ? champ.genome.conns.filter(c => c.enabled).length : 0,
         uprightPct:   champ ? Math.round(Math.max(0, Math.min(1,
           (GROUND_Y - champ.ragdoll.particles[PI.PELVIS].y) / STANDING_PELVIS_H)) * 100) : 0,
+        comPct: champ ? Math.round(Math.min(100, Math.max(0,
+          (GROUND_Y - champ.ragdoll.particles.reduce((s, p) => s + p.y * p.mass, 0) /
+           champ.ragdoll.particles.reduce((s, p) => s + p.mass, 0)) / STANDING_COM_H * 100))) : 0,
+        headPct: champ ? Math.round(Math.min(100, Math.max(0,
+          (GROUND_Y - champ.ragdoll.particles[PI.HEAD].y) / STANDING_HEAD_H * 100))) : 0,
+        champSteps:   champ ? champ.ragdoll.stepCount : 0,
+        champStandingTime: champ ? Math.round(champ.ragdoll.standingTime) : 0,
+        stagnation:   state.stagnation,
+        gravityPct:   Math.round(state.gravityMul * 100),
+        speciesCount: state.species.length,
       });
     }
 
@@ -662,23 +759,22 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
   const handleSkip = () => {
     const state = stateRef.current;
     if (!state) return;
-    // Run sim at full speed until done
     const DT = 1 / 60;
     let i = 0;
-    while (i++ < 4000) { // max 60s of sim time + settle
+    while (i++ < 4000) {
       if (stepSim(state, DT)) break;
     }
     nextGeneration(state);
     cameraXRef.current = 0;
   };
 
-  const SPEED_OPTIONS = [1, 3, 6, 24];
+  const SPEED_OPTIONS = [1, 3, 10, 30, 60];
 
   // Population dot colours
-  const popDots = Array.from({ length: 10 }, (_, i) => {
+  const popDots = Array.from({ length: 15 }, (_, i) => {
     const agent = stateRef.current?.agents.find(a => a.rank === i);
     const alive = agent?.ragdoll.alive ?? false;
-    return { color: AGENT_COLORS[i], alive };
+    return { color: AGENT_COLORS[i] ?? '#6b7280', alive };
   });
 
   return (
@@ -693,16 +789,16 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
           className="neat-canvas"
         />
 
-        {/* Neural network overlay (champion) */}
+        {/* Neural network overlay (champion) — large panel */}
         <div className="neat-nn">
           <div className="neat-nn-title">Champion Network</div>
-          <canvas ref={nnCanvasRef} width={200} height={180} />
+          <canvas ref={nnCanvasRef} width={360} height={300} style={{ borderRadius: '6px', background: 'rgba(7,9,15,0.3)' }} />
           <div style={{ marginTop: '0.3rem', fontSize: '0.58rem', color: '#2e4158', lineHeight: 1.5, display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <span><span style={{ color: 'rgba(96,165,250,0.8)' }}>━</span> excite</span>
-            <span><span style={{ color: 'rgba(248,113,113,0.8)' }}>━</span> inhibit</span>
-            <span><span style={{ color: '#34d399' }}>●</span> sensor</span>
+            <span><span style={{ color: 'rgba(240,160,80,0.8)' }}>━</span> excite</span>
+            <span><span style={{ color: 'rgba(180,80,60,0.8)' }}>━</span> inhibit</span>
+            <span><span style={{ color: '#70c080' }}>●</span> sensor</span>
             <span><span style={{ color: '#a78bfa' }}>●</span> hidden</span>
-            <span><span style={{ color: '#fbbf24' }}>●</span> motor</span>
+            <span><span style={{ color: '#f0a050' }}>●</span> motor</span>
           </div>
         </div>
 
@@ -716,14 +812,38 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
             <span className="label">TIME</span>
             <span className="val">{display.time}s</span>
           </div>
+          <div className="neat-hud-row">
+            <span className="label">GRAVITY</span>
+            <span className="val" style={{ color: display.gravityPct >= 100 ? '#70c080' : '#f0a050' }}>
+              {display.gravityPct}%
+            </span>
+          </div>
+          {display.stagnation > 5 && (
+            <div className="neat-hud-row">
+              <span className="label">STAG</span>
+              <span style={{ color: display.stagnation > 20 ? '#c05040' : '#f0a050', fontWeight: 600 }}>{display.stagnation}</span>
+            </div>
+          )}
           <div className="neat-hud-divider" />
           <div className="neat-hud-row">
             <span className="label">LEAD</span>
             <span className="val">{display.champDist}px</span>
           </div>
           <div className="neat-hud-row">
-            <span className="label">UPRIGHT</span>
-            <span className="val" style={{ color: display.uprightPct > 60 ? '#34d399' : display.uprightPct > 30 ? '#fbbf24' : '#f87171' }}>{display.uprightPct}%</span>
+            <span className="label">CoG</span>
+            <span className="val" style={{ color: display.comPct > 60 ? '#70c080' : display.comPct > 30 ? '#f0a050' : '#c05040' }}>
+              {display.comPct}%
+            </span>
+          </div>
+          <div className="neat-hud-row">
+            <span className="label">STAND</span>
+            <span className="val" style={{ color: display.champStandingTime > 10 ? '#70c080' : display.champStandingTime > 3 ? '#f0a050' : '#c05040' }}>
+              {display.champStandingTime}s
+            </span>
+          </div>
+          <div className="neat-hud-row">
+            <span className="label">STEPS</span>
+            <span className="val" style={{ color: display.champSteps > 0 ? '#70c080' : '#a08060' }}>{display.champSteps}</span>
           </div>
           <div className="neat-hud-row">
             <span className="label">BEST</span>
@@ -731,17 +851,23 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
           </div>
           <div className="neat-hud-divider" />
           <div className="neat-hud-row">
-            <span className="label">NODES↑</span>
+            <span className="label">NODES</span>
             <span className="val">{display.hiddenNodes}</span>
           </div>
           <div className="neat-hud-row">
             <span className="label">CONNS</span>
             <span className="val">{display.activeConns}</span>
           </div>
+          {display.speciesCount > 0 && (
+            <div className="neat-hud-row">
+              <span className="label">SPECIES</span>
+              <span className="val" style={{ color: display.speciesCount > 3 ? '#70c080' : '#f0a050' }}>{display.speciesCount}</span>
+            </div>
+          )}
           <div className="neat-hud-divider" />
           <div className="neat-hud-row">
             <span className="label">ALIVE</span>
-            <span className="val">{display.alive}/10</span>
+            <span className="val">{display.alive}/15</span>
           </div>
           {display.history.length > 1 && (
             <>
@@ -764,8 +890,8 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
               style={{
                 background:  dot.alive ? dot.color : 'rgba(100,116,139,0.3)',
                 boxShadow:   dot.alive && i === 0 ? `0 0 6px ${dot.color}` : 'none',
-                width:  i === 0 ? '7px' : '5px',
-                height: i === 0 ? '7px' : '5px',
+                width:  i === 0 ? '6px' : '4px',
+                height: i === 0 ? '6px' : '4px',
               }}
             />
           ))}
@@ -801,6 +927,8 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
           <button className="neat-btn" onClick={handleSkip} title="Skip to next generation">
             ⏭ Skip
           </button>
+
+          <div className="neat-divider" />
 
           {/* Reset */}
           <button className="neat-btn danger" onClick={handleReset} title="Reset simulation">

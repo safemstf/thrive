@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Play, Pause, Zap, MapPin, Navigation, Building2, Brain, Shuffle, Trophy, Cpu, BarChart3, ChevronDown, ChevronUp, Home, Compass, CheckCircle2, AlertCircle, TrendingUp, Award, RotateCcw, Layers, X } from 'lucide-react';
-import styled, { keyframes, createGlobalStyle } from 'styled-components';
+import { Play, Pause, Zap, MapPin, Navigation, Building2, Brain, Shuffle, Trophy, Cpu, BarChart3, Home, Compass, TrendingUp, Award, RotateCcw, Layers, X } from 'lucide-react';
+import styled, { createGlobalStyle } from 'styled-components';
 
 // ==================== CONSTANTS ====================
 const COLORS = {
@@ -28,37 +28,6 @@ const MEDIUM_NETWORK = 150;
 const LARGE_NETWORK = 500;
 
 // ==================== STYLED COMPONENTS ====================
-const slideUp = keyframes`
-  from { 
-    opacity: 0; 
-    transform: translateY(20px); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
-  }
-`;
-
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
-const pulse = keyframes`
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-`;
-
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-`;
-
-const gentlePulse = keyframes`
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-`;
-
 // ==================== OVERLAY STYLES ====================
 const SpOverlayStyles = createGlobalStyle`
   .sp-root {
@@ -148,29 +117,6 @@ const SpOverlayStyles = createGlobalStyle`
     font-size: 0.72rem; font-weight: 600; color: rgba(255,255,255,0.7); white-space: nowrap; }
 `;
 
-const RouteInfo = styled.div`
-  position: absolute;
-  top: 1.5rem;
-  left: 1.5rem;
-  background: rgba(0,0,0,0.9);
-  backdrop-filter: blur(10px);
-  padding: 1rem 1.5rem;
-  border-radius: 12px;
-  border: 1px solid ${COLORS.borderAccent};
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-size: 1rem;
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  
-  @media (max-width: 768px) {
-    font-size: 0.875rem;
-    padding: 0.75rem 1rem;
-    left: 1rem;
-    top: 1rem;
-  }
-`;
 
 const CityLabel = styled.span<{ $color: string }>`
   color: ${({ $color }) => $color};
@@ -179,146 +125,6 @@ const CityLabel = styled.span<{ $color: string }>`
   gap: 0.5rem;
 `;
 
-const WinnerBanner = styled.div<{ $color: string }>`
-  width: 100%;
-  background: linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(0,10,30,0.95) 100%);
-  backdrop-filter: blur(20px);
-  padding: 1.5rem 2rem;
-  border-radius: 12px;
-  border: 2px solid ${({ $color }) => $color};
-  box-shadow: 0 0 30px ${({ $color }) => $color}60;
-  text-align: center;
-  animation: ${slideUp} 0.5s ease-out;
-  
-  @media (max-width: 768px) {
-    padding: 1rem 1.5rem;
-  }
-`;
-
-const WinnerTitle = styled.h2<{ $color: string }>`
-  font-size: 1.5rem;
-  margin: 0;
-  color: ${({ $color }) => $color};
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  justify-content: center;
-  font-weight: 700;
-  flex-wrap: wrap;
-  
-  @media (max-width: 768px) {
-    font-size: 1.125rem;
-    gap: 0.5rem;
-  }
-`;
-
-const WinnerStats = styled.div`
-  font-size: 0.875rem;
-  color: ${COLORS.textMuted};
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  
-  @media (max-width: 768px) {
-    font-size: 0.75rem;
-  }
-`;
-
-
-const Section = styled.div`
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  border: 1px solid ${COLORS.borderAccent};
-  padding: 1.25rem;
-  animation: ${fadeIn} 0.6s ease-out;
-`;
-
-const SectionTitle = styled.div`
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: ${COLORS.textPrimary};
-`;
-
-const Label = styled.div`
-  font-size: 0.875rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: ${COLORS.textMuted};
-`;
-
-const Slider = styled.input`
-  width: 100%;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(59, 130, 246, 0.2);
-  outline: none;
-  
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: ${COLORS.accent};
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
-    transition: all 0.2s ease;
-  }
-  
-  &::-webkit-slider-thumb:hover {
-    background: ${COLORS.accentSoft};
-    transform: scale(1.1);
-  }
-  
-  &::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: ${COLORS.accent};
-    cursor: pointer;
-    border: none;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
-  }
-`;
-
-const ButtonGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
-`;
-
-const ModeButton = styled.button<{ $active: boolean }>`
-  padding: 0.75rem;
-  background: ${({ $active }) =>
-    $active ? 'rgba(59, 130, 246, 0.25)' : 'rgba(0,0,0,0.3)'};
-  border: 1px solid ${({ $active }) =>
-    $active ? COLORS.accent : COLORS.borderAccent};
-  border-radius: 8px;
-  color: ${({ $active }) => $active ? COLORS.accent : COLORS.textMuted};
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  
-  &:hover {
-    background: rgba(59, 130, 246, 0.2);
-    transform: translateY(-1px);
-  }
-`;
 
 const AlgoCheckbox = styled.label<{ $active: boolean; $color: string }>`
   display: flex;
@@ -371,217 +177,7 @@ const AlgoDescription = styled.div`
   opacity: 0.8;
 `;
 
-const Leaderboard = styled.div<{ $expanded?: boolean }>`
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  border: 1px solid ${COLORS.borderAccent};
-  padding: 1.25rem;
-  animation: ${fadeIn} 0.6s ease-out;
-  min-height: 400px;
-  max-height: ${({ $expanded }) => $expanded ? '1000px' : '400px'};
-  overflow-y: auto;
-  transition: max-height 0.3s ease;
-  
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.2);
-    border-radius: 3px;
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: ${COLORS.borderAccent};
-    border-radius: 3px;
-  }
-`;
 
-const LeaderboardHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-`;
-
-const LeaderboardTitle = styled.div`
-  font-size: 1rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: ${COLORS.textPrimary};
-`;
-
-const ExpandButton = styled.button`
-  background: transparent;
-  border: none;
-  color: ${COLORS.textMuted};
-  cursor: pointer;
-  padding: 0.25rem;
-  display: flex;
-  align-items: center;
-  transition: color 0.2s ease;
-  
-  &:hover {
-    color: ${COLORS.textPrimary};
-  }
-`;
-
-const LeaderboardItem = styled.div<{ $rank: number; $isWinner: boolean; $color: string; $failed: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  background: ${({ $isWinner, $color, $failed }) =>
-    $failed ? 'rgba(239, 68, 68, 0.1)' :
-      $isWinner ? `${$color}20` : 'rgba(0,0,0,0.3)'};
-  border: 1px solid ${({ $isWinner, $color, $failed }) =>
-    $failed ? 'rgba(239, 68, 68, 0.3)' :
-      $isWinner ? $color : COLORS.borderAccent};
-  border-radius: 12px;
-  animation: ${fadeIn} 0.4s ease-out ${({ $rank }) => $rank * 0.05}s both;
-  
-  ${({ $isWinner }) => $isWinner && `
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-  `}
-`;
-
-const Rank = styled.div`
-  font-size: 1.5rem;
-  font-weight: 700;
-  min-width: 40px;
-  text-align: center;
-`;
-
-const AlgoInfo = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-`;
-
-const AlgoHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-`;
-
-const AlgoNameInBoard = styled.span<{ $color: string }>`
-  font-size: 1rem;
-  font-weight: 600;
-  color: ${({ $color }) => $color};
-`;
-
-const AlgoStatus = styled.div<{ $color: string }>`
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: ${({ $color }) => $color};
-  animation: ${pulse} 2s ease-in-out infinite;
-`;
-
-const Stats = styled.div`
-  display: flex;
-  gap: 1rem;
-  font-size: 0.875rem;
-  color: ${COLORS.textMuted};
-`;
-
-const StatValue = styled.span`
-  font-weight: 600;
-  color: ${COLORS.textPrimary};
-`;
-
-const GlobalLeaderboard = styled.div`
-  background: rgba(0,0,0,0.4);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  border: 1px solid ${COLORS.borderAccent};
-  padding: 1.25rem;
-  animation: ${fadeIn} 0.6s ease-out;
-`;
-
-const GlobalLeaderboardHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-`;
-
-const ResetButton = styled.button`
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 8px;
-  color: ${COLORS.danger};
-  padding: 0.5rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  
-  &:hover {
-    background: rgba(239, 68, 68, 0.2);
-    transform: translateY(-1px);
-  }
-`;
-
-const GlobalLeaderboardItem = styled.div<{ $rank: number; $color: string }>`
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-  background: rgba(0,0,0,0.3);
-  border: 1px solid ${COLORS.borderAccent};
-  border-radius: 12px;
-  animation: ${fadeIn} 0.4s ease-out ${({ $rank }) => $rank * 0.05}s both;
-`;
-
-const GlobalAlgoHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.75rem;
-`;
-
-const GlobalAlgoLeft = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-`;
-
-const GlobalAlgoName = styled.span<{ $color: string }>`
-  font-size: 1rem;
-  font-weight: 600;
-  color: ${({ $color }) => $color};
-`;
-
-const GlobalStats = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
-  font-size: 0.75rem;
-  color: ${COLORS.textMuted};
-`;
-
-const GlobalStatItem = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const GlobalStatLabel = styled.span`
-  opacity: 0.7;
-`;
-
-const GlobalStatValue = styled.span`
-  color: ${COLORS.textPrimary};
-  font-weight: 600;
-  font-size: 0.85rem;
-  margin-top: 0.25rem;
-`;
 
 // ==================== TYPES ====================
 type AlgorithmType = 'dijkstra' | 'astar' | 'bfs' | 'dfs' | 'bmssp';
@@ -1510,20 +1106,34 @@ class GraphRenderer {
   private offscreenCtx: CanvasRenderingContext2D | null = null;
   private staticLayerDirty: boolean = true;
 
+  private dpr: number;
+
   constructor(canvas: HTMLCanvasElement, graph: CityGraph) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.graph = graph;
 
-    // Create offscreen canvas for static elements
+    // HiDPI / Retina support — scale the backing store so everything is crisp
+    this.dpr = Math.min(window.devicePixelRatio || 1, 3); // cap at 3× to avoid huge buffers
+    canvas.width = CANVAS_WIDTH * this.dpr;
+    canvas.height = CANVAS_HEIGHT * this.dpr;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+
+    // Create offscreen canvas for static elements (also HiDPI)
     this.offscreenCanvas = document.createElement('canvas');
     this.offscreenCanvas.width = canvas.width;
     this.offscreenCanvas.height = canvas.height;
     this.offscreenCtx = this.offscreenCanvas.getContext('2d')!;
+    this.offscreenCtx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
   clear(): void {
+    this.ctx.save();
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.restore();
   }
 
   render(algorithms: PathfindingAlgorithm[], startCity: number, goalCity: number): void {
@@ -1535,14 +1145,20 @@ class GraphRenderer {
 
     // Render static layer (connections and cities) only when dirty
     if (this.staticLayerDirty && this.offscreenCtx) {
-      this.offscreenCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.offscreenCtx.save();
+      this.offscreenCtx.setTransform(1, 0, 0, 1, 0, 0);
+      this.offscreenCtx.clearRect(0, 0, this.offscreenCanvas!.width, this.offscreenCanvas!.height);
+      this.offscreenCtx.restore();
       this.drawConnections(this.offscreenCtx, isLargeNetwork, isMediumNetwork);
       this.staticLayerDirty = false;
     }
 
-    // Draw static layer
+    // Draw static layer — blit at native resolution, then restore transform
     if (this.offscreenCanvas) {
+      this.ctx.save();
+      this.ctx.setTransform(1, 0, 0, 1, 0, 0);
       this.ctx.drawImage(this.offscreenCanvas, 0, 0);
+      this.ctx.restore();
     }
 
     // Draw dynamic elements
@@ -1951,8 +1567,6 @@ export default function ShortestPathAlgorithmDemo({
   const [isPlaying, setIsPlaying] = useState(isRunningProp);
   const [localSpeed, setLocalSpeed] = useState(speedProp);
   const [showStats, setShowStats] = useState(true);
-  const [showGlobalLeaderboard, setShowGlobalLeaderboard] = useState(true);
-  const [expandedStats, setExpandedStats] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>('massive-random');
   const [selectedAlgos, setSelectedAlgos] = useState<AlgorithmType[]>([
     'dijkstra', 'astar', 'bfs', 'dfs', 'bmssp'
@@ -1964,7 +1578,7 @@ export default function ShortestPathAlgorithmDemo({
   const [startCity, setStartCity] = useState(0);
   const [goalCity, setGoalCity] = useState(0);
   const [globalStats, setGlobalStats] = useState<Record<AlgorithmType, LeaderboardStats>>(LeaderboardManager.getStats());
-  const [activePanel, setActivePanel] = useState<'none' | 'algorithms' | 'leaderboard'>('none');
+  const [activePanel, setActivePanel] = useState<'none' | 'algorithms'>('none');
 
   // Use refs to track mutable state that needs to be accessed in callbacks without stale closures
   const statsUpdatedRef = useRef(false);
@@ -2258,9 +1872,6 @@ export default function ShortestPathAlgorithmDemo({
           <button className={`sp-icon-btn${showStats ? ' active' : ''}`} onClick={() => setShowStats(!showStats)} title="Race results">
             <Trophy size={15} />
           </button>
-          <button className={`sp-icon-btn${showGlobalLeaderboard ? ' active' : ''}`} onClick={() => setShowGlobalLeaderboard(!showGlobalLeaderboard)} title="Global leaderboard">
-            <Award size={15} />
-          </button>
         </div>
 
         {/* HUD: winner/route info */}
@@ -2306,10 +1917,53 @@ export default function ShortestPathAlgorithmDemo({
             <Brain size={13} />Algos
           </button>
 
-          <button className={`sp-bar-btn${activePanel === 'leaderboard' ? ' active' : ''}`}
-            onClick={() => setActivePanel(p => p === 'leaderboard' ? 'none' : 'leaderboard')}>
-            <Trophy size={13} />Race
-          </button>
+          {/* Live race position tracker — compact colored dots in rank order */}
+          {algorithmStates.length > 0 && (
+            <>
+              <div className="sp-bar-divider" />
+              {[...algorithmStates]
+                .sort((a, b) => {
+                  if (a.status === 'failed' && b.status !== 'failed') return 1;
+                  if (a.status !== 'failed' && b.status === 'failed') return -1;
+                  if (a.path.length > 0 && b.path.length === 0) return -1;
+                  if (a.path.length === 0 && b.path.length > 0) return 1;
+                  if (a.path.length > 0 && b.path.length > 0) return a.steps - b.steps;
+                  return a.steps - b.steps;
+                })
+                .map((algo, idx) => {
+                  const config = algorithmConfigs[algo.id];
+                  const medal = idx === 0 && algo.status === 'winner' ? '🏆'
+                    : idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+                  return (
+                    <div key={algo.id} title={`${config.name}: ${algo.steps} steps${algo.path.length > 0 ? `, ${algo.path.length} nodes` : ''}${algo.status === 'failed' ? ' (failed)' : ''}`}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.2rem',
+                        padding: '0.15rem 0.4rem', borderRadius: 999,
+                        background: algo.status === 'failed' ? 'rgba(239,68,68,0.12)'
+                          : algo.status === 'winner' ? `${config.color}25`
+                          : 'transparent',
+                        opacity: algo.status === 'failed' ? 0.4 : 1,
+                        transition: 'all 0.3s',
+                      }}>
+                      <span style={{ fontSize: '0.55rem' }}>{medal}</span>
+                      <span style={{
+                        width: 7, height: 7, borderRadius: '50%',
+                        background: algo.status === 'failed' ? COLORS.danger : config.color,
+                        boxShadow: algo.status === 'running' ? `0 0 6px ${config.color}` : 'none',
+                        flexShrink: 0,
+                      }} />
+                      <span style={{
+                        fontSize: '0.62rem', fontWeight: 600,
+                        color: algo.status === 'failed' ? 'rgba(255,255,255,0.3)' : config.color,
+                        fontFamily: 'inherit', whiteSpace: 'nowrap',
+                      }}>
+                        {config.name.length > 6 ? config.name.slice(0, 5) : config.name}
+                      </span>
+                    </div>
+                  );
+                })}
+            </>
+          )}
         </div>
 
         {/* Algorithms popup panel */}
@@ -2350,109 +2004,44 @@ export default function ShortestPathAlgorithmDemo({
           </div>
         )}
 
-        {/* Leaderboard popup panel */}
-        {activePanel === 'leaderboard' && (
-          <div className="sp-panel">
+        {/* Global stats popup — compact, from Trophy icon */}
+        {showStats && sortedGlobalStats.length > 0 && (
+          <div className="sp-panel" style={{ left: 'auto', right: '0.75rem', top: '3rem', bottom: 'auto' }}>
             <div className="sp-panel-header">
-              <Trophy size={15} />Current Race
-              <button className="sp-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
-            </div>
-            <div className="sp-panel-body">
-              {[...algorithmStates]
-                .sort((a, b) => {
-                  if (a.status === 'failed' && b.status !== 'failed') return 1;
-                  if (a.status !== 'failed' && b.status === 'failed') return -1;
-                  if (a.path.length === 0 && b.path.length === 0) return a.steps - b.steps;
-                  if (a.path.length === 0) return 1;
-                  if (b.path.length === 0) return -1;
-                  return a.steps - b.steps;
-                })
-                .map((algo, idx) => {
-                  const config = algorithmConfigs[algo.id];
-                  return (
-                    <LeaderboardItem
-                      key={algo.id}
-                      $rank={idx}
-                      $isWinner={algo.status === 'winner'}
-                      $color={config.color}
-                      $failed={algo.status === 'failed'}
-                    >
-                      <Rank>
-                        {algo.status === 'failed' ? <AlertCircle size={20} color={COLORS.danger} /> :
-                          idx === 0 && algo.status === 'winner' ? '🏆' :
-                            idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
-                      </Rank>
-                      <AlgoInfo>
-                        <AlgoHeader>
-                          <span style={{ fontSize: '1.5rem' }}>{config.emoji}</span>
-                          <AlgoNameInBoard $color={config.color}>{config.name}</AlgoNameInBoard>
-                          {algo.status === 'running' && <AlgoStatus $color={config.color} />}
-                          {algo.status === 'winner' && <CheckCircle2 size={18} color={COLORS.success} />}
-                        </AlgoHeader>
-                        <Stats>
-                          <span>Steps: <StatValue>{algo.steps.toLocaleString()}</StatValue></span>
-                          <span>Nodes: <StatValue>{algo.path.length > 0 ? algo.path.length : '-'}</StatValue></span>
-                          {algo.distance > 0 && (
-                            <span>Dist: <StatValue>{algo.distance.toFixed(0)}</StatValue></span>
-                          )}
-                        </Stats>
-                      </AlgoInfo>
-                    </LeaderboardItem>
-                  );
-                })}
-            </div>
-          </div>
-        )}
-
-        {/* Global leaderboard popup (right side) when toggled */}
-        {showGlobalLeaderboard && (
-          <div className="sp-panel" style={{ left: 'auto', right: '0.75rem', bottom: '3.5rem' }}>
-            <div className="sp-panel-header">
-              <Award size={15} />Global Stats
-              <button className="sp-panel-close" onClick={() => setShowGlobalLeaderboard(false)}><X size={13} /></button>
+              <Award size={15} />All-Time Stats
+              <button className="sp-panel-close" onClick={() => setShowStats(false)}><X size={13} /></button>
             </div>
             <div className="sp-panel-body">
               {sortedGlobalStats.map(([id, stats], idx) => {
                 const config = algorithmConfigs[id as AlgorithmType];
                 const totalScore = stats.firstPlace * 3 + stats.secondPlace * 2 + stats.thirdPlace * 1;
-                const podiumFinishes = stats.firstPlace + stats.secondPlace + stats.thirdPlace;
-                const podiumRate = stats.totalRuns > 0 ? ((podiumFinishes / stats.totalRuns) * 100).toFixed(0) : '0';
-
                 return (
-                  <GlobalLeaderboardItem key={id} $rank={idx} $color={config.color}>
-                    <GlobalAlgoHeader>
-                      <GlobalAlgoLeft>
-                        <span style={{ fontSize: '1.5rem' }}>{config.emoji}</span>
-                        <GlobalAlgoName $color={config.color}>{config.name}</GlobalAlgoName>
-                      </GlobalAlgoLeft>
-                      <Rank style={{ fontSize: '1rem', minWidth: 'auto' }}>
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
-                      </Rank>
-                    </GlobalAlgoHeader>
-                    <GlobalStats>
-                      <GlobalStatItem>
-                        <GlobalStatLabel>Score</GlobalStatLabel>
-                        <GlobalStatValue>{totalScore} pts</GlobalStatValue>
-                      </GlobalStatItem>
-                      <GlobalStatItem>
-                        <GlobalStatLabel>Podium Rate</GlobalStatLabel>
-                        <GlobalStatValue>{podiumRate}%</GlobalStatValue>
-                      </GlobalStatItem>
-                      <GlobalStatItem style={{ gridColumn: '1 / -1' }}>
-                        <GlobalStatLabel>Finishes</GlobalStatLabel>
-                        <GlobalStatValue>
-                          <span style={{ marginRight: '0.75rem' }}>🥇 {stats.firstPlace}</span>
-                          <span style={{ marginRight: '0.75rem' }}>🥈 {stats.secondPlace}</span>
-                          <span>🥉 {stats.thirdPlace}</span>
-                        </GlobalStatValue>
-                      </GlobalStatItem>
-                    </GlobalStats>
-                  </GlobalLeaderboardItem>
+                  <div key={id} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    padding: '0.35rem 0', borderBottom: `1px solid rgba(255,255,255,0.04)`,
+                  }}>
+                    <span style={{ fontSize: '0.72rem', minWidth: 18, textAlign: 'center' }}>
+                      {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
+                    </span>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: config.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.72rem', color: config.color, fontWeight: 600, flex: 1 }}>{config.name}</span>
+                    <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace' }}>
+                      {totalScore}pt
+                    </span>
+                    <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+                      {stats.firstPlace}W
+                    </span>
+                  </div>
                 );
               })}
-              <ResetButton onClick={handleResetGlobalStats} style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}>
-                <RotateCcw size={14} />Reset Stats
-              </ResetButton>
+              <button onClick={handleResetGlobalStats} style={{
+                width: '100%', marginTop: '0.4rem', padding: '0.3rem',
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+                borderRadius: 6, color: '#f87171', fontSize: '0.65rem', cursor: 'pointer',
+                fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem',
+              }}>
+                <RotateCcw size={11} />Reset
+              </button>
             </div>
           </div>
         )}

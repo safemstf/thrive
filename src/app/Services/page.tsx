@@ -3,12 +3,13 @@
 // cladogram simulation with longest subsequences and phylogenetic trees
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import dynamic from "next/dynamic";
-import styled, { keyframes, css } from 'styled-components';
+import styled, { keyframes, css, createGlobalStyle } from 'styled-components';
 import {
   Play, Pause, RotateCcw, Activity, Target, Grid, Volume2, VolumeX,
   Zap, Users, Star, RotateCw, Microscope, Droplet, Wifi, BookOpen,
-  Sliders, Cpu, Eye, Camera, Info, Gauge, HelpCircle, Maximize2, Check, Shield,
-  Lock, Fingerprint, FileSearch, Code2, Sheet, X, Briefcase, Home, Globe
+  Sliders, Cpu, Eye, EyeOff, Camera, Info, Gauge, HelpCircle, Maximize2, Check, Shield,
+  Lock, Fingerprint, FileSearch, Code2, Sheet, X, Briefcase, Home, Globe,
+  ChevronDown
 } from 'lucide-react';
 import { MatrixRain } from './matrixStyling';
 import AmdahlsLawSimulator from '@/components/cs/amdalsLaw/amdalsLaw';
@@ -121,9 +122,14 @@ const TalkOhTacoDemo = dynamic(() => import('@/app/talkohtaco/page'), {
   loading: () => <SimulationLoader>Loading Talk Oh—Taco...</SimulationLoader>
 });
 
+const ContractScraperDemo = dynamic(() => import('@/components/cs/webscraper/webscrapper'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Contract Intelligence...</SimulationLoader>
+});
+
 
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach' | 'virtual-recruiter' | 'interview-prep' | 'homerank' | 'talkohtaco';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach' | 'virtual-recruiter' | 'interview-prep' | 'homerank' | 'talkohtaco' | 'contract-scraper';
 type TabType = 'simulations' | 'algorithms' | 'tools';
 
 interface SimulationItem {
@@ -161,6 +167,21 @@ const shimmer = keyframes`
 const spin = keyframes`
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+`;
+
+/* Stealth mode: hide site header, footer, and scrollbar chrome */
+const StealthGlobalStyle = createGlobalStyle`
+  html.stealth-mode {
+    /* Hide the site-wide header and footer rendered by ConditionalLayout */
+    & header,
+    & footer {
+      display: none !important;
+    }
+    /* Remove any top margin/padding the header was reserving */
+    & body {
+      padding-top: 0 !important;
+    }
+  }
 `;
 
 // Loading Component
@@ -442,11 +463,84 @@ const ItemDescription = styled.p`
   color: #7a6e5f;
 `;
 
-const FadingElements = styled.div<{ $theater: boolean }>`
+const FadingElements = styled.div<{ $theater: boolean; $stealth?: boolean }>`
   opacity: ${({ $theater }) => $theater ? '0' : '1'};
   visibility: ${({ $theater }) => $theater ? 'hidden' : 'visible'};
   pointer-events: ${({ $theater }) => $theater ? 'none' : 'auto'};
-  transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1), visibility 0.35s;
+  transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1), visibility 0.35s, max-height 0.4s ease;
+
+  ${({ $stealth }) => $stealth && css`
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    margin: 0;
+  `}
+`;
+
+/* Stealth mode: compact strip showing active item + quick-switch dropdown */
+const StealthBar = styled.div<{ $visible: boolean }>`
+  display: ${({ $visible }) => $visible ? 'flex' : 'none'};
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  background: rgba(26, 18, 8, 0.04);
+  border-radius: 10px;
+  border: 1px solid rgba(26, 18, 8, 0.06);
+  position: relative;
+`;
+
+const StealthLabel = styled.div`
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem;
+  color: #1a1208;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+`;
+
+const StealthSelect = styled.select`
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  color: #1a1208;
+  background: rgba(26, 18, 8, 0.05);
+  border: 1px solid rgba(26, 18, 8, 0.1);
+  border-radius: 6px;
+  padding: 0.25rem 1.5rem 0.25rem 0.5rem;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231a1208' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.4rem center;
+
+  &:focus {
+    outline: none;
+    border-color: #2563eb;
+  }
+`;
+
+const StealthToggle = styled.button<{ $active?: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: ${({ $active }) => $active ? 'rgba(37, 99, 235, 0.1)' : 'transparent'};
+  color: ${({ $active }) => $active ? '#2563eb' : '#7a6e5f'};
+  border: none;
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: rgba(37, 99, 235, 0.08);
+    color: #2563eb;
+  }
 `;
 
 /* ControlsContainer — chip layout with subtle dividers; children keep their own padding */
@@ -1039,10 +1133,10 @@ const allItems: SimulationItem[] = [
   },
   {
     key: 'TD',
-    label: 'TD',
+    label: 'Walking',
     icon: <RotateCw size={22} />,
     color: '#ef4444',
-    description: '3-body problem chaos visualization',
+    description: '2D bipedal walker',
     comingSoon: false,
     category: 'simulations'
   },
@@ -1176,6 +1270,15 @@ const allItems: SimulationItem[] = [
     comingSoon: false,
     category: 'tools',
   },
+  {
+    key: 'contract-scraper',
+    label: 'Contract Intelligence',
+    icon: <FileSearch size={22} />,
+    color: '#0369a1',
+    description: 'Search live SAM.gov contract opportunities — filter by NAICS, state, type, and date range. Import DataBank CSVs for deeper analysis.',
+    comingSoon: false,
+    category: 'tools',
+  },
 
 ];
 
@@ -1192,6 +1295,7 @@ export default function SimulationsPage() {
   const [showInfo, setShowInfo] = useState(false);
   const [fps, setFps] = useState(60);
   const [showTheaterBar, setShowTheaterBar] = useState(true);
+  const [stealthMode, setStealthMode] = useState(false);
 
   const fpsRef = useRef<number[]>([]);
   const lastFrameTimeRef = useRef(performance.now());
@@ -1353,6 +1457,17 @@ export default function SimulationsPage() {
     };
   }, [theaterMode]);
 
+  // Stealth mode — hide site header and footer
+  useEffect(() => {
+    const html = document.documentElement;
+    if (stealthMode) {
+      html.classList.add('stealth-mode');
+    } else {
+      html.classList.remove('stealth-mode');
+    }
+    return () => html.classList.remove('stealth-mode');
+  }, [stealthMode]);
+
   const handleItemClick = (item: SimulationItem) => {
     if (!item.comingSoon) {
       setActiveSimulation(item.key);
@@ -1424,6 +1539,8 @@ export default function SimulationsPage() {
         return <HomeRankDemo />;
       case 'talkohtaco':
         return <TalkOhTacoDemo />;
+      case 'contract-scraper':
+        return <ContractScraperDemo />;
       default:
         return (
           <PlaceholderContent>
@@ -1443,9 +1560,47 @@ export default function SimulationsPage() {
   return (
     <PageContainer>
       <MatrixRain />
+      {stealthMode && <StealthGlobalStyle />}
 
       <ContentWrapper>
-        <FadingElements $theater={theaterMode}>
+        {/* Stealth mode: compact item picker replaces full header/tabs/grid */}
+        <StealthBar $visible={stealthMode}>
+          <StealthLabel>
+            <span style={{ color: activeItem?.color }}>{activeItem?.icon}</span>
+            {activeItem?.label}
+          </StealthLabel>
+          <StealthSelect
+            value={activeSimulation}
+            onChange={(e) => {
+              const item = allItems.find(i => i.key === e.target.value);
+              if (item && !item.comingSoon) {
+                setActiveSimulation(item.key as SimulationType);
+                setActiveTab(item.category);
+              }
+            }}
+          >
+            <optgroup label="Tools">
+              {allItems.filter(i => i.category === 'tools' && !i.comingSoon).map(i => (
+                <option key={i.key} value={i.key}>{i.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Simulations">
+              {allItems.filter(i => i.category === 'simulations' && !i.comingSoon).map(i => (
+                <option key={i.key} value={i.key}>{i.label}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Algorithms">
+              {allItems.filter(i => i.category === 'algorithms' && !i.comingSoon).map(i => (
+                <option key={i.key} value={i.key}>{i.label}</option>
+              ))}
+            </optgroup>
+          </StealthSelect>
+          <StealthToggle $active={true} onClick={() => setStealthMode(false)} title="Exit stealth mode">
+            <Eye size={14} />
+          </StealthToggle>
+        </StealthBar>
+
+        <FadingElements $theater={theaterMode} $stealth={stealthMode}>
           <PageHeader>
             <PageTitle>Computation Tools & Models</PageTitle>
             <PageSubtitle>
@@ -1519,6 +1674,15 @@ export default function SimulationsPage() {
           </ItemsGrid>
         </FadingElements>
 
+        {/* Stealth toggle for tool items (which don't have the TheaterControls bar) */}
+        {isToolItem && !theaterMode && !stealthMode && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '0.5rem 0' }}>
+            <StealthToggle onClick={() => setStealthMode(true)} title="Hide branding (stealth mode)">
+              <EyeOff size={14} /> Stealth
+            </StealthToggle>
+          </div>
+        )}
+
         {activeItem && !activeItem.comingSoon && !theaterMode && !isToolItem && (
           <TheaterControls $theater={false}>
             <ControlButton
@@ -1574,6 +1738,14 @@ export default function SimulationsPage() {
               $active={soundEnabled}
             >
               {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </ControlButton>
+
+            <ControlButton
+              onClick={() => setStealthMode(!stealthMode)}
+              $active={stealthMode}
+              title={stealthMode ? 'Show branding' : 'Hide branding (stealth mode)'}
+            >
+              {stealthMode ? <Eye size={18} /> : <EyeOff size={18} />}
             </ControlButton>
 
             <ControlButton onClick={() => setShowKeyboardHints(true)}>

@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Pause, Zap, Sparkles, Map as MapIcon, TrendingUp, Award, Brain, Circle, Grid3x3, Shuffle, Eye, EyeOff, Trophy, Target, Cpu, BarChart3, Timer, Activity, ChevronDown, ChevronUp, X, Maximize2 } from 'lucide-react';
-import styled, { keyframes, css } from 'styled-components';
+import { Play, Pause, Sparkles, Map as MapIcon, TrendingUp, Brain, Circle, Grid3x3, Shuffle, Eye, EyeOff, Trophy, X } from 'lucide-react';
+import styled, { createGlobalStyle } from 'styled-components';
 
 // Color palette matching Permutations
 const COLORS = {
@@ -80,590 +80,142 @@ interface TrailPoint {
   alpha: number;
 }
 
-// Animations
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(10px) scale(0.99); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-`;
-
-const gentlePulse = keyframes`
-  0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(59,130,246,0.12); }
-  50% { transform: scale(1.02); box-shadow: 0 0 25px rgba(59,130,246,0.16); }
-`;
-
-const shimmer = keyframes`
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-`;
-
-const pulse = keyframes`
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-`;
-
-// Styled Components
-const MainContainer = styled.div`
-  width: 100%;
-  height: 100vh;
-  background: linear-gradient(135deg, ${COLORS.bg1} 0%, ${COLORS.bg2} 50%, ${COLORS.bg1} 100%);
-  color: ${COLORS.textPrimary};
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-                radial-gradient(circle at 80% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
-    pointer-events: none;
-  }
-`;
-
-const Header = styled.div`
-  padding: 1.5rem 2rem;
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid ${COLORS.borderAccent};
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  animation: ${fadeIn} 0.6s ease-out;
-  position: relative;
-  z-index: 10;
-  
-  @media (max-width: 768px) {
-    padding: 1rem;
-    flex-wrap: wrap;
-  }
-`;
-
-const Title = styled.h1`
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: ${COLORS.textPrimary};
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  text-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-  
-  @media (max-width: 768px) {
-    font-size: 1.25rem;
-  }
-`;
-
-const Badge = styled.div`
-  padding: 0.5rem 1rem;
-  background: rgba(59, 130, 246, 0.12);
-  border-radius: 24px;
-  font-size: 0.875rem;
-  border: 1px solid ${COLORS.borderAccent};
-  font-weight: 500;
-  white-space: nowrap;
-`;
-
-const ThemeButtons = styled.div`
-  margin-left: auto;
-  display: flex;
-  gap: 0.5rem;
-  
-  @media (max-width: 768px) {
+// ==================== OVERLAY STYLES (same pattern as shortestPath) ====================
+const AntOverlayStyles = createGlobalStyle`
+  .ant-root {
+    position: relative;
     width: 100%;
-    margin-left: 0;
-    margin-top: 0.5rem;
+    aspect-ratio: 1 / 1;
+    max-height: 70vh;
+    background: #0a0e1a;
+    border-radius: 12px;
+    overflow: hidden;
+    user-select: none;
   }
+  .ant-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    cursor: grab; touch-action: none; display: block;
+  }
+  .ant-canvas:active { cursor: grabbing; }
+
+  .ant-chips { position: absolute; top: 0.75rem; left: 0.75rem; z-index: 50;
+    display: flex; flex-wrap: wrap; gap: 0.3rem; max-width: calc(100% - 5rem); }
+  .ant-chip { display: flex; align-items: center; gap: 0.3rem; padding: 0.28rem 0.6rem;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.62); color: rgba(255,255,255,0.65);
+    font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+    backdrop-filter: blur(8px); font-family: inherit; white-space: nowrap; }
+  .ant-chip:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .ant-chip.active { border-color: var(--chip-color, #3b82f6);
+    background: color-mix(in srgb, var(--chip-color, #3b82f6) 20%, rgba(0,0,0,0.6)); color: #fff; }
+
+  .ant-top-right { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 50; display: flex; gap: 0.3rem; }
+  .ant-icon-btn { width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.62);
+    color: rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; backdrop-filter: blur(8px); transition: all 0.15s; }
+  .ant-icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .ant-icon-btn.active { background: rgba(59,130,246,0.2); border-color: rgba(59,130,246,0.5); color: #3b82f6; }
+
+  .ant-hud { position: absolute; top: 3rem; right: 0.75rem; z-index: 40;
+    min-width: 145px; background: rgba(5,8,18,0.82); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.09); border-radius: 10px;
+    padding: 0.6rem 0.75rem; font-size: 0.73rem; color: rgba(255,255,255,0.55); }
+  .ant-hud-title { font-weight: 700; font-size: 0.78rem; color: #e2e8f0;
+    margin-bottom: 0.45rem; display: flex; align-items: center; gap: 0.3rem; }
+  .ant-hud-row { display: flex; justify-content: space-between; align-items: center;
+    padding: 0.13rem 0; gap: 0.6rem; }
+  .ant-hud-divider { height: 1px; background: rgba(255,255,255,0.07); margin: 0.3rem 0; }
+
+  .ant-bar { position: absolute; bottom: 0.75rem; left: 50%; transform: translateX(-50%);
+    z-index: 50; display: flex; align-items: center; gap: 0.25rem;
+    background: rgba(4,7,16,0.84); backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.09); border-radius: 999px;
+    padding: 0.35rem 0.55rem; white-space: nowrap; }
+  .ant-bar-btn { display: flex; align-items: center; gap: 0.28rem;
+    padding: 0.28rem 0.6rem; border-radius: 999px; border: 1px solid transparent;
+    background: transparent; color: rgba(255,255,255,0.55); font-size: 0.72rem;
+    font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap; font-family: inherit; }
+  .ant-bar-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .ant-bar-btn.primary { background: #3b82f6; color: #fff; border-color: rgba(59,130,246,0.4); }
+  .ant-bar-btn.primary:hover { background: #2563eb; }
+  .ant-bar-btn.danger { background: rgba(239,68,68,0.18); color: #f87171; border-color: rgba(239,68,68,0.25); }
+  .ant-bar-btn.active { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.35); color: #a5b4fc; }
+  .ant-bar-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.1); margin: 0 0.1rem; flex-shrink: 0; }
+  .ant-speed-ctrl { display: flex; align-items: center; gap: 0.3rem; }
+  .ant-slider { width: 56px; height: 4px; cursor: pointer; accent-color: #3b82f6; }
+  .ant-speed-label { color: rgba(255,255,255,0.45); font-size: 0.68rem; font-family: monospace; min-width: 1.6rem; text-align: right; }
+
+  .ant-panel { position: absolute; bottom: 3.5rem; left: 0.75rem; z-index: 60;
+    width: clamp(220px, 32vw, 380px); background: rgba(6,10,22,0.93);
+    backdrop-filter: blur(20px); border: 1px solid rgba(59,130,246,0.18);
+    border-radius: 12px; overflow: hidden; }
+  .ant-panel-header { display: flex; align-items: center; gap: 0.45rem;
+    padding: 0.65rem 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-weight: 700; font-size: 0.82rem; color: #e2e8f0; }
+  .ant-panel-close { margin-left: auto; background: transparent; border: none;
+    color: rgba(255,255,255,0.35); cursor: pointer; padding: 0.2rem; border-radius: 4px;
+    display: flex; align-items: center; transition: all 0.15s; }
+  .ant-panel-close:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .ant-panel-body { padding: 0.6rem 0.85rem; max-height: 48vh; overflow-y: auto; overflow-x: hidden; }
+  .ant-panel-body::-webkit-scrollbar { width: 3px; }
+  .ant-panel-body::-webkit-scrollbar-thumb { background: rgba(59,130,246,0.4); border-radius: 2px; }
+
+  .ant-city-ctrl { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; }
+  .ant-city-ctrl span { font-size: 0.72rem; color: rgba(255,255,255,0.5); font-family: monospace; }
+  .ant-city-slider { width: 80px; height: 4px; cursor: pointer; accent-color: #3b82f6; }
 `;
 
-const ThemeButton = styled.button<{ $active: boolean }>`
-  padding: 0.5rem 1rem;
-  background: ${({ $active }) => $active ? COLORS.accent : 'transparent'};
-  border: 2px solid ${({ $active }) => $active ? COLORS.accent : COLORS.borderAccent};
-  border-radius: 8px;
-  color: ${({ $active }) => $active ? '#000' : COLORS.textPrimary};
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-transform: capitalize;
-  transition: all 0.3s ease;
-  flex: 1;
-  
-  &:hover {
-    background: ${({ $active }) => $active ? COLORS.accent : 'rgba(59, 130, 246, 0.06)'};
-    transform: scale(1.05);
-  }
-`;
-
-const MainContent = styled.div`
-  flex: 1;
-  display: flex;
-  padding: 1.5rem;
-  gap: 1.5rem;
-  overflow: hidden;
-  animation: ${fadeIn} 0.8s ease-out;
-  position: relative;
-  z-index: 1;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    padding: 1rem;
-    overflow-y: auto;
-  }
-`;
-
-const CanvasArea = styled.div<{ $mobileViewing?: boolean }>`
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid ${COLORS.borderAccent};
-  box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-  position: relative;
-  overflow: hidden;
-  
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, 
-      transparent,
-      rgba(59, 130, 246, 0.35),
-      transparent
-    );
-    background-size: 200% 100%;
-    animation: ${shimmer} 3s linear infinite;
-  }
-  
-  @media (max-width: 768px) {
-    display: none;
-    min-height: 400px;
-  }
-  
-  ${({ $mobileViewing }) => $mobileViewing && css`
-    @media (max-width: 768px) {
-      display: flex !important;
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      bottom: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      margin: 0 !important;
-      border-radius: 0 !important;
-      padding: 0 !important;
-      z-index: 10000 !important;
-    }
-  `}
-`;
-
-const Sidebar = styled.div`
-  width: 400px;
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid ${COLORS.borderAccent};
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  overflow-y: auto;
-  
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  &::-webkit-scrollbar-track {
-    background: rgba(0,0,0,0.2);
-  }
-  
-  &::-webkit-scrollbar-thumb {
-    background: rgba(59, 130, 246, 0.22);
-    border-radius: 3px;
-  }
-  
-  @media (max-width: 768px) {
-    width: 100%;
-    padding: 1rem;
-  }
-`;
-
-const MobileViewButton = styled.button`
-  display: none;
-  
-  @media (max-width: 768px) {
-    display: flex;
-    width: 100%;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    padding: 1.25rem;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    color: white;
-    border: none;
-    border-radius: 1rem;
-    font-size: 1.125rem;
-    font-weight: 600;
-    cursor: pointer;
-    margin-bottom: 1rem;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-    
-    &:active {
-      transform: scale(0.98);
-    }
-  }
-`;
-
-const ControlsSection = styled.div`
-  display: flex;
-  gap: 0.75rem;
-`;
-
-const PlayButton = styled.button<{ $playing?: boolean }>`
-  flex: 1;
-  padding: 0.875rem;
-  background: ${({ $playing }) => $playing
-    ? `linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.06))`
-    : `linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.06))`};
-  border: 1px solid ${({ $playing }) => $playing ? COLORS.danger : COLORS.accent};
-  border-radius: 12px;
-  color: ${({ $playing }) => $playing ? COLORS.danger : COLORS.accentSoft};
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 20px ${({ $playing }) => $playing
-    ? 'rgba(239, 68, 68, 0.18)'
-    : 'rgba(59, 130, 246, 0.18)'};
-  }
-`;
-
-const ControlButton = styled.button<{ $active?: boolean }>`
-  padding: 0.875rem;
-  background: ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.12)' : 'rgba(0,0,0,0.28)'};
-  border: 1px solid ${({ $active }) => $active ? COLORS.accent : COLORS.borderAccent};
-  border-radius: 12px;
-  color: ${({ $active }) => $active ? COLORS.accentSoft : COLORS.textMuted};
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    transform: scale(1.05);
-    background: rgba(59, 130, 246, 0.06);
-    color: ${COLORS.accentSoft};
-  }
-`;
-
-const Section = styled.div``;
-
-const SectionTitle = styled.h3`
-  font-size: 1rem;
-  margin-bottom: 0.75rem;
-  color: ${COLORS.textPrimary};
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const Label = styled.label`
-  fontSize: 0.875rem;
-  color: ${COLORS.textMuted};
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-  font-weight: 500;
-`;
-
-const Slider = styled.input`
-  width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(59, 130, 246, 0.14);
-  outline: none;
-  
-  &::-webkit-slider-thumb {
-    appearance: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: ${COLORS.accentSoft};
-    cursor: pointer;
-  }
-  
-  &::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: ${COLORS.accentSoft};
-    cursor: pointer;
-    border: none;
-  }
-`;
-
-const ButtonGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.625rem;
-  margin-top: 0.75rem;
-`;
-
-const ModeButton = styled.button<{ $active: boolean }>`
-  padding: 0.75rem;
-  background: ${({ $active }) => $active ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255,255,255,0.05)'};
-  border: 2px solid ${({ $active }) => $active ? COLORS.accent : 'transparent'};
-  border-radius: 10px;
-  color: ${COLORS.textPrimary};
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.375rem;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    background: rgba(59, 130, 246, 0.08);
-    transform: scale(1.05);
-  }
-`;
-
+// Styled components for algorithm panel (reused in popup)
 const AlgoCheckbox = styled.label<{ $active: boolean; $color: string }>`
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  padding: 0.875rem;
-  margin-bottom: 0.625rem;
-  background: ${({ $active, $color }) => $active ? `${$color}15` : 'rgba(255,255,255,0.05)'};
-  border: 2px solid ${({ $active, $color }) => $active ? $color : 'transparent'};
-  border-radius: 10px;
+  gap: 1rem;
+  padding: 1rem;
+  background: ${({ $active, $color }) =>
+    $active ? `${$color}15` : 'rgba(0,0,0,0.3)'};
+  border: 1px solid ${({ $active, $color }) =>
+    $active ? $color : COLORS.borderAccent};
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
-  
+  margin-bottom: 0.75rem;
+
   &:hover {
-    background: ${({ $color }) => `${$color}10`};
-    transform: translateY(-2px);
+    background: ${({ $color }) => `${$color}20`};
+    transform: translateX(4px);
   }
-  
-  input {
-    display: none;
+
+  input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: ${({ $color }) => $color};
   }
 `;
 
 const AlgoEmoji = styled.span`
-  font-size: 1.5rem;
-  min-width: 30px;
-  text-align: center;
+  font-size: 1.75rem;
+  line-height: 1;
 `;
 
 const AlgoDetails = styled.div`
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 `;
 
 const AlgoName = styled.div<{ $color: string; $active: boolean }>`
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 600;
-  color: ${({ $active, $color }) => $active ? $color : COLORS.textPrimary};
+  color: ${({ $color, $active }) => $active ? $color : COLORS.textMuted};
 `;
 
 const AlgoDescription = styled.div`
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: ${COLORS.textMuted};
-  margin-top: 0.125rem;
-`;
-
-const Leaderboard = styled.div<{ $expanded: boolean }>`
-  background: linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,10,30,0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: ${({ $expanded }) => $expanded ? '1.25rem' : '1rem'};
-  border: 1px solid ${COLORS.borderAccent};
-`;
-
-const LeaderboardHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-`;
-
-const LeaderboardTitle = styled.h3`
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: ${COLORS.textPrimary};
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-`;
-
-const ExpandButton = styled.button`
-  background: transparent;
-  border: none;
-  color: ${COLORS.textPrimary};
-  cursor: pointer;
-  padding: 0.25rem;
-  display: flex;
-  align-items: center;
-  
-  &:hover {
-    color: ${COLORS.accentSoft};
-  }
-`;
-
-const LeaderboardItem = styled.div<{ $rank: number; $isWinner: boolean; $color: string }>`
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  background: ${({ $rank, $isWinner, $color }) => 
-    $rank === 0 && $isWinner ? `${$color}15` : 'rgba(255,255,255,0.03)'};
-  border-radius: 8px;
-  border: 1px solid ${({ $rank, $isWinner, $color }) =>
-    $rank === 0 && $isWinner ? $color : 'transparent'};
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    background: rgba(59, 130, 246, 0.06);
-    transform: translateX(4px);
-  }
-`;
-
-const Rank = styled.div`
-  font-size: 1.25rem;
-  min-width: 30px;
-  text-align: center;
-`;
-
-const AlgoInfo = styled.div`
-  flex: 1;
-`;
-
-const AlgoHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-`;
-
-const AlgoStatus = styled.div<{ $color: string }>`
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: ${({ $color }) => $color};
-  animation: ${pulse} 1s infinite;
-`;
-
-const AlgoNameInBoard = styled.span<{ $color: string }>`
-  font-weight: 600;
-  font-size: 1rem;
-  color: ${({ $color }) => $color};
-`;
-
-const Stats = styled.div`
-  font-size: 0.875rem;
-  color: ${COLORS.textMuted};
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-`;
-
-const StatValue = styled.strong`
-  color: ${COLORS.textPrimary};
-`;
-
-const WinnerOverlay = styled.div`
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(0,10,30,0.95) 100%);
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  padding: 2rem;
-  border: 2px solid;
-  text-align: center;
-  box-shadow: 0 0 60px;
-  max-width: 90%;
-  animation: ${gentlePulse} 2s ease-in-out infinite;
-`;
-
-const WinnerTitle = styled.h2`
-  font-size: 2.25rem;
-  margin: 0 0 1rem 0;
-`;
-
-const WinnerAlgo = styled.p`
-  font-size: 1.25rem;
-  margin: 0 0 0.5rem 0;
-`;
-
-const WinnerDistance = styled.p`
-  font-size: 1rem;
-  color: ${COLORS.textMuted};
-  margin: 0;
-`;
-
-const MobileControls = styled.div`
-  position: absolute;
-  top: calc(1rem + env(safe-area-inset-top));
-  right: 1rem;
-  z-index: 10001;
-  display: flex;
-  gap: 0.5rem;
-  background: rgba(0,0,0,0.95);
-  backdrop-filter: blur(10px);
-  padding: 0.6rem;
-  border-radius: 999px;
-  border: 1px solid ${COLORS.borderAccent};
-`;
-
-const MobileControlButton = styled.button<{ $variant?: 'primary' | 'danger' | 'default' }>`
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: none;
-  background: ${({ $variant }) => {
-    switch ($variant) {
-      case 'primary': return '#6366f1';
-      case 'danger': return '#ef4444';
-      default: return 'rgba(51,65,85,0.8)';
-    }
-  }};
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-  
-  &:active {
-    transform: scale(0.95);
-  }
+  opacity: 0.8;
 `;
 
 // Constants
@@ -1138,9 +690,8 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
   const [cityMode, setCityMode] = useState<CityMode>('random');
   const [showTrails, setShowTrails] = useState(true);
   const [winner, setWinner] = useState<string | null>(null);
-  const [showStats, setShowStats] = useState(true);
-  const [expandedStats, setExpandedStats] = useState(false);
-  const [mobileViewing, setMobileViewing] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [activePanel, setActivePanel] = useState<'algorithms' | 'city' | 'none'>('none');
   
   const frameRef = useRef<number>(0);
   const tempRef = useRef(100);
@@ -1148,7 +699,6 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
   const pheromonesRef = useRef<number[][]>([]);
   const timeRef = useRef(0);
   const trailsRef = useRef(new Map<string, TrailPoint[]>());
-  const previouslyRunningRef = useRef<boolean>(false);
 
   useEffect(() => {
     setIsPlaying(isRunning);
@@ -1157,103 +707,6 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
   useEffect(() => {
     setLocalSpeed(speed);
   }, [speed]);
-
-  useEffect(() => {
-    if (!mobileViewing) return;
-
-    const enterMobileView = async () => {
-      previouslyRunningRef.current = isPlaying;
-      
-      if (!isPlaying) {
-        setAlgorithms(prev => prev.map(a => ({ ...a, status: 'running' })));
-        setIsPlaying(true);
-      }
-
-      try {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        
-        const container = canvas.parentElement;
-        if (!container) return;
-
-        const doc = window.document as any;
-        if (container && !doc.fullscreenElement) {
-          if ((container as any).requestFullscreen) await (container as any).requestFullscreen();
-          else if ((container as any).webkitRequestFullscreen) await (container as any).webkitRequestFullscreen();
-          else if ((container as any).mozRequestFullScreen) await (container as any).mozRequestFullScreen();
-        }
-      } catch (err) {
-        console.warn('Fullscreen failed', err);
-      }
-
-      setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-      }, 100);
-    };
-
-    enterMobileView();
-  }, [mobileViewing, isPlaying]);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const doc = document as any;
-      const isFS = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement);
-      if (!isFS && mobileViewing) {
-        setMobileViewing(false);
-        if (!previouslyRunningRef.current) setIsPlaying(false);
-      }
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-    };
-  }, [mobileViewing]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const updateCanvasSize = () => {
-      const container = canvas.parentElement;
-      if (!container) return;
-
-      const dpr = window.devicePixelRatio || 1;
-      
-      if (mobileViewing) {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
-      } else {
-        canvas.width = CANVAS_BASE_WIDTH * dpr;
-        canvas.height = CANVAS_BASE_HEIGHT * dpr;
-        canvas.style.width = `${CANVAS_BASE_WIDTH}px`;
-        canvas.style.height = `${CANVAS_BASE_HEIGHT}px`;
-      }
-      
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.scale(dpr, dpr);
-      }
-    };
-
-    updateCanvasSize();
-    window.addEventListener('resize', updateCanvasSize);
-    window.addEventListener('orientationchange', updateCanvasSize);
-
-    return () => {
-      window.removeEventListener('resize', updateCanvasSize);
-      window.removeEventListener('orientationchange', updateCanvasSize);
-    };
-  }, [mobileViewing]);
 
   const initializeSimulation = useCallback(() => {
     const canvas = canvasRef.current;
@@ -1607,257 +1060,240 @@ export default function TSPAlgorithmRace({ isRunning = false, speed = 1 }: TSPAl
     initializeSimulation();
   };
 
-  const exitMobileView = async () => {
-    setMobileViewing(false);
-    
-    try {
-      const doc = window.document as any;
-      if (doc && doc.fullscreenElement) {
-        if (doc.exitFullscreen) await doc.exitFullscreen();
-        else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
-        else if (doc.mozCancelFullScreen) await doc.mozCancelFullScreen();
-      }
-    } catch (err) {
-      console.warn('Exit fullscreen failed', err);
-    }
-  };
-
-  const cityModeIcons: Record<CityMode, React.ReactElement> = {
-    random: <Sparkles size={18} />,
-    circle: <Circle size={18} />,
-    grid: <Grid3x3 size={18} />,
-    clusters: <MapIcon size={18} />,
-    spiral: <TrendingUp size={18} />
-  };
-
   const winnerAlgo = algorithms.find(a => a.id === winner);
 
+  const cityModeIcons: Record<CityMode, { icon: React.ReactElement; label: string }> = {
+    random: { icon: <Sparkles size={13} />, label: 'Random' },
+    circle: { icon: <Circle size={13} />, label: 'Circle' },
+    grid: { icon: <Grid3x3 size={13} />, label: 'Grid' },
+    clusters: { icon: <MapIcon size={13} />, label: 'Clusters' },
+    spiral: { icon: <TrendingUp size={13} />, label: 'Spiral' },
+  };
+
+  const sorted = [...algorithms].sort((a, b) => a.bestDistance - b.bestDistance);
+
   return (
-    <MainContainer>
-      <Header>
-        <Title>
-          <Cpu size={32} />
-          TSP Algorithm Battle Arena
-        </Title>
-        
-        <Badge>
-          {cities.length} Cities • {algorithms.length} Algorithms
-        </Badge>
-        
-        <ThemeButtons>
-          <ThemeButton $active={true}>
-            Matrix
-          </ThemeButton>
-        </ThemeButtons>
-      </Header>
+    <>
+      <AntOverlayStyles />
 
-      <MainContent>
-        <MobileViewButton onClick={() => setMobileViewing(true)}>
-          <Maximize2 size={24} />
-          View Simulation
-        </MobileViewButton>
+      <div className="ant-root">
+        <canvas
+          ref={canvasRef}
+          className="ant-canvas"
+          width={CANVAS_BASE_WIDTH}
+          height={CANVAS_BASE_HEIGHT}
+        />
 
-        <CanvasArea $mobileViewing={mobileViewing}>
-          <canvas
-            ref={canvasRef}
-            style={{ 
-              maxWidth: '100%',
-              maxHeight: '100%',
-              borderRadius: '12px'
-            }}
-          />
+        {/* Top-left: city mode chips */}
+        <div className="ant-chips">
+          {Object.entries(cityModeIcons).map(([mode, { icon, label }]) => (
+            <button
+              key={mode}
+              className={`ant-chip${cityMode === mode ? ' active' : ''}`}
+              style={cityMode === mode ? { '--chip-color': COLORS.accent } as React.CSSProperties : {}}
+              onClick={() => {
+                setCityMode(mode as CityMode);
+                setTimeout(initializeSimulation, 0);
+              }}
+            >
+              {icon}{label}
+            </button>
+          ))}
+        </div>
 
-          {winner && winnerAlgo && !mobileViewing && (
-            <WinnerOverlay style={{
-              borderColor: winnerAlgo.color,
-              boxShadow: `0 0 60px ${winnerAlgo.glow}`
-            }}>
-              <WinnerTitle style={{ color: winnerAlgo.color }}>
-                🎉 Victory! 🎉
-              </WinnerTitle>
-              <WinnerAlgo>
-                {winnerAlgo.emoji} {winnerAlgo.name} Algorithm Wins!
-              </WinnerAlgo>
-              <WinnerDistance>
-                Final Distance: {winnerAlgo.bestDistance.toFixed(1)}
-              </WinnerDistance>
-            </WinnerOverlay>
+        {/* Top-right: icon buttons */}
+        <div className="ant-top-right">
+          <button
+            className={`ant-icon-btn${showTrails ? ' active' : ''}`}
+            onClick={() => setShowTrails(!showTrails)}
+            title="Toggle trails"
+          >
+            {showTrails ? <Eye size={15} /> : <EyeOff size={15} />}
+          </button>
+          <button
+            className={`ant-icon-btn${showStats ? ' active' : ''}`}
+            onClick={() => setShowStats(!showStats)}
+            title="Live leaderboard"
+          >
+            <Trophy size={15} />
+          </button>
+        </div>
+
+        {/* HUD: winner announcement */}
+        {winner && winnerAlgo && (
+          <div className="ant-hud" style={{ top: '50%', left: '50%', right: 'auto',
+            transform: 'translate(-50%, -50%)', textAlign: 'center',
+            border: `1px solid ${winnerAlgo.color}`,
+            boxShadow: `0 0 40px ${winnerAlgo.glow}` }}>
+            <div className="ant-hud-title" style={{ justifyContent: 'center', color: winnerAlgo.color, fontSize: '1.1rem' }}>
+              🏆 {winnerAlgo.emoji} {winnerAlgo.name} Wins!
+            </div>
+            <div className="ant-hud-divider" />
+            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem' }}>
+              Distance: <span style={{ color: winnerAlgo.color, fontWeight: 700 }}>{winnerAlgo.bestDistance.toFixed(1)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Stats HUD: live leaderboard */}
+        {showStats && !winner && sorted.length > 0 && (
+          <div className="ant-hud">
+            <div className="ant-hud-title">
+              <Trophy size={13} style={{ color: COLORS.accent }} />
+              Leaderboard
+            </div>
+            <div className="ant-hud-divider" />
+            {sorted.map((algo, idx) => {
+              const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`;
+              return (
+                <div className="ant-hud-row" key={algo.id}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <span style={{ fontSize: '0.6rem', minWidth: 14 }}>{medal}</span>
+                    <span style={{
+                      width: 7, height: 7, borderRadius: '50%', background: algo.color,
+                      boxShadow: algo.status === 'running' ? `0 0 6px ${algo.color}` : 'none',
+                      flexShrink: 0, display: 'inline-block',
+                    }} />
+                    <span style={{ color: algo.color, fontWeight: 600, fontSize: '0.7rem' }}>
+                      {algo.name.length > 10 ? algo.name.slice(0, 9) + '…' : algo.name}
+                    </span>
+                  </span>
+                  <span style={{ fontFamily: 'monospace', fontSize: '0.68rem', color: 'rgba(255,255,255,0.7)' }}>
+                    {algo.bestDistance.toFixed(0)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Bottom pill bar */}
+        <div className="ant-bar">
+          <button
+            className={`ant-bar-btn${isPlaying ? ' danger' : ' primary'}`}
+            onClick={handlePlay}
+          >
+            {isPlaying ? <Pause size={13} /> : <Play size={13} />}
+            {isPlaying ? 'Pause' : 'Race'}
+          </button>
+
+          <button className="ant-bar-btn" onClick={handleReset}>
+            <Shuffle size={13} />Reset
+          </button>
+
+          <div className="ant-bar-divider" />
+
+          <div className="ant-speed-ctrl">
+            <span className="ant-speed-label">{localSpeed}×</span>
+            <input type="range" className="ant-slider" min={0.5} max={5} step={0.5}
+              value={localSpeed} onChange={e => setLocalSpeed(Number(e.target.value))} />
+          </div>
+
+          <div className="ant-bar-divider" />
+
+          <button
+            className={`ant-bar-btn${activePanel === 'algorithms' ? ' active' : ''}`}
+            onClick={() => setActivePanel(activePanel === 'algorithms' ? 'none' : 'algorithms')}
+          >
+            <Brain size={13} />Algos
+          </button>
+
+          <button
+            className={`ant-bar-btn${activePanel === 'city' ? ' active' : ''}`}
+            onClick={() => setActivePanel(activePanel === 'city' ? 'none' : 'city')}
+          >
+            <MapIcon size={13} />Cities
+          </button>
+
+          <div className="ant-bar-divider" />
+
+          {/* Inline position tracker */}
+          {algorithms.length > 0 && (
+            <>
+              {sorted.map((algo, idx) => {
+                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+                return (
+                  <div key={algo.id} title={`${algo.name}: ${algo.bestDistance.toFixed(0)} (${algo.improvements} improvements)`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.2rem',
+                      padding: '0.15rem 0.4rem', borderRadius: 999,
+                      background: algo.status === 'winner' ? `${algo.color}25` : 'transparent',
+                      transition: 'all 0.3s',
+                    }}>
+                    {medal && <span style={{ fontSize: '0.55rem' }}>{medal}</span>}
+                    <span style={{
+                      width: 7, height: 7, borderRadius: '50%', background: algo.color,
+                      boxShadow: algo.status === 'running' ? `0 0 6px ${algo.color}` : 'none',
+                      flexShrink: 0,
+                    }} />
+                    <span style={{
+                      fontSize: '0.62rem', fontWeight: 600, color: algo.color,
+                      fontFamily: 'inherit', whiteSpace: 'nowrap',
+                    }}>
+                      {algo.name.length > 6 ? algo.name.slice(0, 5) : algo.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </>
           )}
+        </div>
 
-          {mobileViewing && (
-            <MobileControls>
-              <MobileControlButton $variant="primary" onClick={handlePlay}>
-                {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-              </MobileControlButton>
-              <MobileControlButton onClick={handleReset}>
-                <Shuffle size={20} />
-              </MobileControlButton>
-              <MobileControlButton $variant="danger" onClick={exitMobileView}>
-                <X size={20} />
-              </MobileControlButton>
-            </MobileControls>
-          )}
-        </CanvasArea>
-
-        <Sidebar>
-          <ControlsSection>
-            <PlayButton $playing={isPlaying} onClick={handlePlay}>
-              {isPlaying ? <><Pause size={22} />Pause</> : <><Play size={22} />Start Race</>}
-            </PlayButton>
-            
-            <ControlButton onClick={handleReset}>
-              <Shuffle size={22} />
-            </ControlButton>
-            
-            <ControlButton $active={showTrails} onClick={() => setShowTrails(!showTrails)}>
-              {showTrails ? <Eye size={22} /> : <EyeOff size={22} />}
-            </ControlButton>
-            
-            <ControlButton $active={showStats} onClick={() => setShowStats(!showStats)}>
-              <BarChart3 size={22} />
-            </ControlButton>
-          </ControlsSection>
-
-          {showStats && (
-            <Leaderboard $expanded={expandedStats}>
-              <LeaderboardHeader>
-                <LeaderboardTitle>
-                  <Trophy size={20} />
-                  Live Leaderboard
-                </LeaderboardTitle>
-                <ExpandButton onClick={() => setExpandedStats(!expandedStats)}>
-                  {expandedStats ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </ExpandButton>
-              </LeaderboardHeader>
-              
-              {[...algorithms]
-                .sort((a, b) => a.bestDistance - b.bestDistance)
-                .map((algo, idx) => (
-                  <LeaderboardItem
-                    key={algo.id}
-                    $rank={idx}
-                    $isWinner={algo.status === 'winner'}
-                    $color={algo.color}
-                  >
-                    <Rank>
-                      {idx === 0 && algo.status === 'winner' ? '🏆' : 
-                       idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
-                    </Rank>
-                    
-                    <AlgoInfo>
-                      <AlgoHeader>
-                        <span style={{ fontSize: '1.5rem' }}>{algo.emoji}</span>
-                        <AlgoNameInBoard $color={algo.color}>
-                          {algo.name}
-                        </AlgoNameInBoard>
-                        {algo.status === 'running' && (
-                          <AlgoStatus $color={algo.color} />
-                        )}
-                      </AlgoHeader>
-                      
-                      <Stats>
-                        <span>Distance: <StatValue>
-                          {algo.bestDistance.toFixed(0)}
-                        </StatValue></span>
-                        <span>Improvements: <StatValue>
-                          {algo.improvements}
-                        </StatValue></span>
-                      </Stats>
-                    </AlgoInfo>
-                  </LeaderboardItem>
-                ))}
-            </Leaderboard>
-          )}
-
-          <Section>
-            <Label>
-              <Zap size={16} />
-              Simulation Speed: {localSpeed}x
-            </Label>
-            <Slider
-              type="range"
-              min="0.5"
-              max="5"
-              step="0.5"
-              value={localSpeed}
-              onChange={(e) => setLocalSpeed(Number(e.target.value))}
-            />
-          </Section>
-
-          <Section>
-            <SectionTitle>
-              <MapIcon size={18} />
-              City Configuration
-            </SectionTitle>
-            
-            <Label>
-              Number of Cities: {cityCount}
-            </Label>
-            <Slider
-              type="range"
-              min="5"
-              max="25"
-              value={cityCount}
-              onChange={(e) => setCityCount(Number(e.target.value))}
-            />
-            
-            <ButtonGrid>
-              {Object.entries(cityModeIcons).map(([mode, icon]) => (
-                <ModeButton
-                  key={mode}
-                  $active={cityMode === mode}
-                  onClick={() => {
-                    setCityMode(mode as CityMode);
-                    setTimeout(initializeSimulation, 0);
-                  }}
+        {/* Algorithms popup panel */}
+        {activePanel === 'algorithms' && (
+          <div className="ant-panel">
+            <div className="ant-panel-header">
+              <Brain size={15} />Algorithms
+              <button className="ant-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
+            </div>
+            <div className="ant-panel-body">
+              {Object.entries(algorithmConfigs).map(([id, config]) => (
+                <AlgoCheckbox
+                  key={id}
+                  $active={selectedAlgos.includes(id as AlgorithmType)}
+                  $color={config.color}
                 >
-                  {icon}
-                  <span style={{ textTransform: 'capitalize' }}>{mode}</span>
-                </ModeButton>
+                  <input
+                    type="checkbox"
+                    checked={selectedAlgos.includes(id as AlgorithmType)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedAlgos([...selectedAlgos, id as AlgorithmType]);
+                      } else {
+                        setSelectedAlgos(selectedAlgos.filter(a => a !== id));
+                      }
+                    }}
+                  />
+                  <AlgoEmoji>{config.emoji}</AlgoEmoji>
+                  <AlgoDetails>
+                    <AlgoName $color={config.color} $active={selectedAlgos.includes(id as AlgorithmType)}>
+                      {config.name}
+                    </AlgoName>
+                    <AlgoDescription>{config.funFact}</AlgoDescription>
+                  </AlgoDetails>
+                </AlgoCheckbox>
               ))}
-            </ButtonGrid>
-          </Section>
+            </div>
+          </div>
+        )}
 
-          <Section>
-            <SectionTitle>
-              <Brain size={18} />
-              Select Algorithms
-            </SectionTitle>
-            
-            {Object.entries(algorithmConfigs).map(([id, config]) => (
-              <AlgoCheckbox
-                key={id}
-                $active={selectedAlgos.includes(id as AlgorithmType)}
-                $color={config.color}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedAlgos.includes(id as AlgorithmType)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedAlgos([...selectedAlgos, id as AlgorithmType]);
-                    } else {
-                      setSelectedAlgos(selectedAlgos.filter(a => a !== id));
-                    }
-                  }}
-                />
-                <AlgoEmoji>{config.emoji}</AlgoEmoji>
-                <AlgoDetails>
-                  <AlgoName
-                    $color={config.color}
-                    $active={selectedAlgos.includes(id as AlgorithmType)}
-                  >
-                    {config.name}
-                  </AlgoName>
-                  <AlgoDescription>
-                    {config.funFact}
-                  </AlgoDescription>
-                </AlgoDetails>
-              </AlgoCheckbox>
-            ))}
-          </Section>
-        </Sidebar>
-      </MainContent>
-    </MainContainer>
+        {/* City config popup panel */}
+        {activePanel === 'city' && (
+          <div className="ant-panel">
+            <div className="ant-panel-header">
+              <MapIcon size={15} />City Configuration
+              <button className="ant-panel-close" onClick={() => setActivePanel('none')}><X size={13} /></button>
+            </div>
+            <div className="ant-panel-body">
+              <div className="ant-city-ctrl">
+                <span>Cities: {cityCount}</span>
+                <input type="range" className="ant-city-slider" min={5} max={25}
+                  value={cityCount} onChange={e => setCityCount(Number(e.target.value))} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
