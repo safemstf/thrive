@@ -2,8 +2,9 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { createGlobalStyle } from 'styled-components';
 import {
-  SimState, Agent, NEATGenome, Particle, Obstacle, Species,
-  createSimState, stepSim, nextGeneration,
+  SimState, Agent, NEATGenome, Particle, Obstacle, Species, Population,
+  ArchType, ARCH_TYPES, ARCH_CONFIGS, POP_SIZE,
+  createSimState, stepSim, nextGeneration, getAllAgents, trainHeadless,
   PI, L, HEAD_RADIUS, MOTORS, AGENT_COLORS,
   N_INPUT, N_OUTPUT, STANDING_PELVIS_H, STANDING_COM_H, STANDING_HEAD_H,
   getObstaclesNear,
@@ -25,8 +26,13 @@ type DrawFn = (
 const noop: DrawFn = () => {};
 // Generate character labels dynamically for any population size
 const CHARACTERS: Array<{ name: string; drawExtras: DrawFn }> = Array.from(
-  { length: 15 },
-  (_, i) => ({ name: String(i + 1), drawExtras: noop }),
+  { length: ARCH_TYPES.length * POP_SIZE },
+  (_, i) => {
+    const archIdx = Math.floor(i / POP_SIZE);
+    const inPop = (i % POP_SIZE) + 1;
+    const label = ARCH_CONFIGS[ARCH_TYPES[archIdx]]?.label ?? '?';
+    return { name: `${label}${inPop}`, drawExtras: noop };
+  },
 );
 
 // ── Alto's Adventure Color Palette ─────────────────────────────
@@ -606,14 +612,26 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
 
   const [isPlaying,  setIsPlaying]  = useState(isRunning);
   const [localSpeed, setLocalSpeed] = useState(speed);
+  const [isTraining, setIsTraining] = useState(false);
+  const [trainProgress, setTrainProgress] = useState(0);
+
   const [display, setDisplay] = useState({
-    generation: 1, time: 0, bestFitness: 0,
-    allTimeBest: 0, alive: 15,
-    champDist: 0, history: [] as number[],
+    globalGen: 1, time: 0, gravityPct: 90,
+    alive: 16, totalAgents: 16,
+    // Per-population stats
+    pops: ARCH_TYPES.map(a => ({
+      archType: a as ArchType,
+      label: ARCH_CONFIGS[a].label,
+      color: ARCH_CONFIGS[a].color,
+      gen: 1, bestFitness: 0, allTimeBest: 0,
+      speciesCount: 0, stagnation: 0,
+    })),
+    // Global champion info
+    champDist: 0, champArch: 'minimal' as ArchType,
+    history: [] as number[],
     hiddenNodes: 0, activeConns: N_INPUT * N_OUTPUT,
     uprightPct: 0, champSteps: 0, champStandingTime: 0, comPct: 0, headPct: 0,
-    stagnation: 0, gravityPct: 90,
-    speciesCount: 0,
+    globalBest: 0,
   });
 
   isPlayingRef.current = isPlaying;
@@ -655,11 +673,12 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
       }
 
       // Camera: smoothly follow the leader (camX = world X of left screen edge)
-      const leader = [...state.agents].sort((a, b) =>
+      const allAgents = getAllAgents(state);
+      const leader = [...allAgents].sort((a, b) =>
         b.ragdoll.fitness - a.ragdoll.fitness
       )[0];
       const leaderX   = leader.ragdoll.particles[PI.PELVIS].x;
-      const startX    = state.agents[0].ragdoll.startX; // for distance labels
+      const startX    = allAgents[0].ragdoll.startX; // for distance labels
       const targetCam = leaderX - CW * 0.3;             // keep leader at 30% from left
       cameraXRef.current += (targetCam - cameraXRef.current) * 0.07;
       const camX = Math.max(startX - CW * 0.15, cameraXRef.current); // don't pan left of spawn
@@ -699,46 +718,67 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
       }
 
       // All foot trails
-      for (const agent of state.agents) drawFootTrail(ctx, agent, camX);
+      for (const agent of allAgents) drawFootTrail(ctx, agent, camX);
 
       // Draw agents: non-champions first (highest rank = drawn last = on top)
-      const sorted = [...state.agents].sort((a, b) => b.rank - a.rank);
+      const sorted = [...allAgents].sort((a, b) => b.rank - a.rank);
       for (const agent of sorted) drawRagdoll(ctx, agent, camX);
 
-      // Update NN canvas (champion)
-      const champ = state.agents.find(a => a.rank === 0);
-      if (nnCanvasRef.current && champ) {
-        drawNN(nnCanvasRef.current, champ);
+      // Find global champion (best fitness across all populations)
+      const globalChamp = [...allAgents].sort((a, b) =>
+        b.ragdoll.fitness - a.ragdoll.fitness
+      )[0];
+      if (nnCanvasRef.current && globalChamp) {
+        drawNN(nnCanvasRef.current, globalChamp);
       }
 
-      // Keep allTimeBest current during the generation (not just at end)
-      const liveBest = Math.max(...state.agents.map(a => a.ragdoll.fitness));
-      if (liveBest > state.allTimeBest) state.allTimeBest = liveBest;
+      // Keep allTimeBest current per-population
+      for (const pop of state.populations) {
+        const popBest = Math.max(...pop.agents.map(a => a.ragdoll.fitness));
+        if (popBest > pop.allTimeBest) pop.allTimeBest = popBest;
+      }
+
+      // Build per-population display data
+      const popDisplays = state.populations.map(pop => ({
+        archType: pop.archType,
+        label: ARCH_CONFIGS[pop.archType].label,
+        color: ARCH_CONFIGS[pop.archType].color,
+        gen: pop.generation,
+        bestFitness: Math.round(Math.max(...pop.agents.map(a => a.ragdoll.fitness))),
+        allTimeBest: Math.round(pop.allTimeBest),
+        speciesCount: pop.species.length,
+        stagnation: pop.stagnation,
+      }));
+
+      // Best history: combine all populations
+      const bestPop = state.populations.reduce((best, p) =>
+        p.allTimeBest > best.allTimeBest ? p : best
+      );
 
       // Update display state
-      const alive = state.agents.filter(a => a.ragdoll.alive).length;
+      const alive = allAgents.filter(a => a.ragdoll.alive).length;
       setDisplay({
-        generation:   state.generation,
+        globalGen:    state.globalGen,
         time:         Math.max(0, Math.ceil(state.evalDuration - Math.max(0, state.time - 0.5))),
-        bestFitness:  Math.round(state.bestFitness),
-        allTimeBest:  Math.round(state.allTimeBest),
-        alive,
-        champDist:    champ ? Math.round(champ.ragdoll.fitness) : 0,
-        history:      state.history,
-        hiddenNodes:  Math.max(...state.agents.map(a => a.genome.nodes.length)),
-        activeConns:  champ ? champ.genome.conns.filter(c => c.enabled).length : 0,
-        uprightPct:   champ ? Math.round(Math.max(0, Math.min(1,
-          (GROUND_Y - champ.ragdoll.particles[PI.PELVIS].y) / STANDING_PELVIS_H)) * 100) : 0,
-        comPct: champ ? Math.round(Math.min(100, Math.max(0,
-          (GROUND_Y - champ.ragdoll.particles.reduce((s, p) => s + p.y * p.mass, 0) /
-           champ.ragdoll.particles.reduce((s, p) => s + p.mass, 0)) / STANDING_COM_H * 100))) : 0,
-        headPct: champ ? Math.round(Math.min(100, Math.max(0,
-          (GROUND_Y - champ.ragdoll.particles[PI.HEAD].y) / STANDING_HEAD_H * 100))) : 0,
-        champSteps:   champ ? champ.ragdoll.stepCount : 0,
-        champStandingTime: champ ? Math.round(champ.ragdoll.standingTime) : 0,
-        stagnation:   state.stagnation,
         gravityPct:   Math.round(state.gravityMul * 100),
-        speciesCount: state.species.length,
+        alive,
+        totalAgents:  allAgents.length,
+        pops:         popDisplays,
+        champDist:    globalChamp ? Math.round(globalChamp.ragdoll.fitness) : 0,
+        champArch:    globalChamp?.archType ?? 'minimal',
+        history:      bestPop.history,
+        hiddenNodes:  Math.max(...allAgents.map(a => a.genome.nodes.length)),
+        activeConns:  globalChamp ? globalChamp.genome.conns.filter(c => c.enabled).length : 0,
+        uprightPct:   globalChamp ? Math.round(Math.max(0, Math.min(1,
+          (GROUND_Y - globalChamp.ragdoll.particles[PI.PELVIS].y) / STANDING_PELVIS_H)) * 100) : 0,
+        comPct: globalChamp ? Math.round(Math.min(100, Math.max(0,
+          (GROUND_Y - globalChamp.ragdoll.particles.reduce((s, p) => s + p.y * p.mass, 0) /
+           globalChamp.ragdoll.particles.reduce((s, p) => s + p.mass, 0)) / STANDING_COM_H * 100))) : 0,
+        headPct: globalChamp ? Math.round(Math.min(100, Math.max(0,
+          (GROUND_Y - globalChamp.ragdoll.particles[PI.HEAD].y) / STANDING_HEAD_H * 100))) : 0,
+        champSteps:   globalChamp ? globalChamp.ragdoll.stepCount : 0,
+        champStandingTime: globalChamp ? Math.round(globalChamp.ragdoll.standingTime) : 0,
+        globalBest:   Math.round(Math.max(...state.populations.map(p => p.allTimeBest))),
       });
     }
 
@@ -770,12 +810,48 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
 
   const SPEED_OPTIONS = [1, 3, 10, 30, 60];
 
-  // Population dot colours
-  const popDots = Array.from({ length: 15 }, (_, i) => {
-    const agent = stateRef.current?.agents.find(a => a.rank === i);
-    const alive = agent?.ragdoll.alive ?? false;
-    return { color: AGENT_COLORS[i] ?? '#6b7280', alive };
-  });
+  // Population dot colours — grouped by architecture
+  const popDots: Array<{ color: string; alive: boolean; archType: ArchType; gap: boolean }> = [];
+  if (stateRef.current) {
+    for (let pi = 0; pi < stateRef.current.populations.length; pi++) {
+      const pop = stateRef.current.populations[pi];
+      for (let ai = 0; ai < pop.agents.length; ai++) {
+        const agent = pop.agents[ai];
+        popDots.push({
+          color: AGENT_COLORS[agent.globalIdx] ?? ARCH_CONFIGS[pop.archType].color,
+          alive: agent.ragdoll.alive,
+          archType: pop.archType,
+          gap: ai === 0 && pi > 0, // gap before each new group
+        });
+      }
+    }
+  }
+
+  // Headless training handler — uses trainHeadless with 2× DT for speed
+  const handleTrain = (gens: number) => {
+    const state = stateRef.current;
+    if (!state || isTraining) return;
+    setIsTraining(true);
+    setTrainProgress(0);
+
+    // Run in chunks via setTimeout to keep UI responsive
+    let done = 0;
+    const chunkSize = 10; // 10 gens per chunk — each gen is ~600 steps at 1/30 DT
+    function runChunk() {
+      if (!stateRef.current) return;
+      const batch = Math.min(chunkSize, gens - done);
+      trainHeadless(stateRef.current, batch);
+      done += batch;
+      setTrainProgress(Math.round((done / gens) * 100));
+      if (done < gens) {
+        setTimeout(runChunk, 0);
+      } else {
+        setIsTraining(false);
+        cameraXRef.current = 0;
+      }
+    }
+    runChunk();
+  };
 
   return (
     <>
@@ -791,7 +867,12 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
 
         {/* Neural network overlay (champion) — large panel */}
         <div className="neat-nn">
-          <div className="neat-nn-title">Champion Network</div>
+          <div className="neat-nn-title">
+            Champion Network
+            <span style={{ color: ARCH_CONFIGS[display.champArch].color, marginLeft: '0.4rem', fontSize: '0.6rem' }}>
+              {ARCH_CONFIGS[display.champArch].name}
+            </span>
+          </div>
           <canvas ref={nnCanvasRef} width={360} height={300} style={{ borderRadius: '6px', background: 'rgba(7,9,15,0.3)' }} />
           <div style={{ marginTop: '0.3rem', fontSize: '0.58rem', color: '#2e4158', lineHeight: 1.5, display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
             <span><span style={{ color: 'rgba(240,160,80,0.8)' }}>━</span> excite</span>
@@ -806,7 +887,7 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
         <div className="neat-hud">
           <div className="neat-hud-row">
             <span className="label">GEN</span>
-            <span className="champ">{display.generation}</span>
+            <span className="champ">{display.pops.map(p => p.gen).join(' | ')}</span>
           </div>
           <div className="neat-hud-row">
             <span className="label">TIME</span>
@@ -818,16 +899,23 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
               {display.gravityPct}%
             </span>
           </div>
-          {display.stagnation > 5 && (
-            <div className="neat-hud-row">
-              <span className="label">STAG</span>
-              <span style={{ color: display.stagnation > 20 ? '#c05040' : '#f0a050', fontWeight: 600 }}>{display.stagnation}</span>
+          <div className="neat-hud-divider" />
+          {/* Per-population stats */}
+          {display.pops.map(p => (
+            <div key={p.archType} className="neat-hud-row" style={{ gap: '0.4rem' }}>
+              <span style={{ color: p.color, fontWeight: 700, fontSize: '0.65rem', minWidth: '2.2rem' }}>{p.label}</span>
+              <span className="val" style={{ fontSize: '0.65rem' }}>{p.bestFitness}px</span>
+              <span style={{ color: '#7a6050', fontSize: '0.58rem' }}>sp:{p.speciesCount}</span>
+              {p.stagnation > 5 && <span style={{ color: '#c05040', fontSize: '0.55rem' }}>stag:{p.stagnation}</span>}
             </div>
-          )}
+          ))}
           <div className="neat-hud-divider" />
           <div className="neat-hud-row">
             <span className="label">LEAD</span>
             <span className="val">{display.champDist}px</span>
+            <span style={{ color: ARCH_CONFIGS[display.champArch].color, fontSize: '0.6rem', fontWeight: 600 }}>
+              {ARCH_CONFIGS[display.champArch].label}
+            </span>
           </div>
           <div className="neat-hud-row">
             <span className="label">CoG</span>
@@ -847,27 +935,12 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
           </div>
           <div className="neat-hud-row">
             <span className="label">BEST</span>
-            <span className="best">{display.allTimeBest}px</span>
+            <span className="best">{display.globalBest}px</span>
           </div>
-          <div className="neat-hud-divider" />
-          <div className="neat-hud-row">
-            <span className="label">NODES</span>
-            <span className="val">{display.hiddenNodes}</span>
-          </div>
-          <div className="neat-hud-row">
-            <span className="label">CONNS</span>
-            <span className="val">{display.activeConns}</span>
-          </div>
-          {display.speciesCount > 0 && (
-            <div className="neat-hud-row">
-              <span className="label">SPECIES</span>
-              <span className="val" style={{ color: display.speciesCount > 3 ? '#70c080' : '#f0a050' }}>{display.speciesCount}</span>
-            </div>
-          )}
           <div className="neat-hud-divider" />
           <div className="neat-hud-row">
             <span className="label">ALIVE</span>
-            <span className="val">{display.alive}/15</span>
+            <span className="val">{display.alive}/{display.totalAgents}</span>
           </div>
           {display.history.length > 1 && (
             <>
@@ -878,22 +951,45 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
           )}
         </div>
 
-        {/* Fitness history mini-chart — embedded in HUD below stats */}
+        {/* Training overlay */}
+        {isTraining && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(15,10,42,0.85)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            zIndex: 50,
+          }}>
+            <div style={{ color: '#f0a050', fontFamily: '"DM Serif Display",serif', fontSize: '1.2rem', marginBottom: '1rem' }}>
+              Training...
+            </div>
+            <div style={{ width: '60%', maxWidth: '300px', height: '6px', borderRadius: '3px', background: 'rgba(255,190,140,0.15)' }}>
+              <div style={{
+                width: `${trainProgress}%`, height: '100%', borderRadius: '3px',
+                background: 'linear-gradient(90deg, #f0a050, #70c080)',
+                transition: 'width 0.2s',
+              }} />
+            </div>
+            <div style={{ color: '#a08060', fontSize: '0.75rem', marginTop: '0.5rem' }}>{trainProgress}%</div>
+          </div>
+        )}
 
-        {/* Population dots (alive/dead indicator) */}
+        {/* Population dots (alive/dead indicator, grouped by architecture) */}
         <div className="neat-pop">
           {popDots.map((dot, i) => (
-            <div
-              key={i}
-              className="neat-pop-dot"
-              title={`Agent ${i + 1}`}
-              style={{
-                background:  dot.alive ? dot.color : 'rgba(100,116,139,0.3)',
-                boxShadow:   dot.alive && i === 0 ? `0 0 6px ${dot.color}` : 'none',
-                width:  i === 0 ? '6px' : '4px',
-                height: i === 0 ? '6px' : '4px',
-              }}
-            />
+            <React.Fragment key={i}>
+              {dot.gap && <div style={{ width: '6px' }} />}
+              <div
+                className="neat-pop-dot"
+                title={`${ARCH_CONFIGS[dot.archType].name} ${(i % POP_SIZE) + 1}`}
+                style={{
+                  background:  dot.alive ? dot.color : 'rgba(100,116,139,0.3)',
+                  boxShadow:   dot.alive ? `0 0 4px ${dot.color}` : 'none',
+                  width:  '5px',
+                  height: '5px',
+                }}
+              />
+            </React.Fragment>
           ))}
         </div>
 
@@ -927,6 +1023,22 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
           <button className="neat-btn" onClick={handleSkip} title="Skip to next generation">
             ⏭ Skip
           </button>
+
+          <div className="neat-divider" />
+
+          {/* Headless training */}
+          {[50, 100, 500].map(n => (
+            <button
+              key={n}
+              className="neat-btn"
+              onClick={() => handleTrain(n)}
+              disabled={isTraining}
+              title={`Train ${n} generations headless`}
+              style={{ fontSize: '0.65rem' }}
+            >
+              Train {n}
+            </button>
+          ))}
 
           <div className="neat-divider" />
 

@@ -57,6 +57,7 @@ export interface DistConstraint {
   restLen: number;
   stiffness: number;
   minOnly?: boolean;  // if true, only enforce when distance < restLen (like a ligament)
+  maxOnly?: boolean;  // if true, only enforce when distance > restLen (like a patella)
 }
 
 export interface MotorDef {
@@ -73,9 +74,9 @@ export const MOTORS: MotorDef[] = [
   // Hips — enough to swing legs, not enough to launch into orbit
   { parentIdx: PI.CHEST,   pivotIdx: PI.PELVIS,  childIdx: PI.L_KNEE,   strength: 3400, minAngle: -1.0, maxAngle: 1.5  },
   { parentIdx: PI.CHEST,   pivotIdx: PI.PELVIS,  childIdx: PI.R_KNEE,   strength: 3400, minAngle: -1.5, maxAngle: 1.0  },
-  // Knees — moderate, supports stance without launching
-  { parentIdx: PI.PELVIS,  pivotIdx: PI.L_KNEE,  childIdx: PI.L_FOOT,   strength: 2800, minAngle: -0.3, maxAngle: 2.0  },
-  { parentIdx: PI.PELVIS,  pivotIdx: PI.R_KNEE,  childIdx: PI.R_FOOT,   strength: 2800, minAngle: -2.0, maxAngle: 0.3  },
+  // Knees — stronger, patella prevents backward bend. Range restricted.
+  { parentIdx: PI.PELVIS,  pivotIdx: PI.L_KNEE,  childIdx: PI.L_FOOT,   strength: 3200, minAngle: -0.15, maxAngle: 2.2  },
+  { parentIdx: PI.PELVIS,  pivotIdx: PI.R_KNEE,  childIdx: PI.R_FOOT,   strength: 3200, minAngle: -2.2,  maxAngle: 0.15 },
   // Shoulders — wider range to allow natural arm swing
   { parentIdx: PI.PELVIS,  pivotIdx: PI.CHEST,   childIdx: PI.L_ELBOW,  strength: 900,  minAngle: -2.2, maxAngle: 2.2  },
   { parentIdx: PI.PELVIS,  pivotIdx: PI.CHEST,   childIdx: PI.R_ELBOW,  strength: 900,  minAngle: -2.2, maxAngle: 2.2  },
@@ -124,8 +125,6 @@ export interface Ragdoll {
 
 export const N_INPUT  = 23;  // 21 base + 2 obstacle proximity sensors
 export const N_OUTPUT = 10;  // 8 original + 2 ankle motors
-const MAX_HIDDEN = 800;  // room to grow from 600 seed nodes
-const MAX_CONNS  = 8000; // room to grow from ~4000+ seed connections
 
 export interface NodeGene {
   id:    number;
@@ -225,30 +224,71 @@ export function neatForward(genome: NEATGenome, inputs: Float32Array): Float32Ar
   return outputs;
 }
 
-// ── Genome Creation ───────────────────────────────────────────
-// Seed with hidden nodes from the start — walking requires substantial
-// network capacity for CPG patterns, balance feedback, and limb coordination.
-// Starting from zero hidden forces evolution to simultaneously discover
-// topology AND tune weights, which is too hard with small populations.
+// ── Multi-Architecture System ────────────────────────────────
+// 4 architecture types compete simultaneously, each evolving
+// independently with 4 agents. Which topology discovers walking first?
 
-// 6-layer deep architecture: 60 + 120 + 120 + 120 + 120 + 60 = 600 hidden neurons
-// Large pre-built network provides rich sub-circuits for evolution to tune.
-// Walking requires CPG patterns, balance feedback, limb coordination —
-// a big network has more capacity to encode these from the start.
-// L1 (60):  sensory preprocessing — compress 23 inputs
-// L2 (120): deep integration — balance, proprioception
-// L3 (120): central pattern generator layer 1
-// L4 (120): central pattern generator layer 2
-// L5 (120): motor planning
-// L6 (60):  motor coordination — map to 10 outputs
-const SEED_LAYERS = [60, 120, 120, 120, 120, 60];  // 600 total hidden neurons
+export type ArchType = 'minimal' | 'wide' | 'deep' | 'dense';
+export const ARCH_TYPES: ArchType[] = ['minimal', 'wide', 'deep', 'dense'];
+export const POP_SIZE = 4;  // agents per population (fixed, never changes)
 
-export function createInitialGenome(): NEATGenome {
+export interface ArchConfig {
+  name:      string;
+  label:     string;     // short HUD label
+  color:     string;     // group accent color
+  layers:    number[];
+  maxHidden: number;
+  maxConns:  number;
+  inputDensity:  number;
+  seqDensity:    number[];
+  outputDensity: number;
+  lateralDensity: number;
+  skipDensity:    number;
+  directDensity:  number;
+}
+
+export const ARCH_CONFIGS: Record<ArchType, ArchConfig> = {
+  minimal: {
+    name: 'Minimal', label: 'MIN', color: '#f0a050',
+    layers: [8, 16, 8],  // 32 nodes — fast, classic NEAT
+    maxHidden: 100, maxConns: 1000,
+    inputDensity: 0.60, seqDensity: [0.50, 0.60],
+    outputDensity: 0.70, lateralDensity: 0.10,
+    skipDensity: 0.08, directDensity: 0.10,
+  },
+  wide: {
+    name: 'Wide', label: 'WIDE', color: '#50c0c0',
+    layers: [40, 80, 40],  // 160 nodes — broad feature extraction
+    maxHidden: 250, maxConns: 3000,
+    inputDensity: 0.25, seqDensity: [0.18, 0.25],
+    outputDensity: 0.35, lateralDensity: 0.05,
+    skipDensity: 0.04, directDensity: 0.05,
+  },
+  deep: {
+    name: 'Deep', label: 'DEEP', color: '#e06080',
+    layers: [20, 30, 30, 30, 30, 20],  // 160 nodes — hierarchical
+    maxHidden: 250, maxConns: 3000,
+    inputDensity: 0.30, seqDensity: [0.20, 0.15, 0.15, 0.15, 0.22],
+    outputDensity: 0.35, lateralDensity: 0.04,
+    skipDensity: 0.03, directDensity: 0.04,
+  },
+  dense: {
+    name: 'Dense', label: 'DNSE', color: '#80c050',
+    layers: [30, 60, 30],  // 120 nodes — heavily interconnected
+    maxHidden: 200, maxConns: 2500,
+    inputDensity: 0.40, seqDensity: [0.30, 0.35],
+    outputDensity: 0.50, lateralDensity: 0.15,
+    skipDensity: 0.08, directDensity: 0.08,
+  },
+};
+
+export function createGenomeForArch(arch: ArchType): NEATGenome {
+  const cfg = ARCH_CONFIGS[arch];
   const nodes: NodeGene[] = [];
   const conns: ConnGene[] = [];
 
-  // Create all layers — tag each node with its layer index
-  const layers: number[][] = SEED_LAYERS.map((size, li) => {
+  // Create layers
+  const layers: number[][] = cfg.layers.map((size, li) => {
     const ids: number[] = [];
     for (let h = 0; h < size; h++) {
       const id = _nextHiddenId++;
@@ -258,117 +298,55 @@ export function createInitialGenome(): NEATGenome {
     return ids;
   });
 
-  // Input → Layer 0 (23×60 = 1380 possible, ~30% ≈ 414 conns)
+  // Input → Layer 0
   for (let i = 0; i < N_INPUT; i++) {
     for (const hid of layers[0]) {
-      if (Math.random() < 0.30) {
-        conns.push({
-          innov: getInnov(i, hid), inNode: i, outNode: hid,
-          weight: rand(-1.0, 1.0), enabled: true,
-        });
-      }
+      if (Math.random() < cfg.inputDensity)
+        conns.push({ innov: getInnov(i, hid), inNode: i, outNode: hid, weight: rand(-1, 1), enabled: true });
     }
   }
 
-  // Sequential layer → layer connections
-  // Low density for wide layers to keep total conns manageable
-  // 60→120 (~12%), 120→120 (~10%), 120→120 (~10%), 120→120 (~10%), 120→60 (~15%)
-  const seqDensity = [0.12, 0.10, 0.10, 0.10, 0.15];
+  // Sequential layer → layer
   for (let l = 0; l < layers.length - 1; l++) {
-    const d = seqDensity[l] ?? 0.20;
-    for (const src of layers[l]) {
-      for (const dst of layers[l + 1]) {
-        if (Math.random() < d) {
-          conns.push({
-            innov: getInnov(src, dst), inNode: src, outNode: dst,
-            weight: rand(-1.0, 1.0), enabled: true,
-          });
-        }
-      }
-    }
+    const d = cfg.seqDensity[l] ?? 0.20;
+    for (const src of layers[l])
+      for (const dst of layers[l + 1])
+        if (Math.random() < d)
+          conns.push({ innov: getInnov(src, dst), inNode: src, outNode: dst, weight: rand(-1, 1), enabled: true });
   }
 
-  // Last layer → Outputs (60×10 = 600 possible, ~40% ≈ 240 conns)
-  const lastLayer = layers[layers.length - 1];
-  for (const hid of lastLayer) {
-    for (let o = 0; o < N_OUTPUT; o++) {
-      if (Math.random() < 0.40) {
-        conns.push({
-          innov: getInnov(hid, N_INPUT + o), inNode: hid, outNode: N_INPUT + o,
-          weight: rand(-1.0, 1.0), enabled: true,
-        });
-      }
-    }
-  }
+  // Last layer → Outputs
+  for (const hid of layers[layers.length - 1])
+    for (let o = 0; o < N_OUTPUT; o++)
+      if (Math.random() < cfg.outputDensity)
+        conns.push({ innov: getInnov(hid, N_INPUT + o), inNode: hid, outNode: N_INPUT + o, weight: rand(-1, 1), enabled: true });
 
-  // Within-layer lateral connections (~3% for wide layers, ~6% for narrow)
-  for (const layer of layers) {
-    const d = layer.length > 80 ? 0.03 : 0.06;
-    for (let i = 0; i < layer.length; i++) {
-      for (let j = i + 1; j < layer.length; j++) {
-        if (Math.random() < d) {
-          conns.push({
-            innov: getInnov(layer[i], layer[j]), inNode: layer[i], outNode: layer[j],
-            weight: rand(-0.6, 0.6), enabled: true,
-          });
-        }
-      }
-    }
-  }
+  // Within-layer lateral
+  for (const layer of layers)
+    for (let i = 0; i < layer.length; i++)
+      for (let j = i + 1; j < layer.length; j++)
+        if (Math.random() < cfg.lateralDensity)
+          conns.push({ innov: getInnov(layer[i], layer[j]), inNode: layer[i], outNode: layer[j], weight: rand(-0.6, 0.6), enabled: true });
 
-  // Skip connections — skip 1 layer (~3% for wide layers)
-  for (let l = 0; l < layers.length - 2; l++) {
-    for (const src of layers[l]) {
-      for (const dst of layers[l + 2]) {
-        if (Math.random() < 0.03) {
-          conns.push({
-            innov: getInnov(src, dst), inNode: src, outNode: dst,
-            weight: rand(-0.7, 0.7), enabled: true,
-          });
-        }
-      }
-    }
-  }
+  // Skip connections (skip 1 layer)
+  for (let l = 0; l < layers.length - 2; l++)
+    for (const src of layers[l])
+      for (const dst of layers[l + 2])
+        if (Math.random() < cfg.skipDensity)
+          conns.push({ innov: getInnov(src, dst), inNode: src, outNode: dst, weight: rand(-0.7, 0.7), enabled: true });
 
-  // Residual: L0 → last-1 (~2% — skip connection highway)
-  if (layers.length >= 4) {
-    for (const src of layers[0]) {
-      for (const dst of layers[layers.length - 2]) {
-        if (Math.random() < 0.02) {
-          conns.push({
-            innov: getInnov(src, dst), inNode: src, outNode: dst,
-            weight: rand(-0.5, 0.5), enabled: true,
-          });
-        }
-      }
-    }
-  }
-
-  // Input skip to L2 (~3% — fast balance feedback bypass)
-  for (let i = 0; i < N_INPUT; i++) {
-    for (const hid of layers[2]) {
-      if (Math.random() < 0.03) {
-        conns.push({
-          innov: getInnov(i, hid), inNode: i, outNode: hid,
-          weight: rand(-0.5, 0.5), enabled: true,
-        });
-      }
-    }
-  }
-
-  // Direct input → output (~6% — reflex arcs)
-  for (let i = 0; i < N_INPUT; i++) {
-    for (let o = 0; o < N_OUTPUT; o++) {
-      if (Math.random() < 0.06) {
-        conns.push({
-          innov: getInnov(i, N_INPUT + o), inNode: i, outNode: N_INPUT + o,
-          weight: rand(-0.3, 0.3), enabled: true,
-        });
-      }
-    }
-  }
+  // Direct input → output (reflex arcs)
+  for (let i = 0; i < N_INPUT; i++)
+    for (let o = 0; o < N_OUTPUT; o++)
+      if (Math.random() < cfg.directDensity)
+        conns.push({ innov: getInnov(i, N_INPUT + o), inNode: i, outNode: N_INPUT + o, weight: rand(-0.3, 0.3), enabled: true });
 
   return { nodes, conns };
+}
+
+// Legacy alias for any remaining references
+export function createInitialGenome(): NEATGenome {
+  return createGenomeForArch('minimal');
 }
 
 // ── NEAT Structural Mutations ─────────────────────────────────
@@ -376,7 +354,7 @@ export function createInitialGenome(): NEATGenome {
 // Split an existing connection with a new hidden node.
 // Old connection disabled; two new connections added.
 function addNodeMut(g: NEATGenome): void {
-  if (g.nodes.length >= MAX_HIDDEN) return;
+  if (g.nodes.length >= 300) return; // hard cap (per-arch limits enforced by caller)
   const enabled = g.conns.filter(c => c.enabled);
   if (!enabled.length) return;
   const target  = enabled[Math.floor(Math.random() * enabled.length)];
@@ -386,9 +364,10 @@ function addNodeMut(g: NEATGenome): void {
   // Determine layer for the new node: midpoint between source and dest layers
   const srcNode = g.nodes.find(n => n.id === target.inNode);
   const dstNode = g.nodes.find(n => n.id === target.outNode);
+  const maxLayer = Math.max(1, ...g.nodes.map(n => n.layer ?? 0)) + 1;
   const srcLayer = target.inNode < N_INPUT ? -1 : (srcNode?.layer ?? 0);
   const dstLayer = target.outNode >= N_INPUT && target.outNode < N_INPUT + N_OUTPUT
-    ? SEED_LAYERS.length : (dstNode?.layer ?? SEED_LAYERS.length - 1);
+    ? maxLayer : (dstNode?.layer ?? maxLayer - 1);
   const newLayer = Math.round((srcLayer + dstLayer) / 2);
 
   g.nodes.push({ id: newId, bias: 0, layer: Math.max(0, newLayer) });
@@ -400,7 +379,7 @@ function addNodeMut(g: NEATGenome): void {
 
 // Add a new random connection between two previously unconnected nodes.
 function addConnMut(g: NEATGenome): void {
-  if (g.conns.length >= MAX_CONNS) return;
+  if (g.conns.length >= 4000) return; // hard cap (per-arch limits enforced by caller)
   const existing = new Set(g.conns.map(c => `${c.inNode}|${c.outNode}`));
   const sources  = [...Array.from({ length: N_INPUT }, (_, i) => i), ...g.nodes.map(n => n.id)];
   const targets  = [...g.nodes.map(n => n.id), ...Array.from({ length: N_OUTPUT }, (_, i) => N_INPUT + i)];
@@ -615,6 +594,12 @@ export function createRagdoll(startX: number, groundY: number, color: string): R
     // Ankle cross-braces: knee→toe keeps feet roughly flat, prevents ankle flopping
     { a: PI.L_KNEE,  b: PI.L_TOE,   restLen: Math.sqrt(L.SHIN * L.SHIN + L.FOOT * L.FOOT), stiffness: 0.45 },
     { a: PI.R_KNEE,  b: PI.R_TOE,   restLen: Math.sqrt(L.SHIN * L.SHIN + L.FOOT * L.FOOT), stiffness: 0.45 },
+    // Patella constraints — prevent knee hyperextension (knee bending backward).
+    // Max distance from pelvis to foot = full leg length. Knee MUST flex forward only.
+    { a: PI.PELVIS,  b: PI.L_FOOT,  restLen: L.THIGH + L.SHIN,       stiffness: 0.95, maxOnly: true },
+    { a: PI.PELVIS,  b: PI.R_FOOT,  restLen: L.THIGH + L.SHIN,       stiffness: 0.95, maxOnly: true },
+    // Back stiffener — head-to-pelvis cross-brace. Prevents slouching/folding.
+    { a: PI.HEAD,    b: PI.PELVIS,  restLen: (L.NECK + L.SPINE) * 0.92, stiffness: 0.92, minOnly: true },
   ];
 
   return {
@@ -693,6 +678,8 @@ export function stepRagdoll(
       const d  = Math.sqrt(dx * dx + dy * dy) + 0.0001;
       // minOnly: only push apart when too close (like a ligament), allow stretching
       if (c.minOnly && d >= c.restLen) continue;
+      // maxOnly: only pull together when too far (like a patella), allow compression
+      if (c.maxOnly && d <= c.restLen) continue;
       const k  = (d - c.restLen) / d * c.stiffness;
       const tm = a.mass + b.mass;
       a.x += dx * k * (b.mass / tm);
@@ -747,7 +734,7 @@ export function stepRagdoll(
   const spDy   = chest.y - pelvis.y;
   const spDist = Math.sqrt(spDx * spDx + spDy * spDy) + 0.001;
   const spineAngle = Math.atan2(spDx, pelvis.y - chest.y); // 0 = vertical upright
-  const corr = -spineAngle * 0.25;   // strong passive stability — like real postural muscles
+  const corr = -spineAngle * 0.35;   // very strong passive stability — stiff back like real postural muscles
   chest.x += (-spDy / spDist) * corr;
   chest.y += ( spDx / spDist) * corr;
 
@@ -966,18 +953,7 @@ export function getSensorInputs(ragdoll: Ragdoll, groundY: number, time: number)
 
 // ── Agent & Simulation ────────────────────────────────────────
 
-// One colour per character slot
-export const AGENT_COLORS: string[] = (() => {
-  // Generate 15 visually distinct colors via HSL spacing
-  const colors: string[] = [];
-  for (let i = 0; i < 15; i++) {
-    const hue = (i * 137.5) % 360;  // golden angle spacing
-    const sat = 55 + (i % 3) * 15;  // vary saturation
-    const lit = 50 + (i % 2) * 15;  // vary lightness
-    colors.push(`hsl(${hue}, ${sat}%, ${lit}%)`);
-  }
-  return colors;
-})();
+// AGENT_COLORS is defined below after ArchConfig (architecture-aware coloring)
 
 // ── Obstacles ──────────────────────────────────────────────────
 // Disabled for now — creatures need to learn flat-ground walking first.
@@ -997,68 +973,109 @@ export function getObstaclesNear(_worldX: number, _range: number, _startX: numbe
 }
 
 export interface Agent {
-  ragdoll:    Ragdoll;
-  genome:     NEATGenome;
-  rank:       number;
-  lastInputs: Float32Array | null;
+  ragdoll:     Ragdoll;
+  genome:      NEATGenome;
+  rank:        number;      // rank within population (0 = pop champion)
+  globalIdx:   number;      // index across all agents (0-15)
+  archType:    ArchType;    // which architecture this agent belongs to
+  lastInputs:  Float32Array | null;
   lastOutputs: Float32Array | null;
 }
 
-// No phases — unified fitness. Evolution discovers standing→walking naturally.
+// ── Population — one per architecture, evolves independently ──
+
+export interface Population {
+  archType:    ArchType;
+  agents:      Agent[];     // always exactly POP_SIZE (4)
+  species:     Species[];
+  generation:  number;
+  bestFitness: number;
+  allTimeBest: number;
+  stagnation:  number;
+  history:     number[];
+}
 
 export interface SimState {
-  agents:       Agent[];
-  generation:   number;
+  populations:  Population[];
   time:         number;
   evalDuration: number;
   groundY:      number;
-  bestFitness:  number;
-  allTimeBest:  number;
-  history:      number[];
-  stagnation:   number;  // generations without improvement
-  gravityMul:   number;  // 0→1 curriculum: starts low, ramps to full gravity
-  species:      Species[];  // NEAT speciation — protects structural innovation
+  gravityMul:   number;
+  globalGen:    number;     // shared generation counter
 }
 
-const EVAL_DURATION = 20;  // single eval duration — long enough for walking, short enough for fast gens
-const N_AGENTS         = 8;
+const EVAL_DURATION = 20;
 
-function makeAgent(genome: NEATGenome, i: number, groundY: number): Agent {
+// ── Agent colors per architecture ──
+// 4 agents per arch, each with a variation of the arch's accent color
+export function getAgentColor(archType: ArchType, indexInPop: number): string {
+  const cfg = ARCH_CONFIGS[archType];
+  // Parse base HSL from hex-ish color, generate variations
+  const baseHues: Record<ArchType, number> = { minimal: 35, wide: 175, deep: 340, dense: 90 };
+  const hue = baseHues[archType];
+  const sat = 55 + (indexInPop % 2) * 15;
+  const lit = 45 + indexInPop * 8;
+  return `hsl(${hue}, ${sat}%, ${lit}%)`;
+}
+
+// Legacy export — flat list for rendering
+export const AGENT_COLORS: string[] = (() => {
+  const colors: string[] = [];
+  for (const arch of ARCH_TYPES) {
+    for (let i = 0; i < POP_SIZE; i++) {
+      colors.push(getAgentColor(arch, i));
+    }
+  }
+  return colors;
+})();
+
+function makeAgent(genome: NEATGenome, rankInPop: number, globalIdx: number, groundY: number, archType: ArchType): Agent {
   return {
-    genome,
-    ragdoll:    createRagdoll(120 + i * 4, groundY, AGENT_COLORS[i]),
-    rank:       i,
-    lastInputs: null,
+    genome, archType,
+    ragdoll:     createRagdoll(100 + globalIdx * 6, groundY, AGENT_COLORS[globalIdx]),
+    rank:        rankInPop,
+    globalIdx,
+    lastInputs:  null,
     lastOutputs: null,
+  };
+}
+
+function createPopulation(archType: ArchType, popIndex: number, groundY: number): Population {
+  const baseIdx = popIndex * POP_SIZE;
+  const agents = Array.from({ length: POP_SIZE }, (_, i) =>
+    makeAgent(createGenomeForArch(archType), i, baseIdx + i, groundY, archType)
+  );
+  return {
+    archType, agents,
+    species: [], generation: 1,
+    bestFitness: 0, allTimeBest: 0, stagnation: 0, history: [],
   };
 }
 
 export function createSimState(groundY: number): SimState {
   resetNEAT();
-  const agents = Array.from({ length: N_AGENTS }, (_, i) =>
-    makeAgent(createInitialGenome(), i, groundY)
-  );
+  const populations = ARCH_TYPES.map((arch, i) => createPopulation(arch, i, groundY));
   return {
-    agents, generation: 1, time: 0, evalDuration: EVAL_DURATION,
-    groundY, bestFitness: 0, allTimeBest: 0, history: [],
-    stagnation: 0,
-    gravityMul: 0.90,  // start at 90% gravity — almost Earth
-    species: [],       // populated after first generation
+    populations, time: 0, evalDuration: EVAL_DURATION,
+    groundY, gravityMul: 0.90, globalGen: 1,
   };
 }
 
-// No phase advancement — unified fitness handles everything
+// ── Helper: get all agents flat (for rendering & physics) ──
+export function getAllAgents(state: SimState): Agent[] {
+  return state.populations.flatMap(p => p.agents);
+}
 
-const SETTLE_TIME = 0.5; // seconds of settling before NN activates
-const ZERO_MOTORS = new Float32Array(N_OUTPUT); // all-zero motor outputs
+const SETTLE_TIME = 0.5;
+const ZERO_MOTORS = new Float32Array(N_OUTPUT);
 
 export function stepSim(state: SimState, dt: number): boolean {
   state.time += dt;
   const settling = state.time < SETTLE_TIME;
+  const allAgents = getAllAgents(state);
 
-  for (const agent of state.agents) {
+  for (const agent of allAgents) {
     if (!agent.ragdoll.alive) continue;
-
     if (settling) {
       stepRagdoll(agent.ragdoll, state.groundY, dt, ZERO_MOTORS, state.gravityMul);
     } else {
@@ -1070,9 +1087,9 @@ export function stepSim(state: SimState, dt: number): boolean {
     }
   }
 
-  // Reset fitness reference point after settling (don't penalise settling drift)
+  // Reset fitness after settling
   if (settling) {
-    for (const agent of state.agents) {
+    for (const agent of allAgents) {
       agent.ragdoll.startX       = agent.ragdoll.particles[PI.PELVIS].x;
       agent.ragdoll.fitness       = 0;
       agent.ragdoll.fitnessScore  = 0;
@@ -1088,108 +1105,108 @@ export function stepSim(state: SimState, dt: number): boolean {
     }
   }
 
-  // All-dead early exit — biggest speed win
-  const allDead = state.agents.every(a => !a.ragdoll.alive);
+  const allDead = allAgents.every(a => !a.ragdoll.alive);
   if (allDead) return true;
-
   return state.time >= state.evalDuration + SETTLE_TIME;
 }
 
-export function nextGeneration(state: SimState): void {
-  // ── Evaluate & rank ──
-  const sorted = [...state.agents].sort((a, b) => b.ragdoll.fitnessScore - a.ragdoll.fitnessScore);
+// ── Per-population evolution ─────────────────────────────────
+// Each population evolves independently. Always produces exactly POP_SIZE genomes.
+
+function evolvePopulation(pop: Population, groundY: number, popIndex: number): void {
+  const cfg  = ARCH_CONFIGS[pop.archType];
+  const sorted = [...pop.agents].sort((a, b) => b.ragdoll.fitnessScore - a.ragdoll.fitnessScore);
+  const best   = Math.max(...pop.agents.map(a => a.ragdoll.fitness));
   const bestScore = sorted[0].ragdoll.fitnessScore;
-  const best      = Math.max(...state.agents.map(a => a.ragdoll.fitness));
-  state.bestFitness = best;
 
-  // Stagnation tracking
-  if (bestScore > state.allTimeBest) { state.allTimeBest = bestScore; state.stagnation = 0; }
-  else state.stagnation++;
-  state.history.push(Math.round(best));
+  pop.bestFitness = best;
+  if (bestScore > pop.allTimeBest) { pop.allTimeBest = bestScore; pop.stagnation = 0; }
+  else pop.stagnation++;
+  pop.history.push(Math.round(best));
 
-  // ── Speciation — assign agents to species ──
-  state.species = assignSpecies(state.agents, state.species);
+  // Speciation within this population
+  pop.species = assignSpecies(pop.agents, pop.species);
 
-  // ── Adaptive mutation scaling ──
-  const stag   = Math.min(state.stagnation, 80);
+  const stag   = Math.min(pop.stagnation, 80);
   const mutMul = 1.0 + Math.min(2.5, stag / 20);
 
   function evolve(base: NEATGenome, rate: number, str: number, nodeP = 0, connP = 0): NEATGenome {
     const g = mutateWeights(base, Math.min(0.95, rate * mutMul), str * mutMul);
-    const tries = stag > 20 ? 8 : stag > 10 ? 6 : 4;
+    const tries = stag > 20 ? 6 : stag > 10 ? 4 : 3;
     for (let i = 0; i < tries; i++) {
-      if (nodeP > 0 && g.nodes.length < MAX_HIDDEN && Math.random() < Math.min(0.9, nodeP * mutMul)) addNodeMut(g);
-      if (connP > 0 && g.conns.length < MAX_CONNS  && Math.random() < Math.min(0.9, connP * mutMul)) addConnMut(g);
+      if (nodeP > 0 && g.nodes.length < cfg.maxHidden && Math.random() < Math.min(0.9, nodeP * mutMul)) addNodeMut(g);
+      if (connP > 0 && g.conns.length < cfg.maxConns  && Math.random() < Math.min(0.9, connP * mutMul)) addConnMut(g);
     }
     return g;
   }
 
-  // Mutation parameters — single set, stagnation scales them up
   const pm = { rate: 0.18, str: 0.35, nodeP: 0.15, connP: 0.25 };
-
   const nextGenomes: NEATGenome[] = [];
 
-  // ── 1. Global elite — champion always survives ──
+  // Slot 0: elite — champion survives unchanged
   nextGenomes.push(cloneGenome(sorted[0].genome));
 
-  // ── 2. Species-proportional reproduction ──
-  // Filter out stale species (unless it's the only one)
-  const liveSpecies = state.species.filter(sp =>
-    sp.staleGens <= MAX_STALE || state.species.length <= 1
-  );
-
-  // Calculate adjusted fitness per species (fitness / species_size)
-  // This is the NEAT mechanism that protects innovation: small novel species
-  // get proportionally more reproduction slots per member.
-  const speciesInfo: { sp: Species; adjTotal: number; members: Agent[] }[] = [];
-  let grandTotal = 0;
-  for (const sp of liveSpecies) {
-    const members = sp.memberIndices.map(i => state.agents[i]);
-    const adjTotal = members.reduce((s, a) => s + Math.max(0, a.ragdoll.fitnessScore), 0) / members.length;
-    grandTotal += adjTotal;
-    speciesInfo.push({ sp, adjTotal, members });
+  // Slot 1: crossover of top 2
+  if (sorted.length >= 2) {
+    nextGenomes.push(evolve(neatCrossover(sorted[0].genome, sorted[1].genome), pm.rate, pm.str, pm.nodeP, pm.connP));
+  } else {
+    nextGenomes.push(evolve(cloneGenome(sorted[0].genome), pm.rate, pm.str, pm.nodeP, pm.connP));
   }
 
-  const slotsAvailable = N_AGENTS - 1; // -1 for global elite
-  for (const info of speciesInfo) {
-    const proportion = grandTotal > 0 ? info.adjTotal / grandTotal : 1 / speciesInfo.length;
-    const slots = Math.max(1, Math.round(proportion * slotsAvailable));
-    const membersSorted = [...info.members].sort((a, b) => b.ragdoll.fitnessScore - a.ragdoll.fitnessScore);
-    const topN = Math.max(2, Math.ceil(membersSorted.length * 0.4));
-    const topGenomes = membersSorted.slice(0, topN).map(a => a.genome);
+  // Slot 2: mutated champion
+  nextGenomes.push(evolve(cloneGenome(sorted[0].genome), pm.rate * 1.3, pm.str * 1.3, pm.nodeP * 1.5, pm.connP * 1.5));
 
-    for (let i = 0; i < slots && nextGenomes.length < N_AGENTS; i++) {
-      if (i === 0) {
-        // Species elite — best member survives unchanged
-        nextGenomes.push(cloneGenome(membersSorted[0].genome));
-      } else if (topGenomes.length >= 2 && Math.random() < 0.7) {
-        // Crossover within species + mutation
-        const a = topGenomes[Math.floor(Math.random() * Math.min(topGenomes.length, 3))];
-        const b = topGenomes[Math.floor(Math.random() * topGenomes.length)];
-        nextGenomes.push(evolve(neatCrossover(a, b), pm.rate, pm.str, pm.nodeP, pm.connP));
-      } else {
-        // Mutate a top member
-        nextGenomes.push(evolve(cloneGenome(topGenomes[0]), pm.rate * 1.2, pm.str * 1.2, pm.nodeP, pm.connP));
+  // Slot 3: fresh genome OR mutated second-best (based on stagnation)
+  if (stag > 15 || Math.random() < 0.2) {
+    nextGenomes.push(createGenomeForArch(pop.archType));
+  } else {
+    const base = sorted.length >= 2 ? sorted[1].genome : sorted[0].genome;
+    nextGenomes.push(evolve(cloneGenome(base), pm.rate * 1.5, pm.str * 1.5, pm.nodeP * 2, pm.connP * 2));
+  }
+
+  // Rebuild agents with new genomes — always exactly POP_SIZE
+  const baseIdx = popIndex * POP_SIZE;
+  pop.agents = nextGenomes.map((g, i) =>
+    makeAgent(g, i, baseIdx + i, groundY, pop.archType)
+  );
+  pop.generation += 1;
+}
+
+export function nextGeneration(state: SimState): void {
+  state.populations.forEach((pop, i) => evolvePopulation(pop, state.groundY, i));
+  state.globalGen += 1;
+  state.time = 0;
+  // Gravity curriculum
+  state.gravityMul = Math.min(1.0, 0.90 + 0.10 * (state.globalGen / 15));
+}
+
+// ── Headless bulk training ───────────────────────────────────
+// Runs N generations without rendering for fast training.
+
+// Headless training: faster DT (2× normal), skip foot trails, tight loop.
+// Returns synchronously — caller should chunk via setTimeout for UI updates.
+export function trainHeadless(
+  state: SimState,
+  generations: number,
+  onProgress?: (gen: number, total: number) => void,
+): void {
+  const DT = 1 / 30;  // 2× larger timestep = half the steps = ~2× faster physics
+  const maxSteps = 1000; // 20s / (1/30) ≈ 600, cap at 1000 for safety
+  for (let g = 0; g < generations; g++) {
+    // Clear foot trails (saves memory & allocation during headless)
+    for (const pop of state.populations) {
+      for (const agent of pop.agents) {
+        agent.ragdoll.footTrail.length = 0;
       }
     }
-  }
-
-  // ── 3. Fill remaining slots (rounding gaps + fresh blood) ──
-  while (nextGenomes.length < N_AGENTS) {
-    if (Math.random() < 0.3) {
-      nextGenomes.push(createInitialGenome()); // fresh genome — diversity injection
-    } else {
-      const src = sorted[Math.floor(Math.random() * 3)].genome;
-      nextGenomes.push(evolve(cloneGenome(src), 0.20, 0.40, pm.nodeP, pm.connP));
+    // Run one full evaluation
+    state.time = 0;
+    let steps = 0;
+    while (steps++ < maxSteps) {
+      if (stepSim(state, DT)) break;
     }
+    nextGeneration(state);
+    if (onProgress && g % 5 === 0) onProgress(g, generations);
   }
-  nextGenomes.length = N_AGENTS; // trim if over
-
-  // ── Finalize generation ──
-  state.agents     = nextGenomes.map((g, i) => makeAgent(g, i, state.groundY));
-  state.generation += 1;
-  state.time        = 0;
-
-  // Gravity curriculum — ramp from 90% → 100% over ~15 generations
-  state.gravityMul = Math.min(1.0, 0.90 + 0.10 * (state.generation / 15));
+  if (onProgress) onProgress(generations, generations);
 }
