@@ -162,6 +162,22 @@ export function resetNEAT(): void {
   _innovCache.clear();
 }
 
+// ── NEAT state capture/restore — for Web Worker sync ──
+export function captureNEATState(): { nextHiddenId: number; nextInnov: number; innovCache: [string, number][] } {
+  return {
+    nextHiddenId: _nextHiddenId,
+    nextInnov:    _nextInnov,
+    innovCache:   [..._innovCache.entries()],
+  };
+}
+
+export function restoreNEATState(s: { nextHiddenId: number; nextInnov: number; innovCache: [string, number][] }): void {
+  _nextHiddenId = s.nextHiddenId;
+  _nextInnov    = s.nextInnov;
+  _innovCache.clear();
+  for (const [k, v] of s.innovCache) _innovCache.set(k, v);
+}
+
 function getInnov(inNode: number, outNode: number): number {
   const key = `${inNode}|${outNode}`;
   if (!_innovCache.has(key)) _innovCache.set(key, _nextInnov++);
@@ -636,12 +652,17 @@ export function stepRagdoll(
   dt: number,
   motorOutputs: Float32Array,
   gravityMul: number = 1.0,
+  mode: LocomotionMode = 'bipedal',
 ): void {
   const { particles, constraints } = ragdoll;
 
-  // Motor forces
+  // Motor forces — scale depends on mode
+  // Bipedal: damped to 50% (stability reflexes handle the rest)
+  // Free: full power (NN has total control, no reflexes to help)
+  const MOTOR_SCALE = mode === 'free' ? 1.0 : 0.5;
   MOTORS.forEach((motor, i) => {
-    const target  = Math.max(motor.minAngle, Math.min(motor.maxAngle, motorOutputs[i]));
+    const raw     = motorOutputs[i] * MOTOR_SCALE;
+    const target  = Math.max(motor.minAngle, Math.min(motor.maxAngle, raw));
     const parent  = particles[motor.parentIdx];
     const pivot   = particles[motor.pivotIdx];
     const child   = particles[motor.childIdx];
@@ -727,180 +748,230 @@ export function stepRagdoll(
     }
   }
 
-  // Core stability — angular spring biasing torso toward vertical.
-  // Mimics involuntary postural muscles (vestibular reflex). Strong enough
-  // that random NN motor noise can't instantly tip the creature over.
-  // The NN's job is BALANCE CORRECTION, not discovering how to stand.
-  const chest  = particles[PI.CHEST];
-  const pelvis = particles[PI.PELVIS];
-  const spDx   = chest.x - pelvis.x;
-  const spDy   = chest.y - pelvis.y;
-  const spDist = Math.sqrt(spDx * spDx + spDy * spDy) + 0.001;
-  const spineAngle = Math.atan2(spDx, pelvis.y - chest.y); // 0 = vertical upright
-  const corr = -spineAngle * 0.35;   // very strong passive stability — stiff back like real postural muscles
-  chest.x += (-spDy / spDist) * corr;
-  chest.y += ( spDx / spDist) * corr;
+  // ── PASSIVE STABILITY SYSTEM (Bipedal mode only) ──────────────
+  // In bipedal mode: involuntary balance reflexes keep creature standing.
+  // In free mode: NN has total control — no reflexes, full freedom.
+  if (mode === 'bipedal') {
+    // 1. Core stability — angular spring biasing spine toward vertical.
+    const chest  = particles[PI.CHEST];
+    const pelvis = particles[PI.PELVIS];
+    const spDx   = chest.x - pelvis.x;
+    const spDy   = chest.y - pelvis.y;
+    const spDist = Math.sqrt(spDx * spDx + spDy * spDy) + 0.001;
+    const spineAngle = Math.atan2(spDx, pelvis.y - chest.y);
+    const coreCorr = -spineAngle * 0.50;
+    chest.x += (-spDy / spDist) * coreCorr;
+    chest.y += ( spDx / spDist) * coreCorr;
+
+    // 2. Vestibular balance reflex — keeps CoM over feet (ankle strategy).
+    {
+      const lFoot = particles[PI.L_FOOT];
+      const rFoot = particles[PI.R_FOOT];
+      const footMidX = (lFoot.x + rFoot.x) / 2;
+      const comResult = getCenterOfMass(particles);
+      const comErr = comResult.x - footMidX;
+      const pelvisH = groundY - pelvis.y;
+      const isStanding = (lFoot.y >= groundY - 3 || rFoot.y >= groundY - 3) && pelvisH > 15;
+      if (isStanding) {
+        const ankleStr = 0.12 * Math.min(1, Math.abs(comErr) / 25);
+        const ankleForce = -Math.sign(comErr) * ankleStr;
+        pelvis.x += ankleForce;
+        chest.x  += ankleForce * 0.6;
+        particles[PI.HEAD].x += ankleForce * 0.4;
+        for (const [kneeIdx, footIdx] of [[PI.L_KNEE, PI.L_FOOT], [PI.R_KNEE, PI.R_FOOT]] as [number, number][]) {
+          const knee = particles[kneeIdx];
+          const foot = particles[footIdx];
+          if (foot.y >= groundY - 3) {
+            const legDy = knee.y - pelvis.y;
+            if (legDy > 0) {
+              knee.y -= 0.08;
+              knee.x += (pelvis.x - knee.x) * 0.02;
+            }
+          }
+        }
+      }
+    }
+
+    // 3. Head stabilisation — anti-nod reflex.
+    {
+      const head = particles[PI.HEAD];
+      const chest2 = particles[PI.CHEST];
+      if (head.y > chest2.y) {
+        const headCorr = (head.y - chest2.y) * 0.15;
+        head.y -= headCorr;
+        head.x += (chest2.x - head.x) * 0.05;
+      }
+    }
+  }
+  // Free mode: no stability reflexes. NN has full control over the body.
 
   ragdoll.age    += dt;
 
-  // ── Early termination: kill creatures that are fully on the ground ──
-  // Proto-walkers get extra grace — they've shown useful behavior.
-  // Recovery from stumbles is tracked and heavily rewarded.
-  {
-    const etComH = Math.max(0, groundY - getCenterOfMass(particles).y);
-    const etRatio = etComH / STANDING_COM_H;
+  // ── SHARED: compute basic metrics ──
+  const com      = getCenterOfMass(particles);
+  const comH     = Math.max(0, groundY - com.y);
+  const comRatio = Math.min(1, comH / STANDING_COM_H);
+  const hVel     = particles[PI.PELVIS].x - particles[PI.PELVIS].px;
+  const lOnGround    = particles[PI.L_FOOT].y >= groundY - 2;
+  const rOnGround    = particles[PI.R_FOOT].y >= groundY - 2;
+  const anyGrounded  = lOnGround || rOnGround;
 
-    // Track stumble/recovery: CoG dipping below 30% then rising above 45%
+  // ── EARLY TERMINATION ──
+  if (mode === 'free') {
+    // Free mode: very lenient — only kill if truly flat & stuck for 3+ seconds
+    if (comRatio < 0.05) {
+      ragdoll.lowCoGTime += dt;
+      if (ragdoll.lowCoGTime > 3.0) {
+        ragdoll.alive = false;
+        ragdoll.terminatedAt = ragdoll.age;
+        return;
+      }
+    } else {
+      ragdoll.lowCoGTime = Math.max(0, ragdoll.lowCoGTime - dt);
+    }
+  } else {
+    // Bipedal mode: strict posture-based termination
+    const etRatio = comRatio;
     if (etRatio < 0.30) {
       ragdoll.wasLow = true;
     } else if (ragdoll.wasLow && etRatio > 0.45) {
       ragdoll.wasLow = false;
       ragdoll.recoveries++;
-      ragdoll.fitnessScore += 15.0; // huge reward for catching yourself
+      ragdoll.fitnessScore += 15.0;
     }
-
-    // Termination threshold depends on demonstrated ability:
-    // - Creatures with upright steps get longer grace (1.2s) and lower threshold (10%)
-    // - Regular creatures: 0.7s grace, 12% threshold
-    // - Crawlers (head below pelvis for extended time): faster kill
     const hasWalked = ragdoll.stepCount >= 1 || ragdoll.recoveries > 0;
     const termThreshold = hasWalked ? 0.10 : 0.12;
     const graceTime     = hasWalked ? 1.2  : 0.7;
-
-    // Extra termination: if head is below pelvis AND CoG < 30% for 1.5s, kill the crawler
     const headBelowPelvis = particles[PI.HEAD].y > particles[PI.PELVIS].y;
     if (headBelowPelvis && etRatio < 0.30 && ragdoll.age > 2.0) {
-      ragdoll.lowCoGTime += dt * 1.5; // accelerated kill for crawlers
+      ragdoll.lowCoGTime += dt * 1.5;
     }
-
     if (etRatio < termThreshold) {
       ragdoll.lowCoGTime += dt;
       if (ragdoll.lowCoGTime > graceTime) {
         ragdoll.alive = false;
         ragdoll.terminatedAt = ragdoll.age;
-        return; // dead — skip fitness
+        return;
       }
     } else {
-      ragdoll.lowCoGTime = Math.max(0, ragdoll.lowCoGTime - dt * 2); // drain slowly, not instant reset
+      ragdoll.lowCoGTime = Math.max(0, ragdoll.lowCoGTime - dt * 2);
     }
   }
 
-  // Displacement fitness (used for camera tracking / display)
+  // ── DISPLACEMENT FITNESS (camera tracking / display — both modes) ──
   let maxX = particles[PI.PELVIS].x;
   for (const p of particles) if (p.x > maxX) maxX = p.x;
   ragdoll.fitness = Math.max(0, maxX - ragdoll.startX);
 
-  // ── UNIFIED FITNESS — all rewards available simultaneously ────
-  // No phases. Everything is rewarded at once, weighted so that:
-  //   standing upright = easiest points (foundation)
-  //   balance + weight shifting = medium points (builds on standing)
-  //   stepping + forward movement = jackpot (builds on balance)
-  // Evolution naturally discovers the progression because you can't
-  // step without balance and can't balance without standing.
+  // ═══════════════════════════════════════════════════════════════
+  // ── FITNESS FUNCTION — branches on mode ──
+  // ═══════════════════════════════════════════════════════════════
 
-  const com      = getCenterOfMass(particles);
-  const comH     = Math.max(0, groundY - com.y);
-  const comRatio = Math.min(1, comH / STANDING_COM_H);
-  const hVel     = particles[PI.PELVIS].x - particles[PI.PELVIS].px;
+  if (mode === 'free') {
+    // ── FREE LOCOMOTION FITNESS ──────────────────────────────────
+    // Reward ANY forward movement. No posture gates, no anti-crawl.
+    // Creatures can crawl, hop, drag, roll — whatever works.
 
-  const lOnGround    = particles[PI.L_FOOT].y >= groundY - 2;
-  const rOnGround    = particles[PI.R_FOOT].y >= groundY - 2;
-  const anyGrounded  = lOnGround || rOnGround;
-  const bothGrounded = lOnGround && rOnGround;
+    const dist = Math.max(0, particles[PI.PELVIS].x - ragdoll.startX);
 
-  // ── HEAD-ABOVE-PELVIS CHECK ──
-  // Fundamental: head must be above pelvis. If not, creature is folded/crawling.
-  const headAbove = particles[PI.HEAD].y < particles[PI.PELVIS].y;
+    // Forward velocity — primary reward signal
+    ragdoll.fitnessScore += Math.max(0, hVel) * 8.0;
 
-  // ── TIER 1: UPRIGHT (always active) ─────────────────────────
-  // Continuous quadratic — every bit of height counts, but ONLY if head is up
-  ragdoll.fitnessScore += 1.5 * comRatio * comRatio;
-  if (comRatio > 0.30) ragdoll.fitnessScore += 0.5;  // survival bonus
-  // Survival time — every frame alive and upright is worth something
-  ragdoll.fitnessScore += 0.15 * comRatio;
+    // Distance accumulated (sqrt prevents runaway from falling forward)
+    ragdoll.fitnessScore += 0.08 * Math.sqrt(Math.max(0, dist));
 
-  // Penalties — STRONG anti-crawl measures
-  if (!anyGrounded) ragdoll.fitnessScore -= 1.0;  // airborne
-  if (!headAbove) ragdoll.fitnessScore -= 1.5;    // head below pelvis = HEAVY penalty (was -0.5)
-  // Crawl penalty: if pelvis is low AND moving forward, actively punish it
-  if (comRatio < 0.45 && hVel > 0.5) ragdoll.fitnessScore -= 2.0 * hVel;
+    // Soft upright bonus — not required, but being higher IS slightly better
+    ragdoll.fitnessScore += 0.3 * comRatio;
 
-  // ── TIER 2: POSTURE QUALITY (kicks in at 55% CoG + head above) ──
-  if (comRatio > 0.55 && anyGrounded && headAbove) {
-    ragdoll.standingTime += dt;
-    if (bothGrounded) ragdoll.fitnessScore += 1.0;
-    ragdoll.fitnessScore += 0.5;  // posture bonus for being properly upright
-    // Balance — CoM over feet
-    const footMidX = (particles[PI.L_FOOT].x + particles[PI.R_FOOT].x) / 2;
-    const balErr   = Math.abs(com.x - footMidX);
-    if (balErr < 30) ragdoll.fitnessScore += 0.4 * (1 - balErr / 30);
-  }
+    // Survival bonus — staying alive = more time to move
+    ragdoll.fitnessScore += 0.1;
 
-  // ── TIER 3: WEIGHT SHIFTING (kicks in at 60% CoG + head above) ──
-  if (comRatio > 0.60 && anyGrounded && headAbove) {
-    const singleSupport = (lOnGround && !rOnGround) || (!lOnGround && rOnGround);
-    if (singleSupport) {
-      ragdoll.singleSupportTime += dt;
-      const liftedFootY = lOnGround ? particles[PI.R_FOOT].y : particles[PI.L_FOOT].y;
-      const clearance   = Math.max(0, groundY - liftedFootY - 2) / 15;
-      ragdoll.fitnessScore += 1.0 + 0.5 * Math.min(1, clearance);
-
-      // Balance on support foot
-      const supportFoot = lOnGround ? particles[PI.L_FOOT] : particles[PI.R_FOOT];
-      const sBal = Math.abs(com.x - supportFoot.x);
-      if (sBal < 20) ragdoll.fitnessScore += 0.4 * (1 - sBal / 20);
-    }
-
-    // Hip asymmetry — legs doing different things
+    // Limb movement bonus — reward any coordinated motion
     const lHip = jointAngle(particles[PI.CHEST], particles[PI.PELVIS], particles[PI.L_KNEE]);
     const rHip = jointAngle(particles[PI.CHEST], particles[PI.PELVIS], particles[PI.R_KNEE]);
-    const hipDiff = Math.abs(lHip - rHip);
-    if (hipDiff > 0.1) ragdoll.fitnessScore += 0.3 * Math.min(1, hipDiff);
+    const hipActivity = Math.abs(lHip) + Math.abs(rHip);
+    if (hipActivity > 0.3) ragdoll.fitnessScore += 0.15 * Math.min(1, hipActivity / 2);
 
-    // Anti-phase leg swing
-    const antiPhase = -lHip * rHip;
-    if (antiPhase > 0.02) ragdoll.fitnessScore += 0.4 * Math.min(1, antiPhase);
-  }
+    // Arm usage bonus — using all limbs for locomotion
+    const lArm = Math.abs(particles[PI.L_HAND].x - particles[PI.L_HAND].px);
+    const rArm = Math.abs(particles[PI.R_HAND].x - particles[PI.R_HAND].px);
+    if (lArm + rArm > 0.3) ragdoll.fitnessScore += 0.1;
 
-  // ── TIER 4: STEPPING & LOCOMOTION (kicks in at 60% CoG + head above) ──
-  // CRITICAL: forward distance is ONLY rewarded when upright with head above pelvis.
-  // This makes crawling/lunging worthless — evolution MUST discover upright walking.
-  if (comRatio > 0.60 && anyGrounded && headAbove) {
-    // Step detection
-    if (ragdoll.lGrounded && !lOnGround) ragdoll.lLiftX = particles[PI.L_FOOT].x;
-    if (ragdoll.rGrounded && !rOnGround) ragdoll.rLiftX = particles[PI.R_FOOT].x;
+  } else {
+    // ── BIPEDAL FITNESS (4-tier posture-gated system) ────────────
 
-    if (!ragdoll.lGrounded && lOnGround && rOnGround) {
-      const d = particles[PI.L_FOOT].x - ragdoll.lLiftX;
-      if (d > 2) {
-        const q   = Math.min(1, d / 20);
-        const alt = ragdoll.lastStepSide !== 'l';
-        ragdoll.fitnessScore += alt ? 25.0 * q : 4.0 * q;
-        if (alt) { ragdoll.stepCount++; ragdoll.lastStepSide = 'l'; }
+    const bothGrounded = lOnGround && rOnGround;
+    const headAbove = particles[PI.HEAD].y < particles[PI.PELVIS].y;
+
+    // TIER 1: UPRIGHT (always active)
+    ragdoll.fitnessScore += 1.5 * comRatio * comRatio;
+    if (comRatio > 0.30) ragdoll.fitnessScore += 0.5;
+    ragdoll.fitnessScore += 0.15 * comRatio;
+    if (!anyGrounded) ragdoll.fitnessScore -= 1.0;
+    if (!headAbove) ragdoll.fitnessScore -= 1.5;
+    if (comRatio < 0.45 && hVel > 0.5) ragdoll.fitnessScore -= 2.0 * hVel;
+
+    // TIER 2: POSTURE QUALITY (55% CoG + head above)
+    if (comRatio > 0.55 && anyGrounded && headAbove) {
+      ragdoll.standingTime += dt;
+      if (bothGrounded) ragdoll.fitnessScore += 1.0;
+      ragdoll.fitnessScore += 0.5;
+      const footMidX = (particles[PI.L_FOOT].x + particles[PI.R_FOOT].x) / 2;
+      const balErr   = Math.abs(com.x - footMidX);
+      if (balErr < 30) ragdoll.fitnessScore += 0.4 * (1 - balErr / 30);
+    }
+
+    // TIER 3: WEIGHT SHIFTING (60% CoG + head above)
+    if (comRatio > 0.60 && anyGrounded && headAbove) {
+      const singleSupport = (lOnGround && !rOnGround) || (!lOnGround && rOnGround);
+      if (singleSupport) {
+        ragdoll.singleSupportTime += dt;
+        const liftedFootY = lOnGround ? particles[PI.R_FOOT].y : particles[PI.L_FOOT].y;
+        const clearance   = Math.max(0, groundY - liftedFootY - 2) / 15;
+        ragdoll.fitnessScore += 1.0 + 0.5 * Math.min(1, clearance);
+        const supportFoot = lOnGround ? particles[PI.L_FOOT] : particles[PI.R_FOOT];
+        const sBal = Math.abs(com.x - supportFoot.x);
+        if (sBal < 20) ragdoll.fitnessScore += 0.4 * (1 - sBal / 20);
       }
+      const lHip = jointAngle(particles[PI.CHEST], particles[PI.PELVIS], particles[PI.L_KNEE]);
+      const rHip = jointAngle(particles[PI.CHEST], particles[PI.PELVIS], particles[PI.R_KNEE]);
+      const hipDiff = Math.abs(lHip - rHip);
+      if (hipDiff > 0.1) ragdoll.fitnessScore += 0.3 * Math.min(1, hipDiff);
+      const antiPhase = -lHip * rHip;
+      if (antiPhase > 0.02) ragdoll.fitnessScore += 0.4 * Math.min(1, antiPhase);
     }
-    if (!ragdoll.rGrounded && rOnGround && lOnGround) {
-      const d = particles[PI.R_FOOT].x - ragdoll.rLiftX;
-      if (d > 2) {
-        const q   = Math.min(1, d / 20);
-        const alt = ragdoll.lastStepSide !== 'r';
-        ragdoll.fitnessScore += alt ? 25.0 * q : 4.0 * q;
-        if (alt) { ragdoll.stepCount++; ragdoll.lastStepSide = 'r'; }
+
+    // TIER 4: STEPPING & LOCOMOTION (60% CoG + head above)
+    if (comRatio > 0.60 && anyGrounded && headAbove) {
+      if (ragdoll.lGrounded && !lOnGround) ragdoll.lLiftX = particles[PI.L_FOOT].x;
+      if (ragdoll.rGrounded && !rOnGround) ragdoll.rLiftX = particles[PI.R_FOOT].x;
+      if (!ragdoll.lGrounded && lOnGround && rOnGround) {
+        const d = particles[PI.L_FOOT].x - ragdoll.lLiftX;
+        if (d > 2) {
+          const q   = Math.min(1, d / 20);
+          const alt = ragdoll.lastStepSide !== 'l';
+          ragdoll.fitnessScore += alt ? 25.0 * q : 4.0 * q;
+          if (alt) { ragdoll.stepCount++; ragdoll.lastStepSide = 'l'; }
+        }
       }
+      if (!ragdoll.rGrounded && rOnGround && lOnGround) {
+        const d = particles[PI.R_FOOT].x - ragdoll.rLiftX;
+        if (d > 2) {
+          const q   = Math.min(1, d / 20);
+          const alt = ragdoll.lastStepSide !== 'r';
+          ragdoll.fitnessScore += alt ? 25.0 * q : 4.0 * q;
+          if (alt) { ragdoll.stepCount++; ragdoll.lastStepSide = 'r'; }
+        }
+      }
+      const uprightGate = Math.min(1, Math.max(0, (comRatio - 0.55) / 0.35));
+      ragdoll.fitnessScore += Math.max(0, hVel) * 5.0 * uprightGate;
+      const dist = Math.max(0, particles[PI.PELVIS].x - ragdoll.startX);
+      if (dist > 10 && ragdoll.singleSupportTime > 1.0) {
+        ragdoll.fitnessScore += 0.06 * Math.sqrt(dist) * uprightGate;
+      }
+      if (ragdoll.stepCount >= 2) ragdoll.fitnessScore += ragdoll.stepCount * 8.0;
+      if (ragdoll.stepCount >= 4) ragdoll.fitnessScore += (ragdoll.stepCount - 3) * 12.0;
     }
-
-    // Forward velocity reward — ONLY when upright. comRatio gates it hard.
-    const uprightGate = Math.min(1, Math.max(0, (comRatio - 0.55) / 0.35)); // 0 at 55%, 1 at 90%
-    ragdoll.fitnessScore += Math.max(0, hVel) * 5.0 * uprightGate;
-
-    // Distance bonus — must have taken steps AND be upright
-    const dist = Math.max(0, particles[PI.PELVIS].x - ragdoll.startX);
-    if (dist > 10 && ragdoll.singleSupportTime > 1.0) {
-      ragdoll.fitnessScore += 0.06 * Math.sqrt(dist) * uprightGate;
-    }
-    // Step count bonus — scales superlinearly to heavily reward multi-step gaits
-    if (ragdoll.stepCount >= 2) ragdoll.fitnessScore += ragdoll.stepCount * 8.0;
-    if (ragdoll.stepCount >= 4) ragdoll.fitnessScore += (ragdoll.stepCount - 3) * 12.0; // bonus accelerates
   }
 
   // Update ground contact
@@ -1034,6 +1105,8 @@ export interface Population {
   history:     number[];
 }
 
+export type LocomotionMode = 'bipedal' | 'free';
+
 export interface SimState {
   populations:  Population[];
   time:         number;
@@ -1041,6 +1114,7 @@ export interface SimState {
   groundY:      number;
   gravityMul:   number;
   globalGen:    number;     // shared generation counter
+  mode:         LocomotionMode;
 }
 
 const EVAL_DURATION = 20;
@@ -1091,12 +1165,12 @@ function createPopulation(archType: ArchType, popIndex: number, groundY: number)
   };
 }
 
-export function createSimState(groundY: number): SimState {
+export function createSimState(groundY: number, mode: LocomotionMode = 'bipedal'): SimState {
   resetNEAT();
   const populations = ARCH_TYPES.map((arch, i) => createPopulation(arch, i, groundY));
   return {
     populations, time: 0, evalDuration: EVAL_DURATION,
-    groundY, gravityMul: 0.90, globalGen: 1,
+    groundY, gravityMul: 0.90, globalGen: 1, mode,
   };
 }
 
@@ -1116,13 +1190,13 @@ export function stepSim(state: SimState, dt: number): boolean {
   for (const agent of allAgents) {
     if (!agent.ragdoll.alive) continue;
     if (settling) {
-      stepRagdoll(agent.ragdoll, state.groundY, dt, ZERO_MOTORS, state.gravityMul);
+      stepRagdoll(agent.ragdoll, state.groundY, dt, ZERO_MOTORS, state.gravityMul, state.mode);
     } else {
       const inputs  = getSensorInputs(agent.ragdoll, state.groundY, state.time - SETTLE_TIME);
       const outputs = neatForward(agent.genome, inputs);
       agent.lastInputs  = inputs;
       agent.lastOutputs = outputs;
-      stepRagdoll(agent.ragdoll, state.groundY, dt, outputs, state.gravityMul);
+      stepRagdoll(agent.ragdoll, state.groundY, dt, outputs, state.gravityMul, state.mode);
     }
   }
 

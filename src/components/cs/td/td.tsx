@@ -4,7 +4,9 @@ import { createGlobalStyle } from 'styled-components';
 import {
   SimState, Agent, NEATGenome, Particle, Obstacle, Species, Population,
   ArchType, ARCH_TYPES, ARCH_CONFIGS, POP_SIZE,
+  LocomotionMode,
   createSimState, stepSim, nextGeneration, getAllAgents, trainHeadless,
+  captureNEATState, restoreNEATState,
   PI, L, HEAD_RADIUS, MOTORS, AGENT_COLORS,
   N_INPUT, N_OUTPUT, STANDING_PELVIS_H, STANDING_COM_H, STANDING_HEAD_H,
   getObstaclesNear,
