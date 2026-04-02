@@ -1,13 +1,10 @@
 'use client'
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import styled, { createGlobalStyle, keyframes } from "styled-components";
 import {
-  Sparkles, ChevronDown, Copy, CheckCircle, AlertCircle,
-  BookOpen, Cpu, MessageSquare, HelpCircle, Calendar,
-  Target, Users, Zap, ClipboardList, ChevronRight,
-  Play, RotateCcw, Eye, EyeOff, Timer, Code2, CheckSquare,
-  TrendingUp, Lightbulb, X
+  Play, RotateCcw, Eye, EyeOff, Timer, Lightbulb, CheckCircle, AlertCircle,
+  ChevronRight, TrendingUp, Code2, X
 } from "lucide-react";
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
@@ -22,45 +19,33 @@ const T = {
   purple: '#7c3aed', purpleBg: '#f5f3ff', purpleBorder: 'rgba(124,58,237,0.22)',
   serif: '"DM Serif Display", serif', mono: '"DM Mono", monospace', sans: '"DM Sans", sans-serif',
   shadow: '0 1px 3px rgba(26,18,8,0.08), 0 4px 16px rgba(26,18,8,0.06)',
-  shadowMd: '0 4px 12px rgba(26,18,8,0.10), 0 8px 24px rgba(26,18,8,0.06)',
   radius: '12px', radiusSm: '7px',
 };
 
-const fadeIn = keyframes`from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; }`;
-const pulse  = keyframes`0%,100% { opacity:1; } 50% { opacity:.5; }`;
+const fadeIn = keyframes`from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}`;
 
 const GlobalStyle = createGlobalStyle`
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
 `;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Mode   = 'prep' | 'code';
-type Round  = 'technical' | 'behavioral' | 'final' | 'vp';
-type Diff   = 'easy' | 'medium' | 'hard';
-type Cat    = 'arrays' | 'strings' | 'dp' | 'design';
+type Diff = 'easy' | 'medium' | 'hard';
+type Cat  = 'arrays' | 'strings' | 'dp' | 'design';
 
-interface TestCase  { args: unknown[]; expected: unknown; label: string; compareMode?: 'sortedGroups'; }
-interface TestResult{ label: string; passed: boolean; got: unknown; expected: unknown; error?: string; }
+interface TestCase   { args: unknown[]; expected: unknown; label: string; compareMode?: 'sortedGroups'; }
+interface TestResult { label: string; passed: boolean; got: unknown; expected: unknown; error?: string; }
 interface Problem {
   id: string; title: string; difficulty: Diff; category: Cat; pattern: string;
   description: string; examples: { input: string; output: string; explanation?: string }[];
-  constraints: string[]; starterCode: string; testCases: TestCase[];
+  constraints: string[]; starterCode: string; entryPoint: string;
+  solution: string; testCases: TestCase[];
   hints: [string, string, string]; insight: string;
   complexity: { time: string; space: string }; whyAsked: string;
 }
 
-interface BehavioralQ { question: string; hint: string; why: string; tags: string[]; }
-interface SystemDesignQ { question: string; angles: string[]; }
-interface TechTopic { topic: string; subtopics: string[]; }
-interface AskThem { question: string; why: string; }
-interface GamePlan { when: string; tasks: string[]; }
-interface PrepKit {
-  behavioral: BehavioralQ[]; systemDesign: SystemDesignQ[];
-  technical: TechTopic[]; askThem: AskThem[]; gamePlan: GamePlan[];
-}
-
-// ─── Problem Bank ─────────────────────────────────────────────────────────────
+// ─── Problem Bank (Python) ────────────────────────────────────────────────────
 const PROBLEMS: Problem[] = [
+  // ── HASH MAP ──────────────────────────────────────────
   {
     id: 'two-sum', title: 'Two Sum', difficulty: 'easy', category: 'arrays', pattern: 'Hash Map',
     description: 'Given an array of integers nums and an integer target, return indices of the two numbers that add up to target. You may assume exactly one solution exists.',
@@ -68,8 +53,16 @@ const PROBLEMS: Problem[] = [
       { input: 'nums = [2,7,11,15], target = 9', output: '[0,1]', explanation: 'nums[0] + nums[1] = 9' },
       { input: 'nums = [3,2,4], target = 6', output: '[1,2]' },
     ],
-    constraints: ['2 ≤ nums.length ≤ 10⁴', 'Exactly one valid answer exists'],
-    starterCode: `function twoSum(nums, target) {\n  \n}`,
+    constraints: ['2 <= len(nums) <= 10^4', 'Exactly one valid answer exists'],
+    starterCode: `def two_sum(nums, target):\n    pass`,
+    entryPoint: 'two_sum',
+    solution: `def two_sum(nums, target):
+    seen = {}
+    for i, num in enumerate(nums):
+        complement = target - num
+        if complement in seen:
+            return [seen[complement], i]
+        seen[num] = i`,
     testCases: [
       { args: [[2,7,11,15], 9], expected: [0,1], label: 'Basic' },
       { args: [[3,2,4], 6],     expected: [1,2], label: 'Answer at end' },
@@ -77,22 +70,35 @@ const PROBLEMS: Problem[] = [
     ],
     hints: [
       'What if you stored each number\'s index in a lookup table as you scanned?',
-      'For each number, you need (target − number). A hash map lets you find that in O(1).',
-      'Loop nums. At index i: if (target − nums[i]) is in the map, return [map[target−nums[i]], i]. Else store nums[i] → i.',
+      'For each number, you need (target - number). A dictionary lets you find that in O(1).',
+      'Loop with enumerate. At index i: if (target - nums[i]) is in seen, return [seen[complement], i]. Else store seen[nums[i]] = i.',
     ],
     insight: 'Trade O(n) space for O(n) time. Store what you\'ve seen; check if the complement already exists instead of brute-force pair checking.',
     complexity: { time: 'O(n)', space: 'O(n)' },
     whyAsked: 'The canonical hash-map-for-complement problem. Tests your instinct to trade space for time.',
   },
+  // ── STACK ─────────────────────────────────────────────
   {
     id: 'valid-parens', title: 'Valid Parentheses', difficulty: 'easy', category: 'strings', pattern: 'Stack',
-    description: 'Given a string containing only \'(\', \')\', \'{\', \'}\', \'[\' and \']\', determine if the string is valid — brackets must close in the correct order.',
+    description: 'Given a string containing only \'(\', \')\', \'{\', \'}\', \'[\' and \']\', determine if the string is valid \u2014 brackets must close in the correct order.',
     examples: [
-      { input: 's = "()[]{}"', output: 'true' },
-      { input: 's = "([)]"',  output: 'false', explanation: 'Interleaved brackets' },
+      { input: 's = "()[]{}"', output: 'True' },
+      { input: 's = "([)]"',  output: 'False', explanation: 'Interleaved brackets' },
     ],
-    constraints: ['1 ≤ s.length ≤ 10⁴', 's consists of bracket characters only'],
-    starterCode: `function isValid(s) {\n  \n}`,
+    constraints: ['1 <= len(s) <= 10^4', 's consists of bracket characters only'],
+    starterCode: `def is_valid(s):\n    pass`,
+    entryPoint: 'is_valid',
+    solution: `def is_valid(s):
+    stack = []
+    pairs = {')': '(', ']': '[', '}': '{'}
+    for c in s:
+        if c in pairs:
+            if not stack or stack[-1] != pairs[c]:
+                return False
+            stack.pop()
+        else:
+            stack.append(c)
+    return len(stack) == 0`,
     testCases: [
       { args: ['()[]{}'], expected: true,  label: 'All match' },
       { args: ['(]'],     expected: false, label: 'Wrong closing' },
@@ -102,12 +108,13 @@ const PROBLEMS: Problem[] = [
     hints: [
       'When you see a closing bracket, you need to know the most recently opened bracket.',
       'A stack naturally tracks "last opened". Push on open, pop on close and verify they match.',
-      'Map: {")":"(", "]":"[", "}":"{"}. Push open brackets. For close: pop and check match. Return stack is empty.',
+      'Use a dict: {")":"(", "]":"[", "}":"{"}. Push open brackets. For close: pop and check. Return len(stack) == 0.',
     ],
-    insight: 'The stack models nesting: the last opened must be the next to close. Last-in, first-out maps exactly to the problem\'s constraints.',
+    insight: 'The stack models nesting: the last opened must be the next to close. LIFO maps exactly to the problem\'s constraints.',
     complexity: { time: 'O(n)', space: 'O(n)' },
     whyAsked: 'Classic stack application. Tests whether you recognize LIFO structure in a problem.',
   },
+  // ── KADANE'S ──────────────────────────────────────────
   {
     id: 'max-subarray', title: 'Maximum Subarray', difficulty: 'easy', category: 'arrays', pattern: 'Kadane\'s Algorithm',
     description: 'Given an integer array nums, find the contiguous subarray with the largest sum and return its sum.',
@@ -115,31 +122,47 @@ const PROBLEMS: Problem[] = [
       { input: 'nums = [-2,1,-3,4,-1,2,1,-5,4]', output: '6', explanation: 'Subarray [4,-1,2,1] has sum 6' },
       { input: 'nums = [-1]', output: '-1' },
     ],
-    constraints: ['1 ≤ nums.length ≤ 10⁵', '-10⁴ ≤ nums[i] ≤ 10⁴'],
-    starterCode: `function maxSubArray(nums) {\n  \n}`,
+    constraints: ['1 <= len(nums) <= 10^5', '-10^4 <= nums[i] <= 10^4'],
+    starterCode: `def max_sub_array(nums):\n    pass`,
+    entryPoint: 'max_sub_array',
+    solution: `def max_sub_array(nums):
+    current_sum = max_sum = nums[0]
+    for num in nums[1:]:
+        current_sum = max(num, current_sum + num)
+        max_sum = max(max_sum, current_sum)
+    return max_sum`,
     testCases: [
       { args: [[-2,1,-3,4,-1,2,1,-5,4]], expected: 6,  label: 'Mixed values' },
       { args: [[-1]],                    expected: -1, label: 'Single negative' },
       { args: [[5,4,-1,7,8]],            expected: 23, label: 'Mostly positive' },
     ],
     hints: [
-      'Track a running sum. At what point does it make sense to restart?',
-      'If the running sum becomes negative, it hurts future subarrays — reset to the current element.',
-      'currentSum = max(num, currentSum + num). maxSum = max(maxSum, currentSum). One pass.',
+      'Track a running sum. At what point does it make sense to restart from the current element?',
+      'If the running sum becomes negative, it hurts future subarrays \u2014 reset to the current element.',
+      'current_sum = max(num, current_sum + num). max_sum = max(max_sum, current_sum). One pass.',
     ],
-    insight: 'At each position: extending the existing subarray is only better than restarting if currentSum > 0. This greedy decision is always optimal.',
+    insight: 'At each position: extending the existing subarray is only better than restarting if current_sum > 0. This greedy decision is always optimal.',
     complexity: { time: 'O(n)', space: 'O(1)' },
-    whyAsked: 'Introduces the "reset when negative" greedy insight and local-vs-global optimum — a gateway to DP thinking.',
+    whyAsked: 'Introduces the "reset when negative" greedy insight \u2014 a gateway to DP thinking.',
   },
+  // ── LINEAR DP ─────────────────────────────────────────
   {
-    id: 'climbing-stairs', title: 'Climbing Stairs', difficulty: 'easy', category: 'dp', pattern: 'Dynamic Programming',
+    id: 'climbing-stairs', title: 'Climbing Stairs', difficulty: 'easy', category: 'dp', pattern: 'Linear DP',
     description: 'A staircase has n steps. Each time you can climb 1 or 2 steps. How many distinct ways can you reach the top?',
     examples: [
       { input: 'n = 3', output: '3', explanation: '1+1+1, 1+2, 2+1' },
       { input: 'n = 5', output: '8' },
     ],
-    constraints: ['1 ≤ n ≤ 45'],
-    starterCode: `function climbStairs(n) {\n  \n}`,
+    constraints: ['1 <= n <= 45'],
+    starterCode: `def climb_stairs(n):\n    pass`,
+    entryPoint: 'climb_stairs',
+    solution: `def climb_stairs(n):
+    if n <= 2:
+        return n
+    a, b = 1, 2
+    for _ in range(3, n + 1):
+        a, b = b, a + b
+    return b`,
     testCases: [
       { args: [3],  expected: 3,  label: 'n=3' },
       { args: [5],  expected: 8,  label: 'n=5' },
@@ -147,13 +170,14 @@ const PROBLEMS: Problem[] = [
     ],
     hints: [
       'To reach step n, you arrived from step n-1 (1-step) or step n-2 (2-step). What does that imply?',
-      'ways(n) = ways(n-1) + ways(n-2) — this is the Fibonacci sequence.',
-      'No array needed. Track two variables: let [a, b] = [1, 2]. For i in 3..n: [a, b] = [b, a+b]. Return b.',
+      'ways(n) = ways(n-1) + ways(n-2) \u2014 this is the Fibonacci sequence.',
+      'No array needed. Track two variables: a, b = 1, 2. For i in range(3, n+1): a, b = b, a+b. Return b.',
     ],
     insight: 'This IS Fibonacci. Recognizing that f(n) = f(n-1) + f(n-2) collapses the problem. Solve bottom-up with O(1) space.',
     complexity: { time: 'O(n)', space: 'O(1)' },
-    whyAsked: 'The simplest DP problem. Tests whether you spot overlapping subproblems and build bottom-up instead of recomputing recursively.',
+    whyAsked: 'The simplest DP problem. Tests whether you spot overlapping subproblems and build bottom-up.',
   },
+  // ── GREEDY ────────────────────────────────────────────
   {
     id: 'best-time-stock', title: 'Best Time to Buy and Sell Stock', difficulty: 'easy', category: 'arrays', pattern: 'Greedy',
     description: 'Given an array prices where prices[i] is a stock price on day i, return the maximum profit from one buy and one sell. Return 0 if no profit is possible.',
@@ -161,8 +185,16 @@ const PROBLEMS: Problem[] = [
       { input: 'prices = [7,1,5,3,6,4]', output: '5', explanation: 'Buy at 1, sell at 6' },
       { input: 'prices = [7,6,4,3,1]',   output: '0', explanation: 'No profitable transaction' },
     ],
-    constraints: ['1 ≤ prices.length ≤ 10⁵', '0 ≤ prices[i] ≤ 10⁴'],
-    starterCode: `function maxProfit(prices) {\n  \n}`,
+    constraints: ['1 <= len(prices) <= 10^5', '0 <= prices[i] <= 10^4'],
+    starterCode: `def max_profit(prices):\n    pass`,
+    entryPoint: 'max_profit',
+    solution: `def max_profit(prices):
+    min_price = float('inf')
+    max_profit = 0
+    for price in prices:
+        min_price = min(min_price, price)
+        max_profit = max(max_profit, price - min_price)
+    return max_profit`,
     testCases: [
       { args: [[7,1,5,3,6,4]], expected: 5, label: 'Profitable' },
       { args: [[7,6,4,3,1]],   expected: 0, label: 'No profit' },
@@ -170,13 +202,14 @@ const PROBLEMS: Problem[] = [
     ],
     hints: [
       'The optimal buy is always the minimum price seen before the optimal sell day.',
-      'Track the minimum price seen so far. At each price, the best profit if you sold today is price − minSoFar.',
-      'minPrice = Infinity, maxProfit = 0. For each p: minPrice = min(minPrice, p); maxProfit = max(maxProfit, p - minPrice).',
+      'Track the minimum price seen so far. At each price, the best profit if you sold today is price - min_so_far.',
+      'min_price = inf, result = 0. For each p: min_price = min(min_price, p); result = max(result, p - min_price).',
     ],
     insight: 'You don\'t need to track all pairs. The optimal buy is always the lowest price before the sell. One greedy scan captures the global optimum.',
     complexity: { time: 'O(n)', space: 'O(1)' },
     whyAsked: 'Tests greedy thinking and the "running minimum" pattern. Gateway to multi-transaction stock problems.',
   },
+  // ── SLIDING WINDOW ────────────────────────────────────
   {
     id: 'longest-substring', title: 'Longest Substring Without Repeating Characters', difficulty: 'medium', category: 'strings', pattern: 'Sliding Window',
     description: 'Given a string s, find the length of the longest substring without repeating characters.',
@@ -184,8 +217,18 @@ const PROBLEMS: Problem[] = [
       { input: 's = "abcabcbb"', output: '3', explanation: '"abc" is the longest unique window' },
       { input: 's = "bbbbb"',    output: '1' },
     ],
-    constraints: ['0 ≤ s.length ≤ 5×10⁴', 's can include letters, digits, symbols, spaces'],
-    starterCode: `function lengthOfLongestSubstring(s) {\n  \n}`,
+    constraints: ['0 <= len(s) <= 5*10^4', 's can include letters, digits, symbols, spaces'],
+    starterCode: `def length_of_longest_substring(s):\n    pass`,
+    entryPoint: 'length_of_longest_substring',
+    solution: `def length_of_longest_substring(s):
+    seen = {}
+    left = result = 0
+    for right, char in enumerate(s):
+        if char in seen and seen[char] >= left:
+            left = seen[char] + 1
+        seen[char] = right
+        result = max(result, right - left + 1)
+    return result`,
     testCases: [
       { args: ['abcabcbb'], expected: 3, label: 'Repeating' },
       { args: ['bbbbb'],    expected: 1, label: 'All same' },
@@ -193,70 +236,105 @@ const PROBLEMS: Problem[] = [
       { args: [''],         expected: 0, label: 'Empty' },
     ],
     hints: [
-      'Maintain a window [left, right] that contains no duplicates. When you see a duplicate on the right, advance the left.',
-      'A hash map from char → last-seen-index lets you jump the left pointer in O(1) instead of scanning.',
-      'map = {}, left = 0, max = 0. For each char at right: if map[char] >= left, left = map[char]+1. map[char] = right; max = max(max, right-left+1).',
+      'Maintain a window [left, right] that contains no duplicates. When you see a duplicate, advance the left pointer.',
+      'A dict from char to last-seen-index lets you jump the left pointer in O(1) instead of scanning.',
+      'seen = {}, left = 0, result = 0. For right, char in enumerate(s): if char in seen and seen[char] >= left, left = seen[char]+1. seen[char] = right. result = max(result, right-left+1).',
     ],
-    insight: 'Expand right, contract left only when needed. Storing the last index instead of a boolean lets the left pointer jump — avoiding redundant rescans.',
+    insight: 'Expand right, contract left only when needed. Storing the last index instead of a boolean lets the left pointer jump.',
     complexity: { time: 'O(n)', space: 'O(min(m,n))' },
     whyAsked: 'The canonical sliding window. Mastering expand-then-contract unlocks dozens of substring/subarray problems.',
   },
+  // ── PREFIX/SUFFIX ─────────────────────────────────────
   {
-    id: 'product-except-self', title: 'Product of Array Except Self', difficulty: 'medium', category: 'arrays', pattern: 'Prefix & Suffix Products',
+    id: 'product-except-self', title: 'Product of Array Except Self', difficulty: 'medium', category: 'arrays', pattern: 'Prefix & Suffix',
     description: 'Given integer array nums, return array answer where answer[i] = product of all nums except nums[i]. Must run in O(n); no division operator.',
     examples: [
       { input: 'nums = [1,2,3,4]', output: '[24,12,8,6]' },
       { input: 'nums = [0,1]',     output: '[1,0]' },
     ],
-    constraints: ['2 ≤ nums.length ≤ 10⁵', 'No division allowed', 'Answer fits in 32-bit integer'],
-    starterCode: `function productExceptSelf(nums) {\n  \n}`,
+    constraints: ['2 <= len(nums) <= 10^5', 'No division allowed'],
+    starterCode: `def product_except_self(nums):\n    pass`,
+    entryPoint: 'product_except_self',
+    solution: `def product_except_self(nums):
+    n = len(nums)
+    result = [1] * n
+    prefix = 1
+    for i in range(n):
+        result[i] = prefix
+        prefix *= nums[i]
+    suffix = 1
+    for i in range(n - 1, -1, -1):
+        result[i] *= suffix
+        suffix *= nums[i]
+    return result`,
     testCases: [
       { args: [[1,2,3,4]], expected: [24,12,8,6], label: 'Standard' },
       { args: [[0,1]],     expected: [1,0],       label: 'Contains zero' },
-      { args: [[1,1]],     expected: [1,1],        label: 'All ones' },
+      { args: [[1,1]],     expected: [1,1],       label: 'All ones' },
     ],
     hints: [
-      'answer[i] = (product of everything left of i) × (product of everything right of i).',
-      'Make two passes: one left-to-right to collect prefix products, one right-to-left for suffix products.',
-      'Left pass: result[i] = product of nums[0..i-1]. Right pass (in-place): multiply result[i] by running suffix product from nums[i+1..n-1].',
+      'answer[i] = (product of everything left of i) * (product of everything right of i).',
+      'Make two passes: left-to-right for prefix products, right-to-left for suffix products.',
+      'Left pass: result[i] = running prefix. Right pass: multiply result[i] by running suffix. Two loops, O(1) extra space.',
     ],
-    insight: 'Decompose each answer into left×right products. Two separate passes avoid the division operator and give clean O(n) time, O(1) extra space.',
+    insight: 'Decompose each answer into left*right products. Two separate passes avoid division and give O(n) time, O(1) extra space.',
     complexity: { time: 'O(n)', space: 'O(1) (output excluded)' },
     whyAsked: 'Tests prefix/suffix precomputation thinking. The "no division" constraint forces you beyond the naive approach.',
   },
+  // ── DP BOTTOM-UP ──────────────────────────────────────
   {
-    id: 'coin-change', title: 'Coin Change', difficulty: 'medium', category: 'dp', pattern: 'Dynamic Programming (Bottom-Up)',
-    description: 'Given coin denominations and a target amount, return the minimum number of coins needed to make up the amount. Return -1 if it\'s not possible.',
+    id: 'coin-change', title: 'Coin Change', difficulty: 'medium', category: 'dp', pattern: 'DP Bottom-Up',
+    description: 'Given coin denominations and a target amount, return the minimum number of coins needed. Return -1 if not possible.',
     examples: [
       { input: 'coins = [1,5,11], amount = 15', output: '3', explanation: '5+5+5 = 3 coins' },
       { input: 'coins = [2], amount = 3',        output: '-1' },
     ],
-    constraints: ['1 ≤ coins.length ≤ 12', '0 ≤ amount ≤ 10⁴'],
-    starterCode: `function coinChange(coins, amount) {\n  \n}`,
+    constraints: ['1 <= len(coins) <= 12', '0 <= amount <= 10^4'],
+    starterCode: `def coin_change(coins, amount):\n    pass`,
+    entryPoint: 'coin_change',
+    solution: `def coin_change(coins, amount):
+    dp = [float('inf')] * (amount + 1)
+    dp[0] = 0
+    for i in range(1, amount + 1):
+        for c in coins:
+            if c <= i:
+                dp[i] = min(dp[i], dp[i - c] + 1)
+    return dp[amount] if dp[amount] != float('inf') else -1`,
     testCases: [
       { args: [[1,5,11], 15], expected: 3,  label: 'Multi-denom' },
-      { args: [[2], 3],        expected: -1, label: 'Impossible' },
-      { args: [[1,2,5], 11],   expected: 3,  label: 'Classic' },
-      { args: [[1], 0],        expected: 0,  label: 'Zero amount' },
+      { args: [[2], 3],       expected: -1, label: 'Impossible' },
+      { args: [[1,2,5], 11],  expected: 3,  label: 'Classic' },
+      { args: [[1], 0],       expected: 0,  label: 'Zero amount' },
     ],
     hints: [
       'Define dp[i] = minimum coins to make amount i. What\'s dp[0]? How do you build dp[i] from smaller amounts?',
       'dp[0] = 0. For each i from 1 to amount: try each coin c: if i >= c, dp[i] = min(dp[i], dp[i-c]+1).',
-      'dp = Array(amount+1).fill(Infinity); dp[0]=0. Nested loop: amounts × coins. Return dp[amount]===Infinity ? -1 : dp[amount].',
+      'dp = [inf] * (amount+1); dp[0] = 0. Nested loop: for i in range(1, amount+1): for c in coins: if c <= i: dp[i] = min(dp[i], dp[i-c]+1). Return dp[amount] if != inf else -1.',
     ],
-    insight: 'Classic unbounded knapsack. Build up solutions for small amounts; each coin can be reused. The recurrence is: dp[i] = min(dp[i-c]+1) for all valid coins c.',
-    complexity: { time: 'O(amount × coins.length)', space: 'O(amount)' },
-    whyAsked: 'Fundamental DP problem. Tests your ability to identify the recurrence and build bottom-up — foundational for scheduling, allocation, and resource optimization.',
+    insight: 'Classic unbounded knapsack. Build solutions for small amounts; each coin reusable. Recurrence: dp[i] = min(dp[i-c]+1) for all valid coins c.',
+    complexity: { time: 'O(amount * len(coins))', space: 'O(amount)' },
+    whyAsked: 'Fundamental DP problem. Tests your ability to identify the recurrence and build bottom-up.',
   },
+  // ── SORT + MERGE ──────────────────────────────────────
   {
     id: 'merge-intervals', title: 'Merge Intervals', difficulty: 'medium', category: 'arrays', pattern: 'Sort + Merge',
     description: 'Given an array of intervals [start, end], merge all overlapping intervals and return the result.',
     examples: [
-      { input: 'intervals = [[1,3],[2,6],[8,10],[15,18]]', output: '[[1,6],[8,10],[15,18]]', explanation: '[1,3] and [2,6] overlap' },
+      { input: 'intervals = [[1,3],[2,6],[8,10],[15,18]]', output: '[[1,6],[8,10],[15,18]]' },
       { input: 'intervals = [[1,4],[4,5]]', output: '[[1,5]]' },
     ],
-    constraints: ['1 ≤ intervals.length ≤ 10⁴', 'intervals[i].length == 2'],
-    starterCode: `function merge(intervals) {\n  \n}`,
+    constraints: ['1 <= len(intervals) <= 10^4'],
+    starterCode: `def merge(intervals):\n    pass`,
+    entryPoint: 'merge',
+    solution: `def merge(intervals):
+    intervals.sort(key=lambda x: x[0])
+    result = [intervals[0]]
+    for start, end in intervals[1:]:
+        if start <= result[-1][1]:
+            result[-1][1] = max(result[-1][1], end)
+        else:
+            result.append([start, end])
+    return result`,
     testCases: [
       { args: [[[1,3],[2,6],[8,10],[15,18]]], expected: [[1,6],[8,10],[15,18]], label: 'Multiple overlaps' },
       { args: [[[1,4],[4,5]]],               expected: [[1,5]],                label: 'Touching' },
@@ -264,128 +342,180 @@ const PROBLEMS: Problem[] = [
     ],
     hints: [
       'If you sort by start time, overlapping intervals become adjacent.',
-      'After sorting, scan: if the current interval overlaps with the last merged one, extend it. Otherwise start a new one.',
-      'Sort by start. result = [intervals[0]]. For each [s,e]: if s <= result.last[1], result.last[1] = max(result.last[1], e). Else result.push([s,e]).',
+      'After sorting, scan: if current interval overlaps with the last merged one, extend it. Otherwise start new.',
+      'Sort by start. result = [intervals[0]]. For each [s,e]: if s <= result[-1][1], extend. Else append.',
     ],
-    insight: 'Sorting collapses the 2D problem into a 1D scan — overlapping intervals are adjacent, so you only ever compare with the last merged interval.',
+    insight: 'Sorting collapses the 2D problem into a 1D scan \u2014 overlapping intervals are adjacent.',
     complexity: { time: 'O(n log n)', space: 'O(n)' },
-    whyAsked: '"Sort first" is a widely applicable pattern. This problem tests whether you see how sorting transforms a complex comparison into a simple scan.',
+    whyAsked: '"Sort first" is a widely applicable pattern. Tests whether sorting transforms complex comparison into simple scan.',
   },
+  // ── GREEDY (HORIZON) ──────────────────────────────────
   {
     id: 'jump-game', title: 'Jump Game', difficulty: 'medium', category: 'arrays', pattern: 'Greedy',
-    description: 'Given array nums where nums[i] is your max jump from position i, return true if you can reach the last index.',
+    description: 'Given array nums where nums[i] is your max jump from position i, return True if you can reach the last index.',
     examples: [
-      { input: 'nums = [2,3,1,1,4]', output: 'true' },
-      { input: 'nums = [3,2,1,0,4]', output: 'false', explanation: 'Always land on 0 at index 3' },
+      { input: 'nums = [2,3,1,1,4]', output: 'True' },
+      { input: 'nums = [3,2,1,0,4]', output: 'False', explanation: 'Always land on 0 at index 3' },
     ],
-    constraints: ['1 ≤ nums.length ≤ 10⁴', '0 ≤ nums[i] ≤ 10⁵'],
-    starterCode: `function canJump(nums) {\n  \n}`,
+    constraints: ['1 <= len(nums) <= 10^4', '0 <= nums[i] <= 10^5'],
+    starterCode: `def can_jump(nums):\n    pass`,
+    entryPoint: 'can_jump',
+    solution: `def can_jump(nums):
+    max_reach = 0
+    for i, jump in enumerate(nums):
+        if i > max_reach:
+            return False
+        max_reach = max(max_reach, i + jump)
+    return True`,
     testCases: [
       { args: [[2,3,1,1,4]], expected: true,  label: 'Can reach' },
       { args: [[3,2,1,0,4]], expected: false, label: 'Stuck at zero' },
-      { args: [[0]],          expected: true,  label: 'Single element' },
+      { args: [[0]],         expected: true,  label: 'Single element' },
     ],
     hints: [
       'Track the furthest index you can currently reach (the frontier).',
-      'At each index i: if i > frontier, you\'re stuck and can never proceed.',
-      'maxReach = 0. for i in 0..n-1: if i > maxReach return false; maxReach = max(maxReach, i + nums[i]). return true.',
+      'At each index i: if i > frontier, you can never proceed \u2014 return False.',
+      'max_reach = 0. for i, jump in enumerate(nums): if i > max_reach return False; max_reach = max(max_reach, i + jump). return True.',
     ],
-    insight: 'Maintain the "horizon" — the furthest index reachable. You never need to simulate individual jumps; just track whether i stays within the horizon.',
+    insight: 'Maintain the "horizon" \u2014 the furthest index reachable. Never simulate individual jumps; just track whether i stays within the horizon.',
     complexity: { time: 'O(n)', space: 'O(1)' },
-    whyAsked: 'Clean greedy problem. Teaches "horizon tracking" — a broadly applicable pattern for reachability problems.',
+    whyAsked: 'Clean greedy problem. Teaches "horizon tracking" \u2014 broadly applicable for reachability.',
   },
+  // ── HASH MAP CANONICAL KEY ────────────────────────────
   {
-    id: 'group-anagrams', title: 'Group Anagrams', difficulty: 'medium', category: 'strings', pattern: 'Hash Map with Canonical Key',
-    description: 'Given an array of strings strs, group the anagrams together. You may return them in any order.',
+    id: 'group-anagrams', title: 'Group Anagrams', difficulty: 'medium', category: 'strings', pattern: 'Hash Map + Canonical Key',
+    description: 'Given an array of strings strs, group the anagrams together. Return in any order.',
     examples: [
       { input: 'strs = ["eat","tea","tan","ate","nat","bat"]', output: '[["bat"],["nat","tan"],["ate","eat","tea"]]' },
-      { input: 'strs = ["a"]', output: '[["a"]]' },
     ],
-    constraints: ['1 ≤ strs.length ≤ 10⁴', 'strs[i] consists of lowercase letters'],
-    starterCode: `function groupAnagrams(strs) {\n  \n}`,
+    constraints: ['1 <= len(strs) <= 10^4', 'strs[i] consists of lowercase letters'],
+    starterCode: `def group_anagrams(strs):\n    pass`,
+    entryPoint: 'group_anagrams',
+    solution: `def group_anagrams(strs):
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for s in strs:
+        key = ''.join(sorted(s))
+        groups[key].append(s)
+    return list(groups.values())`,
     testCases: [
       { args: [["eat","tea","tan","ate","nat","bat"]], expected: [["bat"],["nat","tan"],["ate","eat","tea"]], label: 'Classic', compareMode: 'sortedGroups' },
       { args: [[""]], expected: [[""]], label: 'Empty string' },
       { args: [["a"]], expected: [["a"]], label: 'Single' },
     ],
     hints: [
-      'Two strings are anagrams if they contain the same characters with the same frequencies. What key captures that?',
-      'Sort each string alphabetically — all anagrams produce the same sorted form. Use it as a hash map key.',
-      'map = {}. For each str: key = [...str].sort().join(""); (map[key] ||= []).push(str). return Object.values(map).',
+      'Two strings are anagrams if they contain the same characters with same frequencies. What key captures that?',
+      'Sort each string alphabetically \u2014 all anagrams produce the same sorted form. Use it as a dict key.',
+      'groups = defaultdict(list). For each s: key = "".join(sorted(s)); groups[key].append(s). Return list(groups.values()).',
     ],
-    insight: 'Define a canonical form for the equivalence class (sorted string). All anagrams share it. The hash map groups them in O(n k log k).',
-    complexity: { time: 'O(n × k log k)', space: 'O(n × k)' },
-    whyAsked: 'Tests hash map thinking with non-trivial keys. The pattern generalises: whenever you need to group by equivalence, find a canonical representation.',
+    insight: 'Define a canonical form for the equivalence class (sorted string). All anagrams share it. The dict groups them.',
+    complexity: { time: 'O(n * k log k)', space: 'O(n * k)' },
+    whyAsked: 'Tests hash map thinking with non-trivial keys. The pattern generalises: group by equivalence \u2192 find canonical representation.',
   },
+  // ── GRID DP ───────────────────────────────────────────
   {
     id: 'unique-paths', title: 'Unique Paths', difficulty: 'medium', category: 'dp', pattern: 'Grid DP',
-    description: 'A robot at the top-left of an m×n grid can only move right or down. How many unique paths lead to the bottom-right corner?',
+    description: 'A robot at the top-left of an m*n grid can only move right or down. How many unique paths lead to the bottom-right corner?',
     examples: [
       { input: 'm = 3, n = 7', output: '28' },
       { input: 'm = 3, n = 2', output: '3' },
     ],
-    constraints: ['1 ≤ m, n ≤ 100'],
-    starterCode: `function uniquePaths(m, n) {\n  \n}`,
+    constraints: ['1 <= m, n <= 100'],
+    starterCode: `def unique_paths(m, n):\n    pass`,
+    entryPoint: 'unique_paths',
+    solution: `def unique_paths(m, n):
+    dp = [1] * n
+    for _ in range(1, m):
+        for j in range(1, n):
+            dp[j] += dp[j - 1]
+    return dp[-1]`,
     testCases: [
-      { args: [3, 7], expected: 28, label: '3×7' },
-      { args: [3, 2], expected: 3,  label: '3×2' },
-      { args: [1, 1], expected: 1,  label: '1×1' },
+      { args: [3, 7], expected: 28, label: '3x7' },
+      { args: [3, 2], expected: 3,  label: '3x2' },
+      { args: [1, 1], expected: 1,  label: '1x1' },
     ],
     hints: [
-      'Ways to reach cell (i,j) = ways to reach cell above + ways to reach cell to the left.',
-      'Build a 2D dp table. First row and column are all 1s (only one route to reach them).',
-      'Space optimize: dp = Array(n).fill(1). For each row: for j=1..n-1: dp[j] += dp[j-1]. Return dp[n-1].',
+      'Ways to reach cell (i,j) = ways from above + ways from left.',
+      'Build a 2D dp table. First row and column are all 1s.',
+      'Space optimize: dp = [1] * n. For each row: for j in 1..n-1: dp[j] += dp[j-1]. Return dp[-1].',
     ],
-    insight: 'Classic grid DP: every cell\'s answer depends only on its top and left neighbors. The 1D space optimization is worth practising.',
-    complexity: { time: 'O(m×n)', space: 'O(n)' },
-    whyAsked: 'Introduces 2D DP and grid traversal with memoization. Common in matrix/path problems.',
+    insight: 'Classic grid DP: every cell depends only on top and left neighbors. The 1D space optimization is worth practising.',
+    complexity: { time: 'O(m*n)', space: 'O(n)' },
+    whyAsked: 'Introduces 2D DP and grid traversal. Common in matrix/path problems.',
   },
+  // ── PREFIX SUM + HASH MAP ─────────────────────────────
   {
     id: 'subarray-sum-k', title: 'Subarray Sum Equals K', difficulty: 'medium', category: 'arrays', pattern: 'Prefix Sum + Hash Map',
-    description: 'Given integer array nums and integer k, return the total number of continuous subarrays whose sum equals k. May contain negative numbers.',
+    description: 'Given integer array nums and integer k, return the total number of continuous subarrays whose sum equals k.',
     examples: [
       { input: 'nums = [1,1,1], k = 2', output: '2' },
       { input: 'nums = [1,2,3], k = 3', output: '2' },
     ],
-    constraints: ['1 ≤ nums.length ≤ 2×10⁴', 'Negatives allowed — sliding window won\'t work'],
-    starterCode: `function subarraySum(nums, k) {\n  \n}`,
+    constraints: ['1 <= len(nums) <= 2*10^4', 'Negatives allowed \u2014 sliding window won\'t work'],
+    starterCode: `def subarray_sum(nums, k):\n    pass`,
+    entryPoint: 'subarray_sum',
+    solution: `def subarray_sum(nums, k):
+    count = 0
+    prefix_sum = 0
+    seen = {0: 1}
+    for num in nums:
+        prefix_sum += num
+        count += seen.get(prefix_sum - k, 0)
+        seen[prefix_sum] = seen.get(prefix_sum, 0) + 1
+    return count`,
     testCases: [
       { args: [[1,1,1], 2],   expected: 2, label: 'Basic' },
       { args: [[1,2,3], 3],   expected: 2, label: 'Two valid' },
       { args: [[-1,-1,1], 0], expected: 1, label: 'Negatives' },
     ],
     hints: [
-      'sum(i..j) = prefixSum[j] - prefixSum[i-1]. So you need prefixSum[j] - k = prefixSum[i-1].',
-      'As you build the running prefix sum, count how many times (prefixSum − k) appeared before.',
-      'map = {0:1}, sum = 0, count = 0. For each num: sum += num; count += map[sum-k]||0; map[sum] = (map[sum]||0)+1. return count.',
+      'sum(i..j) = prefix[j] - prefix[i-1]. So you need prefix[j] - k = prefix[i-1].',
+      'As you build the running prefix sum, count how many times (prefix_sum - k) appeared before.',
+      'seen = {0: 1}, prefix = 0, count = 0. For each num: prefix += num; count += seen.get(prefix-k, 0); seen[prefix] = seen.get(prefix, 0)+1.',
     ],
-    insight: 'The prefix sum + hash map combo transforms O(n²) into O(n). The key equation: any subarray sum = current prefix − some earlier prefix. Works with negatives.',
+    insight: 'The prefix sum + hash map combo transforms O(n^2) into O(n). Key equation: any subarray sum = current prefix - some earlier prefix. Works with negatives.',
     complexity: { time: 'O(n)', space: 'O(n)' },
-    whyAsked: 'One of the most elegant tricks in interview problems. The prefix-sum-in-a-hash-map pattern recurs constantly.',
+    whyAsked: 'One of the most elegant tricks. The prefix-sum-in-a-hash-map pattern recurs constantly.',
   },
+  // ── TWO POINTERS ──────────────────────────────────────
   {
     id: 'trapping-rain', title: 'Trapping Rain Water', difficulty: 'hard', category: 'arrays', pattern: 'Two Pointers',
-    description: 'Given n non-negative integers representing an elevation map (each bar has width 1), compute how much water it can trap after raining.',
+    description: 'Given n non-negative integers representing an elevation map (bar width 1), compute how much water it can trap.',
     examples: [
       { input: 'height = [0,1,0,2,1,0,1,3,2,1,2,1]', output: '6' },
       { input: 'height = [4,2,0,3,2,5]',             output: '9' },
     ],
-    constraints: ['n = height.length; 1 ≤ n ≤ 2×10⁴', '0 ≤ height[i] ≤ 10⁵'],
-    starterCode: `function trap(height) {\n  \n}`,
+    constraints: ['1 <= len(height) <= 2*10^4', '0 <= height[i] <= 10^5'],
+    starterCode: `def trap(height):\n    pass`,
+    entryPoint: 'trap',
+    solution: `def trap(height):
+    left, right = 0, len(height) - 1
+    max_left = max_right = water = 0
+    while left < right:
+        if height[left] < height[right]:
+            max_left = max(max_left, height[left])
+            water += max_left - height[left]
+            left += 1
+        else:
+            max_right = max(max_right, height[right])
+            water += max_right - height[right]
+            right -= 1
+    return water`,
     testCases: [
       { args: [[0,1,0,2,1,0,1,3,2,1,2,1]], expected: 6, label: 'Classic' },
       { args: [[4,2,0,3,2,5]],             expected: 9, label: 'Large walls' },
       { args: [[3,0,2,0,4]],               expected: 7, label: 'Valley' },
     ],
     hints: [
-      'Water at index i = min(maxLeft, maxRight) - height[i]. How to compute both maxima efficiently?',
-      'Two pointers: whichever side has the smaller max height determines water at that pointer — regardless of the other side.',
-      'left=0, right=n-1, maxL=maxR=0, water=0. While left<right: if height[left]<height[right]: maxL=max(maxL,height[left]); water+=maxL-height[left]; left++. Else mirror for right.',
+      'Water at index i = min(max_left, max_right) - height[i]. How to compute both maxima efficiently?',
+      'Two pointers: whichever side has the smaller max determines water at that pointer.',
+      'left=0, right=n-1, max_l=max_r=water=0. While left<right: if height[left]<height[right]: max_l=max(max_l,height[left]); water+=max_l-height[left]; left+=1. Else mirror.',
     ],
-    insight: 'If maxLeft < maxRight, water at the left pointer is bounded by maxLeft regardless of what\'s on the right — you can commit without full information. That\'s why two pointers works.',
+    insight: 'If max_left < max_right, water at left pointer is bounded by max_left regardless of right side \u2014 you can commit without full information.',
     complexity: { time: 'O(n)', space: 'O(1)' },
-    whyAsked: 'A hard problem that becomes O(n)/O(1) with one insight. Tests ability to reason about what information is actually necessary at each step.',
+    whyAsked: 'A hard problem that becomes O(n)/O(1) with one insight. Tests reasoning about what information is necessary at each step.',
   },
+  // ── SLIDING WINDOW (EXPAND/CONTRACT) ──────────────────
   {
     id: 'min-window', title: 'Minimum Window Substring', difficulty: 'hard', category: 'strings', pattern: 'Sliding Window (Expand/Contract)',
     description: 'Given strings s and t, return the minimum window in s that contains every character of t. Return "" if no such window exists.',
@@ -393,359 +523,466 @@ const PROBLEMS: Problem[] = [
       { input: 's = "ADOBECODEBANC", t = "ABC"', output: '"BANC"' },
       { input: 's = "a", t = "aa"', output: '""' },
     ],
-    constraints: ['1 ≤ |s|, |t| ≤ 10⁵', 's and t consist of letters'],
-    starterCode: `function minWindow(s, t) {\n  \n}`,
+    constraints: ['1 <= len(s), len(t) <= 10^5'],
+    starterCode: `def min_window(s, t):\n    pass`,
+    entryPoint: 'min_window',
+    solution: `def min_window(s, t):
+    from collections import Counter
+    need = Counter(t)
+    missing = len(t)
+    left = start = end = 0
+    for right, char in enumerate(s, 1):
+        if need[char] > 0:
+            missing -= 1
+        need[char] -= 1
+        if missing == 0:
+            while need[s[left]] < 0:
+                need[s[left]] += 1
+                left += 1
+            if not end or right - left <= end - start:
+                start, end = left, right
+            need[s[left]] += 1
+            missing += 1
+            left += 1
+    return s[start:end]`,
     testCases: [
       { args: ['ADOBECODEBANC', 'ABC'], expected: 'BANC', label: 'Classic' },
       { args: ['a', 'a'],              expected: 'a',    label: 'Single match' },
       { args: ['a', 'aa'],             expected: '',     label: 'Impossible' },
     ],
     hints: [
-      'Expand the right pointer until all chars of t are covered. Then shrink the left to find the minimum window.',
-      'Use two frequency maps — one for what you need, one for what\'s in the window — and a "formed" counter for satisfied unique chars.',
-      'need = freq(t), have = {}, formed = 0, required = Object.keys(need).length, [l, minW] = [0, ""]. Expand right; if char needed and freq matches, formed++. While formed===required: update minW; shrink left.',
+      'Expand right until all chars of t are covered. Then shrink left to find the minimum window.',
+      'Use Counter for what you need. Track "missing" count. When missing == 0, shrink left.',
+      'need = Counter(t), missing = len(t). Expand right: if need[char] > 0, missing -= 1. When missing == 0, shrink left while need[s[left]] < 0.',
     ],
-    insight: 'Variable-size sliding window: two phases — expand to satisfy, contract to optimize. The "formed" counter is the critical detail that makes the contraction O(1) per step.',
+    insight: 'Variable-size sliding window: expand to satisfy, contract to optimize. The "missing" counter makes contraction O(1).',
     complexity: { time: 'O(|s|+|t|)', space: 'O(|t|)' },
-    whyAsked: 'The most demanding sliding window problem. Nails the expand/contract pattern with multiple character constraints.',
+    whyAsked: 'The most demanding sliding window problem. Nails expand/contract with multiple character constraints.',
+  },
+  // ════════════════════════════════════════════════════════
+  // NEW PATTERN-PAIRED PROBLEMS
+  // ════════════════════════════════════════════════════════
+  // ── TWO POINTER SQUEEZE (pairs with Trapping Rain Water) ──
+  {
+    id: 'container-water', title: 'Container With Most Water', difficulty: 'medium', category: 'arrays', pattern: 'Two Pointers',
+    description: 'Given n non-negative integers height[i], where each represents a point (i, height[i]), find two lines that together with the x-axis form a container that holds the most water.',
+    examples: [
+      { input: 'height = [1,8,6,2,5,4,8,3,7]', output: '49', explanation: 'Lines at index 1 (h=8) and index 8 (h=7), width=7, area=7*7=49' },
+      { input: 'height = [1,1]', output: '1' },
+    ],
+    constraints: ['2 <= len(height) <= 10^5', '0 <= height[i] <= 10^4'],
+    starterCode: `def max_area(height):\n    pass`,
+    entryPoint: 'max_area',
+    solution: `def max_area(height):
+    left, right = 0, len(height) - 1
+    result = 0
+    while left < right:
+        area = min(height[left], height[right]) * (right - left)
+        result = max(result, area)
+        if height[left] < height[right]:
+            left += 1
+        else:
+            right -= 1
+    return result`,
+    testCases: [
+      { args: [[1,8,6,2,5,4,8,3,7]], expected: 49, label: 'Classic' },
+      { args: [[1,1]],               expected: 1,  label: 'Minimum' },
+      { args: [[4,3,2,1,4]],         expected: 16, label: 'Symmetric' },
+    ],
+    hints: [
+      'Start with the widest container (left=0, right=n-1). What\'s the only direction to improve?',
+      'Moving the taller line inward can only reduce width without increasing height. Move the shorter side.',
+      'left=0, right=n-1, result=0. While left<right: area = min(h[left],h[right])*(right-left); result=max(result,area); move the shorter side inward.',
+    ],
+    insight: 'Same two-pointer squeeze as Trapping Rain Water. The shorter side limits the container \u2014 moving it inward is the only way to potentially find a taller line. Moving the taller side can never help.',
+    complexity: { time: 'O(n)', space: 'O(1)' },
+    whyAsked: 'Simpler version of the two-pointer squeeze pattern. Practice this before Trapping Rain Water to build the intuition.',
+  },
+  // ── SORT + TWO POINTERS (pairs with Two Sum) ──────────
+  {
+    id: 'three-sum', title: '3Sum', difficulty: 'medium', category: 'arrays', pattern: 'Sort + Two Pointers',
+    description: 'Given an integer array nums, return all triplets [nums[i], nums[j], nums[k]] such that i != j != k and nums[i] + nums[j] + nums[k] == 0. No duplicate triplets.',
+    examples: [
+      { input: 'nums = [-1,0,1,2,-1,-4]', output: '[[-1,-1,2],[-1,0,1]]' },
+      { input: 'nums = [0,0,0]', output: '[[0,0,0]]' },
+    ],
+    constraints: ['3 <= len(nums) <= 3000', '-10^5 <= nums[i] <= 10^5'],
+    starterCode: `def three_sum(nums):\n    pass`,
+    entryPoint: 'three_sum',
+    solution: `def three_sum(nums):
+    nums.sort()
+    result = []
+    for i in range(len(nums) - 2):
+        if i > 0 and nums[i] == nums[i - 1]:
+            continue
+        left, right = i + 1, len(nums) - 1
+        while left < right:
+            total = nums[i] + nums[left] + nums[right]
+            if total < 0:
+                left += 1
+            elif total > 0:
+                right -= 1
+            else:
+                result.append([nums[i], nums[left], nums[right]])
+                while left < right and nums[left] == nums[left + 1]:
+                    left += 1
+                while left < right and nums[right] == nums[right - 1]:
+                    right -= 1
+                left += 1
+                right -= 1
+    return result`,
+    testCases: [
+      { args: [[-1,0,1,2,-1,-4]], expected: [[-1,-1,2],[-1,0,1]], label: 'Classic' },
+      { args: [[0,0,0]],          expected: [[0,0,0]],            label: 'All zeros' },
+      { args: [[0,1,1]],          expected: [],                   label: 'No solution' },
+    ],
+    hints: [
+      'Sort the array first. Then for each element, the remaining two elements are a Two Sum problem.',
+      'Fix nums[i], use two pointers (left, right) on the remaining sorted array to find pairs summing to -nums[i]. Skip duplicates.',
+      'Sort. For i in range(n-2): skip if nums[i]==nums[i-1]. left=i+1, right=n-1. While left<right: check total. Skip duplicate lefts/rights after finding a match.',
+    ],
+    insight: 'Reduce 3Sum to Two Sum by fixing one element. Sorting enables the two-pointer approach AND duplicate skipping. Same complement logic as Two Sum, different technique.',
+    complexity: { time: 'O(n^2)', space: 'O(1) (excluding output)' },
+    whyAsked: 'Bridges Two Sum (hash map) with the sort+two-pointer approach. Forces you to handle duplicates cleanly.',
+  },
+  // ── LINEAR DP (pairs with Climbing Stairs) ────────────
+  {
+    id: 'house-robber', title: 'House Robber', difficulty: 'medium', category: 'dp', pattern: 'Linear DP',
+    description: 'You are robbing houses along a street. Each house has money. Adjacent houses have connected alarms \u2014 if two adjacent houses are robbed, the alarm triggers. Return the maximum amount you can rob without triggering alarms.',
+    examples: [
+      { input: 'nums = [1,2,3,1]', output: '4', explanation: 'Rob house 0 (1) + house 2 (3) = 4' },
+      { input: 'nums = [2,7,9,3,1]', output: '12', explanation: 'Rob house 0 (2) + house 2 (9) + house 4 (1) = 12' },
+    ],
+    constraints: ['1 <= len(nums) <= 100', '0 <= nums[i] <= 400'],
+    starterCode: `def rob(nums):\n    pass`,
+    entryPoint: 'rob',
+    solution: `def rob(nums):
+    if not nums:
+        return 0
+    if len(nums) == 1:
+        return nums[0]
+    prev2, prev1 = 0, 0
+    for num in nums:
+        prev2, prev1 = prev1, max(prev1, prev2 + num)
+    return prev1`,
+    testCases: [
+      { args: [[1,2,3,1]],   expected: 4,  label: 'Basic' },
+      { args: [[2,7,9,3,1]], expected: 12, label: 'Longer' },
+      { args: [[2,1,1,2]],   expected: 4,  label: 'Skip middle' },
+    ],
+    hints: [
+      'At each house, you choose: rob it (skip previous) or skip it (keep previous total). Same structure as Climbing Stairs.',
+      'dp[i] = max(dp[i-1], dp[i-2] + nums[i]). Compare with Climbing Stairs: f(n) = f(n-1) + f(n-2).',
+      'prev2, prev1 = 0, 0. For num in nums: prev2, prev1 = prev1, max(prev1, prev2 + num). Return prev1. Two variables, O(1) space.',
+    ],
+    insight: 'Same two-variable recurrence as Climbing Stairs, but with a max() decision instead of addition. If you can solve Climbing Stairs, you can solve this.',
+    complexity: { time: 'O(n)', space: 'O(1)' },
+    whyAsked: 'Pattern twin of Climbing Stairs. Same f(n-1), f(n-2) structure, adds the "take or skip" decision. Practice both back-to-back.',
+  },
+  // ── SEQUENCE DP (pairs with Coin Change) ──────────────
+  {
+    id: 'longest-increasing-subsequence', title: 'Longest Increasing Subsequence', difficulty: 'medium', category: 'dp', pattern: 'Sequence DP',
+    description: 'Given an integer array nums, return the length of the longest strictly increasing subsequence.',
+    examples: [
+      { input: 'nums = [10,9,2,5,3,7,101,18]', output: '4', explanation: '[2,3,7,101]' },
+      { input: 'nums = [0,1,0,3,2,3]', output: '4' },
+    ],
+    constraints: ['1 <= len(nums) <= 2500', '-10^4 <= nums[i] <= 10^4'],
+    starterCode: `def length_of_lis(nums):\n    pass`,
+    entryPoint: 'length_of_lis',
+    solution: `def length_of_lis(nums):
+    from bisect import bisect_left
+    tails = []
+    for num in nums:
+        pos = bisect_left(tails, num)
+        if pos == len(tails):
+            tails.append(num)
+        else:
+            tails[pos] = num
+    return len(tails)`,
+    testCases: [
+      { args: [[10,9,2,5,3,7,101,18]], expected: 4, label: 'Classic' },
+      { args: [[0,1,0,3,2,3]],         expected: 4, label: 'Duplicates' },
+      { args: [[7,7,7,7]],             expected: 1, label: 'All same' },
+    ],
+    hints: [
+      'O(n^2) approach: dp[i] = length of LIS ending at index i. dp[i] = max(dp[j]+1) for all j < i where nums[j] < nums[i].',
+      'O(n log n) optimization: maintain a "tails" array where tails[k] = smallest tail element for increasing subsequences of length k+1.',
+      'tails = []. For each num: use bisect_left to find position. If pos == len(tails), append. Else replace tails[pos] = num. Return len(tails).',
+    ],
+    insight: 'Like Coin Change, this is bottom-up DP. The O(n log n) patience sorting optimization uses the insight that only the smallest tail matters for each length.',
+    complexity: { time: 'O(n log n)', space: 'O(n)' },
+    whyAsked: 'Classic sequence DP with a binary search optimization. Pattern cousin of Coin Change \u2014 both build up optimal solutions from subproblems.',
+  },
+  // ── MONOTONIC STACK (pairs with Valid Parentheses) ─────
+  {
+    id: 'daily-temperatures', title: 'Daily Temperatures', difficulty: 'medium', category: 'arrays', pattern: 'Monotonic Stack',
+    description: 'Given array temperatures, return an array answer where answer[i] is the number of days you have to wait for a warmer temperature. If no future warmer day, answer[i] = 0.',
+    examples: [
+      { input: 'temperatures = [73,74,75,71,69,72,76,73]', output: '[1,1,4,2,1,1,0,0]' },
+      { input: 'temperatures = [30,40,50,60]', output: '[1,1,1,0]' },
+    ],
+    constraints: ['1 <= len(temperatures) <= 10^5', '30 <= temperatures[i] <= 100'],
+    starterCode: `def daily_temperatures(temperatures):\n    pass`,
+    entryPoint: 'daily_temperatures',
+    solution: `def daily_temperatures(temperatures):
+    n = len(temperatures)
+    result = [0] * n
+    stack = []  # indices of unresolved days
+    for i, temp in enumerate(temperatures):
+        while stack and temperatures[stack[-1]] < temp:
+            prev = stack.pop()
+            result[prev] = i - prev
+        stack.append(i)
+    return result`,
+    testCases: [
+      { args: [[73,74,75,71,69,72,76,73]], expected: [1,1,4,2,1,1,0,0], label: 'Classic' },
+      { args: [[30,40,50,60]],             expected: [1,1,1,0],         label: 'Always increasing' },
+      { args: [[60,50,40,30]],             expected: [0,0,0,0],         label: 'Always decreasing' },
+    ],
+    hints: [
+      'Same data structure as Valid Parentheses (stack), different use. Instead of matching brackets, you\'re finding the "next greater element."',
+      'Push indices onto stack. When you find a warmer day, pop all cooler days from the stack and record the distance.',
+      'stack = []. For i, temp in enumerate: while stack and temps[stack[-1]] < temp: prev = stack.pop(); result[prev] = i - prev. Push i.',
+    ],
+    insight: 'The stack in Valid Parens matches open/close brackets. Here, the same stack matches each day with its next warmer day. Both are "resolve when condition met" patterns.',
+    complexity: { time: 'O(n)', space: 'O(n)' },
+    whyAsked: 'Pattern twin of Valid Parentheses. Same stack structure, but for "next greater element" instead of bracket matching. Practice both to see the stack skeleton.',
+  },
+  // ── FIXED SLIDING WINDOW (pairs with Longest Substring) ─
+  {
+    id: 'permutation-in-string', title: 'Permutation in String', difficulty: 'medium', category: 'strings', pattern: 'Fixed Sliding Window',
+    description: 'Given two strings s1 and s2, return True if s2 contains a permutation of s1. In other words, return True if one of s1\'s permutations is a substring of s2.',
+    examples: [
+      { input: 's1 = "ab", s2 = "eidbaooo"', output: 'True', explanation: '"ba" is a permutation of "ab"' },
+      { input: 's1 = "ab", s2 = "eidboaoo"', output: 'False' },
+    ],
+    constraints: ['1 <= len(s1), len(s2) <= 10^4', 's1 and s2 consist of lowercase English letters'],
+    starterCode: `def check_inclusion(s1, s2):\n    pass`,
+    entryPoint: 'check_inclusion',
+    solution: `def check_inclusion(s1, s2):
+    from collections import Counter
+    if len(s1) > len(s2):
+        return False
+    need = Counter(s1)
+    window = Counter(s2[:len(s1)])
+    if window == need:
+        return True
+    for i in range(len(s1), len(s2)):
+        window[s2[i]] += 1
+        old = s2[i - len(s1)]
+        window[old] -= 1
+        if window[old] == 0:
+            del window[old]
+        if window == need:
+            return True
+    return False`,
+    testCases: [
+      { args: ['ab', 'eidbaooo'], expected: true,  label: 'Contains "ba"' },
+      { args: ['ab', 'eidboaoo'], expected: false, label: 'No permutation' },
+      { args: ['a', 'a'],         expected: true,  label: 'Single char' },
+    ],
+    hints: [
+      'A permutation has the same character frequencies as the original. Sliding a fixed-size window of len(s1) across s2...',
+      'Compare frequency counts of the window with s1. Same approach as Longest Substring, but the window size is fixed at len(s1).',
+      'need = Counter(s1). Slide a window of size len(s1): add right char, remove left char, compare Counters. If equal, return True.',
+    ],
+    insight: 'Simpler variant of the sliding window from Longest Substring and Min Window. Fixed window size means you always add one and remove one. Same frequency-map comparison.',
+    complexity: { time: 'O(n)', space: 'O(1) (26 letters max)' },
+    whyAsked: 'Pattern sibling of Longest Substring. Fixed-size window is easier \u2014 practice this first, then variable-size windows.',
   },
 ];
 
-// ─── Prep Kit Library ──────────────────────────────────────────────────────────
-const BEHAVIORAL_BANK: BehavioralQ[] = [
-  { question: "Walk me through the most technically complex system you've built end-to-end.", hint: "Cover scale, your exact role, key decisions, trade-offs, and a measurable outcome. Use real numbers.", why: "Tests technical depth + ownership. Interviewers want real complexity, not just CRUD.", tags: ['ownership','technical depth'] },
-  { question: "Tell me about a time you had to push back on a product decision for technical reasons.", hint: "Show how you framed technical risk in business terms, how you gained buy-in without being adversarial.", why: "Senior engineers influence decisions. Tests communication and courage.", tags: ['influence','leadership'] },
-  { question: "Describe a significant technical failure or outage you were responsible for.", hint: "Don't minimize it. Root cause → response → how you communicated → what changed to prevent recurrence.", why: "How you handle failure reveals character. Ownership + learning is a strong signal.", tags: ['ownership','resilience'] },
-  { question: "How do you balance shipping fast vs maintaining technical quality?", hint: "Give a concrete example. Avoid 'it depends' without a real decision behind it.", why: "Reveals your philosophy and whether you can hold the tension between velocity and sustainability.", tags: ['technical judgment','leadership'] },
-  { question: "Tell me about a time you changed technical direction mid-project. What drove that?", hint: "What new information emerged? How did you make the case? How did you manage the transition?", why: "Tests adaptability and leadership under uncertainty.", tags: ['adaptability','leadership'] },
-  { question: "Describe a situation where you had to deliver difficult news to stakeholders.", hint: "Was it a delay? A security issue? Focus on how early you flagged it and what solutions you offered.", why: "Senior engineers own upward communication. Transparency and solution-orientation matter.", tags: ['communication','ownership'] },
-  { question: "Tell me about a time you made a major architectural decision with incomplete information.", hint: "What data did you gather? What assumptions did you make explicit? What would you do differently?", why: "Real engineering is always uncertain. Tests your decision-making framework.", tags: ['technical judgment','ambiguity'] },
-  { question: "Describe how you've helped a struggling engineer on your team improve.", hint: "What were the gaps? What actions did you take? What was the outcome? Avoid making it sound easy.", why: "Senior engineers grow others, not just themselves.", tags: ['mentorship','leadership'] },
-];
+// ─── Pyodide Runner ───────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let pyodideInstance: any = null;
+let pyodideLoading = false;
+const pyodideQueue: Array<() => void> = [];
 
-const BEHAVIORAL_SENIOR: BehavioralQ[] = [
-  { question: "How do you build engineering culture — specifically psychological safety alongside high performance?", hint: "Give real examples: how you handled brilliant-but-toxic people, or created space for concerns.", why: "Culture multiplies or divides engineering output. Leaders own it.", tags: ['culture','leadership'] },
-  { question: "Describe your approach to technical strategy and getting cross-company alignment.", hint: "How do you connect engineering roadmap to business goals? How do you communicate trade-offs upward?", why: "Operates at the intersection of engineering and business.", tags: ['strategy','communication'] },
-  { question: "Tell me about a time you disagreed with leadership and how you handled it.", hint: "Show you can disagree constructively — and fully commit once a decision is made.", why: "Tests judgment and professionalism. Common at senior+ levels.", tags: ['leadership','judgment'] },
-];
-
-function buildSystemDesign(desc: string): SystemDesignQ[] {
-  const d = desc.toLowerCase();
-  const domain =
-    /payment|fintech|banking|wallet/.test(d) ? 'fintech' :
-    /health|medical|patient|hipaa/.test(d) ? 'health' :
-    /ecommerce|shop|marketplace|checkout/.test(d) ? 'ecommerce' :
-    /ai|ml|model|inference|llm/.test(d) ? 'ai' :
-    /social|feed|post|media/.test(d) ? 'social' :
-    'general';
-
-  const DESIGNS: Record<string, SystemDesignQ[]> = {
-    fintech: [
-      { question: "Design a payment processing system with strong consistency guarantees at high throughput.", angles: ["Idempotency keys", "Two-phase commit vs saga pattern", "Reconciliation jobs", "PCI-DSS compliance"] },
-      { question: "Design a real-time ledger that can serve millions of balance reads per second.", angles: ["CQRS read/write split", "Event sourcing for audit trail", "Caching hot accounts", "Eventual vs strong consistency"] },
-      { question: "Design a fraud detection system that scores transactions in under 100ms.", angles: ["Rule engine vs ML model", "Feature store design", "Async post-processing", "False positive tradeoffs"] },
-    ],
-    health: [
-      { question: "Design a HIPAA-compliant patient data platform with real-time clinician access.", angles: ["Encryption at rest/transit", "Audit logging", "Role-based access", "Consent management"] },
-      { question: "Design a system for processing medical imaging at scale.", angles: ["Async pipeline", "Storage tiers", "ML inference service", "DICOM handling"] },
-    ],
-    ecommerce: [
-      { question: "Design a product catalog and search system for millions of SKUs.", angles: ["Elasticsearch indexing", "Faceted search", "Caching strategy", "A/B test ranking"] },
-      { question: "Design a distributed inventory management system that prevents overselling.", angles: ["Optimistic vs pessimistic locking", "Event-driven stock updates", "Reservation TTLs", "Cart expiry"] },
-    ],
-    ai: [
-      { question: "Design a low-latency ML inference serving platform.", angles: ["Model versioning", "Batching strategy", "GPU resource allocation", "Canary deployments"] },
-      { question: "Design a RAG (retrieval-augmented generation) system for enterprise knowledge.", angles: ["Chunking strategy", "Embedding models", "Vector DB choice", "Context window management"] },
-    ],
-    social: [
-      { question: "Design a social media feed that scales to 100M users.", angles: ["Fan-out on write vs read", "Cache warming", "Timeline storage", "Privacy filter"] },
-    ],
-    general: [
-      { question: "Design a URL shortener with analytics.", angles: ["Hash collision handling", "Redirect performance", "Click analytics pipeline", "Expiry & TTL"] },
-      { question: "Design a distributed rate limiter for an API gateway.", angles: ["Token bucket vs leaky bucket", "Redis vs in-memory", "Sliding window counters", "Header propagation"] },
-      { question: "Design a notification service that delivers at-least-once across email, push, and SMS.", angles: ["Fanout architecture", "Deduplication", "Retry with exponential backoff", "User preference store"] },
-    ],
-  };
-  return (DESIGNS[domain] || DESIGNS.general).slice(0, 3);
-}
-
-function buildTechnical(stack: string, desc: string): TechTopic[] {
-  const s = (stack + ' ' + desc).toLowerCase();
-  const topics: TechTopic[] = [];
-  if (/react|vue|angular|next|frontend/.test(s)) topics.push({ topic: 'React / Frontend Fundamentals', subtopics: ['Virtual DOM & reconciliation', 'State management (Redux, Zustand, Context)', 'React 18: concurrent features, Suspense', 'Performance: memo, useMemo, useCallback', 'SSR vs CSR vs SSG trade-offs'] });
-  if (/node|express|fastify|nest|backend|api/.test(s)) topics.push({ topic: 'Node.js & API Design', subtopics: ['Event loop & non-blocking I/O', 'REST vs GraphQL vs gRPC', 'Middleware patterns', 'Connection pooling', 'Rate limiting & throttling'] });
-  if (/python|django|flask|fastapi/.test(s)) topics.push({ topic: 'Python & Web Frameworks', subtopics: ['Async: asyncio, ASGI vs WSGI', 'ORM: SQLAlchemy / Django ORM', 'Type hints & Pydantic', 'Testing: pytest patterns', 'Packaging & dependency management'] });
-  if (/postgres|mysql|sql|database|db/.test(s)) topics.push({ topic: 'Databases & Query Optimization', subtopics: ['EXPLAIN ANALYZE query plans', 'Index types (B-tree, GIN, partial)', 'Transaction isolation levels', 'N+1 query problem', 'Sharding vs partitioning'] });
-  if (/aws|gcp|azure|cloud|k8s|kubernetes|docker/.test(s)) topics.push({ topic: 'Cloud & Infrastructure', subtopics: ['Container orchestration fundamentals', 'IAM & least-privilege design', 'Auto-scaling strategies', 'Cost optimization patterns', 'Observability: logs, metrics, traces'] });
-  if (/redis|cache|memcache/.test(s)) topics.push({ topic: 'Caching & Data Structures', subtopics: ['Cache invalidation strategies', 'TTL vs event-driven expiry', 'Cache stampede prevention', 'Redis data structures & use cases'] });
-  if (topics.length < 3) {
-    topics.push({ topic: 'System Design Fundamentals', subtopics: ['CAP theorem & consistency models', 'Load balancing strategies', 'Database indexing & query planning', 'Message queues (Kafka, RabbitMQ)', 'CDN & edge caching'] });
-    topics.push({ topic: 'Distributed Systems Patterns', subtopics: ['Saga pattern vs 2PC', 'Circuit breaker & bulkhead', 'Idempotency & exactly-once delivery', 'CQRS & Event Sourcing', 'Leader election & consensus'] });
+async function getPyodide() {
+  if (pyodideInstance) return pyodideInstance;
+  if (pyodideLoading) {
+    return new Promise<typeof pyodideInstance>((resolve) => {
+      pyodideQueue.push(() => resolve(pyodideInstance));
+    });
   }
-  return topics.slice(0, 5);
+  pyodideLoading = true;
+  const { loadPyodide } = await import('pyodide');
+  pyodideInstance = await loadPyodide({
+    indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.5/full/',
+  });
+  pyodideLoading = false;
+  for (const cb of pyodideQueue) cb();
+  pyodideQueue.length = 0;
+  return pyodideInstance;
 }
 
-function buildAskThem(role: string, round: Round): AskThem[] {
-  const base: AskThem[] = [
-    { question: "What does success look like in the first 90 days for this role?", why: "Sets expectations and shows you're thinking about impact." },
-    { question: "What's the biggest technical challenge the team is facing right now?", why: "Shows curiosity about real problems, not just the job description." },
-    { question: "How does engineering influence product direction here?", why: "Reveals how much technical voice there is in the organization." },
-    { question: "What's the deployment pipeline look like — how often do you ship?", why: "Good proxy for engineering maturity and velocity." },
-    { question: "How do you handle on-call and incident response?", why: "Reveals operational burden and support culture." },
-    { question: "What's been the most interesting technical problem the team solved in the last 6 months?", why: "Tells you the quality and nature of work you'd be doing." },
-  ];
-  if (round === 'vp' || round === 'final') {
-    base.push({ question: "What's your vision for the engineering org over the next 2 years?", why: "Strategic question — VP/senior panels love this." });
-    base.push({ question: "How do you think about the balance between innovation and stability?", why: "Reveals leadership philosophy and where they are in company maturity." });
-  }
-  return base;
-}
-
-function buildGamePlan(company: string, round: Round, daysUntil: number): GamePlan[] {
-  if (daysUntil <= 1) {
-    return [
-      { when: daysUntil === 0 ? "Today (Hours Before)" : "Tonight", tasks: [
-        `Speed-research ${company || 'the company'}: what they do, recent news, Glassdoor, LinkedIn of your interviewer.`,
-        "Pick your 3 strongest STAR stories and rehearse them out loud — once is enough.",
-        "Sketch a rough answer to 'Why this company?' — make it specific and genuine.",
-        "Pick 3 sharp questions to ask from the 'Ask Them' section.",
-      ]},
-      { when: "Morning of the Interview", tasks: [
-        "No new material. Review notes only — 15 minutes max.",
-        "Google '[company name] news site:techcrunch.com' — mention something recent.",
-        "Deep breaths: confidence reads as competence.",
-      ]},
-      { when: "During the Interview", tasks: [
-        "Pause 2–3 seconds before answering behaviorals — it reads as thoughtful, not slow.",
-        "For technical/design: think out loud. Say what you're considering, not just your conclusion.",
-        "Ask your questions even if you're nervous — it signals you're evaluating them too.",
-      ]},
-      { when: "After the Interview", tasks: [
-        "Send a follow-up email within 2 hours: thank them, reference one specific thing from the conversation.",
-        "Write down what felt hard — that's signal for next time regardless of outcome.",
-      ]},
-    ];
-  }
-  return [
-    { when: `Days 1–${Math.max(2, Math.round(daysUntil * 0.3))}: Research & Stories`, tasks: [
-      `Research ${company || 'the company'} in depth: product, tech blog, recent hires, Glassdoor, Crunchbase.`,
-      "Write your top 5 STAR stories with real numbers. For each: situation → your exact action → measurable result.",
-      "Practice 2 stories out loud. Record yourself. Reduce filler words.",
-    ]},
-    { when: `Days ${Math.round(daysUntil * 0.3) + 1}–${Math.round(daysUntil * 0.7)}: Technical Prep`, tasks: [
-      "Sketch solutions to the system design questions in this kit — whiteboard or paper.",
-      "Review the technical topics flagged in your kit. Depth over breadth.",
-      "Refresh rusty fundamentals relevant to your stack.",
-      round === 'technical' ? "Practise 3–5 coding problems in the Code Practice tab — focus on patterns, not memorisation." : "Review your architectural decisions and how you'd explain them.",
-    ]},
-    { when: `Days ${Math.round(daysUntil * 0.7) + 1}–${daysUntil - 1}: Polish & Questions`, tasks: [
-      `Run one full mock interview: ${round === 'technical' ? '45 min coding + system design' : '30 min behavioral + 30 min system design'}.`,
-      "Finalise your 5 questions to ask. Make them specific to the company.",
-      "Write your 'Why this company?' answer — it must be genuine.",
-    ]},
-    { when: "Day of: Execution", tasks: [
-      "No new material. Confidence-review only.",
-      "Bring energy — enthusiasm is memorable.",
-      "Ask all your questions.",
-      "Follow-up email within 2 hours.",
-    ]},
-  ];
-}
-
-function buildPrepKit(company: string, role: string, desc: string, round: Round, stack: string, daysUntil: number): PrepKit {
-  const behavioral = [...BEHAVIORAL_BANK];
-  if (round === 'vp' || round === 'final') behavioral.push(...BEHAVIORAL_SENIOR);
-  return {
-    behavioral,
-    systemDesign: buildSystemDesign(desc),
-    technical: buildTechnical(stack, desc),
-    askThem: buildAskThem(role, round),
-    gamePlan: buildGamePlan(company, round, daysUntil),
-  };
-}
-
-// ─── Code runner ───────────────────────────────────────────────────────────────
-function compareResults(got: unknown, expected: unknown, mode?: string): boolean {
-  if (mode === 'sortedGroups') {
-    const g = got as string[][];
-    const e = expected as string[][];
-    const norm = (arr: string[][]) =>
-      arr.map(grp => [...grp].sort()).sort((a, b) => (a[0] || '').localeCompare(b[0] || ''));
-    return JSON.stringify(norm(g)) === JSON.stringify(norm(e));
+function compareResults(got: unknown, expected: unknown, compareMode?: string): boolean {
+  if (compareMode === 'sortedGroups') {
+    if (!Array.isArray(got) || !Array.isArray(expected)) return false;
+    const sortGroup = (arr: unknown[][]) => arr.map(g => [...g].sort()).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+    return JSON.stringify(sortGroup(got as unknown[][])) === JSON.stringify(sortGroup(expected as unknown[][]));
   }
   return JSON.stringify(got) === JSON.stringify(expected);
 }
 
-function runCode(code: string, problem: Problem): TestResult[] {
-  let fn: (...args: unknown[]) => unknown;
-  try {
-    // eslint-disable-next-line no-new-func
-    fn = new Function('"use strict"; return (' + code + ')')() as (...args: unknown[]) => unknown;
-    if (typeof fn !== 'function') throw new Error('Your code must be a function expression.');
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return problem.testCases.map(tc => ({ label: tc.label, passed: false, got: undefined, expected: tc.expected, error: msg }));
-  }
-  return problem.testCases.map(tc => {
+async function runPythonCode(code: string, problem: Problem): Promise<TestResult[]> {
+  const py = await getPyodide();
+  const results: TestResult[] = [];
+  for (const tc of problem.testCases) {
     try {
-      const got = fn(...tc.args);
+      const argsStr = tc.args.map(a => JSON.stringify(a)).join(', ');
+      const script = `
+import json
+${code}
+_r = ${problem.entryPoint}(${argsStr})
+json.dumps(_r)
+`;
+      const raw = py.runPython(script);
+      const got = JSON.parse(raw);
       const passed = compareResults(got, tc.expected, tc.compareMode);
-      return { label: tc.label, passed, got, expected: tc.expected };
+      results.push({ label: tc.label, passed, got, expected: tc.expected });
     } catch (e: unknown) {
-      return { label: tc.label, passed: false, got: undefined, expected: tc.expected, error: e instanceof Error ? e.message : String(e) };
+      const msg = e instanceof Error ? e.message : String(e);
+      // Extract just the last line of Python error for readability
+      const lines = msg.split('\n').filter(Boolean);
+      const short = lines[lines.length - 1] || msg;
+      results.push({ label: tc.label, passed: false, got: undefined, expected: tc.expected, error: short });
     }
-  });
+  }
+  return results;
 }
 
 // ─── Styled Components ────────────────────────────────────────────────────────
 const Root = styled.div`
-  min-height: 100%; padding: 1.5rem 2rem; background: ${T.cream};
-  font-family: ${T.sans}; color: ${T.ink}; box-sizing: border-box;
-  @media (max-width: 900px) { padding: 1rem; }
+  min-height:100%;background:${T.cream};font-family:${T.sans};color:${T.ink};
+  box-sizing:border-box;display:flex;flex-direction:column;
 `;
-const TopBar = styled.div`display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:0.75rem;`;
-const Title  = styled.h1`font-family:${T.serif};font-size:1.85rem;font-weight:400;color:${T.ink};margin:0;`;
-const Sub    = styled.p`font-size:0.8rem;color:${T.inkLight};margin:0;`;
-const ModeToggle = styled.div`display:flex;background:${T.surface};border:1px solid ${T.border};border-radius:${T.radiusSm};padding:3px;gap:2px;`;
-const ModeBtn = styled.button<{$active:boolean}>`
-  display:flex;align-items:center;gap:0.4rem;padding:0.45rem 0.9rem;border-radius:5px;border:none;cursor:pointer;font-size:0.8rem;font-weight:600;font-family:${T.sans};transition:all 0.2s;
-  background:${({$active})=>$active?T.ink:'transparent'};color:${({$active})=>$active?T.cream:T.inkMid};
+const TopBar = styled.div`
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1rem 1.5rem;border-bottom:1px solid ${T.border};flex-wrap:wrap;gap:0.75rem;
+`;
+const Title = styled.h1`font-family:${T.serif};font-size:1.6rem;font-weight:400;margin:0;`;
+const StatChips = styled.div`display:flex;align-items:center;gap:0.75rem;`;
+const Chip = styled.span<{$color?:string}>`
+  font-family:${T.mono};font-size:0.75rem;font-weight:500;padding:0.3rem 0.7rem;
+  border-radius:99px;background:${({$color})=>$color||T.surface};border:1px solid ${T.border};color:${T.inkMid};
+`;
+const Layout = styled.div`
+  display:grid;grid-template-columns:260px 1fr;flex:1;overflow:hidden;
+  @media(max-width:900px){grid-template-columns:1fr;}
+`;
+// ── Sidebar ──
+const Sidebar = styled.div`
+  border-right:1px solid ${T.border};display:flex;flex-direction:column;overflow:hidden;
+`;
+const FilterBar = styled.div`display:flex;flex-wrap:wrap;gap:0.3rem;padding:0.75rem 0.75rem 0.5rem;border-bottom:1px solid ${T.border};`;
+const FilterBtn = styled.button<{$active:boolean}>`
+  padding:0.2rem 0.55rem;border-radius:99px;border:1px solid ${({$active})=>$active?T.ink:'transparent'};
+  background:${({$active})=>$active?T.ink:T.surface};color:${({$active})=>$active?T.cream:T.inkMid};
+  font-size:0.68rem;font-weight:600;cursor:pointer;transition:all 0.15s;
   &:hover{background:${({$active})=>$active?T.ink:T.border};}
 `;
-// Setup form
-const SetupCard  = styled.div`background:${T.surface};border:1px solid ${T.border};border-radius:${T.radius};padding:2rem;max-width:660px;margin:0 auto;animation:${fadeIn} 0.3s ease;box-shadow:${T.shadow};`;
-const FieldGrid  = styled.div`display:grid;grid-template-columns:1fr 1fr;gap:1rem;@media(max-width:600px){grid-template-columns:1fr;}`;
-const Field      = styled.div`display:flex;flex-direction:column;gap:0.3rem;`;
-const FieldFull  = styled(Field)`grid-column:1/-1;`;
-const Label      = styled.label`font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:${T.inkLight};`;
-const Input      = styled.input`padding:0.6rem 0.75rem;border:1px solid ${T.borderMid};border-radius:${T.radiusSm};background:${T.cream};font-family:${T.sans};font-size:0.85rem;color:${T.ink};outline:none;&:focus{border-color:${T.accent};}`;
-const Textarea   = styled.textarea`padding:0.6rem 0.75rem;border:1px solid ${T.borderMid};border-radius:${T.radiusSm};background:${T.cream};font-family:${T.sans};font-size:0.85rem;color:${T.ink};resize:vertical;min-height:68px;outline:none;&:focus{border-color:${T.accent};}`;
-const RoundGrid  = styled.div`display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;@media(max-width:480px){grid-template-columns:repeat(2,1fr);}`;
-const RoundBtn   = styled.button<{$active:boolean}>`
-  padding:0.55rem 0.4rem;border-radius:${T.radiusSm};border:1px solid ${({$active})=>$active?T.ink:'transparent'};
-  background:${({$active})=>$active?T.ink:T.cream};color:${({$active})=>$active?T.cream:T.inkMid};
-  font-family:${T.sans};font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;
-`;
-const DaysRow    = styled.div`display:flex;align-items:center;gap:0.75rem;`;
-const DaysInput  = styled.input`width:60px;padding:0.5rem 0.6rem;border:1px solid ${T.borderMid};border-radius:${T.radiusSm};background:${T.cream};font-family:${T.mono};font-size:0.9rem;text-align:center;color:${T.ink};outline:none;&:focus{border-color:${T.accent};}`;
-const GenBtn     = styled.button<{$disabled?:boolean}>`
-  width:100%;padding:0.85rem;border-radius:${T.radiusSm};border:none;margin-top:1rem;cursor:pointer;font-family:${T.sans};font-size:0.9rem;font-weight:700;transition:all 0.2s;
-  background:${({$disabled})=>$disabled?T.surface:T.ink};color:${({$disabled})=>$disabled?T.inkLight:T.cream};
-  &:hover:not([disabled]){background:#2d2414;}
-`;
-// Kit results
-const KitWrap   = styled.div`display:grid;grid-template-columns:220px 1fr;gap:1.5rem;max-width:1100px;@media(max-width:800px){grid-template-columns:1fr;}`;
-const SideNav   = styled.div`display:flex;flex-direction:column;gap:0.35rem;position:sticky;top:1rem;height:fit-content;`;
-const SideItem  = styled.button<{$active:boolean}>`
-  display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.8rem;border-radius:${T.radiusSm};border:1px solid ${({$active})=>$active?T.borderMid:'transparent'};
-  background:${({$active})=>$active?T.cream:'transparent'};color:${({$active})=>$active?T.ink:T.inkMid};
-  font-family:${T.sans};font-size:0.8rem;font-weight:600;cursor:pointer;text-align:left;transition:all 0.15s;
-  &:hover{background:${T.cream};}
-`;
-const ContentWrap = styled.div`animation:${fadeIn} 0.25s ease;`;
-const SectionTitle = styled.h2`font-family:${T.serif};font-size:1.4rem;font-weight:400;margin:0 0 1rem;`;
-// Q cards
-const QCard  = styled.div`background:${T.cream};border:1px solid ${T.border};border-radius:${T.radiusSm};overflow:hidden;margin-bottom:0.75rem;`;
-const QHead  = styled.button`display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;padding:1rem 1.1rem;width:100%;background:none;border:none;cursor:pointer;text-align:left;`;
-const QNum   = styled.span`font-family:${T.mono};font-size:0.7rem;font-weight:700;color:${T.inkLight};margin-right:0.5rem;`;
-const QText  = styled.span`font-size:0.88rem;font-weight:600;color:${T.ink};line-height:1.4;`;
-const QBody  = styled.div`padding:0 1.1rem 1rem;border-top:1px solid ${T.border};`;
-const QHint  = styled.div`margin:0.75rem 0 0.5rem;padding:0.65rem 0.8rem;background:${T.accentBg};border:1px solid ${T.accentBorder};border-radius:${T.radiusSm};font-size:0.8rem;color:${T.accent};line-height:1.5;`;
-const QWhy   = styled.div`display:flex;gap:0.4rem;align-items:flex-start;font-size:0.75rem;color:${T.inkLight};line-height:1.5;`;
-const TagRow = styled.div`display:flex;gap:0.35rem;flex-wrap:wrap;margin-top:0.5rem;`;
-const Tag    = styled.span`padding:0.15rem 0.5rem;border-radius:99px;font-size:0.65rem;font-weight:600;background:${T.surface};border:1px solid ${T.border};color:${T.inkMid};`;
-// System design + game plan
-const SDCard  = styled.div`border:1px solid ${T.border};border-radius:${T.radiusSm};padding:1rem 1.1rem;margin-bottom:0.75rem;background:${T.cream};`;
-const SDQ     = styled.p`font-size:0.88rem;font-weight:600;color:${T.ink};margin:0 0 0.6rem;`;
-const AngleList = styled.ul`margin:0;padding-left:1.2rem;`;
-const Angle   = styled.li`font-size:0.8rem;color:${T.inkMid};line-height:1.6;`;
-const GPBlock = styled.div`margin-bottom:0.85rem;`;
-const GPWhen  = styled.p`font-size:0.8rem;font-weight:700;color:${T.accent};text-transform:uppercase;letter-spacing:0.04em;margin:0 0 0.35rem;`;
-const GPTask  = styled.p`font-size:0.83rem;color:${T.inkMid};margin:0 0 0.3rem;padding-left:0.9rem;position:relative;&::before{content:"·";position:absolute;left:0;color:${T.inkLight};}`;
-const AskCard = styled.div`background:${T.cream};border:1px solid ${T.border};border-radius:${T.radiusSm};padding:0.9rem 1rem;margin-bottom:0.6rem;`;
-const AskQ    = styled.p`font-size:0.88rem;font-weight:600;color:${T.ink};margin:0 0 0.3rem;`;
-const AskWhy  = styled.p`font-size:0.75rem;color:${T.inkLight};margin:0;`;
-// ── Code Practice ──
-const CodeLayout   = styled.div`display:grid;grid-template-columns:260px 1fr;gap:1rem;min-height:600px;@media(max-width:900px){grid-template-columns:1fr;}`;
-const ProbList     = styled.div`display:flex;flex-direction:column;gap:0.25rem;max-height:75vh;overflow-y:auto;padding-right:0.25rem;`;
-const ProbItem     = styled.button<{$active:boolean;$solved:boolean}>`
-  display:flex;align-items:center;justify-content:space-between;padding:0.55rem 0.75rem;border-radius:${T.radiusSm};
+const ProbList = styled.div`flex:1;overflow-y:auto;padding:0.35rem;`;
+const ProbItem = styled.button<{$active:boolean;$solved:boolean}>`
+  display:flex;align-items:center;justify-content:space-between;width:100%;padding:0.5rem 0.65rem;border-radius:${T.radiusSm};
   border:1px solid ${({$active})=>$active?T.borderMid:'transparent'};
   background:${({$active,$solved})=>$active?T.cream:$solved?T.greenBg:'transparent'};
-  color:${T.ink};font-family:${T.sans};font-size:0.8rem;text-align:left;cursor:pointer;transition:all 0.15s;
+  color:${T.ink};font-family:${T.sans};font-size:0.78rem;text-align:left;cursor:pointer;transition:all 0.12s;
   &:hover{background:${T.cream};}
 `;
+const DiffDot = styled.span<{$d:Diff}>`
+  width:7px;height:7px;border-radius:50%;flex-shrink:0;
+  background:${({$d})=>$d==='easy'?T.green:$d==='medium'?T.amber:T.red};
+`;
+// ── Main Panel ──
+const MainPanel = styled.div`display:flex;flex-direction:column;overflow:hidden;`;
+const ProbHeader = styled.div`
+  padding:1rem 1.5rem 0.75rem;border-bottom:1px solid ${T.border};
+  display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;
+`;
+const ProbTitle = styled.h2`font-family:${T.serif};font-size:1.35rem;font-weight:400;margin:0;`;
 const DiffBadge = styled.span<{$d:Diff}>`
-  font-size:0.62rem;font-weight:700;padding:0.12rem 0.45rem;border-radius:99px;flex-shrink:0;
+  font-size:0.62rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:99px;
   background:${({$d})=>$d==='easy'?T.greenBg:$d==='medium'?T.amberBg:T.redBg};
   color:${({$d})=>$d==='easy'?T.green:$d==='medium'?T.amber:T.red};
   border:1px solid ${({$d})=>$d==='easy'?T.greenBorder:$d==='medium'?T.amberBorder:T.redBorder};
 `;
-const FilterBar = styled.div`display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.75rem;`;
-const FilterBtn = styled.button<{$active:boolean}>`
-  padding:0.25rem 0.65rem;border-radius:99px;border:1px solid ${({$active})=>$active?T.ink:'transparent'};
-  background:${({$active})=>$active?T.ink:T.surface};color:${({$active})=>$active?T.cream:T.inkMid};
-  font-size:0.7rem;font-weight:600;cursor:pointer;transition:all 0.15s;&:hover{background:${({$active})=>$active?T.ink:T.border};}
+const PatternTag = styled.span`
+  padding:0.15rem 0.55rem;border-radius:99px;background:${T.purpleBg};border:1px solid ${T.purpleBorder};
+  color:${T.purple};font-size:0.68rem;font-weight:700;font-family:${T.mono};
 `;
-const ProbPanel    = styled.div`display:flex;flex-direction:column;gap:0.75rem;`;
-const ProbHeader   = styled.div`display:flex;align-items:flex-start;gap:0.75rem;flex-wrap:wrap;`;
-const ProbTitle    = styled.h2`font-family:${T.serif};font-size:1.5rem;font-weight:400;margin:0;`;
-const PatternTag   = styled.span`padding:0.25rem 0.7rem;border-radius:99px;background:${T.purpleBg};border:1px solid ${T.purpleBorder};color:${T.purple};font-size:0.72rem;font-weight:700;font-family:${T.mono};`;
-const DescBox      = styled.div`background:${T.surface};border:1px solid ${T.border};border-radius:${T.radiusSm};padding:1rem 1.1rem;font-size:0.84rem;line-height:1.6;color:${T.inkMid};`;
-const ExBox        = styled.div`background:${T.cream};border:1px solid ${T.border};border-radius:${T.radiusSm};padding:0.75rem 0.9rem;font-family:${T.mono};font-size:0.78rem;color:${T.ink};margin-top:0.5rem;`;
-const ExLabel      = styled.span`font-weight:700;color:${T.inkLight};margin-right:0.35rem;font-size:0.7rem;`;
-const CodeEditor   = styled.textarea`
-  width:100%;min-height:220px;padding:1rem;border-radius:${T.radiusSm};border:1px solid ${T.borderMid};
-  background:#1e1e1e;color:#d4d4d4;font-family:${T.mono};font-size:0.85rem;line-height:1.6;
-  resize:vertical;outline:none;box-sizing:border-box;
-  &:focus{border-color:${T.accent};}
-  &::selection{background:${T.accent}33;}
+const SplitPane = styled.div`
+  flex:1;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;
+  @media(max-width:1100px){grid-template-columns:1fr;grid-template-rows:auto 1fr;}
 `;
-const BtnRow       = styled.div`display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;`;
-const RunBtn       = styled.button`display:flex;align-items:center;gap:0.4rem;padding:0.6rem 1.1rem;border-radius:${T.radiusSm};border:none;background:${T.accent};color:white;font-family:${T.sans};font-size:0.82rem;font-weight:700;cursor:pointer;transition:all 0.15s;&:hover{background:#1d4ed8;}`;
-const HintBtn      = styled.button<{$used:boolean}>`display:flex;align-items:center;gap:0.4rem;padding:0.55rem 0.9rem;border-radius:${T.radiusSm};border:1px solid ${T.borderMid};background:${T.cream};color:${({$used})=>$used?T.amber:T.inkMid};font-family:${T.sans};font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.15s;&:hover{background:${T.surface};}`;
-const SolBtn       = styled.button`display:flex;align-items:center;gap:0.4rem;padding:0.55rem 0.9rem;border-radius:${T.radiusSm};border:1px solid ${T.redBorder};background:${T.redBg};color:${T.red};font-family:${T.sans};font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.15s;&:hover{opacity:0.85;}`;
-const ResetBtn     = styled.button`display:flex;align-items:center;gap:0.4rem;padding:0.55rem 0.9rem;border-radius:${T.radiusSm};border:1px solid ${T.border};background:transparent;color:${T.inkMid};font-family:${T.sans};font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.15s;&:hover{background:${T.surface};}`;
-const HintBox      = styled.div<{$level:number}>`padding:0.75rem 0.9rem;border-radius:${T.radiusSm};font-size:0.82rem;line-height:1.5;
-  background:${({$level})=>$level===0?T.accentBg:$level===1?T.amberBg:T.purpleBg};
-  border:1px solid ${({$level})=>$level===0?T.accentBorder:$level===1?T.amberBorder:T.purpleBorder};
-  color:${({$level})=>$level===0?T.accent:$level===1?T.amber:T.purple};
+// ── Description pane ──
+const DescPane = styled.div`overflow-y:auto;padding:1rem 1.5rem;border-right:1px solid ${T.border};`;
+const Desc = styled.div`font-size:0.84rem;line-height:1.65;color:${T.inkMid};margin-bottom:1rem;`;
+const ExBox = styled.div`background:${T.surface};border:1px solid ${T.border};border-radius:${T.radiusSm};padding:0.7rem 0.85rem;font-family:${T.mono};font-size:0.76rem;color:${T.ink};margin-bottom:0.5rem;`;
+const ExLabel = styled.span`font-weight:700;color:${T.inkLight};margin-right:0.3rem;font-size:0.68rem;`;
+const ConList = styled.ul`margin:0.5rem 0 0;padding-left:1.2rem;`;
+const ConItem = styled.li`font-size:0.78rem;color:${T.inkMid};line-height:1.6;font-family:${T.mono};`;
+const WhyBox = styled.div`margin-top:1rem;padding:0.7rem 0.85rem;background:${T.amberBg};border:1px solid ${T.amberBorder};border-radius:${T.radiusSm};font-size:0.78rem;color:${T.amber};line-height:1.5;`;
+// ── Code pane ──
+const CodePane = styled.div`display:flex;flex-direction:column;overflow:hidden;`;
+const EditorWrap = styled.div`flex:1;position:relative;overflow:hidden;display:flex;`;
+const LineNums = styled.div`
+  padding:1rem 0.5rem 1rem 0.75rem;background:#1a1a1a;color:#555;font-family:${T.mono};
+  font-size:0.8rem;line-height:1.6;text-align:right;user-select:none;overflow:hidden;min-width:2.5rem;
 `;
-const HintMeta    = styled.p`font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 0.3rem;opacity:0.7;`;
-const Results      = styled.div`display:flex;flex-direction:column;gap:0.4rem;`;
-const ResultRow    = styled.div<{$pass:boolean}>`display:flex;align-items:flex-start;gap:0.5rem;padding:0.6rem 0.75rem;border-radius:${T.radiusSm};border:1px solid ${({$pass})=>$pass?T.greenBorder:T.redBorder};background:${({$pass})=>$pass?T.greenBg:T.redBg};font-size:0.78rem;`;
-const ResultLabel  = styled.span`font-weight:700;color:${T.ink};flex-shrink:0;`;
-const ResultDetail = styled.span`color:${T.inkMid};font-family:${T.mono};font-size:0.75rem;`;
-const InsightBox   = styled.div`padding:0.85rem 1rem;background:${T.greenBg};border:1px solid ${T.greenBorder};border-radius:${T.radiusSm};font-size:0.83rem;line-height:1.55;color:${T.green};`;
-const ComplexRow   = styled.div`display:flex;gap:1rem;flex-wrap:wrap;`;
-const ComplexChip  = styled.span`font-size:0.72rem;font-weight:700;font-family:${T.mono};padding:0.2rem 0.6rem;border-radius:99px;background:${T.surface};border:1px solid ${T.border};color:${T.inkMid};`;
-const WhyBox       = styled.div`padding:0.75rem 0.9rem;background:${T.amberBg};border:1px solid ${T.amberBorder};border-radius:${T.radiusSm};font-size:0.8rem;color:${T.amber};line-height:1.5;`;
-const TimerDisplay = styled.div<{$warn:boolean}>`font-family:${T.mono};font-size:0.85rem;font-weight:700;padding:0.35rem 0.75rem;border-radius:${T.radiusSm};border:1px solid ${({$warn})=>$warn?T.redBorder:T.border};background:${({$warn})=>$warn?T.redBg:T.surface};color:${({$warn})=>$warn?T.red:T.inkMid};`;
+const codeAreaStyle: React.CSSProperties = {
+  flex:1,padding:'1rem 1rem 1rem 0.5rem',background:'#1e1e1e',color:'#000000',
+  fontFamily:'DM Mono, monospace',fontSize:'0.8rem',lineHeight:1.6,border:'none',resize:'none' as const,outline:'none',
+  boxSizing:'border-box' as const,tabSize:4,
+};
+const BtnRow = styled.div`display:flex;align-items:center;gap:0.4rem;padding:0.6rem 0.75rem;border-top:1px solid rgba(255,255,255,0.06);background:#1a1a1a;flex-wrap:wrap;`;
+const RunBtn = styled.button<{$loading?:boolean}>`
+  display:flex;align-items:center;gap:0.35rem;padding:0.5rem 1rem;border-radius:${T.radiusSm};border:none;
+  background:${({$loading})=>$loading?T.amber:T.accent};color:white;font-family:${T.sans};font-size:0.78rem;font-weight:700;cursor:pointer;
+  transition:all 0.15s;&:hover{opacity:0.9;}&:disabled{opacity:0.5;cursor:default;}
+`;
+const SmBtn = styled.button<{$color?:string}>`
+  display:flex;align-items:center;gap:0.3rem;padding:0.45rem 0.7rem;border-radius:${T.radiusSm};
+  border:1px solid rgba(255,255,255,0.1);background:transparent;color:${({$color})=>$color||'#999'};
+  font-family:${T.sans};font-size:0.72rem;font-weight:600;cursor:pointer;transition:all 0.15s;
+  &:hover{background:rgba(255,255,255,0.05);}&:disabled{opacity:0.4;cursor:default;}
+`;
+// ── Results area ──
+const ResultsArea = styled.div`max-height:200px;overflow-y:auto;padding:0.5rem 0.75rem;background:#111;border-top:1px solid rgba(255,255,255,0.06);`;
+const ResultRow = styled.div<{$pass:boolean}>`
+  display:flex;align-items:flex-start;gap:0.4rem;padding:0.45rem 0.5rem;border-radius:4px;margin-bottom:0.25rem;
+  background:${({$pass})=>$pass?'rgba(22,163,74,0.1)':'rgba(220,38,38,0.1)'};font-size:0.75rem;
+`;
+const RLabel = styled.span`font-weight:700;color:#ccc;flex-shrink:0;`;
+const RDetail = styled.span`color:#888;font-family:${T.mono};font-size:0.72rem;`;
+// ── Hints/Solution overlay ──
+const HintArea = styled.div`padding:0.5rem 0.75rem;background:#111;border-top:1px solid rgba(255,255,255,0.06);max-height:250px;overflow-y:auto;`;
+const HintBox = styled.div<{$level:number}>`
+  padding:0.65rem 0.8rem;border-radius:${T.radiusSm};margin-bottom:0.35rem;font-size:0.78rem;line-height:1.5;
+  background:${({$level})=>$level===0?'rgba(37,99,235,0.08)':$level===1?'rgba(180,83,9,0.08)':'rgba(124,58,237,0.08)'};
+  border:1px solid ${({$level})=>$level===0?'rgba(37,99,235,0.2)':$level===1?'rgba(180,83,9,0.2)':'rgba(124,58,237,0.2)'};
+  color:${({$level})=>$level===0?'#93c5fd':$level===1?'#fbbf24':'#c4b5fd'};
+`;
+const HintMeta = styled.p`font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 0.25rem;opacity:0.6;`;
+const SolBlock = styled.pre`
+  padding:0.8rem;background:#0d0d0d;border:1px solid rgba(124,58,237,0.2);border-radius:${T.radiusSm};
+  color:#c4b5fd;font-family:${T.mono};font-size:0.78rem;line-height:1.6;overflow-x:auto;margin:0.35rem 0;white-space:pre;
+`;
+const InsightBox = styled.div`
+  padding:0.65rem 0.8rem;background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.2);
+  border-radius:${T.radiusSm};font-size:0.78rem;line-height:1.5;color:#86efac;margin-top:0.35rem;
+`;
+const ComplexRow = styled.div`display:flex;gap:0.6rem;margin-top:0.35rem;`;
+const ComplexChip = styled.span`font-size:0.7rem;font-family:${T.mono};padding:0.15rem 0.5rem;border-radius:99px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#999;`;
+const TimerDisplay = styled.div<{$warn:boolean}>`
+  font-family:${T.mono};font-size:0.8rem;font-weight:700;padding:0.3rem 0.7rem;border-radius:${T.radiusSm};
+  border:1px solid ${({$warn})=>$warn?T.redBorder:T.border};
+  background:${({$warn})=>$warn?T.redBg:T.surface};color:${({$warn})=>$warn?T.red:T.inkMid};cursor:pointer;
+`;
 
-type KitSection = 'gameplan' | 'behavioral' | 'systemdesign' | 'technical' | 'askthem';
-
-// ─── Collapsible Q Card ───────────────────────────────────────────────────────
-function BehavQ({ q, idx }: { q: BehavioralQ; idx: number }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <QCard>
-      <QHead onClick={() => setOpen(o => !o)}>
-        <span><QNum>{String(idx + 1).padStart(2, '0')}</QNum><QText>{q.question}</QText></span>
-        <ChevronDown size={15} style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: '0.2s', color: T.inkLight, marginTop: 3 }} />
-      </QHead>
-      {open && (
-        <QBody>
-          <QHint><Lightbulb size={13} style={{ flexShrink: 0, marginTop: 2 }} />&nbsp;{q.hint}</QHint>
-          <QWhy><AlertCircle size={12} style={{ flexShrink: 0, marginTop: 2 }} />{q.why}</QWhy>
-          <TagRow>{q.tags.map(t => <Tag key={t}>{t}</Tag>)}</TagRow>
-        </QBody>
-      )}
-    </QCard>
-  );
-}
-
-// ─── Code Practice Panel ──────────────────────────────────────────────────────
-function CodePractice() {
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function InterviewPrep() {
   const [diffFilter, setDiffFilter] = useState<string>('all');
   const [catFilter,  setCatFilter]  = useState<string>('all');
   const [selected,   setSelected]   = useState<Problem>(PROBLEMS[0]);
@@ -753,10 +990,12 @@ function CodePractice() {
   const [results,    setResults]    = useState<TestResult[] | null>(null);
   const [hintLevel,  setHintLevel]  = useState(-1);
   const [showSol,    setShowSol]    = useState(false);
-  const [runs,       setRuns]       = useState(0);
+  const [running,    setRunning]    = useState(false);
+  const [pyLoaded,   setPyLoaded]   = useState(false);
   const [solved,     setSolved]     = useState<Set<string>>(new Set());
   const [timerSec,   setTimerSec]   = useState(45 * 60);
   const [timerOn,    setTimerOn]    = useState(false);
+  const codeRef = useRef<HTMLTextAreaElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -767,371 +1006,215 @@ function CodePractice() {
   }, [timerOn]);
 
   const selectProblem = (p: Problem) => {
-    setSelected(p); setCode(p.starterCode); setResults(null); setHintLevel(-1); setShowSol(false); setRuns(0);
+    setSelected(p); setCode(p.starterCode); setResults(null); setHintLevel(-1); setShowSol(false);
   };
 
-  const handleRun = () => {
-    const r = runCode(code, selected);
-    setResults(r);
-    setRuns(n => n + 1);
-    if (r.every(t => t.passed)) setSolved(s => new Set([...s, selected.id]));
+  const handleRun = async () => {
+    setRunning(true);
+    try {
+      const r = await runPythonCode(code, selected);
+      setResults(r);
+      setPyLoaded(true);
+      if (r.every(t => t.passed)) setSolved(s => new Set([...s, selected.id]));
+    } catch {
+      setResults(selected.testCases.map(tc => ({ label: tc.label, passed: false, got: undefined, expected: tc.expected, error: 'Failed to load Python runtime' })));
+    }
+    setRunning(false);
   };
 
-  const handleHint = () => setHintLevel(l => Math.min(l + 1, 2));
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const ta = e.currentTarget;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const newCode = code.substring(0, start) + '    ' + code.substring(end);
+      setCode(newCode);
+      requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = start + 4; });
+    }
+  };
 
   const fmt = (n: number) => `${Math.floor(n / 60).toString().padStart(2,'0')}:${(n%60).toString().padStart(2,'0')}`;
+  const lineCount = code.split('\n').length;
 
   const filtered = PROBLEMS.filter(p =>
     (diffFilter === 'all' || p.difficulty === diffFilter) &&
     (catFilter === 'all' || p.category === catFilter)
   );
 
-  const allPassed = results !== null && results.every(r => r.passed);
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <div>
-          <p style={{ margin: 0, fontSize: '0.78rem', color: T.inkLight }}>
-            {solved.size}/{PROBLEMS.length} solved · Write JavaScript · Run against test cases
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <TimerDisplay $warn={timerOn && timerSec < 300}>{fmt(timerSec)}</TimerDisplay>
-          <RunBtn style={{ padding: '0.35rem 0.7rem', fontSize: '0.72rem', background: timerOn ? T.red : T.green }} onClick={() => { setTimerOn(t => !t); if (!timerOn) setTimerSec(45 * 60); }}>
-            {timerOn ? <X size={12}/> : <Timer size={12}/>} {timerOn ? 'Stop' : '45 min'}
-          </RunBtn>
-        </div>
-      </div>
-      <FilterBar>
-        {['all','easy','medium','hard'].map(d => <FilterBtn key={d} $active={diffFilter===d} onClick={()=>setDiffFilter(d)}>{d==='all'?'All Difficulty':d.charAt(0).toUpperCase()+d.slice(1)}</FilterBtn>)}
-        <span style={{ width: 1, background: T.border, margin: '0 0.15rem' }} />
-        {['all','arrays','strings','dp','design'].map(c => <FilterBtn key={c} $active={catFilter===c} onClick={()=>setCatFilter(c)}>{c==='all'?'All Topics':c.charAt(0).toUpperCase()+c.slice(1)}</FilterBtn>)}
-      </FilterBar>
-
-      <CodeLayout>
-        {/* Problem list */}
-        <div>
-          <ProbList>
-            {filtered.map(p => (
-              <ProbItem key={p.id} $active={selected.id===p.id} $solved={solved.has(p.id)} onClick={()=>selectProblem(p)}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
-                  {solved.has(p.id) && <CheckCircle size={11} color={T.green} style={{ flexShrink: 0 }} />}
-                  <span style={{ fontSize: '0.79rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
-                </span>
-                <DiffBadge $d={p.difficulty}>{p.difficulty.charAt(0).toUpperCase()}</DiffBadge>
-              </ProbItem>
-            ))}
-            {filtered.length === 0 && <p style={{ fontSize: '0.78rem', color: T.inkLight, padding: '1rem 0.5rem' }}>No problems match these filters.</p>}
-          </ProbList>
-        </div>
-
-        {/* Problem panel */}
-        <ProbPanel>
-          <ProbHeader>
-            <div style={{ flex: 1 }}>
-              <ProbTitle>{selected.title}</ProbTitle>
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <DiffBadge $d={selected.difficulty}>{selected.difficulty}</DiffBadge>
-                <PatternTag>{selected.pattern}</PatternTag>
-                <span style={{ fontSize: '0.7rem', color: T.inkLight, fontFamily: T.mono }}>{selected.category}</span>
-              </div>
-            </div>
-          </ProbHeader>
-
-          <DescBox>
-            {selected.description}
-            {selected.examples.map((ex, i) => (
-              <ExBox key={i}>
-                <div><ExLabel>Input</ExLabel>{ex.input}</div>
-                <div><ExLabel>Output</ExLabel>{ex.output}</div>
-                {ex.explanation && <div style={{ marginTop: '0.25rem', color: T.inkLight, fontSize: '0.74rem' }}>{ex.explanation}</div>}
-              </ExBox>
-            ))}
-            <div style={{ marginTop: '0.5rem', fontSize: '0.74rem', color: T.inkLight }}>
-              {selected.constraints.map((c, i) => <div key={i}>• {c}</div>)}
-            </div>
-          </DescBox>
-
-          <WhyBox><strong>Why interviewers use this:</strong> {selected.whyAsked}</WhyBox>
-
-          <CodeEditor
-            value={code}
-            onChange={e => setCode(e.target.value)}
-            spellCheck={false}
-            placeholder={`// Write your JavaScript solution\n${selected.starterCode}`}
-          />
-
-          <BtnRow>
-            <RunBtn onClick={handleRun}><Play size={13}/> Run Tests</RunBtn>
-            <HintBtn $used={hintLevel>=0} onClick={handleHint} disabled={hintLevel>=2}>
-              <Lightbulb size={13}/> Hint {hintLevel+1}/3
-            </HintBtn>
-            <SolBtn onClick={()=>setShowSol(s=>!s)}>
-              {showSol ? <EyeOff size={13}/> : <Eye size={13}/>} Solution
-            </SolBtn>
-            <ResetBtn onClick={()=>{ setCode(selected.starterCode); setResults(null); setHintLevel(-1); setShowSol(false); setRuns(0); }}>
-              <RotateCcw size={13}/> Reset
-            </ResetBtn>
-          </BtnRow>
-
-          {/* Hints */}
-          {hintLevel >= 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {selected.hints.slice(0, hintLevel + 1).map((h, i) => (
-                <HintBox key={i} $level={i}>
-                  <HintMeta>Hint {i+1} of 3 — {i===0?'nudge':i===1?'approach':'algorithm'}</HintMeta>
-                  {h}
-                </HintBox>
-              ))}
-            </div>
-          )}
-
-          {/* Solution */}
-          {showSol && (
-            <div>
-              <p style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: T.red, margin: '0 0 0.4rem' }}>Key Insight — {selected.pattern}</p>
-              <InsightBox>{selected.insight}</InsightBox>
-              <ComplexRow style={{ marginTop: '0.5rem' }}>
-                <ComplexChip>Time: {selected.complexity.time}</ComplexChip>
-                <ComplexChip>Space: {selected.complexity.space}</ComplexChip>
-              </ComplexRow>
-            </div>
-          )}
-
-          {/* Test results */}
-          {results && (
-            <div>
-              <p style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: allPassed ? T.green : T.red, margin: '0 0 0.5rem' }}>
-                {allPassed ? `✓ All ${results.length} tests passed` : `${results.filter(r=>r.passed).length}/${results.length} tests passed`}
-              </p>
-              {allPassed && (
-                <InsightBox style={{ marginBottom: '0.5rem' }}>
-                  <strong>The pattern:</strong> {selected.insight}
-                  <ComplexRow style={{ marginTop: '0.4rem' }}>
-                    <ComplexChip>Time: {selected.complexity.time}</ComplexChip>
-                    <ComplexChip>Space: {selected.complexity.space}</ComplexChip>
-                  </ComplexRow>
-                </InsightBox>
-              )}
-              <Results>
-                {results.map((r, i) => (
-                  <ResultRow key={i} $pass={r.passed}>
-                    {r.passed ? <CheckCircle size={13} color={T.green} style={{ flexShrink: 0, marginTop: 1 }}/> : <X size={13} color={T.red} style={{ flexShrink: 0, marginTop: 1 }}/>}
-                    <div>
-                      <ResultLabel>{r.label}:</ResultLabel>{' '}
-                      {r.error
-                        ? <ResultDetail style={{ color: T.red }}>Error: {r.error}</ResultDetail>
-                        : r.passed
-                          ? <ResultDetail style={{ color: T.green }}>✓</ResultDetail>
-                          : <ResultDetail>got <strong>{JSON.stringify(r.got)}</strong>, expected <strong>{JSON.stringify(r.expected)}</strong></ResultDetail>
-                      }
-                    </div>
-                  </ResultRow>
-                ))}
-              </Results>
-            </div>
-          )}
-        </ProbPanel>
-      </CodeLayout>
-    </div>
-  );
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
-export default function InterviewPrep() {
-  const [mode,      setMode]      = useState<Mode>('prep');
-  const [company,   setCompany]   = useState('');
-  const [role,      setRole]      = useState('');
-  const [desc,      setDesc]      = useState('');
-  const [round,     setRound]     = useState<Round>('technical');
-  const [stack,     setStack]     = useState('');
-  const [daysUntil, setDaysUntil] = useState(7);
-  const [kit,       setKit]       = useState<PrepKit | null>(null);
-  const [section,   setSection]   = useState<KitSection>('gameplan');
-
-  const generate = useCallback(() => {
-    if (!company.trim() || !role.trim()) return;
-    const k = buildPrepKit(company.trim(), role.trim(), desc, round, stack, daysUntil);
-    setKit(k);
-    setSection(daysUntil <= 2 ? 'gameplan' : 'behavioral');
-  }, [company, role, desc, round, stack, daysUntil]);
-
-  const reset = () => setKit(null);
-  const canGenerate = company.trim().length > 0 && role.trim().length > 0;
-
-  const ROUNDS: { key: Round; label: string }[] = [
-    { key: 'technical', label: '💻 Technical' },
-    { key: 'behavioral', label: '🗣 Behavioral' },
-    { key: 'vp', label: '🏢 VP / Director' },
-    { key: 'final', label: '🎯 Final Loop' },
-  ];
-
-  const SECTIONS: { key: KitSection; label: string; icon: React.ReactNode }[] = [
-    { key: 'gameplan',    label: 'Game Plan',       icon: <Calendar size={14}/> },
-    { key: 'behavioral',  label: 'Behavioral',      icon: <MessageSquare size={14}/> },
-    { key: 'systemdesign',label: 'System Design',   icon: <Cpu size={14}/> },
-    { key: 'technical',   label: 'Topics to Study', icon: <BookOpen size={14}/> },
-    { key: 'askthem',     label: 'Ask Them',        icon: <HelpCircle size={14}/> },
-  ];
+  // Pattern grouping for sidebar
+  const patterns = [...new Set(PROBLEMS.map(p => p.pattern))];
+  const patternCounts = patterns.map(pt => ({ pattern: pt, count: filtered.filter(p => p.pattern === pt).length })).filter(p => p.count > 0);
 
   return (
     <Root>
       <GlobalStyle />
       <TopBar>
-        <div>
-          <Title>Interview Prep</Title>
-          <Sub>Customised kit + JavaScript coding practice</Sub>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Title>LeetCode Practice</Title>
+          <Chip $color={T.greenBg}>{solved.size}/{PROBLEMS.length} solved</Chip>
         </div>
-        <ModeToggle>
-          <ModeBtn $active={mode==='prep'} onClick={()=>setMode('prep')}><ClipboardList size={14}/> Prep Kit</ModeBtn>
-          <ModeBtn $active={mode==='code'} onClick={()=>setMode('code')}><Code2 size={14}/> Code Practice</ModeBtn>
-        </ModeToggle>
+        <StatChips>
+          {!pyLoaded && <Chip>Python: not loaded yet</Chip>}
+          {pyLoaded && <Chip $color={T.greenBg}>Python ready</Chip>}
+          <TimerDisplay $warn={timerSec < 300} onClick={() => setTimerOn(t => !t)}>
+            <Timer size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+            {fmt(timerSec)} {timerOn ? '(running)' : '(paused)'}
+          </TimerDisplay>
+        </StatChips>
       </TopBar>
 
-      {/* ── CODE PRACTICE MODE ── */}
-      {mode === 'code' && <CodePractice />}
-
-      {/* ── PREP KIT MODE ── */}
-      {mode === 'prep' && !kit && (
-        <SetupCard>
-          <p style={{ fontSize: '0.82rem', color: T.inkLight, marginTop: 0, marginBottom: '1.5rem' }}>
-            Enter the details below — your personalised prep kit will include tailored behavioral questions, system design scenarios, technical topics, and a day-by-day schedule.
-          </p>
-          <FieldGrid>
-            <Field>
-              <Label>Company *</Label>
-              <Input placeholder="e.g. Stripe, Airbnb, startup" value={company} onChange={e=>setCompany(e.target.value)} />
-            </Field>
-            <Field>
-              <Label>Role *</Label>
-              <Input placeholder="e.g. Senior Software Engineer" value={role} onChange={e=>setRole(e.target.value)} />
-            </Field>
-            <FieldFull>
-              <Label>Interview Round</Label>
-              <RoundGrid>
-                {ROUNDS.map(r => <RoundBtn key={r.key} $active={round===r.key} onClick={()=>setRound(r.key)}>{r.label}</RoundBtn>)}
-              </RoundGrid>
-            </FieldFull>
-            <FieldFull>
-              <Label>Tech Stack / Tools (optional)</Label>
-              <Input placeholder="e.g. React, Node.js, PostgreSQL, AWS" value={stack} onChange={e=>setStack(e.target.value)} />
-            </FieldFull>
-            <FieldFull>
-              <Label>What does this company do? (1–2 sentences)</Label>
-              <Textarea placeholder="e.g. B2B SaaS for healthcare billing, uses ML to reduce claim denials." value={desc} onChange={e=>setDesc(e.target.value)} />
-            </FieldFull>
-            <FieldFull>
-              <Label>Days Until Interview</Label>
-              <DaysRow>
-                <DaysInput type="number" min={0} max={60} value={daysUntil} onChange={e=>setDaysUntil(Math.max(0,parseInt(e.target.value)||0))} />
-                <span style={{ fontSize: '0.8rem', color: T.inkLight }}>
-                  {daysUntil === 0 ? '🔥 Today — urgent mode' : daysUntil === 1 ? '⚡ Tomorrow' : `${daysUntil} days away`}
+      <Layout>
+        {/* Sidebar */}
+        <Sidebar>
+          <FilterBar>
+            {['all','easy','medium','hard'].map(d => (
+              <FilterBtn key={d} $active={diffFilter===d} onClick={()=>setDiffFilter(d)}>
+                {d === 'all' ? 'All' : d.charAt(0).toUpperCase() + d.slice(1)}
+              </FilterBtn>
+            ))}
+            <span style={{ width: '100%' }} />
+            {['all','arrays','strings','dp'].map(c => (
+              <FilterBtn key={c} $active={catFilter===c} onClick={()=>setCatFilter(c)}>
+                {c === 'all' ? 'All' : c === 'dp' ? 'DP' : c.charAt(0).toUpperCase() + c.slice(1)}
+              </FilterBtn>
+            ))}
+          </FilterBar>
+          <ProbList>
+            {filtered.map(p => (
+              <ProbItem key={p.id} $active={selected.id===p.id} $solved={solved.has(p.id)} onClick={()=>selectProblem(p)}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+                  <DiffDot $d={p.difficulty} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
                 </span>
-              </DaysRow>
-            </FieldFull>
-          </FieldGrid>
-          <GenBtn $disabled={!canGenerate} disabled={!canGenerate} onClick={generate}>
-            <Sparkles size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-            Generate My Prep Kit
-          </GenBtn>
-        </SetupCard>
-      )}
-
-      {mode === 'prep' && kit && (
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: T.inkLight }}>
-                Kit for <strong>{company}</strong> — {role} — {round} round — {daysUntil === 0 ? 'today' : `${daysUntil}d away`}
-              </p>
-            </div>
-            <button onClick={reset} style={{ marginLeft: 'auto', background: 'none', border: `1px solid ${T.border}`, borderRadius: T.radiusSm, padding: '0.3rem 0.7rem', cursor: 'pointer', fontSize: '0.75rem', color: T.inkMid, fontFamily: T.sans }}>
-              ← New Kit
-            </button>
-          </div>
-
-          <KitWrap>
-            <SideNav>
-              {SECTIONS.map(s => (
-                <SideItem key={s.key} $active={section===s.key} onClick={()=>setSection(s.key)}>
-                  {s.icon} {s.label}
-                  {section===s.key && <ChevronRight size={12} style={{ marginLeft: 'auto', color: T.inkLight }} />}
-                </SideItem>
+                {solved.has(p.id) && <CheckCircle size={13} color={T.green} />}
+              </ProbItem>
+            ))}
+            {/* Pattern summary */}
+            <div style={{ padding: '0.75rem 0.5rem 0.25rem', borderTop: `1px solid ${T.border}`, marginTop: '0.5rem' }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: T.inkLight }}>
+                Patterns
+              </span>
+              {patternCounts.map(({ pattern, count }) => (
+                <div key={pattern} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.25rem 0.2rem', fontSize: '0.72rem', color: T.inkMid }}>
+                  <span>{pattern}</span>
+                  <span style={{ fontFamily: T.mono, color: T.inkLight }}>{count}</span>
+                </div>
               ))}
-            </SideNav>
+            </div>
+          </ProbList>
+        </Sidebar>
 
-            <ContentWrap>
-              {section === 'gameplan' && (
-                <>
-                  <SectionTitle>📅 Game Plan</SectionTitle>
-                  {kit.gamePlan.map((g, i) => (
-                    <GPBlock key={i}>
-                      <GPWhen>{g.when}</GPWhen>
-                      {g.tasks.map((t, j) => <GPTask key={j}>{t}</GPTask>)}
-                    </GPBlock>
+        {/* Main */}
+        <MainPanel>
+          <ProbHeader>
+            <ProbTitle>{selected.title}</ProbTitle>
+            <DiffBadge $d={selected.difficulty}>{selected.difficulty}</DiffBadge>
+            <PatternTag>{selected.pattern}</PatternTag>
+          </ProbHeader>
+
+          <SplitPane>
+            {/* Left: Description */}
+            <DescPane>
+              <Desc>{selected.description}</Desc>
+              {selected.examples.map((ex, i) => (
+                <ExBox key={i}>
+                  <div><ExLabel>Input:</ExLabel>{ex.input}</div>
+                  <div><ExLabel>Output:</ExLabel>{ex.output}</div>
+                  {ex.explanation && <div style={{ marginTop: '0.3rem', color: T.inkLight, fontSize: '0.72rem' }}>{ex.explanation}</div>}
+                </ExBox>
+              ))}
+              <ConList>
+                {selected.constraints.map((c, i) => <ConItem key={i}>{c}</ConItem>)}
+              </ConList>
+              <WhyBox><strong>Why this is asked:</strong> {selected.whyAsked}</WhyBox>
+            </DescPane>
+
+            {/* Right: Editor + Results */}
+            <CodePane>
+              <EditorWrap>
+                <LineNums>
+                  {Array.from({ length: lineCount }, (_, i) => (
+                    <div key={i}>{i + 1}</div>
                   ))}
-                </>
-              )}
+                </LineNums>
+                <textarea
+                  ref={codeRef}
+                  value={code}
+                  onChange={e => setCode(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  spellCheck={false}
+                  placeholder={`# Write your Python solution\n${selected.starterCode}`}
+                  style={codeAreaStyle}
+                />
+              </EditorWrap>
 
-              {section === 'behavioral' && (
-                <>
-                  <SectionTitle>🗣 Behavioral Questions</SectionTitle>
-                  <p style={{ fontSize: '0.8rem', color: T.inkLight, marginTop: '-0.5rem', marginBottom: '1rem' }}>
-                    Use the STAR format. Click any question to see what the interviewer is looking for.
-                  </p>
-                  {kit.behavioral.map((q, i) => <BehavQ key={i} q={q} idx={i} />)}
-                </>
-              )}
+              <BtnRow>
+                <RunBtn onClick={handleRun} disabled={running} $loading={running}>
+                  {running ? (
+                    <><Code2 size={13} /> {pyLoaded ? 'Running...' : 'Loading Python...'}</>
+                  ) : (
+                    <><Play size={13} /> Run Tests</>
+                  )}
+                </RunBtn>
+                <SmBtn onClick={() => setHintLevel(l => Math.min(l + 1, 2))} disabled={hintLevel >= 2} $color={hintLevel >= 0 ? '#fbbf24' : undefined}>
+                  <Lightbulb size={12} /> Hint {Math.min(hintLevel + 2, 3)}/3
+                </SmBtn>
+                <SmBtn onClick={() => setShowSol(s => !s)} $color={showSol ? '#c4b5fd' : undefined}>
+                  {showSol ? <EyeOff size={12} /> : <Eye size={12} />} Solution
+                </SmBtn>
+                <SmBtn onClick={() => { setCode(selected.starterCode); setResults(null); setHintLevel(-1); setShowSol(false); }}>
+                  <RotateCcw size={12} /> Reset
+                </SmBtn>
+              </BtnRow>
 
-              {section === 'systemdesign' && (
-                <>
-                  <SectionTitle>🏗 System Design</SectionTitle>
-                  <p style={{ fontSize: '0.8rem', color: T.inkLight, marginTop: '-0.5rem', marginBottom: '1rem' }}>
-                    For each question, think out loud — interviewers evaluate your process, not just the answer.
-                  </p>
-                  {kit.systemDesign.map((q, i) => (
-                    <SDCard key={i}>
-                      <SDQ>{i+1}. {q.question}</SDQ>
-                      <AngleList>{q.angles.map((a,j) => <Angle key={j}>{a}</Angle>)}</AngleList>
-                    </SDCard>
+              {/* Hints */}
+              {hintLevel >= 0 && (
+                <HintArea>
+                  {selected.hints.slice(0, hintLevel + 1).map((h, i) => (
+                    <HintBox key={i} $level={i}>
+                      <HintMeta>Hint {i+1}/3 \u2014 {i===0?'Nudge':i===1?'Approach':'Pseudocode'}</HintMeta>
+                      {h}
+                    </HintBox>
                   ))}
-                </>
+                </HintArea>
               )}
 
-              {section === 'technical' && (
-                <>
-                  <SectionTitle>📚 Topics to Study</SectionTitle>
-                  {kit.technical.map((t, i) => (
-                    <SDCard key={i}>
-                      <SDQ>{t.topic}</SDQ>
-                      <AngleList>{t.subtopics.map((s,j) => <Angle key={j}>{s}</Angle>)}</AngleList>
-                    </SDCard>
-                  ))}
-                  <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: T.accentBg, border: `1px solid ${T.accentBorder}`, borderRadius: T.radiusSm, fontSize: '0.8rem', color: T.accent }}>
-                    💡 Switch to <strong>Code Practice</strong> to drill algorithms with an interactive JS runner.
-                  </div>
-                </>
+              {/* Solution */}
+              {showSol && (
+                <HintArea>
+                  <HintMeta style={{ color: '#c4b5fd' }}>Full Solution \u2014 {selected.pattern}</HintMeta>
+                  <SolBlock>{selected.solution}</SolBlock>
+                  <InsightBox><strong>Insight:</strong> {selected.insight}</InsightBox>
+                  <ComplexRow>
+                    <ComplexChip>Time: {selected.complexity.time}</ComplexChip>
+                    <ComplexChip>Space: {selected.complexity.space}</ComplexChip>
+                  </ComplexRow>
+                </HintArea>
               )}
 
-              {section === 'askthem' && (
-                <>
-                  <SectionTitle>❓ Questions to Ask Them</SectionTitle>
-                  <p style={{ fontSize: '0.8rem', color: T.inkLight, marginTop: '-0.5rem', marginBottom: '1rem' }}>
-                    Asking good questions signals genuine interest and evaluates fit on your terms.
-                  </p>
-                  {kit.askThem.map((a, i) => (
-                    <AskCard key={i}>
-                      <AskQ>{i+1}. {a.question}</AskQ>
-                      <AskWhy>{a.why}</AskWhy>
-                    </AskCard>
+              {/* Test results */}
+              {results && (
+                <ResultsArea>
+                  {results.map((r, i) => (
+                    <ResultRow key={i} $pass={r.passed}>
+                      {r.passed ? <CheckCircle size={13} color="#4ade80" /> : <X size={13} color="#f87171" />}
+                      <RLabel>{r.label}</RLabel>
+                      {r.passed ? (
+                        <RDetail>Passed</RDetail>
+                      ) : r.error ? (
+                        <RDetail style={{ color: '#f87171' }}>{r.error}</RDetail>
+                      ) : (
+                        <RDetail>Expected {JSON.stringify(r.expected)}, got {JSON.stringify(r.got)}</RDetail>
+                      )}
+                    </ResultRow>
                   ))}
-                </>
+                </ResultsArea>
               )}
-            </ContentWrap>
-          </KitWrap>
-        </div>
-      )}
+            </CodePane>
+          </SplitPane>
+        </MainPanel>
+      </Layout>
     </Root>
   );
 }

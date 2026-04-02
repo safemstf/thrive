@@ -7,7 +7,9 @@
       "Bash(timeout /t 12 /nobreak)",
       "Bash(npx next:*)",
       "WebSearch",
-      "WebFetch(domain:open.gsa.gov)"
+      "WebFetch(domain:open.gsa.gov)",
+      "Read(//c/Users/safeb/OneDrive/Documents/GitHub/thrive/**)",
+      "Bash(npm install:*)"
     ]
   }
 }

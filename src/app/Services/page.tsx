@@ -1245,7 +1245,7 @@ const allItems: SimulationItem[] = [
   },
   {
     key: 'interview-prep',
-    label: 'Interview Prep',
+    label: 'Coding Training',
     icon: <BookOpen size={22} />,
     color: '#7c3aed',
     description: 'Enter the company and role — get a customized prep kit: behavioral questions, system design, topics to study, and questions to ask',

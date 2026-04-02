@@ -4,7 +4,7 @@ import { createGlobalStyle } from 'styled-components';
 import {
   SimState, Agent, NEATGenome, Particle, Obstacle, Species, Population,
   ArchType, ARCH_TYPES, ARCH_CONFIGS, POP_SIZE,
-  LocomotionMode,
+  LocomotionMode, TerrainType, getTerrainY,
   createSimState, stepSim, nextGeneration, getAllAgents, trainHeadless,
   captureNEATState, restoreNEATState,
   PI, L, HEAD_RADIUS, MOTORS, AGENT_COLORS,
@@ -200,6 +200,7 @@ function drawBackground(
   ctx: CanvasRenderingContext2D,
   camX: number,
   startX: number,
+  terrain: TerrainType = 'flat',
 ) {
   // ── Alto's Adventure sky gradient ──
   const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
@@ -214,7 +215,7 @@ function drawBackground(
   const now = Date.now();
   for (let i = 0; i < 60; i++) {
     const wx  = (i * 137.508) % 4000;
-    const wy  = (i * 53.71)   % (GROUND_Y * 0.5);  // only upper sky
+    const wy  = (i * 53.71)   % (GROUND_Y * 0.5);
     const sz  = (i * 0.43)    % 1.2 + 0.3;
     const twinkle = 0.3 + 0.3 * Math.sin(now * 0.001 + i * 2.3);
     const sx  = ((wx - camX * 0.05) % CW + CW) % CW;
@@ -245,21 +246,33 @@ function drawBackground(
     ctx.fill();
   }
 
-  // ── Ground fill — warm earth ──
-  const gnd = ctx.createLinearGradient(0, GROUND_Y, 0, CH);
+  // ── Ground fill — terrain-following warm earth ──
+  const gnd = ctx.createLinearGradient(0, GROUND_Y - 60, 0, CH);
   gnd.addColorStop(0, ALTO.groundTop);
   gnd.addColorStop(1, ALTO.groundBot);
   ctx.fillStyle = gnd;
-  ctx.fillRect(0, GROUND_Y, CW, CH - GROUND_Y);
+  ctx.beginPath();
+  ctx.moveTo(0, CH);
+  for (let x = 0; x <= CW; x += 2) {
+    const wx = x + camX;
+    ctx.lineTo(x, getTerrainY(wx, GROUND_Y, terrain));
+  }
+  ctx.lineTo(CW, CH);
+  ctx.closePath();
+  ctx.fill();
 
-  // Ground surface line
+  // Ground surface line — follows terrain
   ctx.strokeStyle = ALTO.groundLine;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(0, GROUND_Y); ctx.lineTo(CW, GROUND_Y);
+  for (let x = 0; x <= CW; x += 2) {
+    const wx = x + camX;
+    const ty = getTerrainY(wx, GROUND_Y, terrain);
+    if (x === 0) ctx.moveTo(x, ty); else ctx.lineTo(x, ty);
+  }
   ctx.stroke();
 
-  // ── Distance ticks ──
+  // ── Distance ticks — follow terrain ──
   const firstWx = Math.floor(camX / 100) * 100;
   for (let wx = firstWx; wx < camX + CW + 100; wx += 100) {
     if (wx < startX) continue;
@@ -267,32 +280,35 @@ function drawBackground(
     const dist = wx - startX;
     if (sx < -10 || sx > CW + 10) continue;
 
+    const tickY = getTerrainY(wx, GROUND_Y, terrain);
     const isMajor = dist % 500 === 0;
     ctx.strokeStyle = isMajor ? '#5a3820' : '#3a2010';
     ctx.lineWidth   = isMajor ? 1.5 : 1;
     ctx.beginPath();
-    ctx.moveTo(sx, GROUND_Y);
-    ctx.lineTo(sx, GROUND_Y + (isMajor ? 12 : 6));
+    ctx.moveTo(sx, tickY);
+    ctx.lineTo(sx, tickY + (isMajor ? 12 : 6));
     ctx.stroke();
 
     if (dist % 200 === 0) {
       ctx.fillStyle = '#5a3820';
       ctx.font      = '10px "DM Sans", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(dist === 0 ? 'START' : `${dist}`, sx, GROUND_Y + 22);
+      ctx.fillText(dist === 0 ? 'START' : `${dist}`, sx, tickY + 22);
     }
   }
 
-  // ── Grass strokes along ground line ──
+  // ── Grass strokes along terrain ──
   for (let i = 0; i < 80; i++) {
     const wx = (i * 73.7) % 2000;
     const px = ((wx - camX * 0.95) % CW + CW) % CW;
+    const grassWx = px + camX;
+    const grassY = getTerrainY(grassWx, GROUND_Y, terrain);
     const h = 3 + (i % 4) * 1.5;
     ctx.strokeStyle = `rgba(60,80,40,${0.15 + (i % 3) * 0.08})`;
     ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.moveTo(px, GROUND_Y);
-    ctx.lineTo(px + (i % 2 ? 1 : -1), GROUND_Y - h);
+    ctx.moveTo(px, grassY);
+    ctx.lineTo(px + (i % 2 ? 1 : -1), grassY - h);
     ctx.stroke();
   }
 }
@@ -608,6 +624,7 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
 
   const stateRef     = useRef<SimState | null>(null);
   const cameraXRef   = useRef(0);
+  const cameraYRef   = useRef(0);
   const rafRef       = useRef<number>(0);
   const isPlayingRef = useRef(isRunning);
   const speedRef     = useRef(speed);
@@ -616,6 +633,11 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
   const [localSpeed, setLocalSpeed] = useState(speed);
   const [isTraining, setIsTraining] = useState(false);
   const [trainProgress, setTrainProgress] = useState(0);
+  const [mode, setMode] = useState<LocomotionMode>('free');
+  const [terrain, setTerrain] = useState<TerrainType>('flat');
+
+  const workerRef  = useRef<Worker | null>(null);
+  const trainIdRef = useRef(0); // stale-result guard
 
   const [display, setDisplay] = useState({
     globalGen: 1, time: 0, gravityPct: 90,
@@ -640,12 +662,52 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
   speedRef.current     = localSpeed;
 
   // Initialise simulation
-  const initSim = useCallback(() => {
-    stateRef.current = createSimState(GROUND_Y);
-    cameraXRef.current = 0;
-  }, []);
+  const initSim = useCallback((m: LocomotionMode = mode, t: TerrainType = terrain) => {
+    stateRef.current = createSimState(GROUND_Y, m, t);
+    cameraXRef.current = 0; cameraYRef.current = 0;
+  }, [mode, terrain]);
 
-  useEffect(() => { initSim(); }, [initSim]);
+  useEffect(() => { initSim(); }, []);
+
+  // Mode change handler — resets simulation
+  const handleModeChange = (newMode: LocomotionMode) => {
+    if (newMode === mode) return;
+    setMode(newMode);
+    trainIdRef.current++;
+    setIsTraining(false);
+    stateRef.current = createSimState(GROUND_Y, newMode, terrain);
+    cameraXRef.current = 0; cameraYRef.current = 0;
+  };
+
+  // Terrain change handler — resets simulation
+  const handleTerrainChange = (newTerrain: TerrainType) => {
+    if (newTerrain === terrain) return;
+    setTerrain(newTerrain);
+    trainIdRef.current++;
+    setIsTraining(false);
+    stateRef.current = createSimState(GROUND_Y, mode, newTerrain);
+    cameraXRef.current = 0; cameraYRef.current = 0;
+  };
+
+  // Web Worker for headless training
+  useEffect(() => {
+    workerRef.current = new Worker(
+      new URL('./td.worker.ts', import.meta.url)
+    );
+    workerRef.current.onmessage = (e: MessageEvent) => {
+      const data = e.data;
+      if (data.trainId !== trainIdRef.current) return; // stale result
+      if (data.type === 'progress') {
+        setTrainProgress(Math.round((data.gen / data.total) * 100));
+      } else if (data.type === 'done') {
+        stateRef.current = data.state;
+        restoreNEATState(data.neatState);
+        setIsTraining(false);
+        cameraXRef.current = 0; cameraYRef.current = 0;
+      }
+    };
+    return () => { workerRef.current?.terminate(); };
+  }, []);
 
   // Animation loop
   useEffect(() => {
@@ -681,37 +743,34 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
       )[0];
       const leaderX   = leader.ragdoll.particles[PI.PELVIS].x;
       const startX    = allAgents[0].ragdoll.startX; // for distance labels
-      const targetCam = leaderX - CW * 0.3;             // keep leader at 30% from left
+      const targetCam = leaderX - CW * 0.3;
       cameraXRef.current += (targetCam - cameraXRef.current) * 0.07;
-      const camX = Math.max(startX - CW * 0.15, cameraXRef.current); // don't pan left of spawn
+      const camX = Math.max(startX - CW * 0.15, cameraXRef.current);
 
-      // Render — camX is the world X of the left screen edge
+      // Camera Y: smoothly track terrain elevation under leader
+      const leaderTerrainY = getTerrainY(leaderX, GROUND_Y, state.terrain);
+      const targetCamYOff  = leaderTerrainY - GROUND_Y;
+      cameraYRef.current  += (targetCamYOff - cameraYRef.current) * 0.05;
+      const camYOff = cameraYRef.current;
+
+      // Render
       ctx.clearRect(0, 0, CW, CH);
-      drawBackground(ctx, camX, startX);
+      ctx.save();
+      ctx.translate(0, -camYOff); // shift world for terrain elevation
+      drawBackground(ctx, camX, startX, state.terrain);
 
-      // Generation progress bar (thin bar below ground)
-      const progress = Math.min(1, Math.max(0, state.time - 0.5) / state.evalDuration);
-      const barW = CW * 0.25;
-      const barX = (CW - barW) / 2;
-      const barY = GROUND_Y + 38;
-      ctx.fillStyle = 'rgba(30,45,62,0.4)';
-      ctx.fillRect(barX, barY, barW, 2.5);
-      ctx.fillStyle = `rgba(240,160,80,${0.35 + progress * 0.4})`;
-      ctx.fillRect(barX, barY, barW * progress, 2.5);
-
-      // Draw obstacles (hurdles on the ground)
+      // Generation progress bar (fixed UI — draw after restore)
+      // Draw obstacles
       const obstacles = getObstaclesNear(camX + CW / 2, CW, startX, GROUND_Y);
       for (const obs of obstacles) {
         const sx = obs.x - camX;
         if (sx + obs.w < -10 || sx > CW + 10) continue;
         const top = obs.groundY - obs.h;
-        // Subtle gradient hurdle
         const grad = ctx.createLinearGradient(0, top, 0, obs.groundY);
         grad.addColorStop(0, 'rgba(240,160,80,0.35)');
         grad.addColorStop(1, 'rgba(240,160,80,0.12)');
         ctx.fillStyle = grad;
         ctx.fillRect(sx, top, obs.w, obs.h);
-        // Top edge highlight
         ctx.strokeStyle = 'rgba(240,160,80,0.5)';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -725,6 +784,18 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
       // Draw agents: non-champions first (highest rank = drawn last = on top)
       const sorted = [...allAgents].sort((a, b) => b.rank - a.rank);
       for (const agent of sorted) drawRagdoll(ctx, agent, camX);
+
+      ctx.restore(); // restore from terrain Y offset — HUD elements below are screen-fixed
+
+      // Generation progress bar (thin bar below ground, screen-fixed)
+      const progress = Math.min(1, Math.max(0, state.time - 0.5) / state.evalDuration);
+      const barW = CW * 0.25;
+      const barX = (CW - barW) / 2;
+      const barY = GROUND_Y + 38;
+      ctx.fillStyle = 'rgba(30,45,62,0.4)';
+      ctx.fillRect(barX, barY, barW, 2.5);
+      ctx.fillStyle = `rgba(240,160,80,${0.35 + progress * 0.4})`;
+      ctx.fillRect(barX, barY, barW * progress, 2.5);
 
       // Find global champion (best fitness across all populations)
       const globalChamp = [...allAgents].sort((a, b) =>
@@ -795,7 +866,7 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
 
   const handleReset = () => {
     initSim();
-    cameraXRef.current = 0;
+    cameraXRef.current = 0; cameraYRef.current = 0;
   };
 
   const handleSkip = () => {
@@ -807,7 +878,7 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
       if (stepSim(state, DT)) break;
     }
     nextGeneration(state);
-    cameraXRef.current = 0;
+    cameraXRef.current = 0; cameraYRef.current = 0;
   };
 
   const SPEED_OPTIONS = [1, 3, 10, 30, 60];
@@ -829,30 +900,21 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
     }
   }
 
-  // Headless training handler — uses trainHeadless with 2× DT for speed
+  // Headless training via Web Worker — UI stays fully responsive
   const handleTrain = (gens: number) => {
     const state = stateRef.current;
-    if (!state || isTraining) return;
+    if (!state || isTraining || !workerRef.current) return;
     setIsTraining(true);
     setTrainProgress(0);
+    trainIdRef.current++;
 
-    // Run in chunks via setTimeout to keep UI responsive
-    let done = 0;
-    const chunkSize = 10; // 10 gens per chunk — each gen is ~600 steps at 1/30 DT
-    function runChunk() {
-      if (!stateRef.current) return;
-      const batch = Math.min(chunkSize, gens - done);
-      trainHeadless(stateRef.current, batch);
-      done += batch;
-      setTrainProgress(Math.round((done / gens) * 100));
-      if (done < gens) {
-        setTimeout(runChunk, 0);
-      } else {
-        setIsTraining(false);
-        cameraXRef.current = 0;
-      }
-    }
-    runChunk();
+    workerRef.current.postMessage({
+      type: 'train',
+      state,
+      generations: gens,
+      neatState: captureNEATState(),
+      trainId: trainIdRef.current,
+    });
   };
 
   return (
@@ -899,6 +961,18 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
             <span className="label">GRAVITY</span>
             <span className="val" style={{ color: display.gravityPct >= 100 ? '#70c080' : '#f0a050' }}>
               {display.gravityPct}%
+            </span>
+          </div>
+          <div className="neat-hud-row">
+            <span className="label">MODE</span>
+            <span className="val" style={{ color: mode === 'free' ? '#f0a050' : '#70c080' }}>
+              {mode === 'free' ? 'Free' : 'Bipedal'}
+            </span>
+          </div>
+          <div className="neat-hud-row">
+            <span className="label">TERRAIN</span>
+            <span className="val" style={{ color: terrain === 'hills' ? '#c0a060' : '#a0a0a0' }}>
+              {terrain === 'hills' ? 'Hills' : 'Flat'}
             </span>
           </div>
           <div className="neat-hud-divider" />
@@ -997,6 +1071,46 @@ export default function EvolutionWalker({ isRunning = true, speed = 1, isTheater
 
         {/* Control bar */}
         <div className={`neat-bar${isTheaterMode ? ' theater-top' : ''}`}>
+          {/* Mode toggle */}
+          <button
+            className={`neat-btn ${mode === 'bipedal' ? 'active' : ''}`}
+            onClick={() => handleModeChange('bipedal')}
+            title="Bipedal mode — strict posture-gated fitness"
+            style={{ fontSize: '0.65rem' }}
+          >
+            🦶 Bipedal
+          </button>
+          <button
+            className={`neat-btn ${mode === 'free' ? 'active' : ''}`}
+            onClick={() => handleModeChange('free')}
+            title="Free locomotion — any movement strategy rewarded"
+            style={{ fontSize: '0.65rem' }}
+          >
+            🐾 Free
+          </button>
+
+          <div className="neat-divider" />
+
+          {/* Terrain toggle */}
+          <button
+            className={`neat-btn ${terrain === 'flat' ? 'active' : ''}`}
+            onClick={() => handleTerrainChange('flat')}
+            title="Flat terrain"
+            style={{ fontSize: '0.65rem' }}
+          >
+            ── Flat
+          </button>
+          <button
+            className={`neat-btn ${terrain === 'hills' ? 'active' : ''}`}
+            onClick={() => handleTerrainChange('hills')}
+            title="Rolling hills terrain"
+            style={{ fontSize: '0.65rem' }}
+          >
+            ∿ Hills
+          </button>
+
+          <div className="neat-divider" />
+
           {/* Play / Pause */}
           <button
             className={`neat-btn ${isPlaying ? 'active' : ''}`}

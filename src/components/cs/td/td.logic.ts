@@ -126,7 +126,7 @@ export interface Ragdoll {
 // Connections are stored as a flat list with global innovation numbers
 // that align genes during crossover (the core NEAT insight).
 
-export const N_INPUT  = 23;  // 21 base + 2 obstacle proximity sensors
+export const N_INPUT  = 24;  // 21 base + 2 obstacle proximity + 1 terrain slope
 export const N_OUTPUT = 10;  // 8 original + 2 ankle motors
 
 export interface NodeGene {
@@ -653,6 +653,7 @@ export function stepRagdoll(
   motorOutputs: Float32Array,
   gravityMul: number = 1.0,
   mode: LocomotionMode = 'bipedal',
+  terrain: TerrainType = 'flat',
 ): void {
   const { particles, constraints } = ragdoll;
 
@@ -712,11 +713,23 @@ export function stepRagdoll(
       b.y -= dy * k * (a.mass / tm);
     }
     for (const p of particles) {
-      if (p.y >= groundY) {
-        p.y  = groundY;
-        const vx = (p.x - p.px) * GROUND_FRICTION;
-        p.px = p.x - vx;
-        p.py = p.y;
+      const localGY = getTerrainY(p.x, groundY, terrain);
+      if (p.y >= localGY) {
+        p.y = localGY;
+        if (terrain === 'hills') {
+          // Slope-aware friction: project velocity onto surface tangent
+          const { nx, ny } = getTerrainNormal(p.x, groundY, terrain);
+          const vx = p.x - p.px;
+          const vy = p.y - p.py;
+          const tx = -ny, ty = nx; // tangent perpendicular to normal
+          const vTan = vx * tx + vy * ty;
+          p.px = p.x - vTan * tx * GROUND_FRICTION;
+          p.py = p.y - vTan * ty * GROUND_FRICTION;
+        } else {
+          const vx = (p.x - p.px) * GROUND_FRICTION;
+          p.px = p.x - vx;
+          p.py = p.y;
+        }
       }
     }
     // Obstacle collisions — push particles out of hurdle rectangles
@@ -770,8 +783,10 @@ export function stepRagdoll(
       const footMidX = (lFoot.x + rFoot.x) / 2;
       const comResult = getCenterOfMass(particles);
       const comErr = comResult.x - footMidX;
-      const pelvisH = groundY - pelvis.y;
-      const isStanding = (lFoot.y >= groundY - 3 || rFoot.y >= groundY - 3) && pelvisH > 15;
+      const pelvisH = getTerrainY(pelvis.x, groundY, terrain) - pelvis.y;
+      const lFootGYr = getTerrainY(lFoot.x, groundY, terrain);
+      const rFootGYr = getTerrainY(rFoot.x, groundY, terrain);
+      const isStanding = (lFoot.y >= lFootGYr - 3 || rFoot.y >= rFootGYr - 3) && pelvisH > 15;
       if (isStanding) {
         const ankleStr = 0.12 * Math.min(1, Math.abs(comErr) / 25);
         const ankleForce = -Math.sign(comErr) * ankleStr;
@@ -781,7 +796,7 @@ export function stepRagdoll(
         for (const [kneeIdx, footIdx] of [[PI.L_KNEE, PI.L_FOOT], [PI.R_KNEE, PI.R_FOOT]] as [number, number][]) {
           const knee = particles[kneeIdx];
           const foot = particles[footIdx];
-          if (foot.y >= groundY - 3) {
+          if (foot.y >= getTerrainY(foot.x, groundY, terrain) - 3) {
             const legDy = knee.y - pelvis.y;
             if (legDy > 0) {
               knee.y -= 0.08;
@@ -809,25 +824,35 @@ export function stepRagdoll(
 
   // ── SHARED: compute basic metrics ──
   const com      = getCenterOfMass(particles);
-  const comH     = Math.max(0, groundY - com.y);
+  const comGY    = getTerrainY(com.x, groundY, terrain);
+  const comH     = Math.max(0, comGY - com.y);
   const comRatio = Math.min(1, comH / STANDING_COM_H);
   const hVel     = particles[PI.PELVIS].x - particles[PI.PELVIS].px;
-  const lOnGround    = particles[PI.L_FOOT].y >= groundY - 2;
-  const rOnGround    = particles[PI.R_FOOT].y >= groundY - 2;
+  const lFootGY  = getTerrainY(particles[PI.L_FOOT].x, groundY, terrain);
+  const rFootGY  = getTerrainY(particles[PI.R_FOOT].x, groundY, terrain);
+  const lOnGround    = particles[PI.L_FOOT].y >= lFootGY - 2;
+  const rOnGround    = particles[PI.R_FOOT].y >= rFootGY - 2;
   const anyGrounded  = lOnGround || rOnGround;
 
   // ── EARLY TERMINATION ──
   if (mode === 'free') {
-    // Free mode: very lenient — only kill if truly flat & stuck for 3+ seconds
-    if (comRatio < 0.05) {
+    // Free mode: moderate — kill low-CoG creatures and stagnant ones
+    if (comRatio < 0.08) {
       ragdoll.lowCoGTime += dt;
-      if (ragdoll.lowCoGTime > 3.0) {
+      if (ragdoll.lowCoGTime > 1.5) {
         ragdoll.alive = false;
         ragdoll.terminatedAt = ragdoll.age;
         return;
       }
     } else {
       ragdoll.lowCoGTime = Math.max(0, ragdoll.lowCoGTime - dt);
+    }
+    // Stagnation kill: if barely moved after 4 seconds, not worth keeping
+    const stagnDist = Math.max(0, particles[PI.PELVIS].x - ragdoll.startX);
+    if (ragdoll.age > 4.0 && stagnDist < 20) {
+      ragdoll.alive = false;
+      ragdoll.terminatedAt = ragdoll.age;
+      return;
     }
   } else {
     // Bipedal mode: strict posture-based termination
@@ -874,19 +899,18 @@ export function stepRagdoll(
 
     const dist = Math.max(0, particles[PI.PELVIS].x - ragdoll.startX);
 
-    // Forward velocity — primary reward signal
-    ragdoll.fitnessScore += Math.max(0, hVel) * 8.0;
+    // Forward velocity — primary reward signal (strong selection pressure)
+    ragdoll.fitnessScore += Math.max(0, hVel) * 12.0;
 
-    // Distance accumulated (sqrt prevents runaway from falling forward)
-    ragdoll.fitnessScore += 0.08 * Math.sqrt(Math.max(0, dist));
+    // Distance — linear (not sqrt) for better differentiation between creatures
+    ragdoll.fitnessScore += 0.15 * dist;
 
-    // Soft upright bonus — not required, but being higher IS slightly better
-    ragdoll.fitnessScore += 0.3 * comRatio;
+    // Soft upright bonus — not required, but being higher helps a bit
+    ragdoll.fitnessScore += 0.2 * comRatio;
 
-    // Survival bonus — staying alive = more time to move
-    ragdoll.fitnessScore += 0.1;
+    // NO survival bonus — was causing fitness plateau (everyone alive = no selection)
 
-    // Limb movement bonus — reward any coordinated motion
+    // Limb movement bonus — reward any coordinated motion (helps early exploration)
     const lHip = jointAngle(particles[PI.CHEST], particles[PI.PELVIS], particles[PI.L_KNEE]);
     const rHip = jointAngle(particles[PI.CHEST], particles[PI.PELVIS], particles[PI.R_KNEE]);
     const hipActivity = Math.abs(lHip) + Math.abs(rHip);
@@ -926,8 +950,9 @@ export function stepRagdoll(
       const singleSupport = (lOnGround && !rOnGround) || (!lOnGround && rOnGround);
       if (singleSupport) {
         ragdoll.singleSupportTime += dt;
-        const liftedFootY = lOnGround ? particles[PI.R_FOOT].y : particles[PI.L_FOOT].y;
-        const clearance   = Math.max(0, groundY - liftedFootY - 2) / 15;
+        const liftedFoot  = lOnGround ? particles[PI.R_FOOT] : particles[PI.L_FOOT];
+        const liftedFootGY = getTerrainY(liftedFoot.x, groundY, terrain);
+        const clearance   = Math.max(0, liftedFootGY - liftedFoot.y - 2) / 15;
         ragdoll.fitnessScore += 1.0 + 0.5 * Math.min(1, clearance);
         const supportFoot = lOnGround ? particles[PI.L_FOOT] : particles[PI.R_FOOT];
         const sBal = Math.abs(com.x - supportFoot.x);
@@ -982,7 +1007,7 @@ export function stepRagdoll(
   if (anyGrounded) {
     for (const [fi, side] of [[PI.L_FOOT, 'l'], [PI.R_FOOT, 'r']] as [number, 'l'|'r'][]) {
       const f = particles[fi];
-      if (f.y >= groundY - 2) {
+      if (f.y >= getTerrainY(f.x, groundY, terrain) - 2) {
         const trail = ragdoll.footTrail;
         const last  = trail[trail.length - 1];
         if (!last || Math.abs(f.x - last.x) > 10) {
@@ -1010,7 +1035,7 @@ function getCenterOfMass(particles: Particle[]): { x: number; y: number; px: num
 
 // ── Sensor inputs ─────────────────────────────────────────────
 
-export function getSensorInputs(ragdoll: Ragdoll, groundY: number, time: number): Float32Array {
+export function getSensorInputs(ragdoll: Ragdoll, groundY: number, time: number, terrain: TerrainType = 'flat'): Float32Array {
   const p      = ragdoll.particles;
   const pelvis = p[PI.PELVIS];
   const chest  = p[PI.CHEST];
@@ -1023,41 +1048,50 @@ export function getSensorInputs(ragdoll: Ragdoll, groundY: number, time: number)
   // Center of mass relative to base of support — critical for balance
   const com = getCenterOfMass(p);
   const footMidX   = (p[PI.L_FOOT].x + p[PI.R_FOOT].x + p[PI.L_TOE].x + p[PI.R_TOE].x) / 4;
-  const comBalance = (com.x - footMidX) / 40;        // + = leaning forward of feet
-  const comVVel    = (com.py - com.y) / 5;            // + = rising (verlet: prev-cur)
+  const comBalance = (com.x - footMidX) / 40;
+  const comVVel    = (com.py - com.y) / 5;
 
   // Ankle angles (shin-to-foot)
   const lAnkle = jointAngle(p[PI.L_KNEE], p[PI.L_FOOT], p[PI.L_TOE]) / Math.PI;
   const rAnkle = jointAngle(p[PI.R_KNEE], p[PI.R_FOOT], p[PI.R_TOE]) / Math.PI;
 
+  // Terrain-aware ground references
+  const pelvisGY = getTerrainY(pelvis.x, groundY, terrain);
+  const lFootGY  = getTerrainY(p[PI.L_FOOT].x, groundY, terrain);
+  const rFootGY  = getTerrainY(p[PI.R_FOOT].x, groundY, terrain);
+
+  // Terrain slope at pelvis (negative = uphill, positive = downhill)
+  const slopeAhead = (getTerrainY(pelvis.x + 5, groundY, terrain) - getTerrainY(pelvis.x - 5, groundY, terrain)) / 10;
+
   return Float32Array.from([
     torsoAngle,
-    Math.min(1, Math.max(0, (groundY - pelvis.y) / STANDING_PELVIS_H)),  // pelvis height ratio
+    Math.min(1, Math.max(0, (pelvisGY - pelvis.y) / STANDING_PELVIS_H)),
     hVel,
     ...jointAngles,
-    p[PI.L_FOOT].y >= groundY - 2 ? 1.0 : -1.0,
-    p[PI.R_FOOT].y >= groundY - 2 ? 1.0 : -1.0,
-    Math.sin(time * 2.0),    // primary gait clock (~walking cadence)
+    p[PI.L_FOOT].y >= lFootGY - 2 ? 1.0 : -1.0,
+    p[PI.R_FOOT].y >= rFootGY - 2 ? 1.0 : -1.0,
+    Math.sin(time * 2.0),
     Math.cos(time * 2.0),
-    comBalance,   // CoM x offset from feet — balance indicator
-    comVVel,      // CoM vertical velocity — falling/rising indicator
-    lAnkle,       // left ankle angle
-    rAnkle,       // right ankle angle
-    Math.sin(time * 4.0),    // double-time harmonic (for faster gaits / sub-phase control)
+    comBalance,
+    comVVel,
+    lAnkle,
+    rAnkle,
+    Math.sin(time * 4.0),
     Math.cos(time * 4.0),
     // Obstacle proximity sensors
     ...(() => {
       const obs = getObstaclesNear(pelvis.x, 150, ragdoll.startX, groundY);
-      // Find the next obstacle ahead of pelvis
       const ahead = obs.filter(o => o.x + o.w > pelvis.x).sort((a, b) => a.x - b.x);
       const next = ahead[0];
       if (next) {
-        const dist = Math.max(0, next.x - pelvis.x) / 100;  // normalized distance (0 = on top, 1 = 100px away)
-        const h    = next.h / OBSTACLE_H_MAX;                 // normalized height (0-1)
+        const dist = Math.max(0, next.x - pelvis.x) / 100;
+        const h    = next.h / OBSTACLE_H_MAX;
         return [Math.min(1, dist), h];
       }
-      return [1.0, 0.0];  // no obstacle ahead
+      return [1.0, 0.0];
     })(),
+    // Terrain slope sensor
+    slopeAhead,
   ]);
 }
 
@@ -1106,6 +1140,29 @@ export interface Population {
 }
 
 export type LocomotionMode = 'bipedal' | 'free';
+export type TerrainType = 'flat' | 'hills';
+
+// ── Terrain height function ──────────────────────────────────
+// Pure function — safe for Web Worker. Returns ground Y at any world X.
+export function getTerrainY(worldX: number, baseGroundY: number, terrain: TerrainType): number {
+  if (terrain === 'flat') return baseGroundY;
+  // Flat spawn zone (0..200), smooth transition (200..400), full hills after
+  const fadeIn = Math.min(1, Math.max(0, (worldX - 200) / 200));
+  const wave = 40 * Math.sin(worldX * 0.006)
+             + 15 * Math.sin(worldX * 0.015 + 1.3)
+             +  8 * Math.sin(worldX * 0.031 + 2.7);
+  return baseGroundY - wave * fadeIn;
+}
+
+export function getTerrainNormal(worldX: number, baseGroundY: number, terrain: TerrainType): { nx: number; ny: number } {
+  if (terrain === 'flat') return { nx: 0, ny: -1 };
+  const dx = 0.5;
+  const y0 = getTerrainY(worldX - dx, baseGroundY, terrain);
+  const y1 = getTerrainY(worldX + dx, baseGroundY, terrain);
+  const slope = (y1 - y0) / (2 * dx);
+  const len = Math.sqrt(1 + slope * slope);
+  return { nx: slope / len, ny: -1 / len };
+}
 
 export interface SimState {
   populations:  Population[];
@@ -1113,8 +1170,9 @@ export interface SimState {
   evalDuration: number;
   groundY:      number;
   gravityMul:   number;
-  globalGen:    number;     // shared generation counter
+  globalGen:    number;
   mode:         LocomotionMode;
+  terrain:      TerrainType;
 }
 
 const EVAL_DURATION = 20;
@@ -1165,12 +1223,12 @@ function createPopulation(archType: ArchType, popIndex: number, groundY: number)
   };
 }
 
-export function createSimState(groundY: number, mode: LocomotionMode = 'bipedal'): SimState {
+export function createSimState(groundY: number, mode: LocomotionMode = 'bipedal', terrain: TerrainType = 'flat'): SimState {
   resetNEAT();
   const populations = ARCH_TYPES.map((arch, i) => createPopulation(arch, i, groundY));
   return {
     populations, time: 0, evalDuration: EVAL_DURATION,
-    groundY, gravityMul: 0.90, globalGen: 1, mode,
+    groundY, gravityMul: 0.90, globalGen: 1, mode, terrain,
   };
 }
 
@@ -1190,13 +1248,13 @@ export function stepSim(state: SimState, dt: number): boolean {
   for (const agent of allAgents) {
     if (!agent.ragdoll.alive) continue;
     if (settling) {
-      stepRagdoll(agent.ragdoll, state.groundY, dt, ZERO_MOTORS, state.gravityMul, state.mode);
+      stepRagdoll(agent.ragdoll, state.groundY, dt, ZERO_MOTORS, state.gravityMul, state.mode, state.terrain);
     } else {
-      const inputs  = getSensorInputs(agent.ragdoll, state.groundY, state.time - SETTLE_TIME);
+      const inputs  = getSensorInputs(agent.ragdoll, state.groundY, state.time - SETTLE_TIME, state.terrain);
       const outputs = neatForward(agent.genome, inputs);
       agent.lastInputs  = inputs;
       agent.lastOutputs = outputs;
-      stepRagdoll(agent.ragdoll, state.groundY, dt, outputs, state.gravityMul, state.mode);
+      stepRagdoll(agent.ragdoll, state.groundY, dt, outputs, state.gravityMul, state.mode, state.terrain);
     }
   }
 
