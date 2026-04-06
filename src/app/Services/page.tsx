@@ -127,9 +127,14 @@ const ContractScraperDemo = dynamic(() => import('@/components/cs/webscraper/web
   loading: () => <SimulationLoader>Loading Contract Intelligence...</SimulationLoader>
 });
 
+const BrokerDemo = dynamic(() => import('@/components/cs/broker/broker'), {
+  ssr: false,
+  loading: () => <SimulationLoader>Loading Broker...</SimulationLoader>
+});
+
 
 // Types
-type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach' | 'virtual-recruiter' | 'interview-prep' | 'homerank' | 'talkohtaco' | 'contract-scraper';
+type SimulationType = 'ants' | 'life' | 'maze' | 'disease' | 'bacteria-phage' | 'predprey' | 'medical-models' | 'nbody' | 'TD' | 'phylogeny' | 'amdahl' | 'permutations-visual' | 'wireless' | 'FourierTransform-NeuralNetwork' | 'FourierTransformNetworkErrorCorrection' | 'Shortest-Path-Networks' | 'virus-checker' | 'password-checker' | 'hash-generator' | 'metadata-viewer' | 'encoder-decoder' | 'invoice-digitalizer' | 'sql-breach' | 'virtual-recruiter' | 'interview-prep' | 'homerank' | 'talkohtaco' | 'contract-scraper' | 'brokerage-analyzer';
 type TabType = 'simulations' | 'algorithms' | 'tools';
 
 interface SimulationItem {
@@ -807,7 +812,7 @@ const TheaterBarBtn = styled.button<{ $active?: boolean; $danger?: boolean }>`
   transition: background 120ms ease, transform 120ms ease, border-color 120ms ease;
   &:hover {
     background: ${({ $active, $danger }) =>
-      $danger ? 'rgba(239,68,68,0.32)' : $active ? 'rgba(59,130,246,0.36)' : 'rgba(71,85,105,0.88)'};
+    $danger ? 'rgba(239,68,68,0.32)' : $active ? 'rgba(59,130,246,0.36)' : 'rgba(71,85,105,0.88)'};
     transform: scale(1.1);
   }
 `;
@@ -1245,7 +1250,7 @@ const allItems: SimulationItem[] = [
   },
   {
     key: 'interview-prep',
-    label: 'Coding Training',
+    label: 'Code Training',
     icon: <BookOpen size={22} />,
     color: '#7c3aed',
     description: 'Enter the company and role — get a customized prep kit: behavioral questions, system design, topics to study, and questions to ask',
@@ -1278,6 +1283,15 @@ const allItems: SimulationItem[] = [
     description: 'Search live SAM.gov contract opportunities — filter by NAICS, state, type, and date range. Import DataBank CSVs for deeper analysis.',
     comingSoon: false,
     category: 'tools',
+  },
+  {
+    key: 'brokerage-analyzer',
+    label: 'Brokerage Analyzer',
+    icon: <FileSearch size={22} />,
+    color: '#0369a1',
+    description: 'Upload your brokerage statement — get an interactive dashboard with portfolio breakdown, performance metrics, and tax lot analysis',
+    comingSoon: false,
+    category: 'algorithms',
   },
 
 ];
@@ -1541,6 +1555,10 @@ export default function SimulationsPage() {
         return <TalkOhTacoDemo />;
       case 'contract-scraper':
         return <ContractScraperDemo />;
+        
+      case 'brokerage-analyzer':
+        return <BrokerDemo/>;
+
       default:
         return (
           <PlaceholderContent>

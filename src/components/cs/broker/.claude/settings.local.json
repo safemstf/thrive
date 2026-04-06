@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/safeb/OneDrive/Documents/GitHub/thrive/**)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

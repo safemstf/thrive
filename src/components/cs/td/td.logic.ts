@@ -478,7 +478,6 @@ export interface Species {
 const COMPAT_C1        = 1.0;   // disjoint/excess gene coefficient
 const COMPAT_C3        = 0.4;   // weight difference coefficient
 const COMPAT_THRESHOLD = 3.0;   // distance threshold for same species
-const MAX_STALE        = 15;    // kill species stale for this many gens
 
 function compatDistance(g1: NEATGenome, g2: NEATGenome): number {
   const map1 = new Map(g1.conns.map(c => [c.innov, c]));
