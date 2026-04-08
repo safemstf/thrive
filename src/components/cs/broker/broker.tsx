@@ -20,8 +20,9 @@ const T = {
   sans:  "'DM Sans', system-ui, sans-serif",
 };
 
-const fadeUp = keyframes`from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}`;
-const spin   = keyframes`from{transform:rotate(0deg)}to{transform:rotate(360deg)}`;
+const fadeUp  = keyframes`from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}`;
+const spin    = keyframes`from{transform:rotate(0deg)}to{transform:rotate(360deg)}`;
+const shimmer = keyframes`0%{background-position:-400px 0}100%{background-position:400px 0}`;
 
 const GlobalStyle = createGlobalStyle`
   @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
@@ -125,26 +126,30 @@ const HeatPage = styled.div`
 const HeatControls = styled.div`
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;
 `;
-const HeatMapWrap = styled.div`display:flex;flex-wrap:wrap;gap:4px;min-height:260px;`;
+const HeatMapWrap = styled.div`display:flex;flex-wrap:wrap;gap:6px;min-height:280px;`;
 const HeatTile = styled.div<{$bg:string;$fg:string;$flex:number}>`
-  flex:${p=>p.$flex};min-width:82px;max-width:220px;height:96px;
-  background:${p=>p.$bg};border-radius:${T.radiusSm};padding:0.6rem 0.7rem;
+  flex:${p=>p.$flex};min-width:96px;max-width:260px;height:112px;
+  background:${p=>p.$bg};border-radius:10px;padding:0.75rem 0.875rem;
   cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;
-  transition:filter 0.13s,transform 0.13s;position:relative;overflow:hidden;
+  transition:filter 0.15s,transform 0.15s,box-shadow 0.15s;position:relative;overflow:hidden;
   color:${p=>p.$fg};
-  &:hover{filter:brightness(0.88);transform:scale(1.025);z-index:2;}
+  &:hover{filter:brightness(0.9);transform:scale(1.03);z-index:2;
+    box-shadow:0 8px 24px rgba(0,0,0,0.18);}
 `;
-const TileSymbol = styled.div`font-family:${T.mono};font-size:0.8rem;font-weight:600;`;
-const TileName = styled.div`font-size:0.63rem;opacity:0.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
-const TileRet = styled.div`font-family:${T.mono};font-size:1.15rem;font-weight:600;line-height:1.1;`;
-const TileEventsRow = styled.div`display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;`;
+const TileTop = styled.div`display:flex;flex-direction:column;gap:2px;`;
+const TileSymbol = styled.div`font-family:${T.mono};font-size:0.88rem;font-weight:700;letter-spacing:0.01em;`;
+const TileName = styled.div`font-size:0.62rem;opacity:0.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;`;
+const TileBottom = styled.div`display:flex;flex-direction:column;gap:4px;`;
+const TileRet = styled.div`font-family:${T.mono};font-size:1.3rem;font-weight:700;line-height:1;letter-spacing:-0.01em;`;
+const TileEventsRow = styled.div`display:flex;flex-wrap:wrap;gap:3px;`;
 const EventBadge = styled.div`
-  font-family:${T.mono};font-size:0.5rem;font-weight:700;letter-spacing:0.04em;
-  padding:0.1rem 0.32rem;border-radius:3px;background:rgba(0,0,0,0.22);
+  font-family:${T.mono};font-size:0.51rem;font-weight:700;letter-spacing:0.05em;
+  padding:0.1rem 0.35rem;border-radius:3px;background:rgba(0,0,0,0.2);
 `;
-const TileLoader = styled.div`
-  width:14px;height:14px;border:2px solid rgba(0,0,0,0.15);
-  border-top:2px solid rgba(0,0,0,0.55);border-radius:50%;animation:${spin} 0.75s linear infinite;
+const SkeletonTile = styled.div<{$flex:number}>`
+  flex:${p=>p.$flex};min-width:96px;max-width:260px;height:112px;border-radius:10px;
+  background:linear-gradient(90deg,${T.creamDark} 0px,${T.creamDeep} 100px,${T.creamDark} 200px);
+  background-size:400px 100%;animation:${shimmer} 1.4s ease-in-out infinite;
 `;
 
 // ─── Compare ──────────────────────────────────────────────────────────────────
@@ -395,13 +400,21 @@ const RankScoreBar = styled.div`display:flex;align-items:center;gap:0.4rem;`;
 const ScoreBarTrack = styled.div`width:52px;height:6px;background:${T.creamDeep};border-radius:999px;overflow:hidden;`;
 const ScoreBarFill = styled.div<{$pct:number;$c:string}>`width:${p=>p.$pct}%;height:100%;background:${p=>p.$c};border-radius:999px;`;
 const ScoreNum = styled.div<{$c:string}>`font-family:${T.mono};font-size:0.75rem;color:${p=>p.$c};font-weight:600;min-width:24px;text-align:right;`;
-const RankLoadingGrid = styled.div`
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0.5rem;
+const ProgressBarTrack = styled.div`
+  width:100%;height:4px;background:${T.creamDeep};border-radius:999px;overflow:hidden;margin-top:0.4rem;
 `;
-const RankLoadingTile = styled.div`
-  height:48px;background:${T.creamDark};border:1px solid ${T.rule};border-radius:${T.radiusSm};
-  display:flex;align-items:center;justify-content:center;gap:0.5rem;font-family:${T.mono};
-  font-size:0.7rem;color:${T.inkFaint};
+const ProgressBarFill = styled.div<{$pct:number}>`
+  width:${p=>p.$pct}%;height:100%;background:${T.accent};border-radius:999px;transition:width 0.3s ease;
+`;
+const SkeletonRow = styled.div`
+  height:56px;border-radius:${T.radius};
+  background:linear-gradient(90deg,${T.creamDark} 0px,${T.creamDeep} 100px,${T.creamDark} 200px);
+  background-size:400px 100%;animation:${shimmer} 1.4s ease-in-out infinite;
+`;
+const TopPickSpark = styled.div`
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:0.5rem 0.6rem;background:${T.creamDark};border-radius:${T.radiusSm};
+  border:1px solid ${T.rule};flex-shrink:0;
 `;
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -633,12 +646,13 @@ function heatFg(ret:number):string{return Math.abs(ret)>10?'#fff':'#1a1208';}
 interface RankResult {
   symbol: string; score: number; ret1y: number;
   signals: {label:string;pos:boolean}[]; summary: string;
+  spark: number[]; // last 40 normalised closes (0–100)
 }
 
 function scoreStock(data:DataPoint[]):Omit<RankResult,'symbol'>{
   const closes=data.map(d=>d.close);
   if(closes.length<50){
-    return{score:0,ret1y:0,signals:[{label:'Insufficient data',pos:false}],summary:'Not enough history.'};
+    return{score:0,ret1y:0,signals:[{label:'Insufficient data',pos:false}],summary:'Not enough history.',spark:[]};
   }
   const rsiVals=computeRSI(closes,14);
   const{macd:ml,signal:sl}=computeMACD(closes);
@@ -692,11 +706,26 @@ function scoreStock(data:DataPoint[]):Omit<RankResult,'symbol'>{
   const s=Math.round(clamp(score,0,100));
   const topSignal=signals.filter(x=>x.pos)[0]?.label??'';
   const summary=s>=75?`Strong setup — ${topSignal}.`:s>=60?`Watchlist candidate — ${topSignal}.`:s>=45?`Mixed signals — wait for clarity.`:'Avoid for now — bearish signals dominate.';
-  return{score:s,ret1y,signals,summary};
+  // Sparkline: last 40 closes normalized 0–100
+  const rawSpark=closes.slice(-40);
+  const sparkMin=Math.min(...rawSpark),sparkMax=Math.max(...rawSpark);
+  const spark=rawSpark.map(v=>sparkMax>sparkMin?((v-sparkMin)/(sparkMax-sparkMin))*100:50);
+  return{score:s,ret1y,signals,summary,spark};
 }
 
 function scoreTone(score:number):string{
   if(score>=72)return T.green;if(score>=55)return T.accent;if(score>=40)return T.amber;return T.red;
+}
+
+function buildSparkPath(spark:number[],w:number,h:number,close:boolean):string{
+  if(spark.length<2)return'';
+  const pad=4,W=w-pad*2,H=h-pad*2;
+  const pts=spark.map((v,i)=>[pad+(i/(spark.length-1))*W,pad+(1-v/100)*H]);
+  const d=pts.map((p,i)=>`${i===0?'M':'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  if(close){
+    return d+` L${pts[pts.length-1][0].toFixed(1)},${(h-pad).toFixed(1)} L${pad.toFixed(1)},${(h-pad).toFixed(1)} Z`;
+  }
+  return d;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -1064,25 +1093,24 @@ export default function StockBroker(){
               const bg=ret!=null?heatColor(ret):T.creamDeep;
               const fg=ret!=null?heatFg(ret):T.inkLight;
               const events=TILE_EVENTS[s.symbol]??[];
+              if(loading){
+                return<SkeletonTile key={s.symbol} $flex={s.mcap}/>;
+              }
               return(
                 <HeatTile key={s.symbol} $bg={bg} $fg={fg} $flex={s.mcap}
                   onClick={()=>{setTab('deepdive');setSymbol(s.symbol);}}>
-                  <div>
+                  <TileTop>
                     <TileSymbol>{s.symbol}</TileSymbol>
                     <TileName>{s.name}</TileName>
-                  </div>
-                  {loading?(
-                    <TileLoader/>
-                  ):(
-                    <div>
-                      <TileRet>{ret!=null?fmtPct(ret):'—'}</TileRet>
-                      {events.length>0&&(
-                        <TileEventsRow>
-                          {events.map(e=><EventBadge key={e}>{e}</EventBadge>)}
-                        </TileEventsRow>
-                      )}
-                    </div>
-                  )}
+                  </TileTop>
+                  <TileBottom>
+                    <TileRet>{ret!=null?fmtPct(ret):'—'}</TileRet>
+                    {events.length>0&&(
+                      <TileEventsRow>
+                        {events.map(e=><EventBadge key={e}>{e}</EventBadge>)}
+                      </TileEventsRow>
+                    )}
+                  </TileBottom>
                 </HeatTile>
               );
             })}
@@ -1319,21 +1347,24 @@ export default function StockBroker(){
           </RankPageHead>
 
           {/* Loading progress */}
-          {rankLoading&&rankLoaded<allStocks.length&&(
+          {rankLoading&&(
             <div>
-              <div style={{fontSize:'0.76rem',color:T.inkLight,fontFamily:T.mono,marginBottom:'0.6rem'}}>
-                Analyzing signals… {rankLoaded}/{allStocks.length} stocks
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'0.35rem'}}>
+                <span style={{fontSize:'0.75rem',color:T.inkLight,fontFamily:T.mono}}>
+                  Analyzing signals… {rankLoaded} / {allStocks.length}
+                </span>
+                <span style={{fontSize:'0.75rem',color:T.accent,fontFamily:T.mono,fontWeight:600}}>
+                  {Math.round((rankLoaded/allStocks.length)*100)}%
+                </span>
               </div>
-              <RankLoadingGrid>
-                {allStocks.map(s=>(
-                  <RankLoadingTile key={s.symbol}>
-                    {rankResults.find(r=>r.symbol===s.symbol)
-                      ?<span style={{color:T.green}}>✓ {s.symbol}</span>
-                      :<><Spinner style={{width:12,height:12,border:`2px solid ${T.creamDeep}`,borderTop:`2px solid ${T.accent}`} as React.CSSProperties}/>{s.symbol}</>
-                    }
-                  </RankLoadingTile>
+              <ProgressBarTrack>
+                <ProgressBarFill $pct={(rankLoaded/allStocks.length)*100}/>
+              </ProgressBarTrack>
+              <div style={{display:'flex',flexDirection:'column',gap:'0.4rem',marginTop:'0.75rem'}}>
+                {Array.from({length:6}).map((_,i)=>(
+                  <SkeletonRow key={i} style={{animationDelay:`${i*0.1}s`}}/>
                 ))}
-              </RankLoadingGrid>
+              </div>
             </div>
           )}
 
@@ -1342,36 +1373,65 @@ export default function StockBroker(){
             const top=rankResults[0];
             const st=allStocks.find(s=>s.symbol===top.symbol)!;
             const tone=scoreTone(top.score);
+            const sparkLine=top.spark.length>5?buildSparkPath(top.spark,148,64,false):'';
+            const sparkArea=top.spark.length>5?buildSparkPath(top.spark,148,64,true):'';
+            const lastPt=top.spark.length>1?[
+              4+((top.spark.length-1)/(top.spark.length-1))*(148-8),
+              4+(1-top.spark[top.spark.length-1]/100)*(64-8),
+            ]:null;
             return(
               <TopPickBanner $color={st.color}>
+                {/* Identity */}
                 <TopPickLeft>
                   <TopPickBadge>⭐ Top Pick · {rankRange.toUpperCase()} signals</TopPickBadge>
                   <TopPickSymbol $c={st.color}>{top.symbol}</TopPickSymbol>
                   <TopPickName>{st.name}</TopPickName>
-                  <div style={{marginTop:'0.35rem',fontSize:'0.78rem',color:T.inkMid,lineHeight:1.55}}>
+                  <div style={{marginTop:'0.5rem',fontSize:'0.78rem',color:T.inkMid,lineHeight:1.6}}>
                     {top.summary}
                   </div>
                 </TopPickLeft>
+
+                {/* Sparkline */}
+                {top.spark.length>5&&(
+                  <TopPickSpark>
+                    <svg width={148} height={64} viewBox="0 0 148 64">
+                      <defs>
+                        <linearGradient id={`sg-${top.symbol}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={st.color} stopOpacity="0.28"/>
+                          <stop offset="100%" stopColor={st.color} stopOpacity="0.02"/>
+                        </linearGradient>
+                      </defs>
+                      <path d={sparkArea} fill={`url(#sg-${top.symbol})`}/>
+                      <path d={sparkLine} fill="none" stroke={st.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+                      {lastPt&&<circle cx={lastPt[0]} cy={lastPt[1]} r={3} fill={st.color}/>}
+                    </svg>
+                    <div style={{fontSize:'0.63rem',color:T.inkFaint,fontFamily:T.mono,marginTop:'0.2rem'}}>
+                      40-day price
+                    </div>
+                  </TopPickSpark>
+                )}
+
+                {/* Signals + score */}
                 <TopPickRight>
                   <TopPickSignals>
                     {top.signals.slice(0,5).map((sig,i)=>(
                       <SignalTag key={i} $pos={sig.pos}>{sig.label}</SignalTag>
                     ))}
                   </TopPickSignals>
-                  <div style={{display:'flex',alignItems:'flex-end',gap:'0.5rem'}}>
+                  <div style={{display:'flex',alignItems:'flex-end',gap:'1rem',marginTop:'0.35rem',flexWrap:'wrap'}}>
                     <div>
                       <TopPickScore $c={tone}>{top.score}</TopPickScore>
                       <TopPickScoreLabel>/ 100 signal score</TopPickScoreLabel>
                     </div>
-                    <div style={{marginBottom:'0.25rem'}}>
-                      <div style={{fontFamily:T.mono,fontSize:'0.85rem',color:top.ret1y>=0?T.green:T.red}}>
-                        {fmtPct(top.ret1y)} {rankRange.toUpperCase()}
+                    <div style={{marginBottom:'0.2rem'}}>
+                      <div style={{fontFamily:T.mono,fontSize:'0.88rem',fontWeight:600,color:top.ret1y>=0?T.green:T.red}}>
+                        {fmtPct(top.ret1y)}
                       </div>
-                      <div style={{fontFamily:T.mono,fontSize:'0.65rem',color:T.inkFaint}}>period return</div>
+                      <div style={{fontFamily:T.mono,fontSize:'0.63rem',color:T.inkFaint}}>{rankRange.toUpperCase()} return</div>
                     </div>
                     <button
                       onClick={()=>{setSymbol(top.symbol);setTab('deepdive');}}
-                      style={{marginBottom:'0.2rem',padding:'0.38rem 0.8rem',borderRadius:T.radiusSm,border:`1px solid ${st.color}60`,background:`${st.color}12`,color:st.color,fontFamily:T.mono,fontSize:'0.74rem',cursor:'pointer'}}>
+                      style={{marginBottom:'0.15rem',padding:'0.45rem 1rem',borderRadius:T.radiusSm,border:`1px solid ${st.color}`,background:st.color,color:'#fff',fontFamily:T.mono,fontSize:'0.76rem',fontWeight:600,cursor:'pointer',letterSpacing:'0.02em'}}>
                       Deep Dive →
                     </button>
                   </div>
